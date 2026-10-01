@@ -1,0 +1,22 @@
+.finance-guide{max-width:960px}
+.finance-chat{max-width:960px;margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}
+.finance-chat>h2{font-size:23px;line-height:1.4;margin:0 0 10px}
+.finance-chat>p{color:#6d807c;font-size:15px;line-height:1.7;margin:0 0 20px}
+.finance-chat .student-guidance{margin-top:16px}
+.finance-guide-intro{color:#6d807c;font-size:15px;line-height:1.7;margin:0 0 24px}
+.finance-cards{list-style:none;padding:0;margin:0;display:grid;gap:14px}
+.finance-card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.finance-card summary{display:flex;align-items:center;gap:18px;padding:22px 24px;cursor:pointer;list-style:none}
+.finance-card summary::-webkit-details-marker{display:none}
+.finance-card summary:hover{background:#f5f8f2}
+.finance-card summary:focus-visible{outline:3px solid #668852;outline-offset:-4px;border-radius:14px}
+.finance-number{display:grid;place-items:center;flex-shrink:0;width:40px;height:40px;background:#edf3e6;border-radius:50%;color:#547148;font-size:16px;font-weight:650}
+.finance-card summary h2{font-size:18px;line-height:1.45;margin:0;flex:1}
+.finance-chevron{flex-shrink:0;color:#68805d}
+.finance-card[open] .finance-chevron{transform:rotate(180deg)}
+.finance-card[open]{border-color:#b7c9aa}
+.finance-card-content{padding:0 28px 25px 82px}
+.finance-card-content p{font-size:16px;line-height:1.85;margin:0 0 18px;color:#405d57;max-width:760px}
+.finance-card-content a{display:inline-flex;align-items:center;gap:8px;color:#4e703f;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+.finance-card-content a:focus-visible{outline:2px solid #668852;outline-offset:4px}
+@media(max-width:760px){.finance-card summary{padding:18px 16px;gap:12px}.finance-card summary h2{font-size:16px}.finance-number{width:34px;height:34px}.finance-card-content{padding:0 18px 22px}.finance-card-content p{font-size:15px}}

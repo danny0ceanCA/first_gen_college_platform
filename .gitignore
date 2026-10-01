@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+
+.camino-logs/
+
+# Local credentials and generated preview captures
+.env.*
+!.env.example
+/*-preview.png
+/landing-*.png
