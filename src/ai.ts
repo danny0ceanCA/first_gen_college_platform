@@ -1,3 +1,4 @@
+import {apiFetch} from './api';
 /** Purpose-based boundary. Real OpenAI calls must run on a server, never with browser API keys. */
 export type AIPurpose = 'conversation' | 'college-research' | 'opportunity-search' | 'roadmap';
 export interface SearchPreferences {interest:string;location:string;distance:string;availability:string;type:string;paid:string;stage:string}
@@ -6,7 +7,7 @@ export interface AIResponse { steps?:import('./planning').PlanDraft[]; text: str
 export interface AIGateway { respond(request: AIRequest): Promise<AIResponse> }
 export const liveGateway: AIGateway = {
   async respond(request) {
-    const response = await fetch('/api/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(280000)});
+    const response = await apiFetch('/api/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(280000)});
     const data = await response.json().catch(()=>({error:'connection_error'}));
     if(!response.ok || typeof data.text!=='string') throw new Error(data.error||'connection_error');
     return data;

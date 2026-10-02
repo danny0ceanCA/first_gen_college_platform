@@ -47,3 +47,22 @@ test('active-response conflict waits for server completion rather than retrying 
  turns.beginDone('existing');turns.completed();assert.equal(events.length,2);
  assert.equal(turns.recover('invalid_api_key'),false);
 });
+
+for(const transcriptFirst of [false,true])test(`empty interruption resumes once, transcript first: ${transcriptFirst}`,()=>{
+ const events=[],turns=voiceTurns(e=>events.push(e));
+ turns.request();turns.created();turns.speechStarted('noise');
+ if(transcriptFirst)turns.transcript('noise','');
+ turns.beginDone('cut',false,true);turns.completed();
+ if(!transcriptFirst){assert.equal(events.length,1);turns.transcript('noise','');}
+ assert.equal(events.length,2);
+ turns.created();turns.speechStarted('noise2');turns.beginDone('cut2',false,true);turns.completed();turns.transcript('noise2','');
+ assert.equal(events.length,2,'repeated noise cannot cause an endless recovery loop');
+});
+for(const transcriptFirst of [false,true])test(`spoken interruption gets ordinary reply, transcript first: ${transcriptFirst}`,()=>{
+ const events=[],recoveries=[],turns=voiceTurns(e=>events.push(e),()=>recoveries.push(true));
+ turns.request();turns.created();turns.speechStarted('user');
+ if(transcriptFirst)turns.transcript('user','What is Common App?');
+ turns.beginDone('cut',false,true);turns.completed();
+ if(!transcriptFirst)turns.transcript('user','What is Common App?');
+ assert.equal(events.length,2);assert.equal(recoveries.length,0);
+});

@@ -66,3 +66,21 @@ test('finance voice uses teaching instructions, minimal context and no profile e
   assert.equal((await call(handler,{...input,mode:'finance'})).status,200);
   assert.equal((await call(handler,{...input,mode:'unknown'})).status,400);
 });
+
+test('admissions voice supports both languages and roles, VAD, minimal context and lookup only',async()=>{
+ for(const role of ['parent','student'])for(const language of ['en','es']){
+  const session=voiceSession({...input,mode:'admissions',role,language,profile:{name:'Sample',stage:'Community college',entryTerm:'Fall 2027',notes:'private-note',gpa:'private-gpa'}},{});
+  assert.equal(session.model,'gpt-realtime-2.1');
+  assert.match(session.instructions,new RegExp(language==='es'?'Speak Spanish':'Speak English'));
+  assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
+  assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
+  assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
+  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications']);
+  assert.equal(session.audio.output.speed,0.95);
+  assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
+ }
+ const handler=createProfileVoiceHandler({OPENAI_API_KEY:'secret'},async(url,options)=>{
+  assert.equal(JSON.parse(options.body.get('session')).tools[0].name,'lookup_college_applications');return new Response('v=0\r\nanswer');
+ });
+ assert.equal((await call(handler,{...input,mode:'admissions'})).status,200);
+});

@@ -1,8 +1,16 @@
+import {setAPITokenProvider} from './api';
+import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useState} from 'react';
 import App from './App';
 import Landing from './Landing';
+import MobileDesign from './MobileDesign';
 export default function Entry(){
- const [inside,setInside]=useState(window.location.hash==='#app');
- useEffect(()=>{const update=()=>{setInside(window.location.hash==='#app');window.scrollTo(0,0);};window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
- return inside?<App/>:<Landing enter={()=>{window.location.hash='app';}}/>;
+ const [route,setRoute]=useState(window.location.hash);
+ const {isLoading,isAuthenticated,error,user,getAccessTokenSilently}=useAuth0();
+ useEffect(()=>{setAPITokenProvider(isAuthenticated?()=>getAccessTokenSilently():undefined);return()=>setAPITokenProvider(undefined);},[isAuthenticated,getAccessTokenSilently]);
+ const inside=route==='#app'||route==='#welcome';
+ useEffect(()=>{const update=()=>{setRoute(window.location.hash);window.scrollTo(0,0);};window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
+ if(isLoading&&window.location.search.includes('code='))return <p role="status">Completing sign-in…</p>;
+ if(error&&window.location.search.includes('error='))return <div><p role="alert">Sign-in could not be completed. Check the Auth0 SMS connection and callback settings.</p><a href="/">Return to Origen</a></div>;
+ return route==='#mobile-design'?<MobileDesign/>:inside?<App welcomePreview={route==='#welcome'} key={isAuthenticated?user?.sub:'preview'}/>:<Landing enter={()=>{window.location.hash='app';}}/>;
 }

@@ -11,3 +11,9 @@ dist/
 !.env.example
 /*-preview.png
 /landing-*.png
+
+# Expo local state and generated mobile bundles
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/web-build/

@@ -1,6 +1,6 @@
-# Camino — family college planning UI
+# Origen — family college planning UI
 
-Interactive React + TypeScript prototype for the product planned in this conversation. **Camino is a working name.**
+Interactive React + TypeScript prototype for the product planned in this conversation. **Origen is a working name.**
 
 ## Live guidance connection
 
@@ -40,7 +40,7 @@ The parent/student toggle is a design preview, **not authentication or access co
 
 `src/ai.ts` defines a purpose-based `AIGateway`: `conversation`, `college-research`, and `opportunity-search`. Conversation and opportunity research route through the server to Astra by default. College research uses the demo adapter. Never put API keys in the browser.
 
-Opportunity research is user-initiated from chat or Explore → Fresh opportunities. In chat, Camino invokes a server-side search tool when the user requests local opportunities and a location is known. It asks for location if missing; unspecified interests, distance, schedule, and pay use explicitly broad search defaults rather than blocking research. There is no separate search button or form in chat. Cited results appear in the same conversation and are included in follow-up context. Explore remains a standalone search entry point. Parents review interests, city/ZIP, distance, availability, opportunity type, and pay preferences before searching. The Responses API uses web_search with medium reasoning and renders linked citations, eligibility, deadlines, uncertainty, and the search timestamp. OPENAI_MODEL_OPPORTUNITIES optionally overrides the research model. Chat uses low reasoning. Results and forms are separated by student and preview role in memory; refreshing clears them. Searches require a completed web search and usable citations.
+Opportunity research is user-initiated from chat or Explore → Fresh opportunities. In chat, Origen invokes a server-side search tool when the user requests local opportunities and a location is known. It asks for location if missing; unspecified interests, distance, schedule, and pay use explicitly broad search defaults rather than blocking research. There is no separate search button or form in chat. Cited results appear in the same conversation and are included in follow-up context. Explore remains a standalone search entry point. Parents review interests, city/ZIP, distance, availability, opportunity type, and pay preferences before searching. The Responses API uses web_search with medium reasoning and renders linked citations, eligibility, deadlines, uncertainty, and the search timestamp. OPENAI_MODEL_OPPORTUNITIES optionally overrides the research model. Chat uses low reasoning. Results and forms are separated by student and preview role in memory; refreshing clears them. Searches require a completed web search and usable citations.
 
 ## Product boundaries retained
 
@@ -85,7 +85,7 @@ Family home > expand a student > Edit profile > Start live conversation.
 Uses OpenAI Realtime over WebRTC, with the API key remaining in the local server.
 Optional server-only OPENAI_MODEL_VOICE overrides the default gpt-realtime-2.1.
 Microphone access is requested only after Start. Audio/profile data goes to OpenAI;
-Camino does not store recordings. Transcripts and proposals exist only in this editor
+Origen does not store recordings. Transcripts and proposals exist only in this editor
 session. End the conversation, review/edit/remove proposals, add them to the form,
 then Save profile to persist locally. Switching page/student/language/role closes
 microphone tracks and the peer connection. Sessions end after 10 minutes; voice is
@@ -100,3 +100,10 @@ Paying for college includes a bilingual live voice explainer with a separate fin
 Voice diagnostics are saved locally in `.camino-logs/voice.jsonl` (ignored by Git), with one rotated backup after approximately 2 MB. Events include a random session ID, client sequence number, operation, error code/parameter, upstream request ID, HTTP status and timing. Audio, transcripts, student profiles, search queries and API keys are excluded. The voice panel exposes its diagnostic session ID. Logging starts with a new voice session; the log does not reconstruct earlier errors. Finance speech speed is 0.95.
 
 Model routing: general text guidance defaults to `gpt-6-luna`. Finance, opportunity and roadmap research default to `gpt-6.1-sol`, configured independently through `OPENAI_MODEL_RESEARCH`. `OPENAI_MODEL_FINANCE_RESEARCH` and `OPENAI_MODEL_OPPORTUNITIES` take precedence for their services. `OPENAI_MODEL` is the general conversation fallback, so changing it does not downgrade research. Live voice remains `gpt-realtime-2.1`; transcription remains `gpt-4o-mini-transcribe`.
+
+Ready to apply for college includes an English/Spanish live admissions guide using `gpt-realtime-2.1` with server VAD and transcript-gated replies. Its `lookup_college_applications` tool calls `/api/admissions-research`, using `gpt-6.1-sol` (override: `OPENAI_MODEL_ADMISSIONS_RESEARCH`) to verify official application requirements and return citations. It shares only name, stage, institutions and entry term, never edits profiles or submits applications, and ends on navigation, student, language or role changes. Sessions remain limited to 10 minutes. Diagnostics accept both current `X-Origen-Session` and legacy `X-Camino-Session` headers.
+
+
+## Native iPhone and Android app
+
+The Expo/React Native project lives in `mobile/`. It is a native implementation, separate from the `#mobile-design` browser mockup. Run `npm run mobile` from the repository root for the Expo device QR code, or `npm run mobile:web` for the browser version of the native components. See [mobile/README.md](mobile/README.md) for implemented features, checks, and pending voice/authentication integration.

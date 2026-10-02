@@ -1,3 +1,5 @@
+import {apiFetch} from './api';
+import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
 import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff } from 'lucide-react';
@@ -9,7 +11,18 @@ const labels = {
 } as const;
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
-export default function ProfileVoice({profile,language,role,apply,onActive,t,mode='profile'}:{mode?:'profile'|'finance';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string}) {
+export default function ProfileVoice({profile,language,role,apply,onActive,t,mode='profile'}:{mode?:'profile'|'finance'|'admissions';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string}) {
+  const history=useConversationHistory();
+  const sessionTurns=useRef<{role:'user'|'assistant';text:string}[]>([]);
+  const sessionSources=useRef<{title:string;url:string;checkedAt:string}[]>([]);
+  const memorySaved=useRef(true);
+  const [savingSummary,setSavingSummary]=useState(false);
+  async function saveSummary(){
+    if(memorySaved.current||!profile.id||!sessionTurns.current.some(t=>t.role==='user'))return;
+    memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=crypto.randomUUID();setSavingSummary(true);
+    try{const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turns,language}),keepalive:true});if(!response.ok)throw new Error();const {summary}=await response.json();history.add({id,studentId:profile.id,date:new Date().toISOString(),mode,summary,sources});}catch{setNotice(t('Conversation summary could not be saved.','No se pudo guardar el resumen de la conversación.'));}finally{setSavingSummary(false);}
+  }
+  const informational=mode!=='profile';
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
   const [muted,setMuted]=useState(false);
   const [error,setError]=useState('');
@@ -18,11 +31,12 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
   const [transcript,setTranscript]=useState<{who:string;text:string}[]>([]);
   const [sources,setSources]=useState<{title:string;url:string;checkedAt:string}[]>([]);
   const [diagnosticId,setDiagnosticId]=useState('');
+  useEffect(()=>{sessionSources.current=sources;},[sources]);
   const logSession=useRef('');
   const logSequence=useRef(0);
   function log(event:string,details:Record<string,unknown>={}){
     if(!logSession.current)return;
-    void fetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
+    void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
   }
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
@@ -30,6 +44,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
   const generation=useRef(0);
   const audio=useRef<HTMLAudioElement>(null);
   function cleanup(){
+    void saveSummary();
     log('session_cleanup');logSession.current='';
     generation.current++;
     const r=resources.current;resources.current={};
@@ -45,6 +60,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     if(resources.current.abort)return;
     const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
     log('session_start',{mode,language});
+    sessionTurns.current=[];sessionSources.current=[];memorySaved.current=false;setTranscript([]);setSources([]);
     setError('');setNotice('');setSeconds(0);setState('connecting');onActive(true);
     const version=++generation.current;
     const abort=new AbortController();resources.current.abort=abort;
@@ -55,7 +71,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
       if(generation.current!==version){stream.getTracks().forEach(track=>track.stop());return;}
       resources.current.stream=stream;
       const pc=new RTCPeerConnection();resources.current.pc=pc;
-      pc.ontrack=e=>{if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().catch(()=>setNotice(t('Use the audio play control to hear Camino.','Usa el control de reproducción para escuchar a Camino.')));}};
+      pc.ontrack=e=>{if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().catch(()=>setNotice(t('Use the audio play control to hear Origen.','Usa el control de reproducción para escuchar a Origen.')));}};
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
       const dc=pc.createDataChannel('oai-events');resources.current.dc=dc;
       const sentEvents=new Map<string,string>();
@@ -68,26 +84,27 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
         if(sentEvents.size>100)sentEvents.delete(sentEvents.keys().next().value!);
         dc.send(JSON.stringify({...payload,event_id}));
       };
-      const turns=voiceTurns(send);
+      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'));
       dc.onopen=()=>{
         if(generation.current!==version)return;
         clearTimeout(resources.current.deadline);setState('live');
         const started=Date.now();
-        resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){end();setNotice(mode==='finance'?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
+        resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){end();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
         turns.request();
       };
-      dc.onclose=()=>{if(generation.current===version){end();setNotice(mode==='finance'?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
+      dc.onclose=()=>{if(generation.current===version){end();setNotice(informational?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
         if(['error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
-          log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status});
+          log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created')turns.created();
         if(e.type==='input_audio_buffer.speech_started')turns.speechStarted(e.item_id);
         if(e.type==='conversation.item.input_audio_transcription.failed')turns.transcript(e.item_id,'');
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
           const valid=e.type.startsWith('conversation')?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
-          if(valid)setTranscript(prev=>[...prev,{who:e.type.startsWith('conversation')?t('You','Tú'):'Camino',text:e.transcript}].slice(-40));
+          if(valid)sessionTurns.current=[...sessionTurns.current,{role:e.type.startsWith('conversation')?'user' as const:'assistant' as const,text:e.transcript}].slice(-40);
+          if(valid)setTranscript(prev=>[...prev,{who:e.type.startsWith('conversation')?t('You','Tú'):'Origen',text:e.transcript}].slice(-40));
         }
         if(e.type==='error'){
           const code=String(e.error?.code||'unknown_error').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80);
@@ -100,18 +117,18 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
         if(e.type==='response.done'){
           if(e.response?.status==='failed')log('response_failed',{responseId:e.response.id,code:e.response.status_details?.error?.code});
           const hasTools=(e.response?.output||[]).some((item:{type:string})=>item.type==='function_call');
-          if(!turns.beginDone(e.response?.id,hasTools))return;
+          if(!turns.beginDone(e.response?.id,hasTools,e.response?.status==='cancelled'))return;
           let called=false;
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             called=true;let accepted=false;
-            if(mode==='finance'&&item.name==='lookup_financial_aid'){
+            if((mode==='finance'&&item.name==='lookup_financial_aid')||(mode==='admissions'&&item.name==='lookup_college_applications')){
               let output:unknown={error:'lookup_failed',instruction:'Explain that current official information could not be verified. Do not invent facts.'};
               log('lookup_start',{callId:item.call_id});
               setResearching(true);
               try{
                 const args=JSON.parse(item.arguments);
-                const response=await fetch('/api/finance-research',{method:'POST',headers:{'Content-Type':'application/json','X-Camino-Session':sessionId},body:JSON.stringify({question:args.question,institution:args.institution,language}),signal:abort.signal});
+                const response=await apiFetch(mode==='admissions'?'/api/admissions-research':'/api/finance-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({question:args.question,institution:args.institution,language}),signal:abort.signal});
                 const result=await response.json();
                 if(generation.current!==version)return;
                 if(!response.ok)throw new Error('lookup_failed');
@@ -146,9 +163,9 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
           if(called)turns.toolsCompleted();else turns.completed();
         }
       };
-      pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version&&['failed','disconnected'].includes(pc.connectionState)){end();setError(t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));}};
+      pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version&&['failed','disconnected'].includes(pc.connectionState)){end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await fetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Camino-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,profile:mode==='finance'?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm}:profile,language,role,mode}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm}:profile,language,role,mode,memory:history.items.filter(x=>x.studentId===profile.id).slice(-6).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json();if(!response.ok)throw new Error(data.error);
       if(generation.current!==version)return;
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
@@ -160,9 +177,9 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     }
   }
   return <section className="profile-voice" aria-labelledby={`${mode}-voice-title`}>
-    <h3 id={`${mode}-voice-title`}>{mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
-    <p>{mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Camino to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Camino. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Camino. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
-    <p className="small-text">{mode==='finance'?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Nothing is saved automatically. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Nada se guarda automáticamente. La sesión termina a los 10 minutos.')}</p>
+    <h3 id={`${mode}-voice-title`}>{mode==='admissions'?t('Talk through college applications','Conversemos sobre las solicitudes universitarias'):mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
+    <p>{mode==='admissions'?t('Ask about UC applications, Cal State Apply, Common App or community college. We can explain a form field, check requirements, or help you understand your next step—in English or Spanish.','Pregunta sobre solicitudes de UC, Cal State Apply, Common App o colegios comunitarios. Podemos explicar una pregunta del formulario, consultar requisitos o ayudarte a entender el siguiente paso, en español o inglés.'):mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Origen to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Origen. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Origen. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
+    <p className="small-text">{informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Nothing is saved automatically. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Nada se guarda automáticamente. La sesión termina a los 10 minutos.')}</p>
     <div className="voice-controls">
       {state==='idle'?<button type="button" className="button primary" onClick={()=>void start()}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>
         <span role="status">{state==='connecting'?t('Connecting…','Conectando…'):t(muted?'Microphone muted':'Microphone on',muted?'Micrófono silenciado':'Micrófono activo')} · {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</span>
@@ -170,7 +187,8 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
         <button type="button" className="button outline" onClick={end}><PhoneOff size={18}/>{t('End conversation','Terminar conversación')}</button>
       </>}
     </div>
-    <audio ref={audio} autoPlay controls hidden={state!=='live'} aria-label={t('Camino voice playback','Reproducción de voz de Camino')}/>
+    <audio ref={audio} autoPlay controls hidden={state!=='live'} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
+    {savingSummary&&<p role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p><p>{t('Technical events are logged locally without audio, transcripts or student details.','Los eventos técnicos se registran localmente sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{t('Checking official sources…','Consultando fuentes oficiales…')}</p>}
     {sources.length>0&&<section className="voice-sources"><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></section>}

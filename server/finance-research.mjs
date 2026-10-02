@@ -1,3 +1,4 @@
+import {allowedRequest} from './origin.mjs';
 import {searchResponse} from './opportunities.mjs';
 export const financeTool={type:'function',name:'lookup_financial_aid',description:'Look up official FSA guidance or a college cost of attendance. Use for factual financial-aid explanations and current college costs, deadlines or requirements. Exclude names and personal financial details from the question.',parameters:{type:'object',additionalProperties:false,properties:{question:{type:'string'},institution:{type:'string',description:'College name, or empty for federal student aid guidance.'}},required:['question','institution']}};
 export function financeResearchRequest(env,input){
@@ -13,10 +14,10 @@ export function createFinanceResearchHandler(env,request=fetch,log=()=>{}){
  return async(req,res,next)=>{
   if(req.url?.split('?')[0]!=='/api/finance-research')return next();
   const started=Date.now();
-  const sessionId=typeof req.headers['x-camino-session']==='string'?req.headers['x-camino-session']:undefined;
+  const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
+  const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
   const send=(status,body)=>{void log({sessionId,event:'finance_lookup',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
-  const host=req.headers.host;
-  if(!host||!/^(localhost|127\.0\.0\.1):\d+$/.test(host)||req.headers.origin!==`http://${host}`)return send(403,{error:'origin_not_allowed'});
+  if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
   if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
   if(!env.OPENAI_API_KEY?.trim())return send(503,{error:'missing_api_key'});

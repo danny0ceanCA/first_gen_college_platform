@@ -1,18 +1,23 @@
+import LandingStory from './LandingStory';
+import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
-import {ArrowRight,ArrowUpRight,BookOpen,Mic,Users,X} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
 export default function Landing({enter}:{enter:()=>void}){
- const [es,setEs]=useState(false),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
+ const {loginWithRedirect,isLoading,error}=useAuth0();
+ const [signinError,setSigninError]=useState(false);
+ const signIn=()=>{setSigninError(false);void loginWithRedirect({authorizationParams:{connection:'sms',ui_locales:es?'es':'en'}}).catch(()=>setSigninError(true));};
+ const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
  const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false);
  const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
  const t=(en:string,sp:string)=>es?sp:en;
- useEffect(()=>{document.documentElement.lang=es?'es':'en';},[es]);
+ useEffect(()=>{document.documentElement.lang=es?'es':'en';localStorage.setItem('origen.language',es?'es':'en');},[es]);
  useEffect(()=>{
   if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const scene=line.current;
   const animations:ReturnType<typeof animate>[]=[];
-  const originals=Array.from(scene.querySelectorAll<SVGPathElement>('path:not(.sky-drift)'));
+  const originals=Array.from(scene.querySelectorAll<SVGPathElement>('path:not(.sky-drift):not(.life-route):not(.life-ink)'));
   const fragments:SVGPathElement[]=[];
   type Stroke={path:SVGPathElement;length:number;start:DOMPoint;end:DOMPoint};
   const routes:Stroke[][]=[[],[]];
@@ -57,9 +62,9 @@ export default function Landing({enter}:{enter:()=>void}){
   const clouds=[...scene.querySelectorAll<SVGPathElement>('.sky-drift'),...ambient.current!.querySelectorAll<SVGPathElement>('path'),...sky.current!.querySelectorAll<SVGPathElement>('.upper-cloud')];
   clouds.forEach((cloud,index)=>{
    const phase={value:0};
-   animations.push(animate(phase,{value:[0,Math.PI*2],duration:16000+index*2700,loop:true,ease:'linear',onUpdate:()=>{
+   animations.push(animate(phase,{value:[0,Math.PI*2],duration:12000+index*1700,loop:true,ease:'linear',onUpdate:()=>{
     const wave=phase.value+index*1.7;
-    cloud.setAttribute('transform',`translate(${Math.sin(wave)*22} ${Math.cos(wave)*3})`);
+    cloud.setAttribute('transform',`translate(${Math.sin(wave)*46} ${Math.cos(wave)*7})`);
     cloud.style.opacity=String(0.65+0.35*(Math.sin(wave)+1)/2);
    }}));
   });
@@ -69,6 +74,50 @@ export default function Landing({enter}:{enter:()=>void}){
     const brightness=(Math.sin(shimmer.phase)+1)/2;
     star.style.opacity=String(0.22+0.78*brightness**2);
     star.style.filter=`drop-shadow(0 0 ${1+brightness*5}px #ffe2ad)`;
+   }}));
+  });
+  // Staggered walks keep at most two people visible; nobody waits in a crowd.
+  const residents=Array.from(scene.querySelectorAll<SVGGElement>('.village-visitor')).filter(visitor=>!['burro','dog'].includes(visitor.dataset.kind!)).map((visitor,order)=>{
+   const index=Number(visitor.dataset.route);
+   const arrival=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!;
+   const departure=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
+   return {visitor,index,order,arrival,departure,arrivalLength:arrival.getTotalLength(),departureLength:departure.getTotalLength(),
+    legs:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),
+    arms:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-arm'))};
+  });
+  const village={time:0};
+  animations.push(animate(village,{time:[0,1],duration:64000,delay:30000,loop:true,ease:'linear',onUpdate:()=>{
+   residents.forEach(({visitor,index,order,arrival,departure,arrivalLength,departureLength,legs,arms})=>{
+    const phase=(village.time+order/residents.length)%1;
+    const travel=Math.min(1,phase/0.30),totalLength=arrivalLength+departureLength;
+    const travelled=totalLength*travel,leaving=travelled>=arrivalLength;
+    const route=leaving?departure:arrival,length=leaving?departureLength:arrivalLength;
+    const distance=leaving?travelled-arrivalLength:travelled,point=route.getPointAtLength(distance);
+    const next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
+    const facing=next.x<previous.x?-1:1,stride=Math.sin(travelled*0.46);
+    const fade=Math.max(0,Math.min(1,phase/0.018,(0.30-phase)/0.018));
+    const scale=index===4?0.63:index>=6?0.90-travel*0.12:0.78;
+    visitor.dataset.activity=fade>0?'walking':'away';
+    visitor.style.opacity=String(fade*0.9);
+    visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
+    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1);leg.setAttribute('d',`M0 -10 L${swing*3} -5 L${swing*5} 0`);});
+    arms.forEach((arm,i)=>{const swing=stride*(i?1:-1);arm.setAttribute('d',`M0 -18 L${swing*3} -14 L${swing*5} -12`);});
+   });
+  }}));
+  // Animals wander continuously on independent clocks.
+  scene.querySelectorAll<SVGGElement>('.village-visitor[data-kind="burro"],.village-visitor[data-kind="dog"]').forEach(visitor=>{
+   const index=Number(visitor.dataset.route),burro=visitor.dataset.kind==='burro';
+   const outward=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!,homeward=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
+   const outwardLength=outward.getTotalLength(),homewardLength=homeward.getTotalLength();
+   const legs=Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),wander={time:0};
+   animations.push(animate(wander,{time:[0,1],duration:burro?38000:27000,delay:burro?30000:33000,loop:true,ease:'linear',onUpdate:()=>{
+    const back=wander.time>=0.5,progress=back?(wander.time-0.5)*2:wander.time*2;
+    const route=back?homeward:outward,length=back?homewardLength:outwardLength,distance=length*progress;
+    const point=route.getPointAtLength(distance),next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
+    const facing=next.x<previous.x?-1:1,stride=Math.sin((distance+(back?outwardLength:0))*0.44),scale=burro?0.72:0.68;
+    visitor.dataset.activity='walking';visitor.style.opacity='0.9';
+    visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
+    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1),hip=burro?(i<2?-9:10):(i<2?-6:7),top=burro?-11:-7;leg.setAttribute('d',`M${hip} ${top} L${hip+swing*2.5} -5 L${hip+swing*4} 0`);});
    }}));
   });
   motion.current=animations;
@@ -81,7 +130,7 @@ export default function Landing({enter}:{enter:()=>void}){
  },[paused]);
  useEffect(()=>{if(login)dialog.current?.showModal();else dialog.current?.close();},[login]);
  return <div className="landing">
-  <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Camino"><span className="landing-mark">∩</span>camino<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a href="#how">{t('How it works','Cómo funciona')}</a><button onClick={()=>setEs(!es)}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
+  <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a href="#how">{t('How it works','Cómo funciona')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>setEs(!es)}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
   <main className="landing-main">
    <section className="landing-hero">
     <svg ref={sky} className="hero-sky" viewBox="0 0 1200 160" fill="none" aria-hidden="true" preserveAspectRatio="none" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round">
@@ -134,19 +183,57 @@ export default function Landing({enter}:{enter:()=>void}){
        <path data-delay="10400" data-duration="1600" d="M352 69 A41 41 0 0 1 411 107 M407 124 A41 41 0 0 1 377 145"/>
        <path data-delay="10800" data-duration="1400" d="M317 71 Q323 64 330 71 Q337 64 343 71 M575 180 Q581 174 587 180 Q593 174 599 180"/>
       </g>
+      <g className="village-life" aria-hidden="true" strokeWidth="1.05">
+       <path className="life-route life-route-0" d="M150 363 Q165 378 209 373 Q253 363 280 373"/>
+       <path className="life-route life-exit-0" d="M280 373 Q242 391 203 372 L150 363"/>
+       <path className="life-route life-route-1" d="M532 352 Q496 366 441 371 Q367 387 300 375"/>
+       <path className="life-route life-exit-1" d="M300 375 Q357 404 410 382 Q470 366 532 352"/>
+       <path className="life-route life-route-2" d="M644 346 Q591 365 530 365 Q470 363 424 376"/>
+       <path className="life-route life-exit-2" d="M424 376 Q466 389 531 371 Q590 360 644 346"/>
+       <path className="life-route life-route-3" d="M252 358 Q256 386 279 399 Q304 405 321 391"/>
+       <path className="life-route life-exit-3" d="M321 391 Q310 411 268 385 L252 358"/>
+       <path className="life-route life-route-4" d="M35 350 Q89 377 160 378 Q227 397 280 391"/>
+       <path className="life-route life-exit-4" d="M280 391 Q215 401 157 383 Q76 365 35 350"/>
+       <path className="life-route life-route-5" d="M431 342 Q421 366 392 375 Q347 405 300 393"/>
+       <path className="life-route life-exit-5" d="M300 393 Q348 416 400 379 L431 342"/>
+       <path className="life-route life-route-6" d="M318 552 C264 507 426 487 367 440 C346 422 336 408 350 393 Q327 382 270 379"/>
+       <path className="life-route life-exit-6" d="M270 379 Q232 376 209 371 L150 363"/>
+       <path className="life-route life-route-7" d="M331 563 C277 518 442 495 379 446 C354 427 348 411 360 399 Q343 395 314 394"/>
+       <path className="life-route life-exit-7" d="M314 394 Q376 404 430 379 Q483 362 532 352"/>
+       {[0,1,4,5,6,7].map(index=><g className="village-visitor" data-route={index} data-kind={index===1||index===6?'farmer':index===0||index===7?'lady':'person'} key={index}>
+        <circle cx="0" cy="-24" r="3.4"/>
+        <path className="life-ink" d="M0 -20 L0 -10"/>
+        <path className="life-ink walking-arm" d="M0 -18 L-4 -12"/><path className="life-ink walking-arm" d="M0 -18 L4 -12"/>
+        <path className="life-ink walking-leg" d="M0 -10 L-4 0"/><path className="life-ink walking-leg" d="M0 -10 L4 0"/>
+        {(index===1||index===6)&&<>
+         <path className="life-ink" d="M-7 -26 Q0 -29 7 -26 M-4 -28 L-3 -32 L3 -32 L4 -28 M-3 -18 L-3 -11 L3 -11 L3 -18 M-3 -14 L3 -14"/>
+         <path className="life-ink" d="M5 -13 L10 -12 L9 -7 L5 -7 Z M6 -13 Q7 -16 9 -13"/>
+        </>}
+        {(index===0||index===7)&&<>
+         <path className="life-ink" d="M-4 -22 Q-7 -30 0 -29 Q6 -28 4 -21 M-3 -18 L-6 -9 Q0 -7 6 -9 L3 -18 M-3 -20 L0 -16 L3 -20"/>
+         <path className="life-ink" d="M4 -13 Q10 -15 11 -11 L10 -7 L5 -7 Z"/>
+        </>}
+       </g>)}
+       <g className="village-visitor" data-route="2" data-kind="burro">
+        <path className="life-ink" d="M-13 -11 Q-17 -20 -10 -21 L7 -21 L13 -29 L20 -30 Q24 -28 23 -24 L18 -22 L15 -11 Z M13 -29 L11 -39 Q14 -41 16 -31 M18 -30 L19 -40 Q23 -40 22 -31 M-14 -19 Q-21 -21 -20 -12 M-8 -23 Q-3 -26 3 -23"/>
+        <path className="life-ink" d="M20 -27 L21 -27 M-6 -22 L-6 -14 L5 -14 L5 -22"/>
+        {[0,1,2,3].map(i=><path key={i} className="life-ink walking-leg" d={`M${i<2?-9:10} -11 L${i<2?-9:10} 0`}/>)}
+       </g>
+       <g className="village-visitor" data-route="3" data-kind="dog">
+        <path className="life-ink" d="M-9 -7 L-9 -14 L8 -14 L12 -20 L18 -19 L22 -16 L17 -13 L12 -7 Z M12 -19 L10 -24 L16 -21 M-9 -13 Q-16 -20 -16 -14 M18 -17 L19 -17"/>
+        {[0,1,2,3].map(i=><path key={i} className="life-ink walking-leg" d={`M${i<2?-6:7} -7 L${i<2?-6:7} 0`}/>)}
+       </g>
+      </g>
       <circle className="drawing-tip drawing-tip-0" r="3" opacity="0" strokeWidth="0.9"/>
       <circle className="drawing-tip drawing-tip-1" r="3" opacity="0" strokeWidth="0.9"/>
      </svg>
      <div className="scene-caption"><span>{t('MANY PATHS. ONE COMMUNITY.','MUCHOS CAMINOS. UNA COMUNIDAD.')}</span><div><button className="motion-toggle" aria-pressed={paused} onClick={()=>setPaused(value=>!value)}>{paused?t('Play','Reproducir'):t('Pause','Pausar')}</button><button className="path-replay" onClick={()=>setReplay(n=>n+1)}>{t('Replay ↗','Repetir ↗')}</button></div></div>
     </div>
    </section>
-   <section className="landing-intro" id="how"><div><span className="landing-eyebrow">{t('YOU DON’T NEED ALL THE ANSWERS','NO NECESITAS SABERLO TODO')}</span><h2>{t('Just a place to begin.','Solo un lugar para empezar.')}</h2></div><p>{t('Whether college is familiar or completely new to your family, Camino helps make the unfamiliar feel manageable. One question at a time.','La universidad puede ser conocida o completamente nueva para tu familia. Camino te ayuda a entenderla, una pregunta a la vez.')}</p></section>
-   <section className="landing-steps" aria-label={t('Ways Camino helps','Cómo ayuda Camino')}>
-    {[{icon:Users,n:'01',title:t('Start with your student','Empieza con tu estudiante'),text:t('Keep their interests, goals and college choices in one place. Every student has a different story.','Reúne sus intereses, metas y opciones universitarias. Cada estudiante tiene su propia historia.')},{icon:Mic,n:'02',title:t('Talk it through','Hablemos de tus preguntas'),text:t('Ask about college costs out loud. Get plain-language guidance and links to official sources.','Pregunta en voz alta sobre los costos. Recibe explicaciones claras y enlaces a fuentes oficiales.')},{icon:BookOpen,n:'03',title:t('Take the next step','Da el siguiente paso'),text:t('Understand your options and find the official application for the colleges you’re considering.','Conoce tus opciones y encuentra la solicitud oficial de las universidades que te interesan.')}].map(({icon:Icon,n,title,text})=><article key={n}><div className="step-top"><Icon size={23}/><span>{n}</span></div><h3>{title}</h3><p>{text}</p></article>)}
-   </section>
+   <LandingStory t={t}/>
    <section className="landing-closing"><h2>{t('You belong in this conversation.','Tu voz tiene un lugar aquí.')}</h2><button onClick={()=>setLogin(true)}>{t('Let’s get started','Empecemos')}<ArrowRight size={18}/></button></section>
   </main>
-  <footer className="landing-footer"><strong>camino.</strong><span>{t('A path forward, together.','Un camino adelante, juntos.')}</span><button onClick={enter}>{t('Explore the preview','Explorar la vista previa')}<ArrowUpRight size={14}/></button></footer>
-  <dialog ref={dialog} className="landing-dialog" aria-labelledby="landing-signin-title" onCancel={()=>setLogin(false)}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>setLogin(false)}><X size={22}/></button><span className="landing-eyebrow">{t('WELCOME TO CAMINO','BIENVENIDO A CAMINO')}</span><h2 id="landing-signin-title">{t('Your path starts here.','Tu camino empieza aquí.')}</h2><p>{t('One simple step to create an account or come back to your family.','Un paso sencillo para crear una cuenta o volver a tu familia.')}</p><label>{t('Phone number','Número de teléfono')}<input type="tel" autoComplete="tel" placeholder="(555) 123-4567"/></label><button className="landing-primary" disabled>{t('Text me a code','Enviar código por texto')}<ArrowRight size={18}/></button><p className="login-preview-note">{t('Sign-in design preview. Text codes and account creation aren’t connected yet.','Vista previa del diseño. Los códigos y la creación de cuentas aún no están conectados.')}</p><button className="landing-preview-link" onClick={enter}>{t('Explore Camino without signing in','Explorar Camino sin iniciar sesión')}<ArrowRight size={17}/></button></dialog>
+  <footer className="landing-footer"><strong>origen.</strong><span>{t('A path forward, together.','Un camino adelante, juntos.')}</span><button onClick={enter}>{t('Explore the preview','Explorar la vista previa')}<ArrowUpRight size={14}/></button></footer>
+  <dialog ref={dialog} className="landing-dialog" aria-labelledby="landing-signin-title" onCancel={()=>setLogin(false)}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>setLogin(false)}><X size={22}/></button><span className="landing-eyebrow">{t('WELCOME TO ORIGEN','BIENVENIDO A ORIGEN')}</span><h2 id="landing-signin-title">{t('Your path starts here.','Tu camino empieza aquí.')}</h2><p>{t('One simple step to create an account or come back to your family.','Un paso sencillo para crear una cuenta o volver a tu familia.')}</p><p>{t('Continue to secure phone sign-in. Enter your number there and verify the code sent by text.','Continúa al acceso seguro por teléfono. Ingresa tu número allí y verifica el código enviado por texto.')}</p><button className="landing-primary" disabled={isLoading} onClick={signIn}>{t('Continue with phone number','Continuar con número de teléfono')}<ArrowRight size={18}/></button>{(signinError||error)&&<p role="alert">{t('Could not complete sign-in. Please try again.','No se pudo completar el acceso. Intenta de nuevo.')}</p>}<p className="login-preview-note">{t('Phone-code delivery requires the SMS connection to be enabled in Auth0.','El envío del código requiere habilitar la conexión SMS en Auth0.')}</p><button className="landing-preview-link" onClick={enter}>{t('Explore Origen without signing in','Explorar Origen sin iniciar sesión')}<ArrowRight size={17}/></button></dialog>
  </div>;
 }
