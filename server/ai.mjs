@@ -1,3 +1,4 @@
+import {safeErrorCode} from './api-logging.mjs';
 import {allowedRequest} from './origin.mjs';
 import {roadmapRequest,parseRoadmap} from './roadmap.mjs';
 import { guidanceTopics } from './guidance-topics.mjs';
@@ -34,6 +35,7 @@ export function createAIHandler(env, request = fetch) {
           input:[{role:'user',content:`Student profile data: ${JSON.stringify(profile)}\nCurrent guidance topic: ${String(input.guidanceTopic||'College planning').slice(0,200)}`},...(input.history||[]).slice(-24).map(e=>({role:e.role==='parent'?'user':'assistant',content:e.text})),{role:'user',content:input.message.trim()}]}),
         signal:AbortSignal.timeout(input.purpose!=='conversation'?180000:90000)
       });
+      req.log?.({event:'upstream_response',operation:'chat',httpStatus:upstream.status,upstreamRequestId:upstream.headers?.get('x-request-id')||undefined});
       if(!upstream.ok){const data=await upstream.json().catch(()=>({}));const code=data.error?.code;return send(502,{error:upstream.status===401?'invalid_api_key':code==='insufficient_quota'?'quota_exceeded':upstream.status===429?'rate_limited':(upstream.status===403||upstream.status===404)?'model_unavailable':'upstream_error'});}
       let data=await upstream.json();
       if(input.purpose==='roadmap'){if(profile.institutions?.trim()&&!(data.output||[]).some(x=>x.type==='web_search_call'&&x.status==='completed'))return send(502,{error:'unverified_roadmap'});const plan=parseRoadmap(data);return plan?send(200,plan):send(502,{error:'invalid_roadmap'});}
@@ -54,6 +56,6 @@ export function createAIHandler(env, request = fetch) {
       const text=(data.output||[]).flatMap(item=>item.type==='message'?item.content||[]:[]).filter(c=>c.type==='output_text'||c.type==='refusal').map(c=>c.text||c.refusal||'').join('\n').trim();
       if(!text)return send(502,{error:data.status==='incomplete'?'incomplete_response':'empty_response'});
       return send(200,{text,mode:'live',model:data.model||env.OPENAI_MODEL_CONVERSATION||env.OPENAI_MODEL||'gpt-6-luna',sources:[]});
-    }catch{return send(502,{error:'connection_error'});}finally{active--;}
+    }catch(error){req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send(502,{error:'connection_error'});}finally{active--;}
   };
 }

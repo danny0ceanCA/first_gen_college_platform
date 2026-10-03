@@ -1,7 +1,7 @@
 import {allowedRequest} from './origin.mjs';
 import {mkdir,appendFile,stat,rename,rm} from 'node:fs/promises';
 import {join} from 'node:path';
-const fields=['sessionId','eventId','responseId','callId','requestId','event','operation','code','parameter','status','mode','language','connectionState'];
+const fields=['sessionId','eventId','responseId','callId','requestId','event','operation','code','parameter','status','mode','language','connectionState','endpoint','method','level','upstreamRequestId'];
 export function diagnosticRecord(input){
  const out={time:new Date().toISOString()};
  if(!input||typeof input!=='object')return out;
@@ -29,6 +29,6 @@ export function createDiagnosticHandler(log){
   if(!allowedRequest(req)) return finish(403);
   if(req.method!=='POST')return finish(405);
   if(!req.headers['content-type']?.startsWith('application/json'))return finish(415);
-  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return finish(413);}const data=JSON.parse(raw);await log(data);return finish(204);}catch{return finish(400);}
+  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return finish(413);}const data=JSON.parse(raw);await (req.log||log)({...data,requestId:undefined,endpoint:undefined,method:undefined,level:undefined,upstreamRequestId:undefined});return finish(204);}catch{return finish(400);}
  };
 }

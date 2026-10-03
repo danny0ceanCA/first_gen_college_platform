@@ -1,3 +1,4 @@
+import {safeErrorCode} from './api-logging.mjs';
 import {allowedRequest} from './origin.mjs';
 
 const fail=(status,error)=>Object.assign(new Error(error),{status});
@@ -54,6 +55,6 @@ export function createHistoryHandler(database){
    if(!['load','delete','import','save'].includes(input?.action)||input.studentId!==undefined&&!identifier(input.studentId)||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
    if(input.action==='save')input.item=validateMemory(input.item);
    return send(200,await run(req.origenIdentity.sub,input));
-  }catch(error){const status=[400,404,409].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
+  }catch(error){if(![400,404,409].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,404,409].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
  };
 }

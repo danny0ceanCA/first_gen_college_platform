@@ -5,6 +5,6 @@ export async function apiFetch(path:string,options:RequestInit={}){
  const headers=new Headers(options.headers);
  if(headers.has('Authorization')){/* Keep the original live-session account through cleanup. */}
  else if(tokenProvider){const token=await tokenProvider();if(!token)throw new Error('Sign in to use Origen AI.');headers.set('Authorization',`Bearer ${token}`);}
- else if(base)throw new Error('Sign in to use Origen AI.');
+ else if(base&&!['/api/profile-voice','/api/finance-research','/api/admissions-research','/api/voice-diagnostics','/api/conversation-summary'].includes(path))throw new Error('Sign in to use Origen AI.');
  return fetch(`${base}${path}`,{...options,headers});
 }

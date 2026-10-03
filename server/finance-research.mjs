@@ -1,3 +1,4 @@
+import {safeErrorCode} from './api-logging.mjs';
 import {allowedRequest} from './origin.mjs';
 import {searchResponse} from './opportunities.mjs';
 export const financeTool={type:'function',name:'lookup_financial_aid',description:'Look up official FSA guidance or a college cost of attendance. Use for factual financial-aid explanations and current college costs, deadlines or requirements. Exclude names and personal financial details from the question.',parameters:{type:'object',additionalProperties:false,properties:{question:{type:'string'},institution:{type:'string',description:'College name, or empty for federal student aid guidance.'}},required:['question','institution']}};
@@ -16,7 +17,7 @@ export function createFinanceResearchHandler(env,request=fetch,log=()=>{}){
   const started=Date.now();
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
-  const send=(status,body)=>{void log({sessionId,event:'finance_lookup',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
+  const send=(status,body)=>{void (req.log||log)({sessionId,event:'finance_lookup',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
   if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
   if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
@@ -26,10 +27,10 @@ export function createFinanceResearchHandler(env,request=fetch,log=()=>{}){
   if(!input||typeof input.question!=='string'||!input.question.trim()||input.question.length>3000||typeof input.institution!=='string'||input.institution.length>300||!['en','es'].includes(input.language))return send(400,{error:'invalid_request'});
   try{
    const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY.trim()}`,'Content-Type':'application/json'},body:JSON.stringify(financeResearchRequest(env,input)),signal:AbortSignal.timeout(120000)});
-  void log({sessionId,event:'upstream_response',operation:'finance_lookup',httpStatus:response.status,requestId:response.headers.get('x-request-id')||undefined});
+  void (req.log||log)({sessionId,event:'upstream_response',operation:'finance_lookup',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
    if(!response.ok)return send(502,{error:'research_unavailable'});
    const result=parseFinanceResearch(await response.json(),input.institution);
    return result?send(200,result):send(502,{error:'official_sources_unverified'});
-  }catch{return send(502,{error:'research_unavailable'});}
+  }catch(error){req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send(502,{error:'research_unavailable'});}
  };
 }

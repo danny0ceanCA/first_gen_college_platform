@@ -1,3 +1,4 @@
+import {safeErrorCode} from './api-logging.mjs';
 import {createHistoryRepository} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
 import {admissionsTool} from './admissions-research.mjs';
@@ -41,7 +42,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
     const started=Date.now();
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
-  const send=(status,body)=>{void log({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
+  const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
     if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
     if(req.method!=='POST') return send(405,{error:'method_not_allowed'});
     if(!req.headers['content-type']?.startsWith('application/json')) return send(415,{error:'json_required'});
@@ -56,12 +57,12 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         input.memory=[];
         if(input.studentId!==undefined){
           if(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128)return send(400,{error:'invalid_request'});
-          try{input.memory=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId})).items;}catch(error){return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
+          try{input.memory=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId})).items;}catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
         }
       }
       const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(voiceSession(input,env)));
       const response=await request('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});
-  void log({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,requestId:response.headers.get('x-request-id')||undefined});
+  void (req.log||log)({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
       if(!response.ok) {
         const data=await response.json().catch(()=>({}));
         const code=data.error?.code;
@@ -70,6 +71,6 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const sdp=await response.text();
       if(!sdp.startsWith('v=0')) return send(502,{error:'voice_unavailable'});
       return send(200,{sdp});
-    } catch {return send(502,{error:'voice_unavailable'});} finally {active--;}
+    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send(502,{error:'voice_unavailable'});} finally {active--;}
   };
 }

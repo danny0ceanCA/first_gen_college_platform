@@ -1,3 +1,4 @@
+import {safeErrorCode} from './api-logging.mjs';
 const profileFields={name:100,stage:40,interest:2000,gpa:30,color:40,institutions:2000,entryTerm:2000,school:2000,activities:2000,goals:2000,needs:2000,notes:2000};
 const columns=['name','stage','interest','gpa','color','institutions','entry_term','school','activities','goals','needs','notes'];
 const stages=['','9th grade','10th grade','11th grade','12th grade','Community college','College'];
@@ -84,6 +85,6 @@ export function createFamilyHandler(database,repository=database?createFamilyRep
    let input;try{input=JSON.parse(raw);}catch{return send(400,{error:'invalid_family_request'});}
    const operation=validateFamily(input);
    return send(200,await repository(req.origenIdentity.sub,operation));
-  }catch(error){return send(error.status===400||error.status===404?error.status:503,{error:error.status===400||error.status===404?error.message:'database_unavailable'});}
+  }catch(error){if(![400,404].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(error.status===400||error.status===404?error.status:503,{error:error.status===400||error.status===404?error.message:'database_unavailable'});}
  };
 }
