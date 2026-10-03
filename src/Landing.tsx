@@ -1,6 +1,6 @@
 import LandingStory from './LandingStory';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
 import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
@@ -9,11 +9,11 @@ export default function Landing({enter}:{enter:()=>void}){
  const [signinError,setSigninError]=useState(false);
  const signIn=()=>{setSigninError(false);void loginWithRedirect({authorizationParams:{connection:'sms',ui_locales:es?'es':'en'}}).catch(()=>setSigninError(true));};
  const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
- const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false);
+ const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false),heroVisible=useRef(true);
  const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
  const t=(en:string,sp:string)=>es?sp:en;
  useEffect(()=>{document.documentElement.lang=es?'es':'en';localStorage.setItem('origen.language',es?'es':'en');},[es]);
- useEffect(()=>{
+ useLayoutEffect(()=>{
   if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const scene=line.current;
   const animations:ReturnType<typeof animate>[]=[];
@@ -121,12 +121,14 @@ export default function Landing({enter}:{enter:()=>void}){
    }}));
   });
   motion.current=animations;
-  if(pauseRef.current)animations.forEach(a=>a.pause());
-  return ()=>{animations.forEach(animation=>animation.revert());fragments.forEach(path=>path.remove());originals.forEach(path=>path.style.removeProperty('visibility'));motion.current=[];};
+  const syncVisibility=()=>animations.forEach(a=>{if(pauseRef.current||!heroVisible.current||document.hidden)a.pause();else if(!a.completed)a.play();});
+  const observer=new IntersectionObserver(([entry])=>{heroVisible.current=entry.isIntersecting;syncVisibility();},{rootMargin:'80px'});
+  observer.observe(scene.closest('.landing-hero')!);document.addEventListener('visibilitychange',syncVisibility);syncVisibility();
+  return ()=>{observer.disconnect();document.removeEventListener('visibilitychange',syncVisibility);animations.forEach(animation=>animation.revert());fragments.forEach(path=>path.remove());originals.forEach(path=>path.style.removeProperty('visibility'));motion.current=[];};
  },[replay]);
  useEffect(()=>{
   pauseRef.current=paused;
-  motion.current.forEach(animation=>paused?animation.pause():animation.play());
+  motion.current.forEach(animation=>{if(paused||!heroVisible.current||document.hidden)animation.pause();else if(!animation.completed)animation.play();});
  },[paused]);
  useEffect(()=>{if(login)dialog.current?.showModal();else dialog.current?.close();},[login]);
  return <div className="landing">

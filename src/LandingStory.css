@@ -31,3 +31,15 @@
 @media(max-width:760px){.story-stage{transform:translateZ(0);backface-visibility:hidden}.story-art{will-change:auto;transform:none!important}.landing-story{overflow-anchor:none}}
 
 @media(max-width:760px){.story-thread{opacity:.38}.story-thread svg{stroke-width:1.2}.story-thread .thread-light{stroke-width:1.8}}
+
+/* The cream thread and its bright leading stroke now follow the scroll position. */
+.story-thread svg>path:first-child{opacity:.16}
+.story-thread .thread-drawn{opacity:.85;stroke-width:1.1;stroke-linecap:round}
+.story-thread .thread-light{animation:none;stroke-linecap:round;stroke-width:2.1}
+
+/* A small luminous nib makes the leading stroke legible without a heavy glow. */
+.story-nib{stroke:#fff1d5;stroke-width:2.2;stroke-linecap:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.story-entry{stroke-width:.85!important;opacity:.55}
+.story-chapter{will-change:opacity}
+@media(max-width:760px){.story-stage{contain:paint}.story-thread .thread-light{filter:none}}
+@media(prefers-reduced-motion:reduce){.story-nib,.thread-light{display:none}.story-chapter{will-change:auto}}
