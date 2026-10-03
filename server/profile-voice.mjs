@@ -1,3 +1,4 @@
+import {createHistoryRepository} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
 import {admissionsTool} from './admissions-research.mjs';
 import {financeTool} from './finance-research.mjs';
@@ -33,7 +34,7 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
   };
 }
 
-export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}) {
+export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, database = null) {
   let active = 0;
   return async(req,res,next) => {
     if(req.url?.split('?')[0] !== '/api/profile-voice') return next();
@@ -51,6 +52,13 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}) {
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
       let input; try {input=JSON.parse(raw);} catch {return send(400,{error:'invalid_request'});}
       if(!input || typeof input.sdp!=='string' || !input.sdp.startsWith('v=0') || input.sdp.length>64000 || !['en','es'].includes(input.language) || !['parent','student'].includes(input.role) || (input.mode!==undefined && !['profile','finance','admissions'].includes(input.mode))) return send(400,{error:'invalid_request'});
+      if(req.origenAuthorized){
+        input.memory=[];
+        if(input.studentId!==undefined){
+          if(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128)return send(400,{error:'invalid_request'});
+          try{input.memory=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId})).items;}catch(error){return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
+        }
+      }
       const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(voiceSession(input,env)));
       const response=await request('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});
   void log({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,requestId:response.headers.get('x-request-id')||undefined});

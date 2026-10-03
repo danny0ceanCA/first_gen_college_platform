@@ -10,6 +10,7 @@
     "mobile": "npm --prefix mobile start",
     "mobile:web": "npm --prefix mobile run web",
     "start": "node server/index.mjs",
+    "db:migrate": "node server/migrate.mjs",
     "test": "node --test server/*.test.mjs"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "animejs": "^4.5.0",
     "jose": "^6.2.12",
     "lucide-react": "^0.468.0",
+    "pg": "^8.23.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -24,6 +26,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",
+    "pg-mem": "^3.0.14",
     "typescript": "~5.8.3",
     "vite": "^6.3.5"
   },

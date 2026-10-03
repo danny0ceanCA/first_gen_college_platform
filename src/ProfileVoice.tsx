@@ -1,3 +1,5 @@
+import {useFamily} from './FamilyStore';
+import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
 import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
@@ -13,14 +15,17 @@ type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export default function ProfileVoice({profile,language,role,apply,onActive,t,mode='profile'}:{mode?:'profile'|'finance'|'admissions';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string}) {
   const history=useConversationHistory();
+  const family=useFamily();const {getAccessTokenSilently}=useAuth0();
+  const summaryToken=useRef<string|undefined>(undefined);const summaryId=useRef('');
   const sessionTurns=useRef<{role:'user'|'assistant';text:string}[]>([]);
   const sessionSources=useRef<{title:string;url:string;checkedAt:string}[]>([]);
   const memorySaved=useRef(true);
   const [savingSummary,setSavingSummary]=useState(false);
   async function saveSummary(){
     if(memorySaved.current||!profile.id||!sessionTurns.current.some(t=>t.role==='user'))return;
-    memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=crypto.randomUUID();setSavingSummary(true);
-    try{const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turns,language}),keepalive:true});if(!response.ok)throw new Error();const {summary}=await response.json();history.add({id,studentId:profile.id,date:new Date().toISOString(),mode,summary,sources});}catch{setNotice(t('Conversation summary could not be saved.','No se pudo guardar el resumen de la conversación.'));}finally{setSavingSummary(false);}
+    memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
+    const body=JSON.stringify({turns,language,id,defer:history.cloud&&!family.students.some(student=>student.id===profile.id),studentId:profile.id,date:new Date().toISOString(),mode,sources});
+    try{const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(summaryToken.current?{Authorization:`Bearer ${summaryToken.current}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await history.add({id,studentId:profile.id,date:new Date().toISOString(),mode,summary,sources});}catch{setNotice(t('Conversation summary could not be saved.','No se pudo guardar el resumen de la conversación.'));}finally{setSavingSummary(false);}
   }
   const informational=mode!=='profile';
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
@@ -31,6 +36,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
   const [transcript,setTranscript]=useState<{who:string;text:string}[]>([]);
   const [sources,setSources]=useState<{title:string;url:string;checkedAt:string}[]>([]);
   const [diagnosticId,setDiagnosticId]=useState('');
+  const [failureCode,setFailureCode]=useState('');
   useEffect(()=>{sessionSources.current=sources;},[sources]);
   const logSession=useRef('');
   const logSequence=useRef(0);
@@ -61,11 +67,12 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
     log('session_start',{mode,language});
     sessionTurns.current=[];sessionSources.current=[];memorySaved.current=false;setTranscript([]);setSources([]);
-    setError('');setNotice('');setSeconds(0);setState('connecting');onActive(true);
+    setError('');setFailureCode('');setNotice('');setSeconds(0);setState('connecting');onActive(true);
     const version=++generation.current;
     const abort=new AbortController();resources.current.abort=abort;
     resources.current.deadline=setTimeout(()=>{if(generation.current===version){end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
     try {
+      summaryToken.current=history.cloud?await getAccessTokenSilently():undefined;summaryId.current=sessionId;
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
       const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
       if(generation.current!==version){stream.getTracks().forEach(track=>track.stop());return;}
@@ -165,21 +172,39 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
       };
       pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version&&['failed','disconnected'].includes(pc.connectionState)){end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm}:profile,language,role,mode,memory:history.items.filter(x=>x.studentId===profile.id).slice(-6).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
-      const data=await response.json();if(!response.ok)throw new Error(data.error);
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,studentId:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm}:profile,language,role,mode,memory:history.items.filter(x=>x.studentId===profile.id).slice(-6).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const data=await response.json().catch(()=>null);
+      if(!response.ok)throw new Error(data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
+      if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(generation.current!==version)return;
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){
       if(generation.current!==version)return;
-      log('connection_failure',{code:err instanceof DOMException?err.name:'connection_failed'});
       const code=err instanceof Error?err.message:'';
-      end();setError(err instanceof DOMException&&err.name==='NotAllowedError'?t('Microphone access was not allowed. Enable it in your browser to start, or keep typing below.','No se permitió el micrófono. Actívalo en el navegador o sigue escribiendo abajo.'):code==='quota_exceeded'?t('Your API account needs credits before voice can connect.','Tu cuenta de API necesita créditos para conectar la voz.'):code==='model_unavailable'?t('The voice model is unavailable to this API project. Check voice model access.','El modelo de voz no está disponible para este proyecto de API.'):t('Could not start voice. Check your microphone, connection and OpenAI API setup, then try again.','No se pudo iniciar la voz. Revisa el micrófono, la conexión y la configuración de la API de OpenAI.'));
+      const messages:Record<string,[string,string]>={
+        authentication_required:['Sign in to Origen before starting a voice conversation.','Inicia sesión en Origen antes de comenzar una conversación de voz.'],
+        invalid_token:['Your sign-in could not be verified. Sign out and sign in again.','No se pudo verificar tu sesión. Cierra la sesión e inicia sesión de nuevo.'],
+        quota_exceeded:['Voice is unavailable because the service’s OpenAI API account needs credits.','La voz no está disponible porque la cuenta de API de OpenAI del servicio necesita créditos.'],
+        model_unavailable:['The service’s voice model is unavailable. Its OpenAI model configuration needs to be checked.','El modelo de voz del servicio no está disponible. Es necesario revisar su configuración de OpenAI.'],
+        missing_api_key:['Voice is not configured on the server yet.','La voz aún no está configurada en el servidor.'],
+        invalid_api_key:['The server’s OpenAI credentials could not be verified.','No se pudieron verificar las credenciales de OpenAI del servidor.'],
+        busy:['Voice is busy right now. Wait a moment and try again.','La voz está ocupada en este momento. Espera un momento e inténtalo de nuevo.'],
+        rate_limited:['Too many requests. Wait a minute before trying again.','Hay demasiadas solicitudes. Espera un minuto antes de intentarlo de nuevo.'],
+        unsupported:['Voice requires a supported browser and a secure HTTPS connection.','La voz requiere un navegador compatible y una conexión HTTPS segura.'],
+        network_error:['Could not reach the voice server. Check your connection and try again. If this continues, the service’s API address or network settings need to be checked.','No se pudo conectar con el servidor de voz. Revisa tu conexión e inténtalo de nuevo. Si continúa, es necesario revisar la dirección de API o la configuración de red del servicio.'],
+        NotAllowedError:['Microphone access was not allowed. Enable it in your browser to start.','No se permitió el micrófono. Actívalo en el navegador para comenzar.'],
+        NotFoundError:['No microphone was found. Connect a microphone and try again.','No se encontró un micrófono. Conecta uno e inténtalo de nuevo.'],
+        NotReadableError:['Your microphone could not be opened. Close other apps using it and try again.','No se pudo abrir el micrófono. Cierra otras aplicaciones que lo estén usando e inténtalo de nuevo.'],
+      };
+      const reason=err instanceof DOMException?err.name:code==='Sign in to use Origen AI.'?'authentication_required':err instanceof TypeError?'network_error':Object.hasOwn(messages,code)||code==='invalid_voice_response'?code:'voice_unavailable';
+      setFailureCode(reason);log('connection_failure',{code:reason});
+      end();setError(t(...(messages[reason]||['Voice could not connect. Please try again. If it continues, share the diagnostic session below with support.','No se pudo conectar la voz. Inténtalo de nuevo. Si continúa, comparte la sesión de diagnóstico con soporte.'])));
     }
   }
   return <section className="profile-voice" aria-labelledby={`${mode}-voice-title`}>
     <h3 id={`${mode}-voice-title`}>{mode==='admissions'?t('Talk through college applications','Conversemos sobre las solicitudes universitarias'):mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
     <p>{mode==='admissions'?t('Ask about UC applications, Cal State Apply, Common App or community college. We can explain a form field, check requirements, or help you understand your next step—in English or Spanish.','Pregunta sobre solicitudes de UC, Cal State Apply, Common App o colegios comunitarios. Podemos explicar una pregunta del formulario, consultar requisitos o ayudarte a entender el siguiente paso, en español o inglés.'):mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Origen to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Origen. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Origen. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
-    <p className="small-text">{informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Nothing is saved automatically. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Nada se guarda automáticamente. La sesión termina a los 10 minutos.')}</p>
+    <p className="small-text">{informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Los cambios del perfil requieren tu revisión. La sesión termina a los 10 minutos.')}</p>
     <div className="voice-controls">
       {state==='idle'?<button type="button" className="button primary" onClick={()=>void start()}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>
         <span role="status">{state==='connecting'?t('Connecting…','Conectando…'):t(muted?'Microphone muted':'Microphone on',muted?'Micrófono silenciado':'Micrófono activo')} · {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</span>
@@ -188,8 +213,9 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
       </>}
     </div>
     <audio ref={audio} autoPlay controls hidden={state!=='live'} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
+    <p className="small-text">{history.cloud?t('Relevant past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Los resúmenes anteriores pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {savingSummary&&<p role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
-    {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p><p>{t('Technical events are logged locally without audio, transcripts or student details.','Los eventos técnicos se registran localmente sin audio, transcripciones ni datos del estudiante.')}</p></details>}
+    {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{t('Checking official sources…','Consultando fuentes oficiales…')}</p>}
     {sources.length>0&&<section className="voice-sources"><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></section>}
     {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}

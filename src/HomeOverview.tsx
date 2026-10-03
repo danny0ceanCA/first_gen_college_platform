@@ -5,6 +5,7 @@ import { ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, GraduationCap, 
 type Student = { id: string; name: string; stage: string; interest: string; gpa: string; color: string };
 type Action = { title: string; detail: string; icon: LucideIcon; action: () => void };
 export type HomeOverviewProps = {
+  cloud?:boolean;
   reviewChat:(id:string,text:string,kind:'profile'|'step')=>void; editProfile:(id:string)=>void; plans:Record<string,PlanStep[]>; onFindOpportunities:(text:string)=>void; students: Student[]; selected: string; role: 'parent' | 'student';
   completed: Record<string, boolean>; saved: Record<string, boolean>;
   shared: {id:string;studentId:string;title:string;note:string;response?:string}[];
@@ -22,7 +23,7 @@ export default function HomeOverview(p:HomeOverviewProps) {
       <div><span className="metric-icon"><Users size={21}/></span><span><strong>{visible.length}</strong><small>{t('Student profiles','Perfiles de estudiantes')}</small></span></div>
     </section>
 
-    <div className="section-heading overview-section-title"><div><h2>{role==='parent'?t('Your students at a glance','Tus estudiantes de un vistazo'):t('Your status at a glance','Tu estado de un vistazo')}</h2></div><span className="pill">{t('Sample family','Familia de ejemplo')}</span></div>
+    <div className="section-heading overview-section-title"><div><h2>{role==='parent'?t('Your students at a glance','Tus estudiantes de un vistazo'):t('Your status at a glance','Tu estado de un vistazo')}</h2></div><span className="pill">{p.cloud?t('Your family','Tu familia'):t('Sample family','Familia de ejemplo')}</span></div>
     <section className="student-status-grid">
       {visible.map(s=>{
         const steps=p.plans[s.id]||[];const count=steps.filter(step=>step.status==='complete').length;
