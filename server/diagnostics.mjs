@@ -1,12 +1,12 @@
 import {allowedRequest} from './origin.mjs';
 import {mkdir,appendFile,stat,rename,rm} from 'node:fs/promises';
 import {join} from 'node:path';
-const fields=['sessionId','eventId','responseId','callId','requestId','event','operation','code','parameter','status','mode','language','connectionState','endpoint','method','level','upstreamRequestId'];
+const fields=['sessionId','eventId','responseId','callId','requestId','event','operation','code','parameter','status','mode','language','connectionState','endpoint','method','level','upstreamRequestId','reason'];
 export function diagnosticRecord(input){
  const out={time:new Date().toISOString()};
  if(!input||typeof input!=='object')return out;
  for(const key of fields)if(typeof input[key]==='string'&&/^[a-zA-Z0-9_.:[\]\-]{1,160}$/.test(input[key]))out[key]=input[key];
- for(const key of ['durationMs','httpStatus','sourceCount','sequence'])if(Number.isFinite(input[key])&&input[key]>=0)out[key]=input[key];
+ for(const key of ['durationMs','httpStatus','sourceCount','sequence','speechDurationMs','toolCount'])if(Number.isFinite(input[key])&&input[key]>=0)out[key]=input[key];
  return out;
 }
 export function createDiagnostics(directory=join(process.cwd(),'.camino-logs')){

@@ -37,3 +37,25 @@ After deploying this version of both the API and web frontend, set the backend e
 Anonymous access is limited to live voice, its official-source financial/application lookups, technical diagnostics and browser-local summary generation. Family records, persisted history and text chat still require verified Auth0 authentication. An invalid supplied token never falls back to anonymous mode. Preview traffic shares a limit of 120 requests/minute and five voice starts/minute per API instance, alongside the existing two concurrent voice setup requests. Preview uses the service's OpenAI credits.
 
 Once Twilio login is ready, set `ALLOW_PREVIEW_VOICE=false` (or remove it) on the backend. No domain, SSL or database settings change is needed. This switch enables web live voice, including phone browsers; native mobile live voice remains pending.
+
+## Voice lookup tuning
+
+Admissions lookups now answer the specific question with a smaller response budget and lower reasoning effort, retaining mandatory live searches and official-source validation. Actual latency still depends on OpenAI and the source pages; verify response quality and timing after deploying.
+
+Within one web voice call, an exact repeated lookup (same topic, language, institution and question) can reuse a successful result for up to five minutes. Cache entries never cross sessions, expire, preserve original source-check dates, and exclude failed/uncited results. The cache is limited to twelve entries. Long lookups display elapsed time and a clearer waiting message after twenty seconds.
+
+Diagnostics now retain the safe cancellation reason, speech segment duration and tool count. Search for `response_cancelled`, `speech_segment`, `lookup_cache_hit` and `lookup_success` to evaluate interruptions and lookup latency. No speech text or audio is logged. Microphone/VAD sensitivity is unchanged until those diagnostics establish whether cancellation reflects actual speech or false detection.
+
+## Parent/student account invitations
+
+Deploy the backend before the web frontend. Backend startup applies `004_account_links.sql`; `/readyz` now requires that migration. No new Auth0 application, SMS provider, email capture, or server secret is required. Linking requires genuine authenticated accounts; anonymous voice preview cannot access `/api/account-links`.
+
+In Settings → Linked accounts, select an owned student profile, choose Invite student or Invite parent, and create a link. Share it manually by text/WhatsApp/email or copy it. HTTPS invitation links put a random 256-bit token in the fragment (not a logged query string); only its SHA-256 hash is stored in PostgreSQL. Links expire after seven days, are accepted once, and can be cancelled. Creating another invitation for the same profile/role cancels the earlier one. Roles are self-described relationships, not identity-verified proof of parenthood or ownership of a phone number. Anyone with the invitation link can accept it after authenticating, so the UI asks users to share only with their intended recipient.
+
+Opening a web invitation preserves its route through Auth0 sign-in and requires explicit acceptance. Accepting creates a separate linked profile in the recipient's account; existing profiles are not automatically merged. Both participants can edit name, education stage, interests, GPA, school, activities, goals, institutions and entry term. Shared fields are resolved from the original profile on each family load/save. Use Refresh linked accounts or reopen the app to retrieve changes made by the other person; this is not a live push subscription. Private notes, practical needs, account email and conversation summaries are never copied/shared. Each participant's voice context uses only their own account's history.
+
+Either participant can unlink. The recipient keeps the last shared academic snapshot and their private history, but future edits are independent. The original profile must be unlinked before its owner can delete it. Linked recipients cannot invite additional people to the original profile.
+
+Native Settings uses the phone share sheet and can review a pasted HTTPS invitation. The web page also offers `origen://invite?token=...` to open an installed development/production build. Native invitation state survives Auth0 login. Native sign-in still requires the configured development build; Expo Go's preview cannot accept an invitation. `EXPO_PUBLIC_WEB_URL` defaults to `https://origenedu.ai`; override it when testing against a local web frontend. Automatic HTTPS universal-link app opening is not configured; the web landing page offers explicit app opening instead.
+
+Verify with two separate authenticated accounts after deploying: invite/accept, academic edits in both directions, private notes/history isolation, cancelled/used/expired links, and unlinking from either side. Automated tests exercise database behavior using pg-mem; the real PostgreSQL integration check requires a dedicated `DATABASE_TEST_URL` and is skipped when absent. No invitations are sent automatically.

@@ -10,7 +10,7 @@ async function call(handler,body,origin='http://127.0.0.1:5173'){
 test('admissions uses Sol and requires completed search with official citations',()=>{
  const input={question:'UC transfer application requirements for Fall 2027',institution:'UC',language:'es'};
  const request=admissionsResearchRequest({OPENAI_MODEL:'gpt-6-luna'},input);
- assert.equal(request.model,'gpt-6.1-sol');assert.equal(request.tool_choice,'required');assert.equal(request.store,false);
+ assert.equal(request.model,'gpt-6.1-sol');assert.equal(request.reasoning.effort,'low');assert.equal(request.max_output_tokens,1800);assert.match(request.instructions,/only the specific question/);assert.equal(request.tool_choice,'required');assert.equal(request.store,false);
  assert.match(request.instructions,/Spanish/);assert.match(request.instructions,/exact application cycle/);
  assert.equal(admissionsResearchRequest({OPENAI_MODEL_ADMISSIONS_RESEARCH:'research-override'},input).model,'research-override');
  for(const url of ['https://admission.universityofcalifornia.edu/apply','https://www.calstate.edu/apply','https://www.commonapp.org/apply','https://commonapp.my.site.com/help','https://www.cccapply.org/apply','https://admissions.sdsu.edu/apply'])assert.ok(parseAdmissionsResearch(result(url),'')?.sources.length);
@@ -32,4 +32,13 @@ test('admissions endpoint rejects invalid requests, returns sources and logs no 
  assert.ok(!JSON.stringify(logs).includes(input.question));
  const failed=createAdmissionsResearchHandler({OPENAI_API_KEY:'secret'},async()=>new Response('private upstream details',{status:500}));
  assert.deepEqual((await call(failed,input)).data,{error:'research_unavailable'});
+});
+
+test('ASSIST citations are accepted only on official HTTPS domains with exact-agreement guidance',()=>{
+ for(const url of ['https://assist.org/','https://www.assist.org/','https://resource.assist.org/FAQ'])assert.ok(parseAdmissionsResearch(result(url),'')?.sources.length);
+ for(const url of ['https://assist.org.evil.example/','https://fakeassist.org/','http://assist.org/'])assert.equal(parseAdmissionsResearch(result(url),''),null);
+ const request=admissionsResearchRequest({}, {question:'Which courses transfer?',institution:'UC Davis',language:'en'});
+ assert.match(request.instructions,/sending community college, receiving campus, major and academic year/);
+ assert.match(request.instructions,/A general ASSIST help page cannot verify a specific course equivalency/);
+ assert.match(request.instructions,/never invent course matches/);
 });

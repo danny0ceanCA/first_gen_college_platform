@@ -2,7 +2,7 @@ import {useState} from 'react';
 import ProfileVoice from './ProfileVoice';
 import {type StudentProfile} from './planning';
 
-export default function Welcome({language,setLanguage,complete,cloud=false}:{language:'en'|'es';setLanguage:(v:'en'|'es')=>void;cloud?:boolean;complete:(firstName:string,student?:StudentProfile)=>Promise<boolean>}){
+export default function Welcome({language,setLanguage,complete,cloud=false,hasStudents=false}:{language:'en'|'es';setLanguage:(v:'en'|'es')=>void;cloud?:boolean;hasStudents?:boolean;complete:(firstName:string,student?:StudentProfile)=>Promise<boolean>}){
  const t=(en:string,es:string)=>language==='es'?es:en;
  const [name,setName]=useState('');
  const [step,setStep]=useState<'name'|'choice'|'voice'|'manual'>('name');
@@ -14,7 +14,7 @@ export default function Welcome({language,setLanguage,complete,cloud=false}:{lan
  <button className="button outline" onClick={()=>setLanguage(language==='en'?'es':'en')}>{language==='en'?'Español':'English'}</button>
  <p className="eyebrow">{t('WELCOME TO ORIGEN','BIENVENIDO A ORIGEN')}</p>
  <h1>{step==='name'?t('What should we call you?','¿Cómo te llamas?'):t(`Welcome, ${name.trim()}.`,`Bienvenido, ${name.trim()}.`)}</h1>
- {step==='name'?<form onSubmit={e=>{e.preventDefault();if(name.trim())setStep('choice');}}><label className="field">{t('Your first name','Tu nombre')}<input required autoComplete="given-name" maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label><button className="button primary" disabled={!name.trim()}>{t('Continue','Continuar')}</button></form>:<>
+ {step==='name'?<form onSubmit={e=>{e.preventDefault();if(name.trim()){if(hasStudents)void finish();else setStep('choice');}}}><label className="field">{t('Your first name','Tu nombre')}<input required autoComplete="given-name" maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label><button className="button primary" disabled={!name.trim()||saving}>{t('Continue','Continuar')}</button></form>:<>
  <h2>{t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h2>
  {step==='choice'?<><p>{t('Talk naturally with Origen, or type what you know. You will review everything before saving.','Conversa naturalmente con Origen o escribe lo que sabes. Revisarás todo antes de guardar.')}</p><div className="card-actions"><button className="button primary" onClick={()=>setStep('voice')}>{t('Talk with Origen','Hablar con Origen')}</button><button className="button outline" onClick={()=>setStep('manual')}>{t('Enter details myself','Ingresar los datos')}</button></div><button className="text-button" onClick={()=>finish()}>{t('Add a student later','Agregar un estudiante después')}</button></>:<>
  {step==='voice'&&<ProfileVoice key={language} profile={draft} language={language} role="parent" t={t} onActive={setActive} apply={changes=>setDraft(prev=>({...prev,...changes}))}/>}

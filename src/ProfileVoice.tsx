@@ -1,3 +1,4 @@
+import {voiceResearchCache} from './voiceResearchCache.mjs';
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
@@ -44,9 +45,10 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     if(!logSession.current)return;
     void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
   }
+  const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopProgress?:()=>void}>({});
   const generation=useRef(0);
   const audio=useRef<HTMLAudioElement>(null);
   function cleanup(){
@@ -55,6 +57,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     generation.current++;
     const r=resources.current;resources.current={};
     r.abort?.abort();clearInterval(r.timer);clearTimeout(r.deadline);
+    r.stopProgress?.();
     if(r.dc){r.dc.onclose=null;r.dc.close();}
     if(r.pc){r.pc.onconnectionstatechange=null;r.pc.close();}
     r.stream?.getTracks().forEach(track=>track.stop());
@@ -90,8 +93,24 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
         sentEvents.set(event_id,payload.type);
         if(sentEvents.size>100)sentEvents.delete(sentEvents.keys().next().value!);
         dc.send(JSON.stringify({...payload,event_id}));
+        return event_id;
       };
+      const cache=voiceResearchCache();const speechTimes=new Map<string,number>();
       const turns=voiceTurns(send,()=>log('empty_interruption_recovered'));
+      let progressTimer:ReturnType<typeof setInterval>|undefined;
+      const stopProgress=()=>{clearInterval(progressTimer);progressTimer=undefined;};
+      resources.current.stopProgress=stopProgress;
+      const startProgress=()=>{
+        stopProgress();const started=Date.now();let count=0;
+        progressTimer=setInterval(()=>{
+          if(generation.current!==version||abort.signal.aborted){stopProgress();return;}
+          const elapsed=Date.now()-started;
+          if(count<3&&elapsed>=[10000,35000,65000][count]){
+            const sentence=count===0?t('I’m still checking the official guidance for your question.','Sigo consultando la guía oficial para tu pregunta.'):t('This is taking a little longer. I’m still checking the official sources.','Está tardando un poco más. Sigo consultando las fuentes oficiales.');
+            if(turns.progress(sentence)){count++;log('lookup_progress',{durationMs:elapsed});}
+          }
+        },1000);
+      };
       dc.onopen=()=>{
         if(generation.current!==version)return;
         clearTimeout(resources.current.deadline);setState('live');
@@ -103,10 +122,14 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
+        // Status audio is outside the conversation: never save it as an answer.
+        if(turns.progressEvent(e))return;
         if(['error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created')turns.created();
-        if(e.type==='input_audio_buffer.speech_started')turns.speechStarted(e.item_id);
+        if(e.type==='input_audio_buffer.speech_started'){speechTimes.set(e.item_id,Date.now());turns.speechStarted(e.item_id);}
+        if(e.type==='input_audio_buffer.speech_stopped'){const started=speechTimes.get(e.item_id);if(started!==undefined){log('speech_segment',{speechDurationMs:Date.now()-started});speechTimes.delete(e.item_id);}}
+        if(e.type==='response.done'&&e.response?.status==='cancelled')log('response_cancelled',{responseId:e.response.id,reason:e.response.status_details?.reason,toolCount:(e.response.output||[]).filter((item:{type:string})=>item.type==='function_call').length});
         if(e.type==='conversation.item.input_audio_transcription.failed')turns.transcript(e.item_id,'');
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
           const valid=e.type.startsWith('conversation')?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
@@ -132,14 +155,21 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
             if((mode==='finance'&&item.name==='lookup_financial_aid')||(mode==='admissions'&&item.name==='lookup_college_applications')){
               let output:unknown={error:'lookup_failed',instruction:'Explain that current official information could not be verified. Do not invent facts.'};
               log('lookup_start',{callId:item.call_id});
-              setResearching(true);
+              researchStarted.current=Date.now();setResearching(true);
               try{
                 const args=JSON.parse(item.arguments);
-                const response=await apiFetch(mode==='admissions'?'/api/admissions-research':'/api/finance-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({question:args.question,institution:args.institution,language}),signal:abort.signal});
-                const result=await response.json();
-                if(generation.current!==version)return;
-                if(!response.ok)throw new Error('lookup_failed');
-                log('lookup_success',{callId:item.call_id,sourceCount:result.sources?.length});
+                const query={mode,language,question:args.question,institution:args.institution};
+                let result=cache.get(query);
+                if(result){log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});}
+                else {
+                  startProgress();
+                  const response=await apiFetch(mode==='admissions'?'/api/admissions-research':'/api/finance-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({question:args.question,institution:args.institution,language}),signal:abort.signal});
+                  result=await response.json();
+                  if(generation.current!==version)return;
+                  if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error('lookup_failed');
+                  cache.put(query,result);
+                }
+                log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
                 output=result;
                 setSources(prev=>[...prev,...result.sources].filter((source,index,all)=>all.findIndex(s=>s.url===source.url)===index));
                 setNotice('');
@@ -147,7 +177,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
                 if(generation.current!==version)return;
                 log('lookup_failure',{callId:item.call_id});
                 setNotice(t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
-              }
+              }finally{stopProgress();}
               if(generation.current!==version)return;
               setResearching(false);
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});
@@ -216,7 +246,7 @@ export default function ProfileVoice({profile,language,role,apply,onActive,t,mod
     <p className="small-text">{history.cloud?t('Relevant past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Los resúmenes anteriores pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {savingSummary&&<p role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
-    {researching&&<p role="status">{t('Checking official sources…','Consultando fuentes oficiales…')}</p>}
+    {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
     {sources.length>0&&<section className="voice-sources"><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></section>}
     {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}
     {transcript.length>0&&<details className="voice-transcript"><summary>{t('Conversation transcript','Transcripción de la conversación')}</summary><div>{transcript.map((entry,i)=><p key={i}><strong>{entry.who}: </strong>{entry.text}</p>)}</div></details>}

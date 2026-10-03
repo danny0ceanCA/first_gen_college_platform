@@ -69,7 +69,7 @@ test('PostgreSQL migration, account boundaries and cascade deletion', {skip:!pro
   const scoped={connect:async()=>({query:(...args)=>client.query(...args),release:()=>{}}),query:(...args)=>client.query(...args)};
   await migrateDatabase(scoped);await migrateDatabase(scoped);
   assert.equal(await databaseReady(scoped),true);
-  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,3);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,4);
   const a=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|a') RETURNING id")).rows[0].id;
   const b=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|b') RETURNING id")).rows[0].id;
   await client.query("INSERT INTO origen_students(account_id,id,name) VALUES ($1,'student','Sofia')",[a]);

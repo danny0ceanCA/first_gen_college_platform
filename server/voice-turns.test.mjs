@@ -66,3 +66,39 @@ for(const transcriptFirst of [false,true])test(`spoken interruption gets ordinar
  if(!transcriptFirst)turns.transcript('user','What is Common App?');
  assert.equal(events.length,2);assert.equal(recoveries.length,0);
 });
+
+test('lookup status stays outside history and serializes the final answer',()=>{
+ const events=[],turns=voiceTurns(e=>{events.push(e);return `event-${events.length}`;});
+ assert.equal(turns.progress('Checking sources.'),false);
+ turns.request();turns.beginDone('lookup',true);
+ assert.equal(turns.progress('Checking sources.'),true);
+ assert.equal(events[1].response.conversation,'none');
+ assert.deepEqual(events[1].response.input,[]);
+ assert.equal(turns.progress('Again.'),false);
+ assert.equal(turns.progressEvent({type:'response.created',response:{id:'status',metadata:{topic:'origen_lookup_progress'}}}),true);
+ assert.equal(turns.progressEvent({type:'response.output_audio_transcript.done',response_id:'status',transcript:'Checking sources.'}),true);
+ turns.toolsCompleted();assert.equal(events.length,2);
+ turns.progressEvent({type:'response.done',response:{id:'status'}});
+ assert.equal(events.length,3);
+ assert.deepEqual(events[2],{type:'response.create'});
+});
+
+test('speaking interrupts status and delays the answer until transcription arrives',()=>{
+ const events=[],turns=voiceTurns(e=>{events.push(e);return `event-${events.length}`;});
+ turns.request();turns.beginDone('lookup',true);turns.progress('Checking.');
+ turns.speechStarted('user');
+ turns.progressEvent({type:'response.created',response:{id:'status',metadata:{topic:'origen_lookup_progress'}}});
+ assert.deepEqual(events[2],{type:'response.cancel',response_id:'status'});
+ turns.toolsCompleted();turns.progressEvent({type:'response.done',response:{id:'status'}});
+ assert.equal(events.length,3);
+ turns.transcript('user','One more question');assert.equal(events.length,4);
+});
+
+test('a rejected status update releases the answer without ending the conversation',()=>{
+ const events=[],turns=voiceTurns(e=>{events.push(e);return `event-${events.length}`;});
+ turns.request();turns.beginDone('lookup',true);turns.progress('Checking.');
+ turns.toolsCompleted();
+ assert.equal(turns.progressEvent({type:'error',error:{event_id:'event-2'}}),true);
+ assert.equal(events.length,3);
+ assert.equal(turns.progressEvent({type:'error',error:{event_id:'unrelated'}}),false);
+});

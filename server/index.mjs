@@ -10,6 +10,7 @@ import {createDiagnosticHandler,diagnosticRecord} from './diagnostics.mjs';
 import {createDatabase,migrateDatabase,databaseReady} from './database.mjs';
 import {createHistoryHandler} from './history.mjs';
 import {createFamilyHandler} from './family.mjs';
+import {createLinksHandler} from './account-links.mjs';
 import {instrumentRequest,safeErrorCode} from './api-logging.mjs';
 
 export function createApp(env=process.env,verify,database=null,writeLog=record=>console.log(JSON.stringify(record))){
@@ -18,7 +19,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const jwks=domain?createRemoteJWKSet(new URL(`https://${domain}/.well-known/jwks.json`)):null;
  const authenticate=verify||(async token=>{if(!jwks||!audience)throw new Error('Authentication not configured');return (await jwtVerify(token,jwks,{issuer:`https://${domain}/`,audience,algorithms:['RS256']})).payload;});
  const log=input=>writeLog(diagnosticRecord(input));
- const handlers=[createFamilyHandler(database),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log),createAdmissionsResearchHandler(env,fetch,log),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
+ const handlers=[createLinksHandler(database),createFamilyHandler(database),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log),createAdmissionsResearchHandler(env,fetch,log),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
  const buckets=new Map();
  const previewPaths=new Set(['/api/profile-voice','/api/finance-research','/api/admissions-research','/api/voice-diagnostics','/api/conversation-summary']);
  let previewStarts={count:0,reset:0};

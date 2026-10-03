@@ -1,5 +1,7 @@
-export function voiceTurns(send:(event:unknown)=>void,onRecovery?:()=>void): {
+export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>void): {
   request:()=>void;
+  progress:(sentence:string)=>boolean;
+  progressEvent:(event:any)=>boolean;
   created:()=>void;
   speechStarted:(itemId:string)=>void;
   beginDone:(responseId:string,hasTools?:boolean,cancelled?:boolean)=>boolean;
