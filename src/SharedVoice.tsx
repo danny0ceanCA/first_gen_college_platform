@@ -2,7 +2,7 @@ import {ChevronDown,ChevronUp,AudioLines,Mic} from 'lucide-react';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {SharedVoiceContext} from './SharedVoiceContext';
-import {LocalProfileVoice,type VoiceProps} from './ProfileVoice';
+import {LocalProfileVoice,type VoiceProps,type VoiceHandoff} from './ProfileVoice';
 import './SharedVoice.css';
 export default function SharedVoice({children}:{children:ReactNode}){
  const [entry,setEntry]=useState<VoiceProps|null>(null);
@@ -19,6 +19,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
 
  const t=entry?.t||session?.props.t||((en:string)=>en);
  function launch(props:VoiceProps){if(ownerRef.current){setExpanded(true);return;}if(!claim('shared',true))return;if(props.mode&&props.mode!=='profile')setGuide(props.mode);setSession({id:Date.now(),props});setExpanded(false);}
+ function handoff(mode:'finance'|'admissions'|'planning'|'loans',continuity:VoiceHandoff){if(!session)return;launch({...session.props,mode,language:continuity.language,continuity,onboarding:false,replayWelcome:false});}
  return <SharedVoiceContext.Provider value={{configure:setEntry,active,owner,claim,queue:queue.current,reportSave:(failed,saving)=>{setSaveFailed(failed);setSaving(saving);},open:()=>setExpanded(true),launch}}>
  {children}
  {!session&&entry&&<aside className="shared-voice voice-ready" aria-label={t('Origen voice guide','Guia de voz Origen')}><div className="shared-voice-heading"><strong><AudioLines size={18} aria-hidden="true"/> Origen</strong><span className="voice-ready-label">{t('Here to help','Aqui para ayudarte')}</span></div><div className="voice-ready-controls"><span className="voice-current-section">{guideName(entry.mode)}</span><button type="button" className="button primary" disabled={active} onClick={()=>launch({...entry,mode:guide})}><Mic size={16}/>{t('Talk','Hablar')}</button></div></aside>}
@@ -27,7 +28,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  <div className="shared-voice-heading"><strong><AudioLines size={18} aria-hidden="true"/> Origen <span className="voice-guide-tag">{(active?session.props.mode:guide)==='loans'?t('Loans','Préstamos'):(active?session.props.mode:guide)==='finance'?t('College costs','Costos'):(active?session.props.mode:guide)==='admissions'?t('Applications','Solicitudes'):t('Planning','Planificación')}</span></strong><button type="button" className="voice-expand" aria-label={expanded?t('Minimize conversation','Minimizar conversación'):t('Show conversation details','Mostrar detalles de la conversación')} aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?<ChevronDown size={18}/>:<ChevronUp size={18}/>}</button></div>
  {saveFailed&&<div className="shared-summary-error" role="alert"><p>{t('Your conversation summary has not saved yet.','El resumen de tu conversacion aun no se ha guardado.')}</p><button type="button" className="button outline" disabled={saving} onClick={()=>void retry()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
  {!active&&entry&&<div className="voice-ready-controls"><span className="voice-current-section">{guideName(entry.mode)}</span></div>}
- <LocalProfileVoice onSwitchGuide={active&&entry&&entry.mode!==session.props.mode?()=>launch({...entry,mode:entry.mode}):undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} autoStart onActive={live=>{claim('shared',live);}}/>
+ <LocalProfileVoice onHandoff={handoff} onSwitchGuide={active&&entry&&entry.mode!==session.props.mode?context=>handoff(entry.mode as 'finance'|'admissions'|'planning'|'loans',context):undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} autoStart onActive={live=>{claim('shared',live);}}/>
  </aside>}
  </SharedVoiceContext.Provider>;
 }

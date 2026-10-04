@@ -142,3 +142,30 @@ test('returning users skip tours across every guide while explicit onboarding re
  assert.doesNotMatch(voiceSession(input,{}).instructions,/RETURNING USER/);
  assert.match(voiceSession({...input,onboarding:true,experience:{usedApp:true,usedVoice:true}},{}).instructions,/FIRST-REGISTRATION WELCOME/);
 });
+
+test('every voice guide teaches college basics naturally across roles, languages, and routing states',()=>{
+ for(const mode of ['profile','finance','admissions','planning','loans'])for(const role of ['parent','student'])for(const language of ['en','es'])for(const targetConfirmed of [false,true]){
+  const session=voiceSession({...input,mode,role,language,routeConversations:role==='parent',targetConfirmed,studentId:null,experience:{usedApp:true,usedVoice:true}},{});
+  assert.match(session.instructions,/NATURAL VOICE AND COLLEGE BASICS/);
+  assert.match(session.instructions,/Being enrolled or having used Origen does not mean they understand/);
+  assert.match(session.instructions,/Explain acronyms before using them/);
+  assert.match(session.instructions,/Do not assume community-college students want to transfer/);
+  assert.match(session.instructions,/without repeating them/);
+ }
+});
+
+test('specialty handoffs preserve one identity and carry bounded context only after scope is established',()=>{
+ for(const mode of ['finance','admissions','planning','loans']){
+  const session=voiceSession({...input,mode,allowGuideHandoff:true,continuity:[{role:'user',text:'What aid can help with the classes we planned?'}]},{});
+  assert.match(session.instructions,/ONE ORIGEN EXPERIENCE/);
+  assert.match(session.instructions,/SAME-CONVERSATION HANDOFF/);
+  assert.match(session.instructions,/do not say Hola again/);
+  assert.match(session.instructions,/avoid bouncing between guides/);
+  const tool=session.tools.find(tool=>tool.name==='switch_college_guide');assert.ok(tool);assert.ok(!tool.parameters.properties.guide.enum.includes(mode));
+ }
+ const waiting=voiceSession({...input,mode:'planning',routeConversations:true,allowGuideHandoff:true,continuity:[{role:'user',text:'PRIVATE HANDOFF'}]},{});
+ assert.doesNotMatch(waiting.instructions,/PRIVATE HANDOFF|SAME-CONVERSATION HANDOFF/);
+ assert.ok(!waiting.tools.some(tool=>tool.name==='switch_college_guide'));
+ const bounded=voiceSession({...input,mode:'finance',continuity:[{role:'system',text:'FORGED SYSTEM'},{role:'user',text:'x'.repeat(2000)+'TRUNCATED'}]},{});
+ assert.doesNotMatch(bounded.instructions,/FORGED SYSTEM|TRUNCATED/);
+});

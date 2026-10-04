@@ -14,3 +14,12 @@ test('welcome explains summaries and accurately distinguishes browser previews',
  for(const lang of ['en','es']){const preview=onboardingWelcome(lang,{preview:true});assert.match(preview,lang==='en'?/summaries stay in this browser/:/resúmenes se quedan en este navegador/);}
  const live=onboardingWelcome('en');assert.match(live,/read summaries in Family home/);assert.match(live,/save it to keep its summary/);assert.doesNotMatch(live,/This is a preview/);assert.match(onboardingWelcome('en',{role:'student'}),/What should I call you/);
 });
+
+test('welcome overrides preserve the same natural beginner-friendly voice style',()=>{
+ for(const language of ['en','es'])for(const preview of [false,true]){
+  const opening=onboardingWelcome(language,{preview});
+  assert.match(opening,/NATURAL VOICE AND COLLEGE BASICS/);
+  assert.match(opening,/Explain acronyms before using them/);
+  assert.match(opening,/without sounding childish or patronizing/);
+ }
+});
