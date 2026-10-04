@@ -5,3 +5,5 @@
 .profile-delete h3 { color: #984336; }
 
 .voice-scope{margin:16px 0;padding:14px 16px;border:1px solid #dce3d6;border-radius:12px;background:#f8faf5}.scope-confirmation label{display:grid;gap:8px;font-size:14px;font-weight:600}.scope-confirmation select{min-height:46px;padding:10px;border:1px solid #ccd8c5;border-radius:9px;background:white;color:#254e42;width:100%;font:inherit}.scope-confirmation .button{margin:8px 12px 8px 0}.scope-confirmation .text-button{min-height:44px}
+
+.voice-launcher{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 16px;padding:16px 20px;background:#f2f6ee;margin:20px 0}.voice-launcher h3{font-size:18px;margin:0}.voice-launcher p{grid-column:1;font-size:13px;margin:0;max-width:55ch;line-height:1.5}.voice-launcher>.button{grid-column:2;grid-row:1 / span 2;min-height:44px;font-size:13px;padding:12px 16px}@media(max-width:600px){.voice-launcher{grid-template-columns:1fr;padding:16px;gap:8px}.voice-launcher>.button{grid-column:1;grid-row:auto;justify-self:start}}

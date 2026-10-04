@@ -6,7 +6,7 @@ Set backend `NODE_ENV=production` and disable `ALLOW_PREVIEW_VOICE` (unset or `f
 
 Current database readiness requires migration `011_subject_locks.sql`; older phase-specific migration references below are historical. Deploy the backend before the web frontend, verify `/readyz`, then verify signed-in data download and closure using synthetic accounts. Install and validate the Auth0 recent-auth Action before rollout: [fresh-auth and concurrency controls](docs/vendor-readiness/RECENT_AUTH_AND_CLOSURE.md). Provider identities, backups and mobile controls require the separate processes documented in [account lifecycle](docs/vendor-readiness/ACCOUNT_LIFECYCLE.md).
 
-Create a Blueprint from this repository using render.yaml, or configure two services manually.
+Create a Blueprint from this repository using render.yaml, or configure two services manually. The Blueprint prompts for DATABASE_URL: use the existing Render database internal connection URL. It does not create another database. NODE_ENV is set to production; anonymous voice must remain disabled there.
 
 ## API web service
 Build: `npm ci`. Start: `npm start`. Health check: `/healthz`.

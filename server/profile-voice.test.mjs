@@ -5,7 +5,7 @@ import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';
 const input={sdp:'v=0\r\n',language:'es',role:'parent',profile:{name:'Test student',id:'private-id',color:'peach'}};
 
 test('all live modes permit bilingual transcription and explicit language switching',()=>{
- for(const mode of ['profile','finance','admissions','planning']){
+ for(const mode of ['profile','finance','admissions','planning','loans']){
   const session=voiceSession({...input,mode},{});
   assert.equal(session.audio.input.transcription.language,undefined);
   const tool=session.tools.find(tool=>tool.name==='set_conversation_language');
@@ -111,7 +111,7 @@ test('first-registration welcome explains the app before collecting student deta
 });
 
 test('all live guides open with Hola and explain English terms without leaving Spanish',()=>{
- for(const mode of ['profile','finance','admissions','planning'])for(const language of ['en','es']){
+ for(const mode of ['profile','finance','admissions','planning','loans'])for(const language of ['en','es']){
   const session=voiceSession({...input,mode,language,onboarding:mode==='profile'},{});
   assert.match(session.instructions,/first spoken word must be exactly Hola/);
   assert.match(session.instructions,/explain its meaning in simple Spanish/);
@@ -120,4 +120,12 @@ test('all live guides open with Hola and explain English terms without leaving S
  }
  const routed=voiceSession({...input,mode:'finance',routeConversations:true,students:[]},{});
  assert.match(routed.instructions,/first spoken word must be exactly Hola/);
+});
+
+test('Loans guide uses FSA lookup and preserves borrower-specific relief guidance',()=>{
+ const session=voiceSession({...input,mode:'loans'},{});
+ assert.ok(session.tools.some(tool=>tool.name==='lookup_financial_aid'));
+ assert.ok(!session.tools.some(tool=>tool.name==='propose_profile'));
+ assert.match(session.instructions,/Deferment and forbearance postpone payments, not erase debt/);
+ assert.match(session.instructions,/restrict research to Federal Student Aid/);
 });

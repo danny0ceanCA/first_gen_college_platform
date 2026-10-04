@@ -7,7 +7,7 @@ export function summarySaveQueue(){
   get size(){return jobs.size;},
   flush(){
    if(running)return running;
-   running=(async()=>{for(const [id,save] of jobs){await save();jobs.delete(id);}})().finally(()=>{running=undefined;});
+   running=(async()=>{const failures=[];for(const [id,save] of jobs){try{await save();jobs.delete(id);}catch(error){failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Some summaries could not be saved');})().finally(()=>{running=undefined;});
    return running;
   },
  };

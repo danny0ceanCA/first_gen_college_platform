@@ -80,28 +80,24 @@ Validation: production build, nine server tests, browser checks of profile/roadm
 ## Profile-only page revision
 The former roadmap page is now Student profiles. It displays saved student details and institutions with an Edit profile action. Plan generation, suggestion review, step editing and progress controls are removed from the UI. Previously stored plan data is retained but is not displayed. AI chat retains the option to review parent-provided information for the profile.
 
-### Live profile conversation
-Family home > expand a student > Edit profile > Start live conversation.
-Uses OpenAI Realtime over WebRTC, with the API key remaining in the local server.
-Optional server-only OPENAI_MODEL_VOICE overrides the default gpt-realtime-2.1.
-Microphone access is requested only after Start. Audio/profile data goes to OpenAI;
-Origen does not store recordings. Transcripts and proposals exist only in this editor
-session. End the conversation, review/edit/remove proposals, add them to the form,
-then Save profile to persist locally. Switching page/student/language/role closes
-microphone tracks and the peer connection. Sessions end after 10 minutes; voice is
-billed separately from Astra text chat. This local-only endpoint must be protected
-with user authentication and quotas before any public deployment.
+### Live voice conversations
+The web app has separate guides for college costs, applications and planning, plus profile onboarding. Specialist calls stay active while navigating within the family app. The fixed voice bar provides mute, end, student confirmation and expandable details; idle starts use the current student, role and interface language. Profile onboarding remains tied to its form and ends when that form closes. Sign-out, leaving the family app and refreshing end calls. Sessions are limited to ten minutes per connection.
+
+Set server-only OPENAI_MODEL_VOICE to override the default gpt-realtime-2.1. OpenAI credentials stay on the server. All new conversations begin with Hola, then continue in the selected language. Spanish explanations may name English terms without changing languages. Parent guides require confirmation before using a student's private context or saving a targeted summary.
+
+Microphone audio goes to OpenAI through WebRTC. Raw transcripts and pending save jobs stay in memory; summaries are saved to PostgreSQL for signed-in accounts or browser storage for previews. Failed jobs can be retried while the app remains open; refreshing loses pending jobs. Profile suggestions require review and explicit saving. Native live voice remains pending. See RENDER_SETUP.md for production authentication, origin restrictions, quotas, diagnostics and the separate non-production preview configuration.
+
 Validation: npm run build; node --test server/*.test.mjs. Live microphone/audio
 playback requires testing in the user's browser with their permission and API access.
 
-Paying for college includes a bilingual live voice explainer with a separate finance teaching prompt, no profile-editing tools, and limited student context. It ends when leaving the page or switching students/language/role. Finance voice can now call /api/finance-research for official FSA and institution information. FSA searches are domain-restricted; college citations must use HTTPS .edu pages (or FSA). The spoken assistant must verify the institution and distinguish year, residency and housing. Sources and retrieval dates appear alongside voice. There is no application lookup-count cap; provider quotas and the existing 10-minute session duration still apply. Each lookup uses billed Responses API web search and model tokens. OPENAI_MODEL_FINANCE_RESEARCH optionally overrides the research model. This is a localhost-only endpoint, like the voice session endpoint. Teaching references: https://studentaid.gov/articles/financial-aid-dictionary/ and https://studentaid.gov/articles/fafsa-student-steps/.
+Paying for college includes a bilingual live voice explainer with a separate finance teaching prompt, no profile-editing tools, and limited student context. It stays active across family-app navigation; confirmed student changes reconnect into a separate segment. Finance voice can now call /api/finance-research for official FSA and institution information. FSA searches are domain-restricted; college citations must use HTTPS .edu pages (or FSA). The spoken assistant must verify the institution and distinguish year, residency and housing. Sources and retrieval dates appear alongside voice. There is no application lookup-count cap; provider quotas and the existing 10-minute session duration still apply. Each lookup uses billed Responses API web search and model tokens. OPENAI_MODEL_FINANCE_RESEARCH optionally overrides the research model. The deployed API requires authentication, except for explicitly enabled non-production previews. Teaching references: https://studentaid.gov/articles/financial-aid-dictionary/ and https://studentaid.gov/articles/fafsa-student-steps/.
 
 
 Voice diagnostics are saved locally in `.camino-logs/voice.jsonl` (ignored by Git), with one rotated backup after approximately 2 MB. Events include a random session ID, client sequence number, operation, error code/parameter, upstream request ID, HTTP status and timing. Audio, transcripts, student profiles, search queries and API keys are excluded. The voice panel exposes its diagnostic session ID. Logging starts with a new voice session; the log does not reconstruct earlier errors. Finance speech speed is 0.95.
 
 Model routing: general text guidance defaults to `gpt-6-luna`. Finance, opportunity and roadmap research default to `gpt-6.1-sol`, configured independently through `OPENAI_MODEL_RESEARCH`. `OPENAI_MODEL_FINANCE_RESEARCH` and `OPENAI_MODEL_OPPORTUNITIES` take precedence for their services. `OPENAI_MODEL` is the general conversation fallback, so changing it does not downgrade research. Live voice remains `gpt-realtime-2.1`; transcription remains `gpt-4o-mini-transcribe`.
 
-Ready to apply for college includes an English/Spanish live admissions guide using `gpt-realtime-2.1` with server VAD and transcript-gated replies. Its `lookup_college_applications` tool calls `/api/admissions-research`, using `gpt-6.1-sol` (override: `OPENAI_MODEL_ADMISSIONS_RESEARCH`) to verify official application requirements and return citations. It shares only name, stage, institutions and entry term, never edits profiles or submits applications, and ends on navigation, student, language or role changes. Sessions remain limited to 10 minutes. Diagnostics accept both current `X-Origen-Session` and legacy `X-Camino-Session` headers.
+Ready to apply for college includes an English/Spanish live admissions guide using `gpt-realtime-2.1` with server VAD and transcript-gated replies. Its `lookup_college_applications` tool calls `/api/admissions-research`, using `gpt-6.1-sol` (override: `OPENAI_MODEL_ADMISSIONS_RESEARCH`) to verify official application requirements and return citations. It shares only name, stage, institutions and entry term, never edits profiles or submits applications, and stays active across family-app navigation without silently changing guides or student context. Sessions remain limited to 10 minutes. Diagnostics accept both current `X-Origen-Session` and legacy `X-Camino-Session` headers.
 
 
 ## Native iPhone and Android app
@@ -113,3 +109,5 @@ The Expo/React Native project lives in `mobile/`. It is a native implementation,
 The landing includes English/Spanish sharing text, copy buttons, sample-preview guidance, and a source-backed privacy overview. The Contact section and footer link use the approved public inbox `daniel@origenedu.ai`. Set `VITE_PUBLIC_CONTACT_EMAIL` to override it. This value is public and is included in the frontend bundle; rebuild after changing it. An invalid override hides Contact rather than pointing visitors to an unavailable destination. The overview should be checked against actual production configuration before publication.
 
 Social previews use `public/social-preview.png` and metadata in `index.html`. Section links work on initial loads and hash navigation; the illustrated story remains under `#story`.
+
+Loans: the web app (including mobile browsers) has a dedicated Loans guide using the financial-aid research endpoint restricted to Federal Student Aid. Summaries use mode `loans`; apply migration 012 before deploying the API. No new model credential is needed. Native mobile parity remains pending.

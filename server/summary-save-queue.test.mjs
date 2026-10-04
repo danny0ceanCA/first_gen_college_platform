@@ -19,3 +19,10 @@ test('overlapping summary cleanup calls do not generate or save the same job twi
  queue.add('one',async()=>assert.fail('duplicate'));
  release();await first;assert.equal(calls,1);assert.equal(queue.size,0);
 });
+
+test('one broken summary does not prevent other students from saving',async()=>{
+ const queue=summarySaveQueue();let saved=false;
+ queue.add('broken',async()=>{throw new Error('student_not_found');});
+ queue.add('healthy',async()=>{saved=true;});
+ await assert.rejects(queue.flush(),AggregateError);assert.equal(saved,true);assert.equal(queue.size,1);
+});
