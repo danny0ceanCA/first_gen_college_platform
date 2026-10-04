@@ -107,3 +107,9 @@ Ready to apply for college includes an English/Spanish live admissions guide usi
 ## Native iPhone and Android app
 
 The Expo/React Native project lives in `mobile/`. It is a native implementation, separate from the `#mobile-design` browser mockup. Run `npm run mobile` from the repository root for the Expo device QR code, or `npm run mobile:web` for the browser version of the native components. See [mobile/README.md](mobile/README.md) for implemented features, checks, and pending voice/authentication integration.
+
+## Landing outreach and contact
+
+The landing includes English/Spanish sharing text, copy buttons, sample-preview guidance, and a source-backed privacy overview. The Contact section and footer link use the approved public inbox `daniel@origenedu.ai`. Set `VITE_PUBLIC_CONTACT_EMAIL` to override it. This value is public and is included in the frontend bundle; rebuild after changing it. An invalid override hides Contact rather than pointing visitors to an unavailable destination. The overview should be checked against actual production configuration before publication.
+
+Social previews use `public/social-preview.png` and metadata in `index.html`. Section links work on initial loads and hash navigation; the illustrated story remains under `#story`.

@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {diagnosticRecord} from './diagnostics.mjs';
 
-const routes=new Set(['healthz','readyz','api/ai','api/chat','api/family','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research']);
+const routes=new Set(['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report','api/ai','api/chat','api/family','api/plans','api/institutions','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research']);
 // Never log error messages: database errors can include SQL, values or credentials.
 export function safeErrorCode(error){
  const code=error?.code;
@@ -33,7 +33,7 @@ export function instrumentRequest(req,res,write){
   if(completed)return;completed=true;
   const status=aborted?499:res.statusCode;
   // Successful probe requests are omitted to keep production logs useful.
-  if(!aborted&&status<400&&['healthz','readyz'].includes(endpoint))return;
+  if(!aborted&&status<400&&['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report'].includes(endpoint))return;
   emit({event:aborted?'api_aborted':'api_request',level:status>=500?'error':status>=400?'warn':'info',httpStatus:status,durationMs:Math.round(performance.now()-started),code:aborted?'client_disconnected':code});
  };
  res.once('finish',()=>complete(false));res.once('close',()=>complete(!res.writableFinished));

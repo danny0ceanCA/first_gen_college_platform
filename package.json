@@ -11,6 +11,7 @@
     "mobile:web": "npm --prefix mobile run web",
     "start": "node server/index.mjs",
     "db:migrate": "node server/migrate.mjs",
+    "check:production": "node server/production-config.mjs",
     "test": "node --test server/*.test.mjs"
   },
   "dependencies": {

@@ -27,7 +27,7 @@ test('all API outcomes have unique request IDs, safe logs and CORS-visible corre
  }finally{await close();}
 });
 test('database failure records SQLSTATE without SQL, user values, stack or secrets',async()=>{
- const database={connect:async()=>{throw Object.assign(new Error('password=private-secret; SELECT private_name'),{code:'53300'});}};
+ const database={query:async()=>({rows:[]}),connect:async()=>{throw Object.assign(new Error('password=private-secret; SELECT private_name'),{code:'53300'});}};
  const {logs,base,close}=await fixture({},database);
  try{
   const response=await fetch(base+'/api/family',{method:'POST',headers:{Authorization:'Bearer valid','Content-Type':'application/json'},body:JSON.stringify({action:'load'})});
@@ -49,7 +49,7 @@ test('preview voice is opt-in, origin restricted, and never grants access to fam
   try{
    const voice=await fetch(base+'/api/profile-voice',{method:'POST',headers,body:'{}'});
    assert.equal(voice.status,enabled?503:401); // With preview enabled it reaches the missing-key check.
-   for(const path of ['/api/family','/api/conversation-history','/api/chat'])assert.equal((await fetch(base+path,{method:'POST',headers,body:'{}'})).status,401);
+   for(const path of ['/api/family','/api/plans','/api/conversation-history','/api/chat'])assert.equal((await fetch(base+path,{method:'POST',headers,body:'{}'})).status,401);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{...headers,Origin:'https://other.example'},body:'{}'})).status,403);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{...headers,Authorization:'Bearer invalid'},body:'{}'})).status,401);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);

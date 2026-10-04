@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-03",
+  "method": "Playwright Chromium; synthetic public page; no authenticated staff/voice/native testing",
+  "results": [
+    {
+      "route": "#institutions",
+      "width": 1280,
+      "mainCount": 1,
+      "overflow": false,
+      "unnamedButtons": 0,
+      "languageSwitch": "passed",
+      "keyboardSkip": "passed"
+    },
+    {
+      "route": "#institution/example",
+      "width": 1280,
+      "mainCount": 1,
+      "overflow": false,
+      "unnamedButtons": 0,
+      "languageSwitch": "passed",
+      "keyboardSkip": "passed"
+    },
+    {
+      "route": "#institutions",
+      "width": 375,
+      "mainCount": 1,
+      "overflow": false,
+      "unnamedButtons": 0,
+      "languageSwitch": "passed",
+      "keyboardSkip": "passed"
+    },
+    {
+      "route": "#institution/example",
+      "width": 375,
+      "mainCount": 1,
+      "overflow": false,
+      "unnamedButtons": 0,
+      "languageSwitch": "passed",
+      "keyboardSkip": "passed"
+    }
+  ]
+}

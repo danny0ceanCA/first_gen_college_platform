@@ -1,4 +1,6 @@
 import {safeErrorCode} from './api-logging.mjs';
+import {accountClosed} from './account-lifecycle.mjs';
+import {guardAccountTransaction} from './account-guard.mjs';
 import {sharedColumns} from './account-links.mjs';
 const profileFields={name:100,stage:40,interest:2000,gpa:30,color:40,institutions:2000,entryTerm:2000,school:2000,activities:2000,goals:2000,needs:2000,notes:2000};
 const columns=['name','stage','interest','gpa','color','institutions','entry_term','school','activities','goals','needs','notes'];
@@ -26,7 +28,11 @@ export function validateFamily(input){
  };
  switch(input.action){
   case 'load':return {action:'load'};
-  case 'save-account':return {action:input.action,account:account(input.account)};
+  case 'save-account':{const details=account(input.account);if(!details.firstName)return invalid();return {action:input.action,account:details};}
+  case 'complete-onboarding':{
+   const details=account(input.account);if(!details.firstName)return invalid();
+   return {action:input.action,account:details,...(input.student===undefined?{}:{student:student(input.student)})};
+  }
   case 'save-student':return {action:input.action,student:student(input.student)};
   case 'delete-student':return {action:input.action,id:id(input.id)};
   case 'import':{
@@ -44,9 +50,11 @@ export function createFamilyRepository(database){
   const client=await database.connect();let transaction=false;
   try{
    await client.query('BEGIN');transaction=true;
+   await guardAccountTransaction(client,subject);
    await client.query('INSERT INTO origen_accounts(auth0_subject) VALUES ($1) ON CONFLICT (auth0_subject) DO NOTHING',[subject]);
    const accountRow=(await client.query('SELECT id, first_name, email FROM origen_accounts WHERE auth0_subject=$1 FOR UPDATE',[subject])).rows[0];
    const owner=accountRow.id;
+   if(await accountClosed(client,subject))throw Object.assign(new Error('account_closed'),{status:403});
    const saveStudent=async(student,importing=false)=>{
     const link=(await client.query('SELECT * FROM origen_student_links WHERE member_account_id=$1 AND member_student_id=$2 FOR UPDATE',[owner,student.id])).rows[0];
     if(link){
@@ -60,7 +68,8 @@ export function createFamilyRepository(database){
     const values=[owner,student.id,...Object.keys(profileFields).map(field=>student[field])];
     await client.query(`INSERT INTO origen_students(account_id,id,${columns.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) ON CONFLICT (account_id,id) ${importing?'DO NOTHING':`DO UPDATE SET ${columns.map(c=>`${c}=EXCLUDED.${c}`).join(',')}, updated_at=now()`}`,values);
    };
-   if(input.action==='save-account')await client.query('UPDATE origen_accounts SET first_name=$2,email=$3,updated_at=now() WHERE id=$1',[owner,input.account.firstName,input.account.email]);
+   if(input.action==='save-account'||input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET first_name=$2,email=$3,updated_at=now() WHERE id=$1',[owner,input.account.firstName,input.account.email]);
+   if(input.action==='complete-onboarding'&&input.student)await saveStudent(input.student);
    if(input.action==='save-student')await saveStudent(input.student);
    if(input.action==='delete-student'){
     if((await client.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 AND owner_student_id=$2',[owner,input.id])).rows.length)throw Object.assign(new Error('unlink_before_deleting'),{status:409});
@@ -96,6 +105,6 @@ export function createFamilyHandler(database,repository=database?createFamilyRep
    let input;try{input=JSON.parse(raw);}catch{return send(400,{error:'invalid_family_request'});}
    const operation=validateFamily(input);
    return send(200,await repository(req.origenIdentity.sub,operation));
-  }catch(error){const known=[400,404,409].includes(error.status);if(!known)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'database_unavailable'});}
+  }catch(error){const known=[400,403,404,409].includes(error.status);if(!known)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'database_unavailable'});}
  };
 }

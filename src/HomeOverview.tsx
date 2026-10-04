@@ -19,6 +19,7 @@ export default function HomeOverview(p:HomeOverviewProps) {
   const {t,students,selected,completed,shared,saved,role}=p;
   const visible=role==='parent'?students:students.filter(s=>s.id===selected);
   return <div className="family-overview">
+    {role==='parent'&&<ConversationHistory studentId={null} t={t}/>}
     <section className="overview-metrics" aria-label={t('Family summary','Resumen familiar')}>
       <div><span className="metric-icon"><Users size={21}/></span><span><strong>{visible.length}</strong><small>{t('Student profiles','Perfiles de estudiantes')}</small></span></div>
     </section>

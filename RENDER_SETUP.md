@@ -1,5 +1,11 @@
 # Deploy Origen to Render
 
+## Current production safeguards
+
+Set backend `NODE_ENV=production` and disable `ALLOW_PREVIEW_VOICE` (unset or `false`). Production startup now rejects missing database/OpenAI/Auth0/origin configuration and unsafe origin syntax. Run `npm run check:production` with the service's backend environment before deployment; it never prints secret values. See [production controls](docs/vendor-readiness/PRODUCTION_CONTROLS.md) for live provider checks and restore/incident procedures. Preview instructions below apply only to an intentionally separate non-production demonstration environment.
+
+Current database readiness requires migration `011_subject_locks.sql`; older phase-specific migration references below are historical. Deploy the backend before the web frontend, verify `/readyz`, then verify signed-in data download and closure using synthetic accounts. Install and validate the Auth0 recent-auth Action before rollout: [fresh-auth and concurrency controls](docs/vendor-readiness/RECENT_AUTH_AND_CLOSURE.md). Provider identities, backups and mobile controls require the separate processes documented in [account lifecycle](docs/vendor-readiness/ACCOUNT_LIFECYCLE.md).
+
 Create a Blueprint from this repository using render.yaml, or configure two services manually.
 
 ## API web service
@@ -46,7 +52,21 @@ Within one web voice call, an exact repeated lookup (same topic, language, insti
 
 Diagnostics now retain the safe cancellation reason, speech segment duration and tool count. Search for `response_cancelled`, `speech_segment`, `lookup_cache_hit` and `lookup_success` to evaluate interruptions and lookup latency. No speech text or audio is logged. Microphone/VAD sensitivity is unchanged until those diagnostics establish whether cancellation reflects actual speech or false detection.
 
+## Planning voice module
+
+Institution registration/pages use migration `008_institutions.sql`; readiness now requires 008. See [INSTITUTIONS.md](INSTITUTIONS.md) for the separate dashboard, affiliation review, public page snapshots and backend-only `INSTITUTION_REVIEWER_SUBJECTS` allowlist. Deploy the API first. With no reviewer identities configured, institution drafts can be submitted but cannot be published.
+
+Structured plan storage is implemented by `007_planning_records.sql` and authenticated `/api/plans`; readiness now requires 007. See [PLANNING_DATABASE.md](PLANNING_DATABASE.md) for table relationships, versioned writes and deletion rules. Deploy the API first. Planning voice automatically receives saved active plans for its confirmed target. The plan editor and voice-to-plan review flow are not yet connected; the current UI saves discussion summaries.
+
+Web navigation includes Planning, with a voice specialist that adapts to high school, community college, transfer and college goals. Its `lookup_education_planning` tool uses `/api/admissions-research` with `purpose=planning` and mandatory live official-source searches. UC admissions, UCOP A–G course lists, CSU, CCCCO/CCCApply, ASSIST, campus catalogs and Federal Student Aid are supported sources. An inaccessible interactive course list or agreement must be reported as unverified. This is researched guidance, not a course audit or guaranteed admission/degree certification.
+
+Parent discussions use the same student/family confirmation flow. Planning summaries persist as mode `planning`, record suggested actions versus verified requirements, and automatically join the confirmed target's future voice context. Deploy the API first: startup applies `006_planning_conversations.sql`, which widens the summary mode constraint without changing existing histories. Then deploy the web frontend. No new environment variable is required; the existing Realtime voice and Sol admissions research settings apply. The module is responsive for phone browsers; native live voice remains pending.
+
 ## Parent/student account invitations
+
+Parent college-cost and application voice guides ask which student the discussion concerns and require an on-screen confirmation before using that student's history or saving a summary. General family discussions use a separate, collapsed Family conversations history on Family home, private to the signed-in account. Switching targets saves the previous segment and opens a fresh voice session with only the next target's history. Profile-edit/onboarding voice remains attached to the profile being edited. Native live voice is still pending; native Family home can display persisted family summaries.
+
+Deploy the backend before the frontend for this change. Startup applies `005_family_conversations.sql` and readiness requires it. This permits account-private summaries with a NULL student ID; existing student histories keep their original ownership. Test initial confirmation, duplicate names, a student-to-student switch and a general-family discussion before enabling production use.
 
 Deploy the backend before the web frontend. Backend startup applies `004_account_links.sql`; `/readyz` now requires that migration. No new Auth0 application, SMS provider, email capture, or server secret is required. Linking requires genuine authenticated accounts; anonymous voice preview cannot access `/api/account-links`.
 

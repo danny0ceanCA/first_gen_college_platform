@@ -11,7 +11,7 @@ async function fixture(){
  db.public.registerFunction({name:'btrim',args:[DataType.text],returns:DataType.text,implementation:value=>value.trim()});
  db.public.registerFunction({name:'length',args:[DataType.text],returns:DataType.integer,implementation:value=>value.length});
  db.public.registerFunction({name:'jsonb_typeof',args:[DataType.jsonb],returns:DataType.text,implementation:value=>Array.isArray(value)?'array':typeof value});
- for(const name of ['001_family_storage.sql','002_local_imports.sql','003_history_imports.sql','004_account_links.sql'])db.public.none(await readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));
+ for(const name of ['001_family_storage.sql','002_local_imports.sql','003_history_imports.sql','004_account_links.sql','005_family_conversations.sql','006_planning_conversations.sql','007_planning_records.sql','008_institutions.sql','009_institution_metrics.sql','010_account_lifecycle.sql','011_subject_locks.sql']){let sql=await readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'); /* pg-mem omits PostgreSQL's generated CHECK name; give it the real name for migration testing. */ if(name==='001_family_storage.sql')sql=sql.replace("mode text NOT NULL CHECK","mode text NOT NULL CONSTRAINT origen_conversation_summaries_mode_check CHECK");db.public.none(sql);}
  const {Pool}=db.adapters.createPg();const pool=new Pool();
  return {pool,run:(subject,input)=>createFamilyRepository(pool)(subject,validateFamily(input))};
 }
@@ -21,6 +21,29 @@ import {createProfileVoiceHandler} from './profile-voice.mjs';
 
 const student={id:'student-1',name:'Sofia',stage:'10th grade',interest:'Art',gpa:'',color:'peach'};
 const item={id:'session-1',studentId:student.id,date:'2026-10-01T12:00:00Z',mode:'finance',summary:'Family asked about UC costs. Residency is unresolved.',sources:[]};
+test('family histories remain account-private and survive student deletion',async()=>{
+ const {pool,run}=await fixture();const history=createHistoryRepository(pool);
+ try{
+  await run('auth0|one',{action:'save-student',student});await run('auth0|two',{action:'load'});
+  await history('auth0|one',{action:'save',item});
+  await history('auth0|one',{action:'save',item:{...item,id:'family-session',studentId:null,summary:'General family advice'}});
+  assert.deepEqual((await history('auth0|one',{action:'context',studentId:null})).items.map(x=>x.summary),['General family advice']);
+  assert.deepEqual((await history('auth0|two',{action:'context',studentId:null})).items,[]);
+  await assert.rejects(history('auth0|one',{action:'save',item:{...item,id:'family-session'}}),{status:409});
+  let session;
+  const voice=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async(url,options)=>{session=JSON.parse(options.body.get('session'));return new Response('v=0\r\nanswer');},()=>{},pool);
+  const base={sdp:'v=0',language:'en',role:'parent',mode:'finance',routeConversations:true,students:[{id:'foreign',name:'FORGED NAME'}],profile:{name:'FORGED PROFILE'},memory:[{summary:'FORGED MEMORY'}]};
+  assert.equal((await invoke(voice,base,'auth0|one','/api/profile-voice')).status,200);
+  assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language']);
+  assert.match(session.instructions,/Sofia/);assert.doesNotMatch(session.instructions,/FORGED|General family advice/);
+  assert.equal((await invoke(voice,{...base,targetConfirmed:true,studentId:null},'auth0|one','/api/profile-voice')).status,200);
+  assert.match(session.instructions,/General family advice/);assert.doesNotMatch(session.instructions,/Residency is unresolved|FORGED/);
+  const summary=createSummaryHandler({OPENAI_API_KEY:'test'},async()=>new Response(JSON.stringify({output:[{content:[{type:'output_text',text:'General application guidance.'}]}]})),pool);
+  assert.equal((await invoke(summary,{...item,id:'generated-family',studentId:null,defer:true,language:'en',turns:[{role:'user',text:'What are the options?'}]},'auth0|one','/api/conversation-summary')).status,200);
+  await run('auth0|one',{action:'delete-student',id:student.id});
+  assert.equal((await history('auth0|one',{action:'load'})).items.length,2);
+ }finally{await pool.end();}
+});
 async function invoke(handler,input,subject='auth0|one',path='/api/conversation-history'){let status,body;await handler(Object.assign(Readable.from([JSON.stringify(input)]),{url:path,method:'POST',headers:{'content-type':'application/json',host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173'},origenAuthorized:true,origenIdentity:{sub:subject}}),{writeHead(s){status=s;},end(s){body=s&&s.startsWith('{')?JSON.parse(s):s;}},()=>assert.fail());return {status,body};}
 test('history belongs to the verified family and student, including matching IDs',async()=>{
  const {pool,run}=await fixture();const history=createHistoryRepository(pool);
@@ -30,6 +53,19 @@ test('history belongs to the verified family and student, including matching IDs
  await assert.rejects(history('auth0|one',{action:'save',item:{...item,id:'foreign',studentId:'missing'}}),{status:404});
  assert.equal((await history('auth0|one',{action:'context',studentId:student.id})).items[0].summary,item.summary);
  await run('auth0|one',{action:'delete-student',id:student.id});assert.deepEqual((await history('auth0|one',{action:'load'})).items,[]);
+ }finally{await pool.end();}
+});
+
+test('planning summaries persist by student and feed the planning voice automatically',async()=>{
+ const {pool,run}=await fixture();const history=createHistoryRepository(pool);
+ try{
+  await run('auth0|one',{action:'save-student',student});
+  await history('auth0|one',{action:'save',item:{...item,id:'plan',mode:'planning',summary:'Agreed to ask a counselor about next year’s science courses. Course approval is unresolved.'}});
+  let instructions;
+  const voice=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async(url,options)=>{instructions=JSON.parse(options.body.get('session')).instructions;return new Response('v=0\r\nanswer');},()=>{},pool);
+  assert.equal((await invoke(voice,{sdp:'v=0',mode:'planning',role:'parent',language:'en',routeConversations:true,targetConfirmed:true,studentId:student.id},'auth0|one','/api/profile-voice')).status,200);
+  assert.match(instructions,/Course approval is unresolved/);
+  assert.deepEqual((await history('auth0|two',{action:'load'})).items,[]);
  }finally{await pool.end();}
 });
 test('history import is once per account, preserves saved summaries and cannot resurrect deletion',async()=>{
@@ -83,6 +119,10 @@ test('onboarding summary waits for a saved student, and failed generation stores
   assert.equal((await history('auth0|one',{action:'load'})).items.length,1);
   const failed=createSummaryHandler({OPENAI_API_KEY:'test'},async()=>new Response('{}',{status:500}),pool);
   assert.equal((await invoke(failed,{...item,id:'failed',language:'en',turns:[{role:'user',text:'Question'}]},'auth0|one','/api/conversation-summary')).status,502);
+  assert.equal((await history('auth0|one',{action:'load'})).items.length,1);
+  const incomplete=createSummaryHandler({OPENAI_API_KEY:'test'},async()=>new Response(JSON.stringify({status:'incomplete',incomplete_details:{reason:'max_output_tokens'},output:[{content:[{type:'output_text',text:'Partial advice without the important caveat'}]}]})),pool);
+  const truncated=await invoke(incomplete,{...item,id:'truncated',language:'en',turns:[{role:'user',text:'Question'}]},'auth0|one','/api/conversation-summary');
+  assert.equal(truncated.status,502);assert.equal(truncated.body.error,'incomplete_summary');
   assert.equal((await history('auth0|one',{action:'load'})).items.length,1);
  }finally{await pool.end();}
 });

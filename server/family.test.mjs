@@ -7,6 +7,20 @@ import {createFamilyHandler,validateFamily} from './family.mjs';
 
 const student={id:'student-1',name:'Sofia',stage:'10th grade',interest:'Art',gpa:'',color:'peach'};
 
+test('first registration saves account and student together and retries without duplicates',async()=>{
+ const {pool,run}=await fixture();
+ try{
+  const input={action:'complete-onboarding',account:{firstName:'Daniel',email:''},student};
+  const saved=await run('auth0|new',input);
+  assert.equal(saved.account.firstName,'Daniel');assert.equal(saved.students[0].name,'Sofia');
+  assert.equal((await run('auth0|new',input)).students.length,1);
+  assert.throws(()=>validateFamily({...input,student:{...student,stage:'invalid'}}),{status:400});
+  assert.throws(()=>validateFamily({...input,account:{firstName:' ',email:''}}),{status:400});
+  const skipped=await run('auth0|later',{action:'complete-onboarding',account:{firstName:'Alex',email:''}});
+  assert.equal(skipped.account.firstName,'Alex');assert.equal(skipped.students.length,0);
+ }finally{await pool.end();}
+});
+
 test('family queries isolate accounts, including forged ownership and matching student IDs',async()=>{
  const {pool,run}=await fixture();
  try{
@@ -64,4 +78,9 @@ test('family handler requires gateway authentication and hides database details'
  const observed=[];
  await request(createFamilyHandler(null,async(subject,input)=>{observed.push({subject,input});return {account:{firstName:'',email:''},students:[]};}),{action:'load',subject:'auth0|victim'});
  assert.deepEqual(observed,[{subject:'auth0|one',input:{action:'load'}}]);
+});
+
+test('account settings cannot erase the name used to recognize completed onboarding',()=>{
+ for(const firstName of ['', '   '])assert.throws(()=>validateFamily({action:'save-account',account:{firstName,email:''}}),{status:400});
+ assert.equal(validateFamily({action:'save-account',account:{firstName:' Alex ',email:''}}).account.firstName,'Alex');
 });

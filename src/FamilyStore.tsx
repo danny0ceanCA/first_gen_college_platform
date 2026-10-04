@@ -4,7 +4,7 @@ import {loadLocal,saveLocal,type StudentProfile} from './planning';
 
 export type Account={firstName:string;email:string};
 type Family={account:Account;students:StudentProfile[]};
-type Store=Family&{cloud:boolean;loading:boolean;error:boolean;saving:boolean;reload:()=>void;saveAccount:(account:Account)=>Promise<boolean>;saveStudent:(student:StudentProfile)=>Promise<boolean>;removeStudent:(id:string)=>Promise<boolean>};
+type Store=Family&{cloud:boolean;loading:boolean;error:boolean;errorCode:string;saving:boolean;reload:()=>void;completeOnboarding:(firstName:string,student?:StudentProfile)=>Promise<boolean>;saveAccount:(account:Account)=>Promise<boolean>;saveStudent:(student:StudentProfile)=>Promise<boolean>;removeStudent:(id:string)=>Promise<boolean>};
 const Context=createContext<Store|null>(null);
 export function useFamily(){const store=useContext(Context);if(!store)throw new Error('FamilyProvider is required');return store;}
 
@@ -15,13 +15,14 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  const accountKey=cloud?`origen.account.${user!.sub}`:'origen.account-preview.v1';
  const [family,setFamily]=useState<Family>(()=>({account:loadLocal<Account>(accountKey,{firstName:'',email:''}),students:loadLocal<StudentProfile[]>(`${scope}.students.v1`,cloud?[]:previewStudents)}));
  const [loading,setLoading]=useState(cloud),[error,setError]=useState(false),[saving,setSaving]=useState(false),[attempt,setAttempt]=useState(0);
+ const [errorCode,setErrorCode]=useState('');
  const busy=useRef(false);
  async function request(operation:Record<string,unknown>,signal?:AbortSignal):Promise<Family>{
   const token=await getAccessTokenSilently();
   const base=(import.meta.env.VITE_API_URL||'').replace(/\/$/,'');
   const response=await fetch(`${base}/api/family`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(operation),signal});
   const result=await response.json();
-  if(!response.ok||!Array.isArray(result.students)||!result.account)throw new Error('family_unavailable');
+  if(!response.ok||!Array.isArray(result.students)||!result.account)throw new Error(result.error||'family_unavailable');
   return result;
  }
  useEffect(()=>{
@@ -42,7 +43,7 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  },[cloud,scope,accountKey,attempt]); // Provider remounts when the Auth0 identity changes.
  async function mutate(operation:Record<string,unknown>,next:Family){
   if(busy.current||loading)return false;
-  busy.current=true;setSaving(true);setError(false);
+  busy.current=true;setSaving(true);setError(false);setErrorCode('');
   try{
    if(cloud)setFamily(await request(operation));
    else{
@@ -50,10 +51,11 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
     setFamily(next);
    }
    return true;
-  }catch{setError(true);return false;}
+  }catch(cause){setErrorCode(cause instanceof Error?cause.message:'family_unavailable');setError(true);return false;}
   finally{busy.current=false;setSaving(false);}
  }
- return <Context.Provider value={{...family,cloud,loading,error,saving,reload:()=>setAttempt(n=>n+1),
+ return <Context.Provider value={{...family,cloud,loading,error,errorCode,saving,reload:()=>setAttempt(n=>n+1),
+  completeOnboarding:(firstName,student)=>{const account={...family.account,firstName};return mutate({action:'complete-onboarding',account,...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
   saveAccount:account=>mutate({action:'save-account',account},{...family,account}),
   saveStudent:student=>mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]}),
   removeStudent:id=>mutate({action:'delete-student',id},{...family,students:family.students.filter(s=>s.id!==id)})

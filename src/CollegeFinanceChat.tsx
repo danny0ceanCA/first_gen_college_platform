@@ -5,8 +5,7 @@ export default function CollegeFinanceChat({ students, selected, select, role, l
   active:boolean; students: StudentProfile[]; selected: string; select: (id: string) => void;
   role: 'parent' | 'student'; language: 'en' | 'es'; t: (en: string, es: string) => string;
 }) {
-  const student = students.find(s => s.id === selected);
-  if (!student) return null;
+  const student = students.find(s => s.id === selected)||{id:'',name:'',stage:'',interest:'',gpa:'',color:'peach'};
   return <section className="finance-chat" aria-labelledby="finance-chat-heading">
     <h2 id="finance-chat-heading">{t('Do you have more questions about paying for college?', '¿Tienes más preguntas sobre cómo pagar la universidad?')}</h2>
     <p>{role === 'parent'
@@ -15,6 +14,6 @@ export default function CollegeFinanceChat({ students, selected, select, role, l
     {role === 'parent' && <div className="overview-student-filter" aria-label={t('Choose a student for financial aid guidance', 'Elige un estudiante para la orientación sobre ayuda económica')}>
       {students.map(s => <button key={s.id} aria-pressed={s.id === selected} className={s.id === selected ? 'active' : ''} onClick={() => select(s.id)}>{s.name}</button>)}
     </div>}
-    {active&&<ProfileVoice key={`${student.id}:${role}:${language}`} mode="finance" profile={student} role={role} language={language} t={t} apply={()=>{}} onActive={()=>{}}/>}
+    {active&&<ProfileVoice key={role} mode="finance" profile={student} role={role} language={language} t={t} apply={()=>{}} onActive={()=>{}}/>}
   </section>;
 }

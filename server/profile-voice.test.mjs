@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';
 const input={sdp:'v=0\r\n',language:'es',role:'parent',profile:{name:'Test student',id:'private-id',color:'peach'}};
+
+test('all live modes permit bilingual transcription and explicit language switching',()=>{
+ for(const mode of ['profile','finance','admissions','planning']){
+  const session=voiceSession({...input,mode},{});
+  assert.equal(session.audio.input.transcription.language,undefined);
+  const tool=session.tools.find(tool=>tool.name==='set_conversation_language');
+  assert.deepEqual(tool.parameters.properties.language.enum,['en','es']);
+  assert.match(session.instructions,/without restarting/);
+  for(const lookup of session.tools.filter(tool=>tool.name.startsWith('lookup_'))){
+   assert.deepEqual(lookup.parameters.properties.language.enum,['en','es']);
+   assert.ok(lookup.parameters.required.includes('language'));
+  }
+ }
+});
 async function call(handler,body=input,headers={}){
   const req=Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json',...headers}});
   let status,output;
@@ -75,7 +89,7 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
   assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
-  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications']);
+  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language']);
   assert.equal(session.audio.output.speed,0.95);
   assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
  }
@@ -83,4 +97,27 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.equal(JSON.parse(options.body.get('session')).tools[0].name,'lookup_college_applications');return new Response('v=0\r\nanswer');
  });
  assert.equal((await call(handler,{...input,mode:'admissions'})).status,200);
+});
+
+test('first-registration welcome explains the app before collecting student details only in onboarding',()=>{
+ for(const language of ['en','es']){
+  const welcome=voiceSession({...input,language,onboarding:true},{});
+  assert.match(welcome.instructions,/FIRST-REGISTRATION WELCOME/);
+  for(const place of ['Family home','Paying for college','Ready to apply for college','Planning'])assert.ok(welcome.instructions.includes(place));
+  assert.match(welcome.instructions,/review it before saving/);
+  assert.doesNotMatch(voiceSession({...input,language},{}).instructions,/FIRST-REGISTRATION WELCOME/);
+  assert.doesNotMatch(voiceSession({...input,language,onboarding:true,mode:'finance'},{}).instructions,/FIRST-REGISTRATION WELCOME/);
+ }
+});
+
+test('all live guides open with Hola and explain English terms without leaving Spanish',()=>{
+ for(const mode of ['profile','finance','admissions','planning'])for(const language of ['en','es']){
+  const session=voiceSession({...input,mode,language,onboarding:mode==='profile'},{});
+  assert.match(session.instructions,/first spoken word must be exactly Hola/);
+  assert.match(session.instructions,/explain its meaning in simple Spanish/);
+  assert.match(session.instructions,/Saying an English term is not a request to change languages/);
+  assert.match(session.instructions,/scope reconnection.*must not repeat the greeting/);
+ }
+ const routed=voiceSession({...input,mode:'finance',routeConversations:true,students:[]},{});
+ assert.match(routed.instructions,/first spoken word must be exactly Hola/);
 });

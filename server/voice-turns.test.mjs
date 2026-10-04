@@ -102,3 +102,20 @@ test('a rejected status update releases the answer without ending the conversati
  assert.equal(events.length,3);
  assert.equal(turns.progressEvent({type:'error',error:{event_id:'unrelated'}}),false);
 });
+
+test('a missing transcription times out and releases the next real question',()=>{
+ const events=[],missing=[],timers=new Map();let id=0;
+ const turns=voiceTurns(event=>events.push(event),()=>{},{schedule:fn=>{timers.set(++id,fn);return id;},cancel:id=>timers.delete(id),onMissing:item=>missing.push(item)});
+ turns.speechStarted('lost');turns.speechStopped('lost');
+ turns.speechStarted('next');turns.speechStopped('next');turns.transcript('next','What is FAFSA?');
+ assert.equal(events.length,0);assert.equal(timers.size,1);
+ [...timers.values()][0]();assert.equal(events.length,1);assert.deepEqual(missing,['lost']);
+});
+test('transcription timeout starts after speech stops and is cancelled on completion or cleanup',()=>{
+ const timers=new Map();let id=0;const turns=voiceTurns(()=>{},()=>{},{schedule:fn=>{timers.set(++id,fn);return id;},cancel:id=>timers.delete(id)});
+ turns.speechStarted('long-answer');assert.equal(timers.size,0);
+ turns.speechStopped('long-answer');assert.equal(timers.size,1);
+ turns.transcript('long-answer','My student likes biology');assert.equal(timers.size,0);
+ turns.speechStarted('pending');turns.speechStopped('pending');turns.stop();assert.equal(timers.size,0);
+ assert.equal(turns.transcript('pending','late words'),false);
+});

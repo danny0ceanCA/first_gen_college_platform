@@ -1,8 +1,10 @@
 // Serialize replies across transcription, interruptions and asynchronous tool calls.
-export function voiceTurns(send, onRecovery = () => {}) {
+export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,cancel=clearTimeout,transcriptionTimeout=12000,onMissing=()=>{}}={}) {
   let active = false, pending = false, tools = 0;
   let interrupted = false, heardSpeech = false, recoveryUsed = false, resume = false;
   const seen = new Set(), finished = new Set(), awaiting = new Set();
+  const timers=new Map();
+  let stopped=false;
   let progressActive = false, progressId = '', progressEvent = '';
   const progressResponses = new Set();
   const progressRequests = new Set();
@@ -17,6 +19,11 @@ export function voiceTurns(send, onRecovery = () => {}) {
   function request() { pending = true; flush(); }
   return {
     request,
+    speechStopped(itemId){
+      if(stopped||!awaiting.has(itemId)||timers.has(itemId))return;
+      timers.set(itemId,schedule(()=>{timers.delete(itemId);awaiting.delete(itemId);onMissing(itemId);flush();},transcriptionTimeout));
+    },
+    stop(){stopped=true;for(const timer of timers.values())cancel(timer);timers.clear();awaiting.clear();},
     progress(sentence) {
       if (!tools || active || progressActive || awaiting.size) return false;
       progressActive = true;
@@ -71,6 +78,8 @@ export function voiceTurns(send, onRecovery = () => {}) {
       return true;
     },
     transcript(itemId, text) {
+      if(stopped)return false;
+      if(timers.has(itemId)){cancel(timers.get(itemId));timers.delete(itemId);}
       if (!itemId || seen.has(itemId)) return false;
       seen.add(itemId); awaiting.delete(itemId);
       if (typeof text !== 'string' || !/[\p{L}\p{N}]/u.test(text)) {

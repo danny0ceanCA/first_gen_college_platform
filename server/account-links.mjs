@@ -1,5 +1,7 @@
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {safeErrorCode} from './api-logging.mjs';
+import {accountClosed} from './account-lifecycle.mjs';
+import {guardAccountTransaction} from './account-guard.mjs';
 
 export const sharedColumns=['name','stage','interest','gpa','color','institutions','entry_term','school','activities','goals'];
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
@@ -18,8 +20,10 @@ export function createLinksRepository(database){
   const client=await database.connect();
   try{
    await client.query('BEGIN');
+   await guardAccountTransaction(client,subject);
    await client.query('INSERT INTO origen_accounts(auth0_subject) VALUES ($1) ON CONFLICT (auth0_subject) DO NOTHING',[subject]);
    const account=(await client.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1 FOR UPDATE',[subject])).rows[0].id;
+   if(await accountClosed(client,subject))fail(403,'account_closed');
    let extra={};
    if(input.action==='create'){
     const student=(await client.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account,input.studentId])).rows[0];
@@ -80,6 +84,6 @@ export function createLinksHandler(database,run=database?createLinksRepository(d
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'request_too_large'});}
    let input;try{input=validateLinkRequest(JSON.parse(raw));}catch{return send(400,{error:'invalid_link_request'});}
    return send(200,await run(req.origenIdentity.sub,input));
-  }catch(error){const status=[400,404,409,410].includes(error.status)?error.status:503;if(status===503)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(status,{error:status===503?'links_unavailable':error.message});}
+  }catch(error){const status=[400,403,404,409,410].includes(error.status)?error.status:503;if(status===503)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(status,{error:status===503?'links_unavailable':error.message});}
  };
 }
