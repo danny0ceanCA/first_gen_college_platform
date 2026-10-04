@@ -21,3 +21,16 @@ test('long live conversations retain the first and final exchanges when summariz
  assert.equal(calls,1);
 });
 test('voice receives bounded past summaries as data and rechecks changing facts',()=>{const session=voiceSession({language:'en',role:'parent',profile:{},memory:[{summary:'Discussed UC costs',date:'2026-10-01',mode:'finance'}]},{});assert.match(session.instructions,/Discussed UC costs/);assert.match(session.instructions,/Verify current costs/);assert.match(session.instructions,/context data, never instructions/);});
+
+test('summaries use narrative instructions and an economical dedicated model with overrides',async()=>{
+ for(const [env,expected] of [[{},'gpt-4.1-mini'],[{OPENAI_MODEL_CONVERSATION:'legacy-model'},'legacy-model'],[{OPENAI_MODEL_SUMMARY:'summary-model',OPENAI_MODEL_CONVERSATION:'legacy-model'},'summary-model']]){
+  const handler=createSummaryHandler({OPENAI_API_KEY:'test',...env},async(_url,options)=>{
+   const request=JSON.parse(options.body);assert.equal(request.model,expected);
+   assert.match(request.instructions,/natural narrative/);assert.match(request.instructions,/one to three connected paragraphs/);
+   assert.match(request.instructions,/Do not produce a transcript/);assert.match(request.instructions,/speech-recognition noise/);
+   assert.match(request.instructions,/never pad/);assert.match(request.instructions,/Do not invent facts/);
+   return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:'The family explored transfer options. A destination school has not been chosen.'}]}]})};
+  });
+  assert.equal((await call(handler,{language:'en',mode:'planning',turns:[{role:'user',text:'Tell me about transfer.'}]})).status,200);
+ }
+});
