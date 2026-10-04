@@ -9,10 +9,13 @@ test('unconfirmed parent sessions offer routing only and omit private history',(
   assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language']);
   assert.deepEqual(session.tools[0].parameters.properties.scope.enum,['family','student:one','student:two']);
   assert.match(session.instructions,/duplicated|ambiguous/);
+  assert.match(session.instructions,/spoken choice automatically/);
+  assert.match(session.tools[0].description,/no on-screen confirmation is needed/);
+  assert.doesNotMatch(session.instructions,/tell the parent to confirm the on-screen selection/);
   assert.doesNotMatch(session.instructions,/PRIVATE PROFILE|PRIVATE HISTORY/);
  }
 });
-test('confirmed family scope retains specialist tools and waits for confirmation on switches',()=>{
+test('confirmed family scope retains specialist tools and applies clear spoken switches automatically',()=>{
  const session=voiceSession({role:'parent',mode:'finance',language:'es',routeConversations:true,targetConfirmed:true,scopeRestart:true,studentId:null,students,profile:{}},{});
  assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language']);
  assert.match(session.instructions,/general family questions/);

@@ -39,7 +39,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
   const spokenLanguage=useRef(language);
   const routing=role==='parent'&&mode!=='profile';
   const [target,setTarget]=useState<{id:string|null;confirmed:boolean}>({id:initialProfile.id||null,confirmed:false});
-  const [pendingTarget,setPendingTarget]=useState<{id:string|null}|null>(null);
+
   const scopePending=useRef(false);
   const profile=voiceProfile(mode,initialProfile,family.students,target.id);
   const summaryScope=useRef<{id:string|null;name:string;confirmed:boolean}>({id:initialProfile.id||null,name:initialProfile.name,confirmed:!routing});
@@ -111,7 +111,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     r.stream?.getTracks().forEach(track=>track.stop());
     if(audio.current){audio.current.pause();audio.current.srcObject=null;}
   }
-  function end(){cleanup();setResearching(false);setState('idle');setMuted(false);setPendingTarget(null);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  function end(){cleanup();setResearching(false);setState('idle');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function finishCall(){
     if(finishPromise.current)return finishPromise.current;
     setFinishing(true);
@@ -132,29 +132,29 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     selectedProfileId.current=initialProfile.id;
     const id=initialProfile.id||null;
     if(routing&&state==='live'){
-      scopePending.current=true;
-      setPendingTarget({id});
+
+
       const dc=resources.current.dc;
       if(dc?.readyState==='open'){
-        dc.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'The parent selected another student on screen. Wait for on-screen confirmation before discussing that student. Do not change the current saving target yet.'}]}}));
+        dc.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'The parent selected another student on screen. Ask one short spoken question to clarify whether they want to discuss that student. Once they answer clearly, call request_conversation_target. No on-screen confirmation is needed.'}]}}));
       }
     }else if(state==='idle')setTarget({id,confirmed:false});
   },[initialProfile.id,routing,state]);
   const latestCleanup=useRef(cleanup);
   useEffect(()=>{latestCleanup.current=cleanup;});
   useEffect(()=>()=>{latestCleanup.current();onActive(false);shared?.claim(ownerId,false);},[]);
-  async function start(scope=target,sessionLanguage=language){
+  async function start(scope=target,sessionLanguage=language,spokenRequest=''){
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
     const profile=voiceProfile(mode,initialProfile,family.students,scope.id);
     summaryScope.current={id:scope.id,name:profile.name,confirmed:!routing||scope.confirmed};
-    setPendingTarget(null);
+
     scopePending.current=false;
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
     const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
     log('session_start',{mode,language});
-    sessionTurns.current=[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setTranscript([]);setSources([]);
+    sessionTurns.current=spokenRequest&&scope.confirmed?[{role:'user',text:spokenRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setTranscript([]);setSources([]);
     setActivity('listening');setLatestAnswer('');setSavedSummary('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);
     const version=++generation.current;
     const abort=new AbortController();resources.current.abort=abort;
@@ -208,6 +208,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
         clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
         const started=Date.now();
         resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){void finishCall();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
+        if(spokenRequest)send({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:`The parent already chose the conversation target by voice. Their latest spoken request was: ${JSON.stringify(spokenRequest)}. Continue with that request if it includes a question; otherwise briefly acknowledge the target and ask how you can help. Do not ask them to choose or confirm again.`}]}});
         turns.request();
       };
       dc.onclose=()=>{if(generation.current===version){end();setNotice(informational?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
@@ -269,11 +270,18 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
               let next:string|null|undefined;
               try{next=resolveScope(JSON.parse(item.arguments).scope,family.students);}catch{/* Invalid model proposals cannot change storage scope. */}
               if(next!==undefined){
+                if(summaryScope.current.confirmed&&next===summaryScope.current.id){
+                  send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'target_confirmed',instruction:'Continue with the current target. No screen confirmation is needed.'})}});continue;
+                }
+                const spokenRequest=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'';
                 if(summaryScope.current.confirmed&&!scopePending.current)sessionTurns.current=beforeScopeRequest(sessionTurns.current);
+
                 scopePending.current=true;
-                setPendingTarget({id:next});
+                const nextScope={id:next,confirmed:true};
+                const nextLanguage=spokenLanguage.current;
+                await finishCall();setTarget(nextScope);void start(nextScope,nextLanguage,spokenRequest);return;
               }
-              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:next===undefined?'invalid_target':'awaiting_on_screen_confirmation',instruction:'Wait for the parent to confirm the target on screen. Do not discuss the proposed student yet.'})}});
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'invalid_target',instruction:'Ask one short spoken clarification. Do not request an on-screen confirmation.'})}});
               continue;
             }
             if(((mode==='finance'||mode==='loans')&&item.name==='lookup_financial_aid')||(mode==='admissions'&&item.name==='lookup_college_applications')||(mode==='planning'&&item.name==='lookup_education_planning')){
@@ -371,16 +379,11 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     {state==='live'&&onSwitchGuide&&<div className="voice-guide-switch"><span>{t('This page has a different guide: ','Esta pagina tiene otra guia: ')}{switchGuideLabel}</span><button type="button" className="text-button" disabled={finishing} onClick={async()=>{await finishCall();onSwitchGuide();}}>{t('Switch guide','Cambiar guia')}</button></div>}
     <div className="voice-controls">
       {state==='idle'?<button type="button" className="button primary" onClick={()=>onRestart?onRestart():void start()}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>
-        <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):pendingTarget?t('Waiting for your confirmation','Esperando tu confirmación'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
+        <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>void finishCall()}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
       </>}
     </div>
-    {routing&&<div className="voice-scope"><p className="small-text" role="status">{target.confirmed&&state!=='idle'?t('Saving this discussion for: ','Esta conversación se guarda para: ')+(target.id===null?t('General family questions','Preguntas generales de familia'):profile.name):t('Origen will ask which student you mean before saving a summary.','Origen preguntará de qué estudiante hablas antes de guardar un resumen.')}</p>
-      {!pendingTarget&&state==='live'&&target.confirmed&&<button className="text-button" type="button" onClick={()=>{scopePending.current=true;setPendingTarget({id:target.id});}}>{t('Change who we’re discussing','Cambiar de quién hablamos')}</button>}
-      {pendingTarget&&<div className="scope-confirmation"><label>{t('Who is this discussion about?','¿De quién trata esta conversación?')}<select value={pendingTarget.id===null?'family':`student:${pendingTarget.id}`} onChange={e=>{const id=resolveScope(e.target.value,family.students);if(id!==undefined)setPendingTarget({id});}}><option value="family">{t('General family questions','Preguntas generales de familia')}</option>{family.students.map(s=><option value={`student:${s.id}`} key={s.id}>{s.name}{family.students.filter(other=>other.name===s.name).length>1?` · ${s.stage||s.school||s.id.slice(-6)}`:''}</option>)}</select></label><p className="small-text">{t('Confirm to begin a separate discussion. The previous segment keeps its original history.','Confirma para comenzar una conversación separada. El segmento anterior conserva su historial original.')}</p><button type="button" className="button primary" disabled={finishing} onClick={async()=>{const next={id:pendingTarget.id,confirmed:true};const nextLanguage=spokenLanguage.current;await finishCall();setTarget(next);void start(next,nextLanguage);}}>{t('Confirm and continue','Confirmar y continuar')}</button><button type="button" className="text-button" disabled={finishing} onClick={()=>void finishCall()}>{t('End without changing target','Terminar sin cambiar de estudiante')}</button></div>}
-    </div>}
-    {audioBlocked&&state==='live'&&<div className="voice-audio-recovery" role="alert"><p>{t('Your browser paused voice playback. Tap Play to hear Origen.','Tu navegador pauso la voz. Toca Reproducir para escuchar a Origen.')}</p><button type="button" className="button primary" onClick={()=>void audio.current?.play().then(()=>setAudioBlocked(false)).catch(()=>setAudioBlocked(true))}>{t('Play Origen','Reproducir Origen')}</button></div>}
     <audio ref={audio} autoPlay controls hidden={state!=='live'} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     <p className="small-text">{history.cloud?t('Relevant past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Los resúmenes anteriores pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {savedSummary&&!savingSummary&&!summaryFailed&&<details className="voice-saved-summary"><summary>{summaryDeferred?t('Summary ready · Save the student profile to keep it','Resumen listo · Guarda el perfil para conservarlo'):t('Summary saved','Resumen guardado')}</summary><p>{savedSummary}</p></details>}
