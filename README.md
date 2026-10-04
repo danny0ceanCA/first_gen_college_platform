@@ -111,3 +111,5 @@ The landing includes English/Spanish sharing text, copy buttons, sample-preview 
 Social previews use `public/social-preview.png` and metadata in `index.html`. Section links work on initial loads and hash navigation; the illustrated story remains under `#story`.
 
 Loans: the web app (including mobile browsers) has a dedicated Loans guide using the financial-aid research endpoint restricted to Federal Student Aid. Summaries use mode `loans`; apply migration 012 before deploying the API. No new model credential is needed. Native mobile parity remains pending.
+
+Voice experience: the persistent web voice bar displays listening, answer preparation, audio playback, research and confirmation states. Expand Latest answer or Official sources for supporting text and links. Successful summary persistence exposes a summary preview. Spoken replies default to one idea in two or three sentences, with the welcome tour preserved. Playback status uses WebRTC audio-buffer events; live microphone validation remains a manual check.

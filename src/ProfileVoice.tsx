@@ -60,12 +60,16 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
     const body=JSON.stringify({turns,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode,sources});
     const subject=history.cloud?user?.sub:undefined,date=new Date().toISOString();
-    summaryQueue.current.add(id,async()=>{let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await history.add({id,studentId,date,mode,summary,sources});});
+    summaryQueue.current.add(id,async()=>{let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await history.add({id,studentId,date,mode,summary,sources});setSummaryDeferred(studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId));setSavedSummary(summary);});
     await retrySummaries();
   }
   const informational=mode!=='profile';
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
   const [muted,setMuted]=useState(false);
+  const [activity,setActivity]=useState<'listening'|'thinking'|'speaking'>('listening');
+  const [latestAnswer,setLatestAnswer]=useState('');
+  const [savedSummary,setSavedSummary]=useState('');
+  const [summaryDeferred,setSummaryDeferred]=useState(false);
   const [finishing,setFinishing]=useState(false);
   const finishPromise=useRef<Promise<void>|null>(null);
   const awaitingTranscription=useRef(new Set<string>());
@@ -149,7 +153,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
     log('session_start',{mode,language});
     sessionTurns.current=[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setTranscript([]);setSources([]);
-    setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);
+    setActivity('listening');setLatestAnswer('');setSavedSummary('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);
     const version=++generation.current;
     const abort=new AbortController();resources.current.abort=abort;
     resources.current.deadline=setTimeout(()=>{if(generation.current===version){end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
@@ -170,7 +174,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
         if(dc.readyState!=='open')return;
         const payload=event as {type:string};
         if(finishPromise.current&&payload.type==='response.create')return;
-        if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(onboarding)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage)}};}
+        if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(onboarding)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage,{preview:!history.cloud,role,hasName:!!profile.name.trim()})}};}
         const event_id=crypto.randomUUID();
         log('client_event',{eventId:event_id,operation:payload.type});
         sentEvents.set(event_id,payload.type);
@@ -179,7 +183,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
         return event_id;
       };
       const cache=voiceResearchCache();const speechTimes=new Map<string,number>();
-      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onMissing:itemId=>{awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();
+      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onMissing:itemId=>{setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();
       let progressTimer:ReturnType<typeof setInterval>|undefined;
       const stopProgress=()=>{clearInterval(progressTimer);progressTimer=undefined;};
       resources.current.stopProgress=stopProgress;
@@ -206,12 +210,16 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
+        if(e.type==='output_audio_buffer.started')setActivity('speaking');
+        if(e.type==='output_audio_buffer.stopped'||e.type==='output_audio_buffer.cleared')setActivity('listening');
+        if(e.type==='input_audio_buffer.speech_started')setActivity('listening');
+        if(e.type==='input_audio_buffer.speech_stopped')setActivity('thinking');
         // Status audio is outside the conversation: never save it as an answer.
         if(turns.progressEvent(e))return;
         if(['error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
-        if(e.type==='response.created'){assistantSpeaking.current=true;turns.created();}
-        if(e.type==='response.done')assistantSpeaking.current=false;
+        if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();}
+        if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);}
         if(e.type==='input_audio_buffer.speech_started'){speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
@@ -223,6 +231,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
           const valid=e.type.startsWith('conversation')?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
           if(valid&&!scopePending.current)sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:e.type.startsWith('conversation')?'user':'assistant',text:e.transcript});
+          if(valid&&!e.type.startsWith('conversation')&&!scopePending.current)setLatestAnswer(e.transcript);
           if(valid)setTranscript(prev=>[...prev,{who:e.type.startsWith('conversation')?t('You','Tú'):'Origen',text:e.transcript}].slice(-40));
         }
         if(e.type==='error'){
@@ -266,7 +275,8 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
               try{
                 const args=JSON.parse(item.arguments);
                 const lookupLanguage=args.language==='en'||args.language==='es'?args.language:spokenLanguage.current;spokenLanguage.current=lookupLanguage;
-                const query={mode,language:lookupLanguage,question:args.question,institution:args.institution};
+                if(typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw new Error('invalid_lookup');
+                const query={mode,language:lookupLanguage,question:args.question,institution:mode==='loans'?'':args.institution};
                 let result=cache.get(query);
                 if(result){log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});}
                 else {
@@ -278,7 +288,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
                   cache.put(query,result);
                 }
                 log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
-                output=result;
+                output={text:result.text,sources:result.sources,checkedAt:result.checkedAt};
                 sessionSources.current=mergeConversationSources(sessionSources.current,result.sources);
                 setSources(sessionSources.current);
                 setNotice('');
@@ -352,7 +362,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     {state==='live'&&onSwitchGuide&&<div className="voice-guide-switch"><span>{t('This page has a different guide: ','Esta pagina tiene otra guia: ')}{switchGuideLabel}</span><button type="button" className="text-button" disabled={finishing} onClick={async()=>{await finishCall();onSwitchGuide();}}>{t('Switch guide','Cambiar guia')}</button></div>}
     <div className="voice-controls">
       {state==='idle'?<button type="button" className="button primary" onClick={()=>onRestart?onRestart():void start()}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>
-        <span role="status">{finishing?t('Finishing conversation…','Terminando conversacion…'):state==='connecting'?t('Connecting…','Conectando…'):t(muted?'Microphone muted':'Microphone on',muted?'Micrófono silenciado':'Micrófono activo')} · {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</span>
+        <span className={`voice-activity activity-${activity}`} role="status"><span className="voice-activity-mark" aria-hidden="true"><i/><i/><i/></span>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):pendingTarget?t('Waiting for your confirmation','Esperando tu confirmación'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>void finishCall()}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
       </>}
@@ -364,11 +374,13 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
     {audioBlocked&&state==='live'&&<div className="voice-audio-recovery" role="alert"><p>{t('Your browser paused voice playback. Tap Play to hear Origen.','Tu navegador pauso la voz. Toca Reproducir para escuchar a Origen.')}</p><button type="button" className="button primary" onClick={()=>void audio.current?.play().then(()=>setAudioBlocked(false)).catch(()=>setAudioBlocked(true))}>{t('Play Origen','Reproducir Origen')}</button></div>}
     <audio ref={audio} autoPlay controls hidden={state!=='live'} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     <p className="small-text">{history.cloud?t('Relevant past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Los resúmenes anteriores pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
-    {savingSummary&&<p role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
+    {savedSummary&&!savingSummary&&!summaryFailed&&<details className="voice-saved-summary"><summary>{summaryDeferred?t('Summary ready · Save the student profile to keep it','Resumen listo · Guarda el perfil para conservarlo'):t('Summary saved','Resumen guardado')}</summary><p>{savedSummary}</p></details>}
+    {savingSummary&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
     {summaryFailed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><button type="button" className="button outline" disabled={savingSummary} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
-    {sources.length>0&&<section className="voice-sources"><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></section>}
+    {latestAnswer&&<details className="voice-answer"><summary>{t('Latest answer','Última respuesta')}</summary><p>{latestAnswer}</p></details>}
+    {sources.length>0&&<details className="voice-sources"><summary>{t('Official sources','Fuentes oficiales')} · {sources.length}</summary><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></details>}
     {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}
     {transcript.length>0&&<details className="voice-transcript"><summary>{t('Conversation transcript','Transcripción de la conversación')}</summary><div>{transcript.map((entry,i)=><p key={i}><strong>{entry.who}: </strong>{entry.text}</p>)}</div></details>}
     {Object.keys(changes).length>0&&<div className="voice-review"><h4>{t('Review suggested changes','Revisa los cambios sugeridos')}</h4><p>{t('Edit or remove any suggestion. End the conversation, add the changes to the form, then select Save profile.','Edita o elimina cualquier sugerencia. Termina la conversación, agrega los cambios al formulario y selecciona Guardar perfil.')}</p>

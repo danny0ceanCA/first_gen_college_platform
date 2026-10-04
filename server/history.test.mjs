@@ -126,3 +126,13 @@ test('onboarding summary waits for a saved student, and failed generation stores
   assert.equal((await history('auth0|one',{action:'load'})).items.length,1);
  }finally{await pool.end();}
 });
+
+test('summary retry lookup is account scoped and finds records outside the recent history window',async()=>{
+ const {pool,run}=await fixture();const history=createHistoryRepository(pool);
+ try{await run('auth0|one',{action:'save-student',student});await run('auth0|two',{action:'load'});
+ for(let i=0;i<102;i++)await history('auth0|one',{action:'save',item:{...item,id:`lookup-${i}`,date:new Date(Date.UTC(2025,0,1+i)).toISOString()}});
+ assert.equal((await history('auth0|one',{action:'load'})).items.some(x=>x.id==='lookup-0'),false);
+ assert.equal((await history('auth0|one',{action:'find',id:'lookup-0'})).items[0].id,'lookup-0');
+ assert.deepEqual((await history('auth0|two',{action:'find',id:'lookup-0'})).items,[]);
+ }finally{await pool.end();}
+});

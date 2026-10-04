@@ -30,3 +30,10 @@ test('deferred onboarding summaries save after student creation and survive a fa
  await flushPendingHistory(pending,new Set(['new-student']),async saved=>{calls++;assert.equal(saved,item);});
  assert.equal(calls,1);assert.equal(pending.size,0);
 });
+
+test('a failed deferred summary does not block other student summaries',async()=>{
+ const first={id:'first',studentId:'one'},second={id:'second',studentId:'two'};
+ const pending=new Map([[first.id,first],[second.id,second]]);const saved=[];
+ await assert.rejects(flushPendingHistory(pending,new Set(['one','two']),async item=>{if(item.id==='first')throw new Error('offline');saved.push(item.id);}));
+ assert.deepEqual(saved,['second']);assert.deepEqual([...pending.keys()],['first']);
+});

@@ -41,6 +41,10 @@ export function createHistoryRepository(database){
    if(input.action==='delete'){
     if(!(await client.query('DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2 RETURNING id',[owner,input.id])).rows.length)throw fail(404,'summary_not_found');
    }
+   if(input.action==='find'){
+    const rows=(await client.query('SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,input.id])).rows;
+    await client.query('COMMIT');return {items:rows.map(memory)};
+   }
    const rows=(await client.query(`SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1${input.studentId===null?' AND student_id IS NULL':input.studentId?' AND student_id=$2':''} ORDER BY conversation_at DESC,id DESC LIMIT ${input.action==='context'?6:100}`,input.studentId?[owner,input.studentId]:[owner])).rows;
    await client.query('COMMIT');return {items:rows.map(memory).reverse()};
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}

@@ -10,3 +10,9 @@ test('live-call cache reuses exact verified questions, expires, and isolates con
  cache.put(query,{error:'lookup_failed',sources:result.sources});assert.equal(cache.get(query),undefined);
  cache.put(query,{sources:[]});assert.equal(cache.get(query),undefined);
 });
+
+test('formatting variations reuse results without merging different years',()=>{
+ const cache=voiceResearchCache();const q={mode:'loans',language:'en',institution:'',question:'Loan limits 2026'};const r={sources:[{url:'https://studentaid.gov/'}]};cache.put(q,r);
+ assert.equal(cache.get({...q,question:'  Loan   limits 2026  '}),r);
+ assert.equal(cache.get({...q,question:'Loan limits 2027'}),undefined);
+});
