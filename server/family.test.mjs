@@ -27,7 +27,7 @@ test('family queries isolate accounts, including forged ownership and matching s
   await run('auth0|one',{action:'save-account',account:{firstName:'Daniel',email:'daniel@example.com'}});
   await run('auth0|one',{action:'save-student',student});
   const other=await run('auth0|two',{action:'load',subject:'auth0|one',accountId:'forged'});
-  assert.deepEqual(other,{account:{firstName:'',email:''},students:[]});
+  assert.deepEqual(other,{account:{firstName:'',email:'',welcomeHeard:false,usedVoice:false},students:[]});
   await assert.rejects(run('auth0|two',{action:'delete-student',id:student.id}),{status:404});
   await run('auth0|two',{action:'save-student',student:{...student,name:'Mateo',account_id:'forged'}});
   assert.equal((await run('auth0|one',{action:'load'})).students[0].name,'Sofia');
@@ -51,13 +51,27 @@ test('one-time import preserves server edits and does not resurrect deleted stud
  }finally{await pool.end();}
 });
 
-test('profile edits retain every supported field and account stores only first name/email',async()=>{
+test('profile edits retain every supported field and account excludes unsupported personal fields',async()=>{
  const {pool,run}=await fixture();
  try{
   const saved=await run('auth0|one',{action:'save-student',student:{...student,entryTerm:'Fall 2027',institutions:'UC Davis',notes:'Shared by parent',goals:'Engineering'}});
   assert.equal(saved.students[0].entryTerm,'Fall 2027');assert.equal(saved.students[0].notes,'Shared by parent');
   const account=await run('auth0|one',{action:'save-account',account:{firstName:'  Daniel ',email:' a@example.com ',phoneNumber:'not-stored',lastName:'not-stored'}});
-  assert.deepEqual(account.account,{firstName:'Daniel',email:'a@example.com'});
+  assert.deepEqual(account.account,{firstName:'Daniel',email:'a@example.com',welcomeHeard:false,usedVoice:false});
+ }finally{await pool.end();}
+});
+
+test('voice usage and welcome receipts persist separately per account and cannot be erased by profile edits',async()=>{
+ const {pool,run}=await fixture();
+ try{
+  let result=await run('auth0|one',{action:'voice-used'});
+  assert.equal(result.account.usedVoice,true);assert.equal(result.account.welcomeHeard,false);
+  await run('auth0|one',{action:'welcome-heard'});
+  await run('auth0|one',{action:'welcome-heard'});
+  result=await run('auth0|one',{action:'save-account',account:{firstName:'Daniel',email:'',welcomeHeard:false,usedVoice:false}});
+  assert.equal(result.account.welcomeHeard,true);assert.equal(result.account.usedVoice,true);
+  assert.equal((await run('auth0|one',{action:'load'})).account.welcomeHeard,true);
+  assert.equal((await run('auth0|two',{action:'load',subject:'auth0|one'})).account.welcomeHeard,false);
  }finally{await pool.end();}
 });
 

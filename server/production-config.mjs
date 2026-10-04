@@ -10,7 +10,7 @@ export function productionConfigIssues(env){
   if(origins.some(value=>{try{const u=new URL(value);return u.protocol!=='https:'||u.origin!==value||u.username||u.password||['localhost','127.0.0.1','[::1]'].includes(u.hostname);}catch{return true;}}))issues.push('ALLOWED_ORIGINS: exact HTTPS origins required; no wildcard, path or local origin');
  }
  if(env.DATABASE_URL){try{const u=new URL(env.DATABASE_URL);if(!['postgres:','postgresql:'].includes(u.protocol)||!u.hostname||!u.pathname||u.pathname==='/')issues.push('DATABASE_URL: PostgreSQL database URL required');}catch{issues.push('DATABASE_URL: invalid database URL');}}
- if(env.ALLOW_PREVIEW_VOICE&&env.ALLOW_PREVIEW_VOICE!=='false')issues.push('ALLOW_PREVIEW_VOICE: must be disabled in production');
+ if(env.ALLOW_PREVIEW_VOICE&&!['true','false'].includes(env.ALLOW_PREVIEW_VOICE))issues.push('ALLOW_PREVIEW_VOICE: use true or false');
  return issues;
 }
 export function assertProductionConfig(env){

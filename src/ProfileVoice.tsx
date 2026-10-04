@@ -12,7 +12,7 @@ import {appendConversationTurn,mergeConversationSources,recentConversationMemory
 import {resolveScope,beforeScopeRequest} from './conversationScope.mjs';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff } from 'lucide-react';
-import type { StudentProfile } from './planning';
+import {loadLocal,saveLocal,type StudentProfile} from './planning';
 import './ProfileVoice.css';
 
 const labels = {
@@ -20,7 +20,7 @@ const labels = {
 } as const;
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
-export type VoiceProps={onSwitchGuide?:()=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={onSwitchGuide?:()=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
@@ -29,11 +29,12 @@ export default function ProfileVoice(props:VoiceProps){
  if(shared.active&&shared.owner!==localOwner.current)return <p role="status">{props.t('End your current voice conversation before starting profile setup.','Termina la conversacion actual antes de iniciar el perfil.')} <button className="text-button" onClick={shared.open}>{props.t('Open conversation','Abrir conversacion')}</button></p>;
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
-export function LocalProfileVoice({profile:initialProfile,language,role,apply,onActive,t,mode='profile',onboarding=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,switchGuideLabel}:VoiceProps) {
+export function LocalProfileVoice({profile:initialProfile,language,role,apply,onActive,t,mode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,switchGuideLabel}:VoiceProps) {
   const shared=useContext(SharedVoiceContext);
   const history=useConversationHistory();
   const latestHistory=useRef(history);latestHistory.current=history;
   const family=useFamily();const {getAccessTokenSilently,user}=useAuth0();
+  const voiceUsageKey=user?.sub?`origen.user.${user.sub}.voice-used.v1`:'camino.voice-used.v1';
   const spokenLanguage=useRef(language);
   const routing=role==='parent'&&mode!=='profile';
   const [target,setTarget]=useState<{id:string|null;confirmed:boolean}>({id:initialProfile.id||null,confirmed:false});
@@ -169,17 +170,19 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
       const dc=pc.createDataChannel('oai-events');resources.current.dc=dc;
       let openingRequested=false;
+      let playWelcome=onboarding&&(!family.account.welcomeHeard||replayWelcome);
+      let welcomeResponseId:string|undefined,welcomeCompleted=false,welcomeRecorded=false,welcomeInterrupted=false;
       const sentEvents=new Map<string,string>();
       const send=(event:unknown)=>{
         if(dc.readyState!=='open')return;
         const payload=event as {type:string};
         if(finishPromise.current&&payload.type==='response.create')return;
-        if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(onboarding)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage,{preview:!history.cloud,role,hasName:!!profile.name.trim()})}};}
+        if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(playWelcome)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage,{preview:!history.cloud,role,hasName:!!profile.name.trim()})}};}
         const event_id=crypto.randomUUID();
         log('client_event',{eventId:event_id,operation:payload.type});
         sentEvents.set(event_id,payload.type);
         if(sentEvents.size>100)sentEvents.delete(sentEvents.keys().next().value!);
-        dc.send(JSON.stringify({...payload,event_id}));
+        dc.send(JSON.stringify({...event as Record<string,unknown>,event_id}));
         return event_id;
       };
       const cache=voiceResearchCache();const speechTimes=new Map<string,number>();
@@ -201,7 +204,7 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
       };
       dc.onopen=()=>{
         if(generation.current!==version)return;
-        clearTimeout(resources.current.deadline);setState('live');
+        clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
         const started=Date.now();
         resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){void finishCall();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
         turns.request();
@@ -211,6 +214,10 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
         if(e.type==='output_audio_buffer.started')setActivity('speaking');
+        if(playWelcome&&!welcomeResponseId&&e.type==='response.created')welcomeResponseId=e.response?.id;
+        if(playWelcome&&!welcomeRecorded&&e.type==='input_audio_buffer.speech_started')welcomeInterrupted=true;
+        if(playWelcome&&e.type==='response.done'&&e.response?.id===welcomeResponseId)welcomeCompleted=e.response?.status==='completed';
+        if(playWelcome&&welcomeCompleted&&!welcomeInterrupted&&!welcomeRecorded&&e.type==='output_audio_buffer.stopped'&&e.response_id===welcomeResponseId){welcomeRecorded=true;void family.recordVoiceExperience?.(true).catch(()=>{welcomeRecorded=false;log('welcome_save_failed');});}
         if(e.type==='output_audio_buffer.stopped'||e.type==='output_audio_buffer.cleared')setActivity('listening');
         if(e.type==='input_audio_buffer.speech_started')setActivity('listening');
         if(e.type==='input_audio_buffer.speech_stopped')setActivity('thinking');
@@ -323,10 +330,11 @@ export function LocalProfileVoice({profile:initialProfile,language,role,apply,on
       resources.current.stopConnection=()=>connection.stop();
       pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version)connection.change(pc.connectionState);};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode,onboarding,memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
       if(!response.ok)throw new Error(data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
+      if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
       if(generation.current!==version)return;
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){

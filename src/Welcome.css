@@ -1,0 +1,12 @@
+.welcome-panel{max-width:760px;margin:40px auto;padding:28px}
+.welcome-review-heading{scroll-margin-top:24px}
+.welcome-save-bar{margin-top:20px;padding-top:16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;justify-content:space-between}
+.welcome-save-bar p{margin:0;line-height:1.5}
+.welcome-save-bar .button{flex-shrink:0;min-height:48px}
+@media(max-width:760px){
+ .welcome-panel{margin:16px 12px;padding:20px}
+ .welcome-profile-step{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
+ .welcome-save-bar{position:fixed;bottom:0;left:0;right:0;z-index:40;margin:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));background:#fff;box-shadow:0 -4px 16px #173e3814;flex-direction:column;gap:8px;align-items:stretch}
+ .welcome-save-bar p{font-size:12px}
+ .welcome-save-bar .button{width:100%}
+}

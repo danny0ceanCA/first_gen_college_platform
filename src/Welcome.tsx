@@ -1,4 +1,5 @@
-import {useState} from 'react';
+import {useRef,useState} from 'react';
+import './Welcome.css';
 import ProfileVoice from './ProfileVoice';
 import {type StudentProfile} from './planning';
 
@@ -9,8 +10,9 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
  const [active,setActive]=useState(false),[error,setError]=useState('');
  const [draft,setDraft]=useState<StudentProfile>({id:crypto.randomUUID(),name:'',stage:'',interest:'',gpa:'',color:'lilac'});
  const [saving,setSaving]=useState(false);
+ const review=useRef<HTMLHeadingElement>(null);
  const finish=async(student?:StudentProfile)=>{if(saving)return;setSaving(true);if(!await complete(name.trim(),student))setError(t('Could not save. Your profile has not been confirmed; please try again.','No se pudo guardar. Tu perfil no se ha confirmado; intenta de nuevo.'));setSaving(false);};
- return <main className="application-panel" style={{maxWidth:760,margin:'40px auto',padding:28}}>
+ return <main className={`application-panel welcome-panel${step==='voice'||step==='manual'?' welcome-profile-step':''}`}>
  <button className="button outline" disabled={active||saving} onClick={()=>setLanguage(language==='en'?'es':'en')}>{language==='en'?'Español':'English'}</button>
  <p className="eyebrow">{t('WELCOME TO ORIGEN','BIENVENIDO A ORIGEN')}</p>
  <h1>{step==='name'?t('What should we call you?','¿Cómo te llamas?'):t(`Welcome, ${name.trim()}.`,`Bienvenido, ${name.trim()}.`)}</h1>
@@ -18,17 +20,17 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
  <p>{t('Origen helps you understand college, paying for it, and your next steps. Ask in English or Spanish.','Origen te ayuda a entender la universidad, cómo pagarla y tus próximos pasos. Pregunta en español o inglés.')}</p>
  <h2>{t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h2>
  {step==='choice'?<><p>{t('Talk naturally with Origen, or type what you know. You will review everything before saving.','Conversa naturalmente con Origen o escribe lo que sabes. Revisarás todo antes de guardar.')}</p><div className="card-actions"><button className="button primary" onClick={()=>setStep('voice')}>{t('Talk with Origen','Hablar con Origen')}</button><button className="button outline" onClick={()=>setStep('manual')}>{t('Enter details myself','Ingresar los datos')}</button></div><button className="text-button" onClick={()=>finish()}>{t('Add a student later','Agregar un estudiante después')}</button></>:<>
- {(step==='voice'||step==='manual')&&<div hidden={step!=='voice'}><ProfileVoice onboarding profile={draft} language={language} role="parent" t={t} onActive={setActive} apply={changes=>setDraft(prev=>({...prev,...changes}))}/></div>}
+ {(step==='voice'||step==='manual')&&<div hidden={step!=='voice'}><ProfileVoice onboarding profile={draft} language={language} role="parent" t={t} onActive={setActive} apply={changes=>{setDraft(prev=>({...prev,...changes}));requestAnimationFrame(()=>review.current?.scrollIntoView({block:'start',behavior:'smooth'}));}}/></div>}
  <p className="small-text muted">{t('After a voice conversation, a short summary helps Origen remember what you discussed. Find it in Family home after saving the new student profile.','Después de una charla, un resumen breve ayuda a Origen a recordar lo conversado. Lo encontrarás en Mi familia al guardar el perfil nuevo.')}</p>
- <h3>{t('Review your student’s profile','Revisa el perfil de tu estudiante')}</h3>
+ <h3 ref={review} className="welcome-review-heading">{t('Review your student’s profile','Revisa el perfil de tu estudiante')}</h3>
  <p>{t('Leave anything you don’t know blank. Your student details are saved when you choose Save profile.','Deja en blanco lo que no sabes. Los datos del estudiante se guardan cuando seleccionas Guardar perfil.')}</p>
- <fieldset disabled={active||saving} style={{border:0,padding:0}}><form onSubmit={e=>{e.preventDefault();if(!active&&draft.name.trim())finish({...draft,name:draft.name.trim()});}}>
+ <fieldset disabled={active||saving} style={{border:0,padding:0}}><form id="welcome-profile-form" onSubmit={e=>{e.preventDefault();if(!active&&draft.name.trim())finish({...draft,name:draft.name.trim()});}}>
  <label className="field">{t('Student name','Nombre del estudiante')}<input required maxLength={100} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
  <label className="field">{t('Education stage','Etapa educativa')}<select value={draft.stage} onChange={e=>setDraft({...draft,stage:e.target.value})}><option value="">{t('Not sure yet','No lo sé todavía')}</option>{['9th grade','10th grade','11th grade','12th grade','Community college','College'].map(s=><option key={s} value={s}>{t(s,s==='Community college'?'Colegio comunitario':s==='College'?'Universidad':`${s.match(/\d+/)?.[0]}.º grado`)}</option>)}</select></label>
  {([['interest','Interests','Intereses'],['activities','Activities and responsibilities','Actividades y responsabilidades'],['goals','Goals','Metas'],['school','School or college','Escuela o colegio'],['institutions','Colleges of interest','Universidades de interés'],['entryTerm','Intended entry term','Período de ingreso'],['needs','Practical needs','Necesidades prácticas'],['notes','Notes and who shared them','Notas y quién las compartió'],['gpa','Reported GPA (optional)','GPA reportado (opcional)']] as const).map(([field,en,es])=><label className="field" key={field}>{t(en,es)}<textarea maxLength={field==='gpa'?30:2000} value={draft[field]||''} onChange={e=>setDraft({...draft,[field]:e.target.value})}/></label>)}
  <p className="small-text muted">{cloud?t('Saved to your account after you confirm.','Se guarda en tu cuenta después de confirmar.'):t('Saved on this device’s browser.','Se guarda en el navegador de este dispositivo.')}</p>
- <div className="card-actions"><button className="button primary" disabled={active||saving||!draft.name.trim()}>{t('Save profile','Guardar perfil')}</button><button type="button" className="button outline" disabled={active||saving} onClick={()=>setStep(step==='voice'?'manual':'voice')}>{step==='voice'?t('Continue by typing','Continuar escribiendo'):t('Use voice instead','Usar voz')}</button></div>
- </form></fieldset></> }</>}
+ <div className="card-actions"><button type="button" className="button outline" disabled={active||saving} onClick={()=>setStep(step==='voice'?'manual':'voice')}>{step==='voice'?t('Continue by typing','Continuar escribiendo'):t('Use voice instead','Usar voz')}</button></div>
+ </form></fieldset><div className="welcome-save-bar"><p className="small-text" role="status">{active?t('End the conversation to review and save.','Termina la conversación para revisar y guardar.'):!draft.name.trim()?t('Add voice suggestions to the form or enter a student name to save.','Agrega las sugerencias al formulario o escribe el nombre del estudiante para guardar.'):t('Review the profile before saving.','Revisa el perfil antes de guardar.')}</p><button type="submit" form="welcome-profile-form" className="button primary" disabled={active||saving||!draft.name.trim()}>{saving?t('Saving…','Guardando…'):t('Save profile','Guardar perfil')}</button></div></> }</>}
  {error&&<p role="alert">{error}</p>}
  </main>;
 }

@@ -23,3 +23,7 @@
 .sidebar nav .nav-item>svg{flex-shrink:0}
 .sidebar nav .nav-item>span:not(.nav-active-dot){white-space:normal;text-align:left;line-height:1.45}
 .profile-information-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:24px 0}.profile-information-grid>div{padding-bottom:18px;border-bottom:1px solid var(--line)}.profile-information-grid dt{font-size:12px;color:#74816c;margin-bottom:9px}.profile-information-grid dd{margin:0;font-size:15px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.student-profile-overview .roadmap-profile-context h3{font-size:13px;margin-top:18px}@media(max-width:760px){.profile-information-grid{grid-template-columns:1fr}.student-profile-overview .section-heading{flex-wrap:wrap;gap:14px}}
+.guidance-composer.unified-composer{padding:6px;align-items:center}
+.guidance-composer.unified-composer .field{min-width:0}
+.guidance-composer.unified-composer textarea{height:44px;min-height:44px;max-height:44px;resize:none;overflow-y:auto;font-size:16px;line-height:24px;padding:10px 8px}
+.guidance-composer.unified-composer .button{min-height:44px;align-self:center;margin-bottom:0}

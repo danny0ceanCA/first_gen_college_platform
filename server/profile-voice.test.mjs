@@ -45,7 +45,7 @@ test('voice sends server-owned settings and returns SDP without exposing credent
     assert.ok(!session.tools[0].parameters.properties.changes.items.properties.field.enum.includes('id'));
     return new Response('v=0\r\nanswer');
   });
-  assert.deepEqual(await call(handler),{status:200,output:{sdp:'v=0\r\nanswer'}});
+  assert.deepEqual(await call(handler),{status:200,output:{sdp:'v=0\r\nanswer',playWelcome:false}});
   assert.match(voiceSession({...input,role:'student',language:'en'},{}).instructions,/student describe their own profile/);
 });
 test('voice sanitizes errors and does not return upstream messages',async()=>{
@@ -62,7 +62,7 @@ test('finance voice uses teaching instructions, minimal context and no profile e
     assert.match(session.instructions,/usually 3 to 5 short sentences/);
     assert.match(session.instructions,/If they say yes, start explaining/);
     assert.match(session.instructions,/I gave you too much at once/);
-    assert.equal(session.audio.output.speed,0.95);
+    assert.equal(session.audio.output.speed,1);
     assert.match(session.instructions,/not a bill/);
     assert.match(session.instructions,/lookup_financial_aid/);
     assert.match(session.instructions,new RegExp(language==='es'?'Speak Spanish':'Speak English'));
@@ -90,7 +90,7 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
   assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language']);
-  assert.equal(session.audio.output.speed,0.95);
+  assert.equal(session.audio.output.speed,1);
   assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
  }
  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'secret'},async(url,options)=>{
@@ -128,4 +128,17 @@ test('Loans guide uses FSA lookup and preserves borrower-specific relief guidanc
  assert.ok(!session.tools.some(tool=>tool.name==='propose_profile'));
  assert.match(session.instructions,/Deferment and forbearance postpone payments, not erase debt/);
  assert.match(session.instructions,/restrict research to Federal Student Aid/);
+});
+
+test('returning users skip tours across every guide while explicit onboarding retains the welcome',()=>{
+ for(const mode of ['profile','finance','admissions','planning','loans']){
+  const session=voiceSession({...input,mode,experience:{usedApp:true,usedVoice:true}},{});
+  assert.match(session.instructions,/RETURNING USER/);
+  assert.match(session.instructions,/Skip the app tour/);
+  assert.match(session.instructions,/avoid repeating explanations already covered/);
+  assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION WELCOME/);
+ }
+ assert.match(voiceSession({...input,memory:[{summary:'Discussed college costs.'}]},{}).instructions,/RETURNING USER/);
+ assert.doesNotMatch(voiceSession(input,{}).instructions,/RETURNING USER/);
+ assert.match(voiceSession({...input,onboarding:true,experience:{usedApp:true,usedVoice:true}},{}).instructions,/FIRST-REGISTRATION WELCOME/);
 });

@@ -2,8 +2,8 @@ import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 
 import {useAuth0} from '@auth0/auth0-react';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 
-export type Account={firstName:string;email:string};
-type Family={account:Account;students:StudentProfile[]};
+export type Account={firstName:string;email:string;welcomeHeard?:boolean;usedVoice?:boolean};
+type Family={account:Account;students:StudentProfile[];returningUser?:boolean;recordVoiceExperience?:(welcomeHeard:boolean)=>Promise<void>};
 type Store=Family&{cloud:boolean;loading:boolean;error:boolean;errorCode:string;saving:boolean;reload:()=>void;completeOnboarding:(firstName:string,student?:StudentProfile)=>Promise<boolean>;saveAccount:(account:Account)=>Promise<boolean>;saveStudent:(student:StudentProfile)=>Promise<boolean>;removeStudent:(id:string)=>Promise<boolean>};
 const Context=createContext<Store|null>(null);
 export function useFamily(){const store=useContext(Context);if(!store)throw new Error('FamilyProvider is required');return store;}
@@ -13,6 +13,8 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  const cloud=isAuthenticated&&!!user?.sub;
  const scope=cloud?`origen.user.${user!.sub}`:'camino';
  const accountKey=cloud?`origen.account.${user!.sub}`:'origen.account-preview.v1';
+ const [visitedBefore]=useState(()=>loadLocal<boolean>(`${scope}.visited.v1`,false)===true);
+ useEffect(()=>{saveLocal(`${scope}.visited.v1`,true);},[scope]);
  const [family,setFamily]=useState<Family>(()=>({account:loadLocal<Account>(accountKey,{firstName:'',email:''}),students:loadLocal<StudentProfile[]>(`${scope}.students.v1`,cloud?[]:previewStudents)}));
  const [loading,setLoading]=useState(cloud),[error,setError]=useState(false),[saving,setSaving]=useState(false),[attempt,setAttempt]=useState(0);
  const [errorCode,setErrorCode]=useState('');
@@ -54,7 +56,11 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
   }catch(cause){setErrorCode(cause instanceof Error?cause.message:'family_unavailable');setError(true);return false;}
   finally{busy.current=false;setSaving(false);}
  }
- return <Context.Provider value={{...family,cloud,loading,error,errorCode,saving,reload:()=>setAttempt(n=>n+1),
+ async function recordVoiceExperience(welcomeHeard:boolean){
+  if(cloud){const next=await request({action:welcomeHeard?'welcome-heard':'voice-used'});setFamily(previous=>({...previous,account:{...previous.account,welcomeHeard:next.account.welcomeHeard,usedVoice:next.account.usedVoice}}));}
+  else setFamily(previous=>{const account={...previous.account,usedVoice:true,welcomeHeard:previous.account.welcomeHeard||welcomeHeard};saveLocal(accountKey,account);return {...previous,account};});
+ }
+ return <Context.Provider value={{...family,recordVoiceExperience,returningUser:visitedBefore||!!family.account.firstName.trim(),cloud,loading,error,errorCode,saving,reload:()=>setAttempt(n=>n+1),
   completeOnboarding:(firstName,student)=>{const account={...family.account,firstName};return mutate({action:'complete-onboarding',account,...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
   saveAccount:account=>mutate({action:'save-account',account},{...family,account}),
   saveStudent:student=>mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]}),

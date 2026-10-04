@@ -28,6 +28,8 @@ export function validateFamily(input){
  };
  switch(input.action){
   case 'load':return {action:'load'};
+  case 'voice-used':return {action:'voice-used'};
+  case 'welcome-heard':return {action:'welcome-heard'};
   case 'save-account':{const details=account(input.account);if(!details.firstName)return invalid();return {action:input.action,account:details};}
   case 'complete-onboarding':{
    const details=account(input.account);if(!details.firstName)return invalid();
@@ -83,10 +85,12 @@ export function createFamilyRepository(database){
      await client.query("UPDATE origen_accounts SET first_name=CASE WHEN first_name='' THEN $2 ELSE first_name END, email=CASE WHEN email='' THEN $3 ELSE email END, updated_at=now() WHERE id=$1",[owner,input.account.firstName,input.account.email]);
     }
    }
-   const row=(await client.query('SELECT first_name,email FROM origen_accounts WHERE id=$1',[owner])).rows[0];
+   if(input.action==='voice-used'||input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET voice_used_at=COALESCE(voice_used_at,now()),updated_at=now() WHERE id=$1',[owner]);
+   if(input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET welcome_heard_at=COALESCE(welcome_heard_at,now()) WHERE id=$1',[owner]);
+   const row=(await client.query('SELECT first_name,email,welcome_heard_at,voice_used_at FROM origen_accounts WHERE id=$1',[owner])).rows[0];
    const students=(await client.query(`SELECT m.id,${sharedColumns.map(c=>`COALESCE(s.${c},m.${c}) AS "${c==='entry_term'?'entryTerm':c}"`).join(',')},m.needs,m.notes FROM origen_students m LEFT JOIN origen_student_links l ON l.member_account_id=m.account_id AND l.member_student_id=m.id LEFT JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id WHERE m.account_id=$1 ORDER BY m.created_at,m.id`,[owner])).rows;
    await client.query('COMMIT');transaction=false;
-   return {account:{firstName:row.first_name,email:row.email},students};
+   return {account:{firstName:row.first_name,email:row.email,welcomeHeard:!!row.welcome_heard_at,usedVoice:!!row.voice_used_at},students};
   }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}
   finally{client.release();}
  };
