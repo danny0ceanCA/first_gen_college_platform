@@ -6,6 +6,7 @@ import {LocalProfileVoice,type VoiceProps} from './ProfileVoice';
 import './SharedVoice.css';
 export default function SharedVoice({children}:{children:ReactNode}){
  const [entry,setEntry]=useState<VoiceProps|null>(null);
+ const voiceLanguage=useRef<'en'|'es'|null>(null),screenLanguage=useRef<'en'|'es'|null>(null);
  const [guide,setGuide]=useState<'finance'|'admissions'|'planning'|'loans'>('planning');
  const [session,setSession]=useState<{id:number;props:VoiceProps}|null>(null);
  const [owner,setOwner]=useState<string|null>(null),[expanded,setExpanded]=useState(false);
@@ -18,7 +19,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  async function retry(){setSaving(true);setSaveFailed(false);try{await queue.current.flush();}catch{setSaveFailed(true);}finally{setSaving(false);}}
 
  const t=entry?.t||session?.props.t||((en:string)=>en);
- function launch(props:VoiceProps){if(ownerRef.current){setExpanded(true);return;}if(!claim('shared',true))return;if(props.mode&&props.mode!=='profile')setGuide(props.mode);setSession({id:Date.now(),props});setExpanded(false);}
+ function launch(props:VoiceProps){if(ownerRef.current){setExpanded(true);return;}if(!claim('shared',true))return;if(props.mode&&props.mode!=='profile')setGuide(props.mode);const language=props.language===screenLanguage.current?voiceLanguage.current||props.language:props.language;screenLanguage.current=props.language;voiceLanguage.current=language;setSession({id:Date.now(),props:{...props,language}});setExpanded(false);}
 
  return <SharedVoiceContext.Provider value={{configure:setEntry,active,owner,claim,queue:queue.current,reportSave:(failed,saving)=>{setSaveFailed(failed);setSaving(saving);},open:()=>setExpanded(true),launch}}>
  {children}
@@ -28,7 +29,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  <div className="shared-voice-heading"><strong><AudioLines size={18} aria-hidden="true"/> Origen <span className="voice-guide-tag">{(active?session.props.mode:guide)==='loans'?t('Loans','Préstamos'):(active?session.props.mode:guide)==='finance'?t('College costs','Costos'):(active?session.props.mode:guide)==='admissions'?t('Applications','Solicitudes'):t('Planning','Planificación')}</span></strong><button type="button" className="voice-expand" aria-label={expanded?t('Close conversation details','Cerrar detalles de la conversación'):t('Show conversation details','Mostrar detalles de la conversación')} aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?<ChevronDown size={18}/>:<ChevronUp size={18}/>}</button></div>
  {saveFailed&&<div className="shared-summary-error" role="alert"><p>{t('Your conversation summary has not saved yet.','El resumen de tu conversacion aun no se ha guardado.')}</p><button type="button" className="button outline" disabled={saving} onClick={()=>void retry()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
  {!active&&entry&&<div className="voice-ready-controls"><span className="voice-current-section">{guideName(entry.mode)}</span></div>}
- <LocalProfileVoice detailsOpen={expanded} onCloseDetails={()=>setExpanded(false)} onGuideChanged={mode=>{setGuide(mode);setSession(previous=>previous?{...previous,props:{...previous.props,mode}}:previous);}} switchGuideMode={active&&entry&&entry.mode!=='profile'&&entry.mode!==session.props.mode?entry.mode:undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} autoStart onActive={live=>{claim('shared',live);}}/>
+ <LocalProfileVoice detailsOpen={expanded} onCloseDetails={()=>setExpanded(false)} onGuideChanged={mode=>{setGuide(mode);setSession(previous=>previous?{...previous,props:{...previous.props,mode}}:previous);}} switchGuideMode={active&&entry&&entry.mode!=='profile'&&entry.mode!==session.props.mode?entry.mode:undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} onLanguageChanged={next=>{voiceLanguage.current=next;setSession(previous=>previous?{...previous,props:{...previous.props,language:next}}:previous);session.props.onLanguageChanged?.(next);}} autoStart onActive={live=>{claim('shared',live);}}/>
  </aside>}
  </SharedVoiceContext.Provider>;
 }

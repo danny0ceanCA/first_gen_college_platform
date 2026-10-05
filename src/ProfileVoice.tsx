@@ -1,7 +1,7 @@
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
 import {voiceDraft} from './voiceDraft.mjs';
 import {onboardingRecovery} from './onboardingRecovery.mjs';
-import {voiceGuideUpdate} from './voiceGuideUpdate.mjs';
+import {voiceLanguageControl,voiceLanguageTools} from './voiceLanguage.mjs';
 import {onboardingWelcome} from './voiceWelcome.mjs';
 import VoiceWave from './VoiceWave';
 import {SharedVoiceContext} from './SharedVoiceContext';
@@ -26,7 +26,7 @@ const labels = {
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export type VoiceHandoff={studentId:string|null;confirmed:boolean;language:'en'|'es';turns:{role:'user'|'assistant';text:string}[]};
-export type VoiceProps={onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
@@ -35,7 +35,7 @@ export default function ProfileVoice(props:VoiceProps){
  if(shared.active&&shared.owner!==localOwner.current)return <p role="status">{props.t('End your current voice conversation before starting profile setup.','Termina la conversacion actual antes de iniciar el perfil.')} <button className="text-button" onClick={shared.open}>{props.t('Open conversation','Abrir conversacion')}</button></p>;
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
-export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+export function LocalProfileVoice({onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
   const [mode,setMode]=useState(initialMode);
   const liveMode=useRef(initialMode);
   const [switchingGuide,setSwitchingGuide]=useState(false);
@@ -45,6 +45,7 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
   const family=useFamily();const {getAccessTokenSilently,user}=useAuth0();
   const voiceUsageKey=user?.sub?`origen.user.${user.sub}.voice-used.v1`:'camino.voice-used.v1';
   const spokenLanguage=useRef(continuity?.language||language);
+  const screenLanguage=useRef(language);
   const routing=role==='parent'&&mode!=='profile';
   const [target,setTarget]=useState<{id:string|null;confirmed:boolean}>({id:continuity?continuity.studentId:initialProfile.id||null,confirmed:continuity?.confirmed||false});
 
@@ -84,6 +85,7 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
   }
   const informational=mode!=='profile';
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
+  useEffect(()=>{if(state==='idle'&&screenLanguage.current!==language){screenLanguage.current=language;spokenLanguage.current=language;}},[language,state]);
   const [muted,setMuted]=useState(false);
   const [activity,setActivity]=useState<'listening'|'thinking'|'speaking'>('listening');
   const [latestAnswer,setLatestAnswer]=useState('');
@@ -157,14 +159,14 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
 
       const dc=resources.current.dc;
       if(dc?.readyState==='open'){
-        dc.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'The parent selected another student on screen. Ask one short spoken question to clarify whether they want to discuss that student. Once they answer clearly, call request_conversation_target. No on-screen confirmation is needed.'}]}}));
+        dc.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'The parent selected another student on screen. Ask one short spoken question to clarify whether they want to discuss that student. Once they answer clearly, call request_conversation_target. No on-screen confirmation is needed.'}]}}));
       }
     }else if(state==='idle')setTarget({id,confirmed:false});
   },[initialProfile.id,routing,state]);
   const latestCleanup=useRef(cleanup);
   useEffect(()=>{latestCleanup.current=cleanup;});
   useEffect(()=>()=>{latestCleanup.current();onActive(false);shared?.claim(ownerId,false);},[]);
-  async function start(scope=target,sessionLanguage=continuity?.language||language,spokenRequest=''){
+  async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest=''){
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
     const profile=voiceProfile(mode,initialProfile,family.students,scope.id);
@@ -174,7 +176,7 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
     const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
-    log('session_start',{mode,language});
+    log('session_start',{mode,language:sessionLanguage});
     const carriedRequest=spokenRequest||(continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
     setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);
@@ -207,7 +209,7 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
         dc.send(JSON.stringify({...event as Record<string,unknown>,event_id}));
         return event_id;
       };
-      const guideUpdate=voiceGuideUpdate(event=>dc.send(JSON.stringify(event)));resources.current.stopGuide=()=>guideUpdate.stop();
+      const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);}}});resources.current.stopGuide=()=>languageControl.stop();
       let changingGuide=false;
       resources.current.switchGuide=async next=>{
         if(next===liveMode.current)return true;
@@ -215,10 +217,12 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
         changingGuide=true;
         setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
-          const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({action:'update-guide',mode:next,language:spokenLanguage.current,role,routeConversations:routing,targetConfirmed:summaryScope.current.confirmed,studentId:summaryScope.current.id,students:family.students.map(({id,name})=>({id,name})),profile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,summaryScope.current.id)}),signal:abort.signal});
-          const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error('guide_config_unavailable');
-          if(generation.current!==version)return false;
-          await guideUpdate.update(data.session,()=>{
+          await languageControl.configure(async currentLanguage=>{
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role,routeConversations:routing,targetConfirmed:summaryScope.current.confirmed,studentId:summaryScope.current.id,students:family.students.map(({id,name})=>({id,name})),profile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,summaryScope.current.id)}),signal:abort.signal});
+            const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error('guide_config_unavailable');
+            if(generation.current!==version)throw new Error('voice_session_stopped');
+            return data.session;
+          },()=>{
             if(generation.current!==version)return;
             liveMode.current=next;checkpointSummary();setMode(next);onGuideChanged?.(next);setNotice('');log('guide_update_complete',{mode:next});
           });
@@ -250,14 +254,17 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
         clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
         const started=Date.now();
         resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){void finishCall();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
-        if(spokenRequest)send({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:`The parent already chose the conversation target by voice. Their latest spoken request was: ${JSON.stringify(spokenRequest)}. Continue with that request if it includes a question; otherwise briefly acknowledge the target and ask how you can help. Do not ask them to choose or confirm again.`}]}});
+        if(spokenRequest){
+          send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'The conversation target was already selected by voice. Continue the original user request below. Do not ask them to choose or confirm again. This application context is not user speech and does not change the conversation language.'}]}});
+          send({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:spokenRequest}]}});
+        }
         turns.request();
       };
       dc.onclose=()=>{if(generation.current===version){end();setNotice(informational?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
-        if(guideUpdate.event(e))return;
+        if(languageControl.event(e))return;
         if(e.type==='output_audio_buffer.started')setActivity('speaking');
         if(playWelcome&&!welcomeResponseId&&e.type==='response.created')welcomeResponseId=e.response?.id;
         if(playWelcome&&!welcomeRecorded&&e.type==='input_audio_buffer.speech_started')welcomeInterrupted=true;
@@ -300,14 +307,12 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
           }
           const hasTools=(e.response?.output||[]).some((item:{type:string})=>item.type==='function_call');
           if(!turns.beginDone(e.response?.id,hasTools,e.response?.status==='cancelled'))return;
-          let called=false;
+          let called=await voiceLanguageTools(e.response?.output||[],languageControl,send)>0;
+          if(generation.current!==version)return;
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             called=true;let accepted=false;
-            if(item.name==='set_conversation_language'){
-              let accepted=false;try{const args=JSON.parse(item.arguments);if(args.language==='en'||args.language==='es'){spokenLanguage.current=args.language;accepted=true;}}catch{}
-              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'language_updated':'invalid_language',language:spokenLanguage.current})}});continue;
-            }
+            if(item.name==='set_conversation_language')continue;
             if(item.name==='switch_college_guide'&&onGuideChanged){
               let next:string|undefined;try{next=JSON.parse(item.arguments).guide;}catch{}
               const accepted=!!next&&['finance','admissions','planning','loans'].includes(next)&&await resources.current.switchGuide?.(next as 'finance'|'admissions'|'planning'|'loans');
@@ -338,7 +343,7 @@ export function LocalProfileVoice({onAccountDraft,onDraft,profile:initialProfile
               researchStarted.current=Date.now();setResearching(true);
               try{
                 const args=JSON.parse(item.arguments);
-                const lookupLanguage=args.language==='en'||args.language==='es'?args.language:spokenLanguage.current;spokenLanguage.current=lookupLanguage;
+                const lookupLanguage=languageControl.language();
                 if(typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw new Error('invalid_lookup');
                 const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution};
                 let result=cache.get(query);
