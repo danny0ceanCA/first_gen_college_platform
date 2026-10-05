@@ -11,7 +11,7 @@ const draft={name:'Alex',role:'student',step:'voice',draft:student};
 
 test('corrupt and incomplete persisted onboarding cannot crash or trap registration',()=>{
  const local=storage(),recovery=onboardingRecovery(local,'account-draft',()=>100);
- for(const invalid of [null,[],{}, {...draft,name:42},{...draft,role:''},{...draft,draft:{...student,name:null}},{...draft,draft:{...student,goals:[]}}, {...draft,draft:{...student,stage:'unsupported'}}]){
+ for(const invalid of [null,[],{}, {...draft,name:42},{...draft,step:'choice',role:''},{...draft,draft:{...student,name:null}},{...draft,draft:{...student,goals:[]}}, {...draft,draft:{...student,stage:'unsupported'}}]){
   recovery.write(invalid);
   assert.equal(recovery.read(null,validOnboardingDraft),null);
   assert.equal(local.getItem('account-draft'),undefined);

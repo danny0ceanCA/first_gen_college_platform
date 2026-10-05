@@ -35,7 +35,9 @@ The developer version starts with no students. It does not use or overwrite the 
 
 ## Still to connect
 
-Auth0 and cloud account/student persistence are wired in source. Native live voice is still pending. The voice card explains this and does not request microphone access. Local information is not encrypted secure storage; do not use this prototype for sensitive documents.
+Registration onboarding now embeds the shared web voice screen in a restricted HTTPS WebView on iOS and Android. It uses the same Anime.js cream writing animation and bottom voice controls as the website. Deploy the website containing `#native-welcome` before installing the new native build. `EXPO_PUBLIC_WEB_URL` defaults to `https://origenedu.ai`; use the exact HTTPS deployment origin, with the existing API origin allowlist configured for that origin. Access tokens are requested from the native Auth0 session in memory, never placed in URLs or local storage. Profile completion waits for the native save acknowledgement before closing.
+
+Rebuild the native app after this change: WebView and microphone permission declarations are new. Test microphone permission denial, audio playback, saving and reopening on physical iOS and Android devices. The separate post-onboarding native topic voice card remains pending. The Expo browser preview also embeds this screen, with microphone permission delegated only to the configured web origin. Local information is not encrypted secure storage; do not use this prototype for sensitive documents.
 
 The existing Vite API is loopback/origin restricted and is not a mobile production API. Before connecting native live voice, deploy an authenticated backend that owns OpenAI credentials and issues voice sessions to signed-in users. Keep API keys off the device. Native WebRTC needs a development build with its native module; Expo Go alone cannot host arbitrary native libraries. Do not relax the existing website origin restrictions to bypass this.
 

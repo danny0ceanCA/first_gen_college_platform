@@ -1,3 +1,4 @@
+import NativeWelcome from './NativeWelcome';
 import {Auth0Provider} from '@auth0/auth0-react';
 import {authConfig} from './authConfig';
 import React from 'react';
@@ -9,4 +10,4 @@ import './guidance.css';
 import './accessibility.css';
 function SkipContent(){return <a className="skip-content" href="#origen-main-content" onClick={event=>{const main=document.querySelector('main');if(main){event.preventDefault();main.id='origen-main-content';main.tabIndex=-1;main.focus();main.scrollIntoView();}}}>Skip to content / Saltar al contenido</a>;}
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><Auth0Provider domain={authConfig.domain} clientId={authConfig.clientId} authorizationParams={{redirect_uri:window.location.origin,audience:authConfig.audience}} onRedirectCallback={state=>{const target=typeof state?.returnTo==='string'&&(/^#invite\/[A-Za-z0-9_-]{43}$/.test(state.returnTo)||state.returnTo==='#institutions')?'/'+state.returnTo:'/#app';window.history.replaceState({},document.title,target);window.dispatchEvent(new HashChangeEvent('hashchange'));}}><SkipContent/><Entry /></Auth0Provider></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Auth0Provider domain={authConfig.domain} clientId={authConfig.clientId} authorizationParams={{redirect_uri:window.location.origin,audience:authConfig.audience}} onRedirectCallback={state=>{const target=typeof state?.returnTo==='string'&&(/^#invite\/[A-Za-z0-9_-]{43}$/.test(state.returnTo)||state.returnTo==='#institutions')?'/'+state.returnTo:'/#app';window.history.replaceState({},document.title,target);window.dispatchEvent(new HashChangeEvent('hashchange'));}}><SkipContent/>{window.location.hash==='#native-welcome'?<NativeWelcome/>:<Entry />}</Auth0Provider></React.StrictMode>);

@@ -1,9 +1,9 @@
 import {useState} from 'react';
 import {Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import type {Account} from './family';
+import type {Account,Student} from './family';
 
-export default function Welcome({account,es,save,logout}:{account:Account;es:boolean;save:(account:Account)=>Promise<boolean>;logout:()=>void}){
+export default function Welcome({account,es,save,logout,onFinished}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void}){
  const t=(en:string,spanish:string)=>es?spanish:en;
  const [name,setName]=useState(account.firstName);
  const [role,setRole]=useState<Account['role']>(account.role);
@@ -12,7 +12,7 @@ export default function Welcome({account,es,save,logout}:{account:Account;es:boo
  const submit=async()=>{
   if(saving||!name.trim()||!role)return;
   setSaving(true);setError(false);
-  try{if(!await save({...account,firstName:name.trim(),role}))setError(true);}
+  try{if(!await save({...account,firstName:name.trim(),role}))setError(true);else onFinished?.();}
   catch{setError(true);}finally{setSaving(false);}
  };
  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.danny0ceanca.origen"
+      "bundleIdentifier": "com.danny0ceanca.origen",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Origen uses your microphone for the live conversation you start during onboarding."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.danny0ceanca.origen"
+      "package": "com.danny0ceanca.origen",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

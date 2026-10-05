@@ -15,6 +15,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
     "svg-path-properties": "^2.1.0"
   },
   "devDependencies": {

@@ -11,7 +11,7 @@ export function onboardingRecovery(storage,key,now=Date.now){
 export function validOnboardingDraft(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
  if(typeof value.name!=='string'||value.name.length>100||!['name','choice','voice','manual'].includes(value.step)||!['','parent','student'].includes(value.role))return false;
- if(value.step!=='name'&&(!value.name.trim()||!value.role))return false;
+ if(value.step==='choice'&&(!value.name.trim()||!value.role))return false;
  const draft=value.draft;
  if(!draft||typeof draft!=='object'||Array.isArray(draft)||typeof draft.id!=='string'||!draft.id.trim()||draft.id.length>128)return false;
  const limits={name:100,stage:40,interest:2000,gpa:30,color:40,school:2000,activities:2000,goals:2000,needs:2000,notes:2000,institutions:2000,entryTerm:2000};
