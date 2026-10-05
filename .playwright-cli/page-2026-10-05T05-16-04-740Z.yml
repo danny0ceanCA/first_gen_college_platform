@@ -1,0 +1,24 @@
+- generic [ref=e2]:
+  - link "Skip to content / Saltar al contenido" [ref=e3] [cursor=pointer]:
+    - /url: "#origen-main-content"
+  - main [ref=e4]:
+    - generic [ref=e31]:
+      - link "Origen" [ref=e32] [cursor=pointer]:
+        - /url: "#"
+        - text: origen.
+      - button "Español" [ref=e33] [cursor=pointer]
+    - region [ref=e34]:
+      - paragraph [ref=e35]: A LITTLE ABOUT YOU
+      - heading "Let’s get to know you, Alex." [level=1] [ref=e36]
+      - paragraph [ref=e37]: Just talk. Your profile takes shape here as you share. Nothing is saved to your profile until you choose Save profile.
+      - generic "Profile draft" [ref=e38]:
+        - paragraph [ref=e39]: Your story starts with whatever you’d like to share.
+      - status [ref=e40]: Your draft is ready to review. You can edit details before saving.
+    - generic [ref=e41]:
+      - region "Tell us about yourself" [ref=e42]:
+        - paragraph [ref=e43]: AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.
+        - button "Start live conversation" [ref=e45] [cursor=pointer]
+      - generic [ref=e49]:
+        - button "Edit details" [ref=e50] [cursor=pointer]
+        - button "Save profile" [disabled] [ref=e51]
+      - paragraph [ref=e52]: Share a name to save, or choose Edit details.

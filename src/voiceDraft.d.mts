@@ -1,0 +1,1 @@
+export function voiceDraft<T extends Record<string,string|undefined>>(recovery:{read:<V>(fallback:V)=>V;write:(value:unknown)=>boolean;clear:()=>void}|null,live:boolean):{read:()=>T;write:(changes:T)=>boolean;accept:(previous:T,next:T,apply:(changes:T)=>void)=>T};

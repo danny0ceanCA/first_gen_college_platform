@@ -21,5 +21,5 @@ export default function Entry(){
  if(route==='#institutions')return <InstitutionPortal key={isAuthenticated?user?.sub:'anonymous'}/>;
  if(/^#institution\/[a-z0-9-]{1,100}$/.test(route))return <InstitutionPublic key={route} slug={route.slice(13)}/>;
  if(/^#invite\/[A-Za-z0-9_-]{43}$/.test(route))return <InviteAccept token={route.slice(8)}/>;
- return route==='#mobile-design'?<MobileDesign/>:inside?<App welcomePreview={route==='#welcome'} key={isAuthenticated?user?.sub:'preview'}/>:<Landing enter={()=>{window.location.hash='app';}}/>;
+ return route==='#mobile-design'?<MobileDesign/>:inside?<App welcomePreview={route==='#welcome'} key={(isAuthenticated?user?.sub:'preview')+(route==='#welcome'?'.welcome':'.app')}/>:<Landing enter={()=>{window.location.hash='app';}}/>;
 }

@@ -2,12 +2,14 @@ import {safeErrorCode} from './api-logging.mjs';
 import {createHistoryRepository,validateMemory} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
 import {narrativeSummaryInstructions} from './summary-style.mjs';
-export function createSummaryHandler(env,request=fetch,database=null){return async(req,res,next)=>{
+import {createConversationOverview} from './conversation-overview.mjs';
+export function createSummaryHandler(env,request=fetch,database=null){const overview=createConversationOverview(env,request,database);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/conversation-summary')return next();
  const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
  if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>512000)return send(413,{error:'too_large'});}let input;try{input=JSON.parse(raw);}catch{return send(400,{error:'invalid_request'});}
+ if(input?.action==='overview')return send(200,await overview(req,input));
  // A ten-minute session can easily exceed forty transcript entries. Bound
  // entry count separately from the existing 512 KB request-body limit.
  if(!input||!['en','es'].includes(input.language)||!Array.isArray(input.turns)||input.turns.length>400||input.turns.some(t=>!t||!['user','assistant'].includes(t.role)||typeof t.text!=='string'||t.text.length>12000))return send(400,{error:'invalid_request'});

@@ -41,6 +41,9 @@ export function createHistoryRepository(database){
    if(input.action==='delete'){
     if(!(await client.query('DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2 RETURNING id',[owner,input.id])).rows.length)throw fail(404,'summary_not_found');
    }
+   if(input.action==='clear'){
+    await client.query(`DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND ${input.studentId===null?'student_id IS NULL':'student_id=$2'}${input.mode?` AND mode=$${input.studentId===null?2:3}`:''}`,[owner,...(input.studentId===null?[]:[input.studentId]),...(input.mode?[input.mode]:[])]);
+   }
    if(input.action==='find'){
     const rows=(await client.query('SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,input.id])).rows;
     await client.query('COMMIT');return {items:rows.map(memory)};
@@ -58,7 +61,7 @@ export function createHistoryHandler(database){
   if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
   if(!allowedRequest(req))return send(403,{error:'origin_not_allowed'});
   try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2000000)return send(413,{error:'too_large'});}let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
-   if(!['load','delete','import','save'].includes(input?.action)||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
+   if(!['load','delete','clear','import','save'].includes(input?.action)||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='clear'&&(input.studentId===undefined||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode))||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
    if(input.action==='save')input.item=validateMemory(input.item);
    return send(200,await run(req.origenIdentity.sub,input));
   }catch(error){if(![400,403,404,409].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}

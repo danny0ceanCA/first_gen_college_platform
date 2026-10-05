@@ -1,0 +1,19 @@
+- generic [ref=e2]:
+  - link "Skip to content / Saltar al contenido" [ref=e3] [cursor=pointer]:
+    - /url: "#origen-main-content"
+  - main [ref=e4]:
+    - button "Español" [ref=e5] [cursor=pointer]
+    - paragraph [ref=e6]: Unfinished setup is kept on this device for up to 24 hours so you can return to it.
+    - paragraph [ref=e7]: WELCOME TO ORIGEN
+    - heading "Welcome, Alex." [level=1] [ref=e19]
+    - paragraph [ref=e20]: Origen helps you understand college, paying for it, and your next steps. Ask in English or Spanish.
+    - button "Edit my name or role" [ref=e21] [cursor=pointer]
+    - heading "Tell us about yourself" [level=2] [ref=e22]
+    - generic [ref=e23]:
+      - paragraph [ref=e24]: Family home keeps student details and conversation summaries together. Origen uses those summaries to help you pick up where you left off.
+      - paragraph [ref=e25]: Paying for college explains costs and financial help. Loans covers borrowing and repayment. Applications helps with forms and deadlines. Planning helps you choose classes and next steps.
+    - paragraph [ref=e26]: Talk naturally with Origen, or type what you know. You will review everything before saving.
+    - generic [ref=e27]:
+      - button "Talk with Origen" [ref=e28] [cursor=pointer]
+      - button "Enter details myself" [ref=e29] [cursor=pointer]
+    - button "Continue to my family" [ref=e30] [cursor=pointer]

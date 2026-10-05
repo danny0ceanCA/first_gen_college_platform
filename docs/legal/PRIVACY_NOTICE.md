@@ -26,6 +26,8 @@ Not every category is collected in every session. Voice is optional. Browser per
 
 ## 3. How we use information
 
+We limit access to people and providers who need information for an authorized purpose. We do not treat information supplied for guidance as permission to publicly endorse Origen, contact a school on your behalf, or send marketing. Any optional marketing permission must be separate from account registration and can be withdrawn. A request to an external school or other recipient must make the recipient and intended information clear before transmission.
+
 We use information to provide and personalize requested guidance; maintain profiles and plans; generate and save summaries; remember relevant context across specialized guides; avoid repeating welcome explanations; manage authorized family links; review and publish institutional pages; authenticate accounts; respond to support and privacy requests; prevent misuse; diagnose failures; and meet legal obligations.
 
 We do not promise that generated guidance or summaries are accurate. You can review and correct supported records. Origen is not intended to make binding admissions, credit, employment, or financial-aid eligibility decisions. No institution receives your private profile or conversations solely because you browse its page.
@@ -34,7 +36,7 @@ We do not promise that generated guidance or summaries are accurate. You can rev
 
 OpenAI provides AI text, voice, and summary processing. Depending on the feature, relevant profile details, questions, conversation context, previous summaries, and tool inputs are transmitted to OpenAI. Starting live voice transmits microphone audio and session context. Speech recognition may misunderstand names or statements. Generated summaries describe the discussion and may contain errors; they are distinct from a verbatim transcript.
 
-The reviewed application stores conversation summaries for account history rather than raw microphone recordings in its own account database. Live transcripts may be held temporarily in the browser and sent for summary generation. This does not mean audio or transcripts are never processed or retained by a provider. Some requests use a setting that disables stored responses; that setting alone does not establish zero retention, exclusion from every provider log, or a particular training policy. Provider terms, actual project settings, and any applicable retention exceptions must be verified before we publish specific promises about them.
+The reviewed application stores conversation summaries for account history rather than raw microphone recordings in its own account database. To recover an interrupted save, conversation text and its student/general-family context may be kept in this browser for up to 24 hours from the latest checkpoint and sent for summary generation. These temporary records are removed after a successful save; they can be accessible to another person using the same browser. They are scoped to the signed-in account or the preview. This does not mean audio or transcripts are never processed or retained by a provider. Some requests use a setting that disables stored responses; that setting alone does not establish zero retention, exclusion from every provider log, or a particular training policy. Provider terms, actual project settings, and any applicable retention exceptions must be verified before we publish specific promises about them.
 
 The application may use previous summaries and account experience markers to continue a discussion without repeating the same explanations. Stop a voice session or revoke microphone permission in your browser/device settings to stop further capture. Stopping does not recall information already transmitted. You can use available nonvoice features instead. We do not use the reviewed voice feature to identify you through a voiceprint.
 
@@ -66,6 +68,8 @@ Provider authentication records, infrastructure logs, backups, support records, 
 
 ## 8. Your controls and privacy requests
 
+If you share a device, sign out and remove sensitive browser copies when finished. If a generated summary misidentifies a student or states something you did not agree to, correct or delete the supported summary and contact us if necessary. A generated summary is not evidence of your consent to an action, purchase, family link, or change in data use.
+
 You can review and edit supported student/profile records, delete supported summaries, manage family links, stop microphone access, and clear preview/browser data. The web application provides supported account-data download and account-closure controls. Available exports include account, student, summary, plan, and relevant institutional membership/representative information; they exclude another user's private data and login credentials.
 
 Closure requires a recent sign-in. Linked family relationships must be resolved first, and institutional membership or reviewer records can require manual review. Closing the application account does not automatically delete the Auth0 identity; that requires separate handling. Native mobile does not yet provide every equivalent self-service control. Contact us if a needed control is unavailable.
@@ -89,6 +93,8 @@ The application uses authentication, authorization checks, validation, and other
 Providers may process information in locations different from your own. Confirm production regions, applicable transfer mechanisms, and intended markets before publishing specific location or international-compliance commitments. If an incident requires notification under applicable law, we will provide the required notification.
 
 ## 11. Updates and contact
+
+If an acceptance process is introduced, we may retain the document version, account identifier, time of acceptance, language, and source of the acceptance action to document the agreement. That record must have a disclosed, purpose-based retention policy before implementation. Hearing a welcome introduction or using voice does not count as accepting legal terms.
 
 We will post the current Notice with an effective date and identify material changes. Significant changes will be communicated through a conspicuous notice or another appropriate channel before they apply where required. New processing that requires consent will have a separate consent flow; continued use alone is not a substitute for required consent.
 

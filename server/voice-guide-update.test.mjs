@@ -16,3 +16,23 @@ test('rejected, concurrent, timed-out and ended updates are recoverable',async()
  const third=update.update({instructions:'c'});update.stop();await assert.rejects(third,/stopped/);
  assert.ok(sent.every(e=>e.type==='session.update'));
 });
+
+test('late guide acknowledgement synchronizes the topic without reconnecting or losing the next update',async()=>{
+ const sent=[],applied=[];let timeout;
+ const update=voiceGuideUpdate(e=>sent.push(e),{schedule:fn=>{timeout=fn;return 1;},cancel:()=>{}});
+ const first=update.update({instructions:'finance'},()=>applied.push('finance'));
+ timeout();await assert.rejects(first,/timeout/);
+ const second=update.update({instructions:'planning'},()=>applied.push('planning'));
+ assert.equal(update.event({type:'session.updated',session:{instructions:'finance'}}),true);
+ assert.equal(update.event({type:'session.updated',session:{instructions:'planning'}}),true);
+ await second;assert.deepEqual(applied,['finance','planning']);
+ assert.ok(sent.every(event=>event.type==='session.update'));
+});
+
+test('a late rejected topic update is consumed instead of terminating the live call',async()=>{
+ let timeout;const events=[];
+ const update=voiceGuideUpdate(event=>events.push(event),{schedule:fn=>{timeout=fn;return 1;},cancel:()=>{}});
+ const result=update.update({instructions:'applications'});timeout();await assert.rejects(result,/timeout/);
+ assert.equal(update.event({type:'error',error:{event_id:events[0].event_id,code:'invalid_value'}}),true);
+ assert.equal(update.event({type:'error',error:{event_id:'unrelated',code:'invalid_value'}}),false);
+});

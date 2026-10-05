@@ -1,5 +1,6 @@
 export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>void,options?:{schedule?:(callback:()=>void,delay:number)=>any;cancel?:(timer:any)=>void;transcriptionTimeout?:number;onMissing?:(itemId:string)=>void}): {
   request:()=>void;
+  busy:()=>boolean;
   speechStopped:(itemId:string)=>void;
   stop:()=>void;
   progress:(sentence:string)=>boolean;

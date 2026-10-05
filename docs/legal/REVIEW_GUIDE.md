@@ -15,7 +15,7 @@ Prepared October 4, 2026. This packet is ready for your review and for sharing w
 - A short disclosure before voice starts, including preview voice. No repeated legal forms during the conversation.
 - Clear identification of AI guidance and summaries, their potential errors, and the need to verify important school and financial-aid information.
 - Users retain rights in their content; Origen receives permission needed to operate the requested features.
-- No compulsory arbitration, class-action waiver, blanket indemnity, or arbitrary monetary liability cap in this recommended version.
+- No compulsory arbitration or class-action waiver. A proposed liability cap is the greater of $1,000 or twelve months of fees, with exceptions for unlawful personal-data handling, confidentiality, serious misconduct, and mandatory rights. A narrow third-party-claim reimbursement provision applies to institutions, not consumer families.
 - Proposed 13+ independent account/voice use, with guardian involvement for minors as required. This choice still needs implementation and review; parent-created profiles about younger children also need assessment.
 - Honest deletion and retention limitations instead of promises that all providers immediately erase every copy.
 

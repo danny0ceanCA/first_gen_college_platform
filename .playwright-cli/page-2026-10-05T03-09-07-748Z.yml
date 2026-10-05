@@ -1,0 +1,99 @@
+- generic [ref=e2]:
+  - link "Skip to content / Saltar al contenido" [ref=e3] [cursor=pointer]:
+    - /url: "#origen-main-content"
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Origen home" [ref=e6] [cursor=pointer]:
+        - text: origen
+        - generic [ref=e8]: .
+      - generic [ref=e9]: A PATH FORWARD, TOGETHER
+      - generic [ref=e10]:
+        - button "Parent" [ref=e11] [cursor=pointer]
+        - button "Student" [ref=e17] [cursor=pointer]
+      - navigation "Main navigation" [ref=e21]:
+        - button "Family home" [ref=e22] [cursor=pointer]
+        - button "Paying for college" [ref=e28] [cursor=pointer]
+        - button "Loans" [ref=e33] [cursor=pointer]
+        - button "Planning" [ref=e37] [cursor=pointer]
+        - button "Ready to apply for college?" [ref=e41] [cursor=pointer]
+        - button "Get support" [ref=e45] [cursor=pointer]
+      - region "Family community" [ref=e49]:
+        - heading "Learn with other families" [level=2] [ref=e55]
+        - paragraph [ref=e56]: Ask questions and share experiences.
+        - button "Discussion board" [ref=e57] [cursor=pointer]
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - text: YOUR FAMILY
+          - button "Add a student" [ref=e63] [cursor=pointer]
+        - button "S Sofía 10th grade" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: S
+          - generic [ref=e67]:
+            - text: Sofía
+            - generic [ref=e68]: 10th grade
+        - button "M Mateo Community college" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: M
+          - generic [ref=e73]:
+            - text: Mateo
+            - generic [ref=e74]: Community college
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - strong [ref=e79]: Every path is personal.
+          - paragraph [ref=e80]: We’ll find yours, one step at a time.
+        - button "○ Your account Preview account" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: ○
+          - generic [ref=e83]:
+            - text: Your account
+            - generic [ref=e84]: Preview account
+    - generic [ref=e88]:
+      - banner [ref=e89]:
+        - generic [ref=e90]:
+          - generic [ref=e91]: Your family’s next chapter
+          - strong [ref=e94]: Family home
+        - generic [ref=e95]:
+          - button "Try the welcome intro" [ref=e96] [cursor=pointer]
+          - generic [ref=e97]: Interactive preview
+          - button "ES Español" [ref=e99] [cursor=pointer]:
+            - text: ES
+            - generic [ref=e100]: Español
+          - button "Log out" [ref=e101] [cursor=pointer]
+          - button "Settings" [ref=e106] [cursor=pointer]
+      - main [ref=e111]:
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: FAMILY OVERVIEW
+            - heading "Your family, at a glance." [level=1] [ref=e115]
+          - button "Add a student" [ref=e116] [cursor=pointer]
+        - generic [ref=e119]:
+          - group [ref=e120]:
+            - generic "Family discussion summary" [ref=e121] [cursor=pointer]
+          - region "Family summary" [ref=e128]:
+            - generic [ref=e136]:
+              - strong [ref=e137]: "2"
+              - generic [ref=e138]: Student profiles
+          - generic [ref=e139]:
+            - heading "Your students at a glance" [level=2] [ref=e141]
+            - generic [ref=e142]: Sample family
+          - generic [ref=e143]:
+            - group [ref=e144]:
+              - generic "S Sofía 10th grade Student profile" [ref=e145] [cursor=pointer]:
+                - generic [ref=e146]: S
+                - generic [ref=e147]:
+                  - heading "Sofía" [level=2] [ref=e148]
+                  - paragraph [ref=e149]: 10th grade
+                - generic [ref=e150]: Student profile
+            - group [ref=e153]:
+              - generic "M Mateo Community college Student profile" [ref=e154] [cursor=pointer]:
+                - generic [ref=e155]: M
+                - generic [ref=e156]:
+                  - heading "Mateo" [level=2] [ref=e157]
+                  - paragraph [ref=e158]: Community college
+                - generic [ref=e159]: Student profile
+        - generic [ref=e162]:
+          - generic [ref=e163]: origen.
+          - generic [ref=e164]: Different paths. A future that fits.
+          - generic [ref=e165]: Profiles saved on this browser · Other previews reset on refresh
+  - complementary "Origen voice guide" [ref=e166]:
+    - strong [ref=e168]: Origen
+    - generic [ref=e170]:
+      - generic [ref=e171]: Planning
+      - button "Talk" [ref=e172] [cursor=pointer]

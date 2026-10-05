@@ -18,6 +18,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   }
   function request() { pending = true; flush(); }
   return {
+    busy(){return !stopped&&Boolean(active||pending||tools||awaiting.size||progressActive);},
     request,
     speechStopped(itemId){
       if(stopped||!awaiting.has(itemId)||timers.has(itemId))return;

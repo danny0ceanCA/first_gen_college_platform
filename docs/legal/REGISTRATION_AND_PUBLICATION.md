@@ -41,7 +41,7 @@ Keep legal acceptance separate from `welcome_heard_at` and `voice_used_at`. Thos
 3. Verify production providers, subprocessors, agreements, OpenAI processing/training settings, Render regions/backups/log expiry, Auth0 identity deletion, security access, and incident handling. Replace draft verification notes with accurate public statements; do not assert zero retention or certification without evidence.
 4. Establish defensible retention for support records, logs, backups, closure hashes, lock records, legal acceptance receipts, and inactive accounts. Confirm that deletion/export procedures match the Notice, including linked families, institutional records and native mobile.
 5. Determine applicable privacy laws based on the actual operator, revenue/data practices, users, and school relationships. Add required regional supplements and request/appeal channels; confirm sale/advertising-sharing statements and GPC obligations. Do not claim CCPA, GDPR, FERPA, or COPPA compliance by publishing a generic agreement.
-6. Seek review from a qualified legal friend, legal-aid reviewer, or other appropriate reviewer when available; paid counsel is not a prerequisite to preparing or reviewing these documents. Finalize English and matching Spanish text, then publish stable URLs and implement consent receipts after resolving the factual and operational gaps above. These drafts intentionally omit mandatory arbitration, class waivers, and a blanket monetary liability cap.
+6. Seek review from a qualified legal friend, legal-aid reviewer, or other appropriate reviewer when available; paid counsel is not a prerequisite to preparing or reviewing these documents. Finalize English and matching Spanish text, then publish stable URLs and implement consent receipts after resolving the factual and operational gaps above. The protective version omits mandatory arbitration and class waivers. It proposes a limited monetary cap with substantial exceptions and a narrow institutional third-party-claim provision; review both explicitly.
 
 ## Sources supporting the placement recommendation
 
@@ -51,5 +51,17 @@ Keep legal acceptance separate from `welcome_heard_at` and `voice_used_at`. Thos
 - The FTC explains under-13 collection, actual knowledge, parental notice, and verifiable parental consent: [COPPA FAQ](https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions).
 
 ## Source-code basis
+
+## What supports binding acceptance
+
+The Terms now expressly state the intention to form an agreement through an affirmative acceptance action. Binding effect still requires a real, identifiable operator, lawful provisions, conspicuous notice, legally capable parties, and evidence of actual acceptance. The current local documents do not bind users retroactively. An acceptance screen and server enforcement have not yet been implemented.
+
+For signed-out preview, do not assume footer links bind visitors. If contractual protection is needed for preview voice, add a clearly disclosed one-time Terms acceptance before starting that feature, separate from microphone permission. Avoid unnecessary identifying information for anonymous visitors. Decide how to retain a minimal versioned receipt without claiming a browser-only marker proves identity. Registration acceptance should be independently recorded after authentication.
+
+For minors, do not promise that a child's checkbox makes every provision enforceable. Use an appropriate guardian account/acceptance route and assess the legal capacity of the actual contracting parties. California generally permits minors to disaffirm contracts, subject to statutory exceptions: [Family Code 6710](https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=FAM&sectionNum=6710.). California also limits contracts that try to excuse fraud, willful injury, or violations of law: [Civil Code 1668](https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1668.).
+
+The proposed cap of the greater of $1,000 or twelve months of fees is a recommended business choice for explicit review. It is not a legally guaranteed amount and is not a substitute for safeguards or appropriate insurance. Highlight Section 11 in the acceptance interface and ensure the document is accessible. The institutional reimbursement clause should be specifically called out to institutional representatives and checked against any separately signed agreement.
+
+Acceptance does not authorize purchases, marketing, or undisclosed new AI-data uses. Obtain separate permission where required and do not silently rewrite the policy to expand processing: [FTC guidance on changing AI terms](https://www.ftc.gov/policy/advocacy-research/tech-at-ftc/2024/02/ai-other-companies-quietly-changing-your-terms-service-could-be-unfair-or-deceptive).
 
 Reviewed `src/LandingDetails.tsx`, `src/ProfileVoice.tsx`, `server/conversation-summary.mjs`, `server/account-lifecycle.mjs`, and existing vendor-readiness inventories. The documents distinguish implemented application features from unverified provider operations. Publication requires production verification; this is not a compliance certification.
