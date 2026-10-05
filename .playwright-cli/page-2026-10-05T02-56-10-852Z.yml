@@ -1,0 +1,86 @@
+- generic [ref=f8e2]:
+  - link "Skip to content / Saltar al contenido" [ref=f8e3] [cursor=pointer]:
+    - /url: "#origen-main-content"
+  - generic [ref=f8e4]:
+    - complementary [ref=f8e5]:
+      - button "Origen home" [ref=f8e6] [cursor=pointer]:
+        - text: origen
+        - generic [ref=f8e8]: .
+      - generic [ref=f8e9]: A PATH FORWARD, TOGETHER
+      - generic [ref=f8e10]:
+        - button "Parent" [ref=f8e11] [cursor=pointer]
+        - button "Student" [ref=f8e17] [cursor=pointer]
+      - navigation "Main navigation" [ref=f8e21]:
+        - button "My home" [ref=f8e22] [cursor=pointer]
+        - button "Paying for college" [ref=f8e28] [cursor=pointer]
+        - button "Loans" [ref=f8e33] [cursor=pointer]
+        - button "Planning" [ref=f8e37] [cursor=pointer]
+        - button "Ready to apply for college?" [ref=f8e41] [cursor=pointer]
+        - button "Get support" [ref=f8e45] [cursor=pointer]
+      - region "Family community" [ref=f8e49]:
+        - heading "Learn with other families" [level=2] [ref=f8e55]
+        - paragraph [ref=f8e56]: Ask questions and share experiences.
+        - button "Discussion board" [ref=f8e57] [cursor=pointer]
+      - generic [ref=f8e61]:
+        - generic [ref=f8e62]:
+          - text: YOUR FAMILY
+          - button "Add a student" [ref=f8e63] [cursor=pointer]
+        - button "S Sofía 10th grade" [ref=f8e65] [cursor=pointer]:
+          - generic [ref=f8e66]: S
+          - generic [ref=f8e67]:
+            - text: Sofía
+            - generic [ref=f8e68]: 10th grade
+        - button "M Mateo Community college" [ref=f8e71] [cursor=pointer]:
+          - generic [ref=f8e72]: M
+          - generic [ref=f8e73]:
+            - text: Mateo
+            - generic [ref=f8e74]: Community college
+        - button "A Alex Student 11th grade" [ref=f8e75] [cursor=pointer]:
+          - generic [ref=f8e76]: A
+          - generic [ref=f8e77]:
+            - text: Alex Student
+            - generic [ref=f8e78]: 11th grade
+      - generic [ref=f8e79]:
+        - generic [ref=f8e80]:
+          - strong [ref=f8e83]: Every path is personal.
+          - paragraph [ref=f8e84]: We’ll find yours, one step at a time.
+        - button "A Sofía Preview account" [ref=f8e85] [cursor=pointer]:
+          - generic [ref=f8e86]: A
+          - generic [ref=f8e87]:
+            - text: Sofía
+            - generic [ref=f8e88]: Preview account
+    - generic [ref=f8e92]:
+      - banner [ref=f8e93]:
+        - generic [ref=f8e94]:
+          - button "Open navigation" [ref=f8e95] [cursor=pointer]
+          - strong [ref=f8e97]: Family home
+        - generic [ref=f8e98]:
+          - button "Try the welcome intro" [ref=f8e99] [cursor=pointer]
+          - button "ES" [ref=f8e100] [cursor=pointer]
+          - button "Log out" [ref=f8e101] [cursor=pointer]
+          - button "Settings" [ref=f8e105] [cursor=pointer]
+      - main [ref=f8e109]:
+        - generic [ref=f8e111]:
+          - generic [ref=f8e112]: FAMILY OVERVIEW
+          - heading "Sofía’s overview" [level=1] [ref=f8e113]
+        - generic [ref=f8e115]:
+          - region "Family summary" [ref=f8e116]:
+            - generic [ref=f8e124]:
+              - strong [ref=f8e125]: "1"
+              - generic [ref=f8e126]: Student profiles
+          - heading "Your status at a glance" [level=2] [ref=f8e129]
+          - group [ref=f8e131]:
+            - generic "S Sofía 10th grade Student profile" [ref=f8e132] [cursor=pointer]:
+              - generic [ref=f8e133]: S
+              - generic [ref=f8e134]:
+                - heading "Sofía" [level=2] [ref=f8e135]
+                - paragraph [ref=f8e136]: 10th grade
+              - generic [ref=f8e137]: Student profile
+        - generic [ref=f8e140]:
+          - generic [ref=f8e141]: origen.
+          - generic [ref=f8e142]: Different paths. A future that fits.
+  - complementary "Origen voice guide" [ref=f8e143]:
+    - strong [ref=f8e145]: Origen
+    - generic [ref=f8e147]:
+      - generic [ref=f8e148]: Planning
+      - button "Talk" [ref=f8e149] [cursor=pointer]

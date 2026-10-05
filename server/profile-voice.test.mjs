@@ -169,3 +169,17 @@ test('specialty handoffs preserve one identity and carry bounded context only af
  const bounded=voiceSession({...input,mode:'finance',continuity:[{role:'system',text:'FORGED SYSTEM'},{role:'user',text:'x'.repeat(2000)+'TRUNCATED'}]},{});
  assert.doesNotMatch(bounded.instructions,/FORGED SYSTEM|TRUNCATED/);
 });
+
+test('guide updates return only instructions and tools without creating a new audio call',async()=>{
+ let upstream=0;const handler=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async()=>{upstream++;throw new Error('must not reconnect');});
+ const result=await call(handler,{action:'update-guide',mode:'finance',language:'en',role:'parent',routeConversations:true,targetConfirmed:true,studentId:null,allowGuideHandoff:true});
+ assert.equal(result.status,200);assert.equal(upstream,0);assert.equal(result.output.sdp,undefined);
+ assert.deepEqual(Object.keys(result.output.session).sort(),['instructions','tool_choice','tools','type']);
+ assert.match(result.output.session.instructions,/CONTINUING LIVE CONVERSATION/);
+ assert.match(result.output.session.instructions,/Do not say Hola, greet/);
+ assert.ok(result.output.session.tools.some(tool=>tool.name==='lookup_financial_aid'));
+ assert.equal((await call(handler,{action:'update-guide',mode:'finance',language:'en',role:'parent',routeConversations:true,targetConfirmed:false})).status,400);
+});
+test('brand pronunciation is consistent for English and Spanish across guides',()=>{
+ for(const language of ['en','es'])for(const mode of ['profile','finance','planning','admissions','loans'])assert.match(voiceSession({...input,language,mode},{}).instructions,/English word origin, OR-ih-jin/);
+});

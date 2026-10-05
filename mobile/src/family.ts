@@ -1,6 +1,6 @@
 import {authConfig} from './authConfig';
 export type Student={id:string;name:string;stage:string;interests:string;goals:string;gpa?:string;color?:string;institutions?:string;entryTerm?:string;school?:string;activities?:string;needs?:string;notes?:string};
-export type Account={firstName:string;email:string};
+export type Account={firstName:string;email:string;role?:'parent'|'student'};
 export type Family={account:Account;students:Student[]};
 export const stages=['','9th grade','10th grade','11th grade','12th grade','Community college','College'];
 export function toServer(student:Student){

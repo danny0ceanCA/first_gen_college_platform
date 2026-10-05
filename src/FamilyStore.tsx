@@ -2,9 +2,9 @@ import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 
 import {useAuth0} from '@auth0/auth0-react';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 
-export type Account={firstName:string;email:string;welcomeHeard?:boolean;usedVoice?:boolean};
+export type Account={firstName:string;email:string;role?:'parent'|'student';welcomeHeard?:boolean;usedVoice?:boolean};
 type Family={account:Account;students:StudentProfile[];returningUser?:boolean;recordVoiceExperience?:(welcomeHeard:boolean)=>Promise<void>};
-type Store=Family&{cloud:boolean;loading:boolean;error:boolean;errorCode:string;saving:boolean;reload:()=>void;completeOnboarding:(firstName:string,student?:StudentProfile)=>Promise<boolean>;saveAccount:(account:Account)=>Promise<boolean>;saveStudent:(student:StudentProfile)=>Promise<boolean>;removeStudent:(id:string)=>Promise<boolean>};
+type Store=Family&{cloud:boolean;loading:boolean;error:boolean;errorCode:string;saving:boolean;reload:()=>void;completeOnboarding:(firstName:string,role:'parent'|'student',student?:StudentProfile)=>Promise<boolean>;saveAccount:(account:Account)=>Promise<boolean>;saveStudent:(student:StudentProfile)=>Promise<boolean>;removeStudent:(id:string)=>Promise<boolean>};
 const Context=createContext<Store|null>(null);
 export function useFamily(){const store=useContext(Context);if(!store)throw new Error('FamilyProvider is required');return store;}
 
@@ -37,7 +37,7 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
    const localStudents=loadLocal<StudentProfile[]>(`${scope}.students.v1`,[]);
    const localAccount=loadLocal<Account>(accountKey,{firstName:'',email:''});
    if(localStudents.length||localAccount.firstName||localAccount.email){
-    next=await request({action:'import',source:'web',account:{firstName:localAccount.firstName||'',email:localAccount.email||''},students:localStudents},controller.signal);
+    next=await request({action:'import',source:'web',account:{firstName:localAccount.firstName||'',email:localAccount.email||'',...(localAccount.role?{role:localAccount.role}:{})},students:localStudents},controller.signal);
    }
    if(active)setFamily(next);
   })().catch(()=>{if(active)setError(true);}).finally(()=>{if(active)setLoading(false);});
@@ -61,8 +61,8 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
   else setFamily(previous=>{const account={...previous.account,usedVoice:true,welcomeHeard:previous.account.welcomeHeard||welcomeHeard};saveLocal(accountKey,account);return {...previous,account};});
  }
  return <Context.Provider value={{...family,recordVoiceExperience,returningUser:visitedBefore||!!family.account.firstName.trim(),cloud,loading,error,errorCode,saving,reload:()=>setAttempt(n=>n+1),
-  completeOnboarding:(firstName,student)=>{const account={...family.account,firstName};return mutate({action:'complete-onboarding',account,...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
-  saveAccount:account=>mutate({action:'save-account',account},{...family,account}),
+  completeOnboarding:(firstName,role,student)=>{const account={...family.account,firstName,role};return mutate({action:'complete-onboarding',account,...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
+  saveAccount:details=>{const account={...family.account,...details};return mutate({action:'save-account',account},{...family,account});},
   saveStudent:student=>mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]}),
   removeStudent:id=>mutate({action:'delete-student',id},{...family,students:family.students.filter(s=>s.id!==id)})
  }}>{children}</Context.Provider>;

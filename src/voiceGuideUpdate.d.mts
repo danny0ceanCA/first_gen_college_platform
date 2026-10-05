@@ -1,0 +1,1 @@
+export function voiceGuideUpdate(send:(event:unknown)=>void,options?:{schedule?:(callback:()=>void,delay:number)=>any;cancel?:(timer:any)=>void}):{update:(session:Record<string,unknown>)=>Promise<void>;event:(event:any)=>boolean;stop:()=>void};

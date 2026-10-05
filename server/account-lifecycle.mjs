@@ -22,7 +22,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
    const rows=async(table)=>account?(await c.query(`SELECT * FROM ${table} WHERE account_id=$1`,[account.id])).rows:[];
    const representatives=(await c.query('SELECT first_name,work_email,job_role,created_at FROM origen_institution_representatives WHERE auth0_subject=$1',[subject])).rows;
    const memberships=(await c.query('SELECT institution_id,role FROM origen_institution_members WHERE auth0_subject=$1',[subject])).rows;
-   const data={formatVersion:1,exportedAt:new Date().toISOString(),account:account?{firstName:account.first_name,email:account.email,createdAt:account.created_at}:null,
+   const data={formatVersion:1,exportedAt:new Date().toISOString(),account:account?{firstName:account.first_name,email:account.email,role:account.role,createdAt:account.created_at}:null,
     students:await rows('origen_students'),summaries:await rows('origen_conversation_summaries'),plans:await rows('origen_plans'),planSteps:await rows('origen_plan_steps'),planSources:await rows('origen_plan_sources'),planConversations:await rows('origen_plan_conversations'),representatives,memberships};
    // No invite tokens/hashes, other participants' private data or identity credentials.
    await c.query('COMMIT');return data;

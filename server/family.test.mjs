@@ -10,14 +10,30 @@ const student={id:'student-1',name:'Sofia',stage:'10th grade',interest:'Art',gpa
 test('first registration saves account and student together and retries without duplicates',async()=>{
  const {pool,run}=await fixture();
  try{
-  const input={action:'complete-onboarding',account:{firstName:'Daniel',email:''},student};
+  const input={action:'complete-onboarding',account:{firstName:'Daniel',email:'',role:'parent'},student};
   const saved=await run('auth0|new',input);
+  assert.equal(saved.account.role,'parent');
   assert.equal(saved.account.firstName,'Daniel');assert.equal(saved.students[0].name,'Sofia');
   assert.equal((await run('auth0|new',input)).students.length,1);
   assert.throws(()=>validateFamily({...input,student:{...student,stage:'invalid'}}),{status:400});
   assert.throws(()=>validateFamily({...input,account:{firstName:' ',email:''}}),{status:400});
-  const skipped=await run('auth0|later',{action:'complete-onboarding',account:{firstName:'Alex',email:''}});
+  const skipped=await run('auth0|later',{action:'complete-onboarding',account:{firstName:'Alex',email:'',role:'student'}});
   assert.equal(skipped.account.firstName,'Alex');assert.equal(skipped.students.length,0);
+  assert.equal(skipped.account.role,'student');
+ }finally{await pool.end();}
+});
+
+test('registration requires an explicit role and account role persists without settings erasing it',async()=>{
+ const {pool,run}=await fixture();
+ try{
+  for(const role of [undefined,null,'admin','Parent',''])assert.throws(()=>validateFamily({action:'complete-onboarding',account:{firstName:'Alex',email:'',role}}),{status:400});
+  await run('auth0|student',{action:'complete-onboarding',account:{firstName:'Alex',email:'',role:'student'}});
+  assert.equal((await run('auth0|student',{action:'load'})).account.role,'student');
+  assert.equal((await run('auth0|student',{action:'save-account',account:{firstName:'Alexis',email:''}})).account.role,'student');
+  assert.equal((await run('auth0|student',{action:'save-account',account:{firstName:'Alexis',email:'',role:'parent'}})).account.role,'parent');
+  assert.equal((await run('auth0|other',{action:'load'})).account.role,undefined);
+  await run('auth0|student',{action:'import',source:'mobile',account:{firstName:'Old',email:'',role:'student'},students:[]});
+  assert.equal((await run('auth0|student',{action:'load'})).account.role,'parent');
  }finally{await pool.end();}
 });
 

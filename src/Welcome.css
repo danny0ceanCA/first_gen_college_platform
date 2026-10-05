@@ -10,3 +10,5 @@
  .welcome-save-bar p{font-size:12px}
  .welcome-save-bar .button{width:100%}
 }
+
+.welcome-role{border:0;padding:12px 0 20px}.welcome-role label{display:flex;align-items:center;gap:10px;margin-top:12px}.welcome-role input{width:auto}.welcome-tour{padding:16px 20px;background:#edf3e9;border-radius:16px;margin:16px 0}.welcome-voice-review-only .profile-voice>:not(.voice-session-details){display:none}.welcome-voice-review-only .voice-session-details>:not(.voice-review):not(.summary-save-error){display:none}.welcome-voice-review-only .voice-session-details{display:block}.welcome-voice-review-only .profile-voice{border:0;margin:0;padding:0;background:transparent}

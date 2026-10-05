@@ -13,7 +13,8 @@ export function validateFamily(input){
   if(!value||typeof value.firstName!=='string'||typeof value.email!=='string')return invalid();
   const firstName=value.firstName.trim(),email=value.email.trim();
   if(firstName.length>100||email.length>320||(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))return invalid();
-  return {firstName,email};
+  if(value.role!==undefined&&!['parent','student'].includes(value.role))return invalid();
+  return {firstName,email,...(value.role===undefined?{}:{role:value.role})};
  };
  const id=value=>{if(typeof value!=='string'||!value.trim()||value.length>128)return invalid();return value;};
  const student=value=>{
@@ -32,7 +33,7 @@ export function validateFamily(input){
   case 'welcome-heard':return {action:'welcome-heard'};
   case 'save-account':{const details=account(input.account);if(!details.firstName)return invalid();return {action:input.action,account:details};}
   case 'complete-onboarding':{
-   const details=account(input.account);if(!details.firstName)return invalid();
+   const details=account(input.account);if(!details.firstName||!details.role)return invalid();
    return {action:input.action,account:details,...(input.student===undefined?{}:{student:student(input.student)})};
   }
   case 'save-student':return {action:input.action,student:student(input.student)};
@@ -71,6 +72,7 @@ export function createFamilyRepository(database){
     await client.query(`INSERT INTO origen_students(account_id,id,${columns.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) ON CONFLICT (account_id,id) ${importing?'DO NOTHING':`DO UPDATE SET ${columns.map(c=>`${c}=EXCLUDED.${c}`).join(',')}, updated_at=now()`}`,values);
    };
    if(input.action==='save-account'||input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET first_name=$2,email=$3,updated_at=now() WHERE id=$1',[owner,input.account.firstName,input.account.email]);
+   if((input.action==='save-account'||input.action==='complete-onboarding')&&input.account.role)await client.query('UPDATE origen_accounts SET role=$2 WHERE id=$1',[owner,input.account.role]);
    if(input.action==='complete-onboarding'&&input.student)await saveStudent(input.student);
    if(input.action==='save-student')await saveStudent(input.student);
    if(input.action==='delete-student'){
@@ -83,14 +85,15 @@ export function createFamilyRepository(database){
     if(receipt.rows.length){
      for(const student of input.students)await saveStudent(student,true);
      await client.query("UPDATE origen_accounts SET first_name=CASE WHEN first_name='' THEN $2 ELSE first_name END, email=CASE WHEN email='' THEN $3 ELSE email END, updated_at=now() WHERE id=$1",[owner,input.account.firstName,input.account.email]);
+     if(input.account.role)await client.query('UPDATE origen_accounts SET role=COALESCE(role,$2) WHERE id=$1',[owner,input.account.role]);
     }
    }
    if(input.action==='voice-used'||input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET voice_used_at=COALESCE(voice_used_at,now()),updated_at=now() WHERE id=$1',[owner]);
    if(input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET welcome_heard_at=COALESCE(welcome_heard_at,now()) WHERE id=$1',[owner]);
-   const row=(await client.query('SELECT first_name,email,welcome_heard_at,voice_used_at FROM origen_accounts WHERE id=$1',[owner])).rows[0];
+   const row=(await client.query('SELECT first_name,email,role,welcome_heard_at,voice_used_at FROM origen_accounts WHERE id=$1',[owner])).rows[0];
    const students=(await client.query(`SELECT m.id,${sharedColumns.map(c=>`COALESCE(s.${c},m.${c}) AS "${c==='entry_term'?'entryTerm':c}"`).join(',')},m.needs,m.notes FROM origen_students m LEFT JOIN origen_student_links l ON l.member_account_id=m.account_id AND l.member_student_id=m.id LEFT JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id WHERE m.account_id=$1 ORDER BY m.created_at,m.id`,[owner])).rows;
    await client.query('COMMIT');transaction=false;
-   return {account:{firstName:row.first_name,email:row.email,welcomeHeard:!!row.welcome_heard_at,usedVoice:!!row.voice_used_at},students};
+   return {account:{firstName:row.first_name,email:row.email,...(row.role?{role:row.role}:{}),welcomeHeard:!!row.welcome_heard_at,usedVoice:!!row.voice_used_at},students};
   }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}
   finally{client.release();}
  };
