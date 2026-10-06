@@ -1,5 +1,5 @@
 import {Auth0Context,useAuth0,type Auth0ContextInterface} from '@auth0/auth0-react';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {apiFetch,setAPITokenProvider} from './api';
 import {onboardingRecovery} from './onboardingRecovery.mjs';
 import {FamilyProvider,useFamily} from './FamilyStore';
@@ -37,12 +37,13 @@ export default function NativeWelcome(){
  return <Auth0Context.Provider value={auth}><FamilyProvider previewStudents={[]}><ConversationHistoryProvider><NativeStory init={init}/></ConversationHistoryProvider></FamilyProvider></Auth0Context.Provider>;
 }
 function NativeStory({init}:{init:Init}){
- const family=useFamily();const [language,setLanguage]=useState(init.language);
- if(family.loading||family.error)return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
- return <Welcome onRole={()=>send({id:crypto.randomUUID(),type:'closed'})} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student)=>{
+ const family=useFamily();const [language,setLanguage]=useState(init.language);const loaded=useRef(false);
+ if(!family.loading&&!family.error)loaded.current=true;
+ if(family.loading||(family.error&&!loaded.current))return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
+ return <Welcome onRole={()=>send({id:crypto.randomUUID(),type:'closed'})} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{
   if(!await family.completeOnboarding(firstName,role,student))return false;
   // Finish deferred onboarding memory before the native host closes this screen.
-  if(family.cloud&&student){
+  if(family.cloud&&student&&!options?.keepOpen){
    const recovery=onboardingRecovery(localStorage,`origen.onboarding-summaries.${init.subject}`);
    for(const [id,record] of Object.entries(recovery.read<Record<string,{studentId:string}>>({}))){
     if(record.studentId!==student.id)continue;

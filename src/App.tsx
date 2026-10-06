@@ -56,8 +56,9 @@ function FamilyApp({welcomePreview=false}:{welcomePreview?:boolean}) {
   useEffect(()=>{if(family.account.role)setRole(family.account.role);},[family.account.role]);
   const [languages, setLanguages] = useState<{parent:'en'|'es';student:'en'|'es'}>(()=>{const lang=localStorage.getItem('origen.language')==='es'?'es':'en';return {parent:lang,student:lang};});
   const lang = languages[role];
+  const liveLanguage=useRef(lang);liveLanguage.current=lang;
   usePageLanguage(lang);
-  const setLang = (language:'en'|'es') => setLanguages(prev => ({...prev,[role]:language}));
+  const setLang = (language:'en'|'es') => {liveLanguage.current=language;setLanguages(prev => ({...prev,[role]:language}));};
   const t = (en: string, es: string) => lang === 'es' ? es : en;
   const [profileNote,setProfileNote]=useState('');
   const [reviewStep,setReviewStep]=useState<Record<string,string>>({});
@@ -134,7 +135,7 @@ function FamilyApp({welcomePreview=false}:{welcomePreview?:boolean}) {
   };
   if(family.loading)return <main className="application-panel" role="status">{t('Loading your family…','Cargando tu familia…')}</main>;
   if(family.error&&!welcomeChecked.current)return <main className="application-panel"><p role="alert">{t('Your family could not be loaded. Your saved information has not been replaced.','No se pudo cargar tu familia. No se ha reemplazado tu información guardada.')}</p><button className="button primary" onClick={family.reload}>{t('Try again','Intentar de nuevo')}</button><button className="button outline" onClick={logOut}>{t('Log out','Cerrar sesión')}</button></main>;
-  if(welcoming)return <Welcome onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added)=>{if(!await family.completeOnboarding(firstName,accountRole,added))return false;if(added)setSelected(added.id);setWelcoming(false);if(welcomePreview)window.location.hash='app';return true;}}/>;
+  if(welcoming)return <Welcome onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added,options)=>{setLanguages(previous=>({...previous,[accountRole]:liveLanguage.current}));if(!await family.completeOnboarding(firstName,accountRole,added))return false;if(added)setSelected(added.id);if(options?.keepOpen)return true;setWelcoming(false);if(welcomePreview)window.location.hash='app';return true;}}/>;
   return <div className="app-shell">
     {mobile && <button className="sidebar-shade" onClick={() => setMobile(false)} aria-label="Close navigation" />}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
