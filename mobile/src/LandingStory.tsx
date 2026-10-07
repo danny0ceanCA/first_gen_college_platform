@@ -5,7 +5,7 @@ import {svgPathProperties} from 'svg-path-properties';
 import {storyArtwork} from './storyArtwork';
 import {storyAccents} from './storyAccents';
 
-const green='#254e42',cream='#eadcc4';
+const green='#a4513c',cream='#f4eee4';
 const threadPath='M120 0 C120 70 24 65 24 180 C24 260 350 245 350 340 C350 430 26 440 26 525 C26 620 285 625 285 700';
 const threadLength=new svgPathProperties(threadPath).getTotalLength();
 const drawings=storyArtwork.map((paths,i)=>[
@@ -110,4 +110,4 @@ const StoryIllustration=memo(function StoryIllustration({i,position,es,reduced}:
  return <Svg viewBox="0 0 560 480" width="100%" height="100%" stroke={cream} strokeLinecap="round" strokeLinejoin="round" fill="none" accessible accessibilityLabel={es?title[i][1]:title[i][0]}>{i===3?<>{strokes.map((s,j)=>!s.path.rider?ink(j):null)}<AnimatedGroup transform={reduced?'matrix(0.65 0 0 0.65 125 139)':rider}>{strokes.map((s,j)=>s.path.rider?ink(j):null)}</AnimatedGroup></>:strokes.map((_,j)=>ink(j))}{!reduced&&<AnimatedGroup transform={pen.transform} opacity={pen.opacity}><Path d="M-2 1 L2 -1" stroke="#fff1d5" strokeWidth={2.4}/></AnimatedGroup>}</Svg>;
 });
 
-const styles=StyleSheet.create({pinned:{position:'absolute',top:0,left:0,right:0,overflow:'hidden',justifyContent:'center'},thread:{position:'absolute',left:0,right:0,top:0,bottom:0},chapter:{justifyContent:'center',paddingHorizontal:20,paddingTop:14,paddingBottom:20},art:{height:265,alignSelf:'center'},text:{paddingHorizontal:12,marginTop:4},kicker:{fontSize:8,letterSpacing:1.9,color:'#c9ae80',fontWeight:'700'},title:{fontSize:29,lineHeight:34,letterSpacing:-1,color:cream,marginTop:13,marginBottom:12},body:{fontSize:14,lineHeight:22,color:'#d0c7b5'},underline:{width:40,height:1,backgroundColor:'#eadcc47a',marginTop:20}});
+const styles=StyleSheet.create({pinned:{position:'absolute',top:0,left:0,right:0,overflow:'hidden',justifyContent:'center'},thread:{position:'absolute',left:0,right:0,top:0,bottom:0},chapter:{justifyContent:'center',paddingHorizontal:20,paddingTop:14,paddingBottom:20},art:{height:265,alignSelf:'center'},text:{paddingHorizontal:12,marginTop:4},kicker:{fontSize:8,letterSpacing:1.9,color:'#c9ae80',fontWeight:'700'},title:{fontSize:29,lineHeight:34,letterSpacing:-1,color:cream,marginTop:13,marginBottom:12},body:{fontSize:14,lineHeight:22,color:'#f4eee4'},underline:{width:40,height:1,backgroundColor:'#f4eee47a',marginTop:20}});

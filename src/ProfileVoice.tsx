@@ -113,6 +113,9 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
   const [diagnosticId,setDiagnosticId]=useState('');
   const [failureCode,setFailureCode]=useState('');
 
+  const usage=useRef<{id:string;timer?:ReturnType<typeof setInterval>}>({id:''});
+  const usageQueue=useRef(Promise.resolve());
+  function usageEvent(action:string,id=usage.current.id){if(!id)return;usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,topic:liveMode.current}),keepalive:true})).then(()=>{});}
   const logSession=useRef('');
   const logSequence=useRef(0);
   function log(event:string,details:Record<string,unknown>={}){
@@ -130,6 +133,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
   function cleanup(){
     void saveSummary();releaseConversation(summaryId.current);
     if(!preserveLogicalSession.current)void guidance.current.event('voice.ended',{reason:finalReason.current})?.catch(()=>{});
+    clearInterval(usage.current.timer);usageEvent('voice_end');usage.current={id:''};
     log('session_cleanup');logSession.current='';
     generation.current++;
     const r=resources.current;resources.current={};
@@ -447,7 +451,8 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
       const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
       resources.current.stopConnection=()=>connection.stop();
       let connectedRecorded=false;
-      pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
+      pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
+      log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
       const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);

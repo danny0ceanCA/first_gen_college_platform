@@ -1,3 +1,5 @@
+> Current access policy: registration/sign-in is required for the family app and all AI endpoints. Public app and voice previews have been retired, including the native Explore preview button. `ALLOW_PREVIEW_VOICE` no longer enables anonymous access. Older preview descriptions below are historical; see RENDER_SETUP.md for current deployment instructions.
+
 # Origen — family college planning UI
 
 Interactive React + TypeScript prototype for the product planned in this conversation. **Origen is a working name.**

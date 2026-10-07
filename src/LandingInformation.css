@@ -1,9 +1,9 @@
 .landing-information-main{max-width:1000px;padding-top:64px;padding-bottom:64px}
-.landing-information-main>h1{font-size:clamp(36px,5vw,58px);line-height:1.15;font-weight:500;letter-spacing:-1.5px;margin:0 0 36px;color:#eadcc4}
+.landing-information-main>h1{font-size:clamp(36px,5vw,58px);line-height:1.15;font-weight:500;letter-spacing:-1.5px;margin:0 0 36px;color:#f4eee4}
 .landing-information-main>h1:focus{outline:none}
 .landing-information-main .landing-resource{padding-top:36px}
 .landing-information-main .landing-resource>p{max-width:780px}
-.landing-information .landing-nav a[aria-current="page"]{color:#eadcc4;text-decoration:underline;text-underline-offset:8px;text-decoration-color:#d5bd98}
+.landing-information .landing-nav a[aria-current="page"]{color:#f4eee4;text-decoration:underline;text-underline-offset:8px;text-decoration-color:#c77758}
 .landing-information .landing-nav nav>a{min-height:44px;display:inline-flex;align-items:center}
 .landing-information-main>a{margin-top:12px;text-decoration:none}
 @media(max-width:760px){.landing-information-main{padding-top:32px;padding-bottom:40px}.landing-information-main>h1{margin-bottom:24px}.landing-information .landing-nav nav{gap:8px 18px}.landing-information .landing-nav nav>a{font-size:13px}.landing-information-main .landing-resource>p{font-size:15px}}

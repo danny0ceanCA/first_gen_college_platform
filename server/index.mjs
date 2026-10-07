@@ -1,3 +1,4 @@
+import {createAdminHandler} from './admin.mjs';
 import {createProgressHandler,assertProgressConfiguration,purgeProgressHistory} from './progress-history.mjs';
 import {createFamilyRepository} from './family.mjs';
 import {createInstitutionHandler} from './institutions.mjs';
@@ -32,10 +33,8 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const institutions=createInstitutionHandler(database,env);
  const metrics=createMetricsHandler(database);
  const lifecycle=createLifecycleHandler(database);
- const handlers=[createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
+ const handlers=[createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
  const buckets=new Map();
- const previewPaths=new Set(['/api/profile-voice','/api/finance-research','/api/admissions-research','/api/voice-diagnostics','/api/conversation-summary']);
- let previewStarts={count:0,reset:0};
  return async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options','nosniff');
@@ -58,25 +57,18 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   if(req.method!=='POST')return send(405,'method_not_allowed');
   if(req.url==='/api/institution-metrics/event')return metrics(req,res,()=>send(404,'not_found'));
   const token=/^Bearer (.+)$/.exec(req.headers.authorization||'')?.[1];
-  const path=req.url.split('?')[0];
-  const preview=!req.headers.authorization&&env.ALLOW_PREVIEW_VOICE==='true'&&!!origin&&previewPaths.has(path);
-  if(!token&&!preview)return send(401,'authentication_required');
+  if(!token)return send(401,'authentication_required');
   let identity;
-  if(!preview){try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255||domain&&identity.iss!==undefined&&identity.iss!==`https://${domain}/`)throw new Error();}catch{return send(401,'invalid_token');}}
+  {try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255||domain&&identity.iss!==undefined&&identity.iss!==`https://${domain}/`)throw new Error();}catch{return send(401,'invalid_token');}}
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
-  // Anonymous preview traffic shares a capped bucket; no untrusted client IP headers.
-  const bucketKey=preview?'anonymous-preview':`account:${identity.sub}`;
+  const bucketKey=`account:${identity.sub}`;
   const bucket=buckets.get(bucketKey)||{count:0,reset:now+60000};buckets.set(bucketKey,bucket);
   if(++bucket.count>120){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
   // Apply the account budget before database lookups so excess traffic cannot
   // consume a closure-status query on every rejected request.
   if(identity&&database){try{if(await accountClosed(database,identity.sub))return send(403,'account_closed');}catch(error){req.log({event:'database_error',code:safeErrorCode(error)});return send(503,'account_status_unavailable');}}
-  if(preview&&path==='/api/profile-voice'){
-   if(previewStarts.reset<now)previewStarts={count:0,reset:now+60000};
-   if(++previewStarts.count>5){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
-  }
-  req.origenAuthorized=!preview;
-  req.origenPreview=preview;
+  req.origenAuthorized=true;
+  req.origenPreview=false;
   req.origenIdentity=identity;
   if(identity&&database&&guidanceEnabled(env)){
    try{await bindGuidanceIdentity(database,identity.sub,`https://${domain}/`);}catch(error){if(error.status!==404)return send(error.status===403?403:503,'identity_mapping_unavailable');}

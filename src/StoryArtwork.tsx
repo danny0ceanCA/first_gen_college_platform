@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-const paper='#254e42';
+const paper='#a4513c';
 function Ink({d,solid=false,detail=false,className=''}:{d:string;solid?:boolean;detail?:boolean;className?:string}){return <path d={d} fill={solid?paper:'none'} className={`story-ink ${detail?'ink-detail':''} ${className}`}/>;}
 function Group({children,className=''}:{children:ReactNode;className?:string}){return <g className={className}>{children}</g>;}
 

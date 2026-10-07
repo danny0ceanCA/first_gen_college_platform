@@ -1,4 +1,4 @@
-.voice-radio-wave{display:block;width:56px;height:24px;flex-shrink:0;color:#527958;opacity:.45;transition:opacity 420ms ease-out}
+.voice-radio-wave{display:block;width:56px;height:24px;flex-shrink:0;color:#756b63;opacity:.45;transition:opacity 420ms ease-out}
 .voice-radio-wave.is-speaking{opacity:1}
 .voice-radio-wave path{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .voice-radio-wave path+path{opacity:.35;stroke-width:1.5}

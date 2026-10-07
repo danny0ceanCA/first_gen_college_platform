@@ -42,18 +42,17 @@ test('successful probes are quiet and failed readiness is logged',async()=>{
  const {logs,base,close}=await fixture();
  try{assert.equal((await fetch(base+'/healthz')).status,200);assert.equal(logs.length,0);assert.equal((await fetch(base+'/readyz')).status,503);assert.equal(logs[0].code,'database_not_ready');}finally{await close();}
 });
-test('preview voice is opt-in, origin restricted, and never grants access to family storage',async()=>{
+test('anonymous AI and family access is rejected even with the retired preview flag',async()=>{
  for(const enabled of [false,true]){
   const {logs,base,close}=await fixture({ALLOW_PREVIEW_VOICE:enabled?'true':'false'});
   const headers={Origin:'https://origen.example','Content-Type':'application/json'};
   try{
    const voice=await fetch(base+'/api/profile-voice',{method:'POST',headers,body:'{}'});
-   assert.equal(voice.status,enabled?503:401); // With preview enabled it reaches the missing-key check.
-   for(const path of ['/api/family','/api/plans','/api/conversation-history','/api/chat'])assert.equal((await fetch(base+path,{method:'POST',headers,body:'{}'})).status,401);
+   assert.equal(voice.status,401);
+   for(const path of ['/api/family','/api/plans','/api/conversation-history','/api/chat','/api/finance-research','/api/admissions-research','/api/voice-diagnostics','/api/conversation-summary'])assert.equal((await fetch(base+path,{method:'POST',headers,body:'{}'})).status,401);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{...headers,Origin:'https://other.example'},body:'{}'})).status,403);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{...headers,Authorization:'Bearer invalid'},body:'{}'})).status,401);
    assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
-   if(enabled){for(let n=0;n<4;n++)await fetch(base+'/api/profile-voice',{method:'POST',headers,body:'{}'});assert.equal((await fetch(base+'/api/profile-voice',{method:'POST',headers,body:'{}'})).status,429);}
    assert.ok(logs.every(record=>record.requestId));
   }finally{await close();}
  }

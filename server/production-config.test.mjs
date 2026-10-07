@@ -4,7 +4,7 @@ import {createServer} from 'node:http';
 import {productionConfigIssues,assertProductionConfig} from './production-config.mjs';
 import {createApp} from './index.mjs';
 const valid={NODE_ENV:'production',AUTH0_DOMAIN:'auth.example.com',AUTH0_AUDIENCE:'https://api.example.com',ALLOWED_ORIGINS:'https://app.example.com',DATABASE_URL:'postgresql://user:private-password@db.internal/origen',OPENAI_API_KEY:'private-api-key',ALLOW_PREVIEW_VOICE:'false'};
-test('production startup accepts opt-in preview voice and rejects invalid configuration without disclosing secrets',()=>{
+test('production startup tolerates the retired preview setting and rejects invalid configuration without disclosing secrets',()=>{
  assert.deepEqual(productionConfigIssues(valid),[]);assert.doesNotThrow(()=>assertProductionConfig(valid));
  assert.doesNotThrow(()=>createApp({...valid,ALLOW_PREVIEW_VOICE:'true'}));
  for(const patch of [{DATABASE_URL:''},{OPENAI_API_KEY:''},{ALLOW_PREVIEW_VOICE:'TRUE'},{ALLOWED_ORIGINS:'*'},{ALLOWED_ORIGINS:'https://app.example.com/path'},{ALLOWED_ORIGINS:'http://localhost:5173'},{AUTH0_DOMAIN:'https://auth.example.com'},{DATABASE_URL:'https://private-user:private-password@db.example.com'}]){

@@ -2,7 +2,7 @@
 
 ## Current production safeguards
 
-Set backend `NODE_ENV=production`. Leave `ALLOW_PREVIEW_VOICE` unset or `false` for sign-in-only voice, or set it to `true` to offer the signed-out voice preview in production. Production startup rejects missing database/OpenAI/Auth0/origin configuration, unsafe origin syntax, and preview values other than `true` or `false`. Preview requests still require an allowed browser origin, share rate limits, and cannot access private account storage. Run `npm run check:production` with the service's backend environment before deployment; it never prints secret values. See [production controls](docs/vendor-readiness/PRODUCTION_CONTROLS.md) for live provider checks and restore/incident procedures.
+Set backend `NODE_ENV=production`. App access and AI endpoints require an authenticated account. `ALLOW_PREVIEW_VOICE` is retired and no longer enables anonymous access; remove it from the backend environment. Run `npm run check:production` before deployment. See [production controls](docs/vendor-readiness/PRODUCTION_CONTROLS.md) for live provider checks and restore/incident procedures.
 
 Current database readiness requires migration `011_subject_locks.sql`; older phase-specific migration references below are historical. Deploy the backend before the web frontend, verify `/readyz`, then verify signed-in data download and closure using synthetic accounts. Install and validate the Auth0 recent-auth Action before rollout: [fresh-auth and concurrency controls](docs/vendor-readiness/RECENT_AUTH_AND_CLOSURE.md). Provider identities, backups and mobile controls require the separate processes documented in [account lifecycle](docs/vendor-readiness/ACCOUNT_LIFECYCLE.md).
 
@@ -36,13 +36,9 @@ The Node service writes structured JSON logs to standard output. In Render, open
 
 Completion records include the known endpoint, HTTP method/status, duration, severity and safe error code. Upstream records include a separate `upstreamRequestId` for OpenAI support. Authentication failures, blocked origins, rate limits and aborted connections are logged too. Successful health/readiness probes are omitted; failed probes are logged. Logs do not include authorization headers, tokens, account identifiers, request bodies, query strings, profile details, audio, transcripts, SQL queries, raw error messages or stacks. Database SQLSTATE and recognized network/timeout codes provide failure details safely. Logs are not stored in PostgreSQL; retention follows the hosting provider's log retention.
 
-## Temporary anonymous live-voice preview
+## Registration-only access
 
-After deploying this version of both the API and web frontend, set the backend environment variable `ALLOW_PREVIEW_VOICE=true` to enable live voice without signing in. It is disabled by default. No new frontend environment variable is needed. The browser origin must already be in `ALLOWED_ORIGINS`, and `OPENAI_API_KEY` must be configured on the backend.
-
-Anonymous access is limited to live voice, its official-source financial/application lookups, technical diagnostics and browser-local summary generation. Family records, persisted history and text chat still require verified Auth0 authentication. An invalid supplied token never falls back to anonymous mode. Preview traffic shares a limit of 120 requests/minute and five voice starts/minute per API instance, alongside the existing two concurrent voice setup requests. Preview uses the service's OpenAI credits.
-
-Once Twilio login is ready, set `ALLOW_PREVIEW_VOICE=false` (or remove it) on the backend. No domain, SSL or database settings change is needed. This switch enables web live voice, including phone browsers; native mobile live voice remains pending.
+Deploy both the frontend and backend. Public visitors can read the landing, About, Privacy and published institution pages. App routes require Auth0 sign-in; Create an account opens Auth0 sign-up. All AI and family-data endpoints require a valid access token, including voice, research, diagnostics and summaries. Remove the obsolete `ALLOW_PREVIEW_VOICE` setting. No domain, SSL or database migration is needed.
 
 ## Voice lookup tuning
 

@@ -25,5 +25,5 @@ export default function Welcome({account,es,save,logout,onFinished}:{account:Acc
   };
   window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);
  },[account,es,onFinished,save,session]);
- return <div style={{height:'100dvh',display:'flex',flexDirection:'column',background:'#204e43'}}><button onClick={logout} style={{alignSelf:'flex-end',background:'transparent',border:0,padding:12,color:'#eadcc4'}}>{es?'Salir':'Exit'}</button><iframe ref={frame} title="Origen live onboarding" src={`${origin}/#native-welcome`} allow={`microphone ${origin}; autoplay ${origin}`} referrerPolicy="origin" style={{flex:1,width:'100%',border:0}}/></div>;
+ return <div style={{height:'100dvh',display:'flex',flexDirection:'column',background:'#a4513c'}}><button onClick={logout} style={{alignSelf:'flex-end',background:'transparent',border:0,padding:12,color:'#f4eee4'}}>{es?'Salir':'Exit'}</button><iframe ref={frame} title="Origen live onboarding" src={`${origin}/#native-welcome`} allow={`microphone ${origin}; autoplay ${origin}`} referrerPolicy="origin" style={{flex:1,width:'100%',border:0}}/></div>;
 }
