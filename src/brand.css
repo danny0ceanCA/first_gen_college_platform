@@ -35,4 +35,6 @@
 .shared-voice .shared-voice-heading strong{color:var(--brand-clay)}
 .institution-header{background:var(--brand-ivory);color:var(--brand-ink);border-bottom:1px solid var(--brand-border)}
 .institution-header .institution-logo,.institution-header .button{color:var(--brand-clay);border-color:var(--brand-clay)}
+.institution-header .text-button{color:var(--brand-clay);border-color:var(--brand-border)}
+.institution-header .text-button:hover{background:var(--brand-ivory)}
 @media(max-width:760px){.landing .landing-story{border-radius:10px}.landing .landing-hero+.landing-resource{padding:28px 22px;border-radius:10px}}

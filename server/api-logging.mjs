@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {diagnosticRecord} from './diagnostics.mjs';
 
-const routes=new Set(['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report','api/ai','api/chat','api/family','api/plans','api/institutions','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research','api/guidance-history','api/progress']);
+const routes=new Set(['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report','api/ai','api/chat','api/family','api/plans','api/institutions','api/institution-campaigns','api/institution-inquiries/public','api/institution-inquiries/staff','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research','api/guidance-history','api/progress']);
 // Never log error messages: database errors can include SQL, values or credentials.
 export function safeErrorCode(error){
  const code=error?.code;

@@ -1,3 +1,4 @@
+import {validCampaign,campaignUUID} from './institution-outreach-data.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export async function purgeMetrics(database,now=new Date()){
@@ -6,8 +7,8 @@ export async function purgeMetrics(database,now=new Date()){
  await database.query('DELETE FROM origen_institution_metrics WHERE month < $1',[cutoff]);
 }
 export function validateMetric(input){
- if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['slug','metric','linkIndex'].includes(k))||typeof input.slug!=='string'||! /^[a-z0-9-]{1,100}$/.test(input.slug)||!['page_view','link_click'].includes(input.metric))throw fail(400,'invalid_metric');
- if(input.metric==='page_view'&&input.linkIndex!==undefined||input.metric==='link_click'&&(!Number.isInteger(input.linkIndex)||input.linkIndex< -1||input.linkIndex>11))throw fail(400,'invalid_metric');
+ if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['slug','metric','linkIndex','campaignId','eventId','offeringId'].includes(k))||typeof input.slug!=='string'||! /^[a-z0-9-]{1,100}$/.test(input.slug)||!['page_view','link_click'].includes(input.metric))throw fail(400,'invalid_metric');
+ if(input.metric==='page_view'&&input.linkIndex!==undefined||input.metric==='link_click'&&(!Number.isInteger(input.linkIndex)||input.linkIndex< -5||input.linkIndex>11))throw fail(400,'invalid_metric');
  return input;
 }
 export function createMetricsRepository(database,clock=()=>new Date()){
@@ -25,12 +26,16 @@ export function createMetricsRepository(database,clock=()=>new Date()){
    const counts=Object.fromEntries(rows.map(r=>[r.metric,Number(r.count)]));
    return {month:period,timeZone:'UTC',minimumCount:10,pageViews:(counts.page_view||0)>=10?counts.page_view:null,linkClicks:(counts.link_click||0)>=10?counts.link_click:null};
   }
-  validateMetric(input);
-  const row=(await database.query('SELECT id,published FROM origen_institutions WHERE slug=$1 AND published IS NOT NULL',[input.slug])).rows[0];
+  validateMetric(input);if(input.campaignId!==undefined&&!campaignUUID(input.campaignId))input={...input,campaignId:undefined};
+  const c=await database.connect();try{await c.query('BEGIN');
+  const row=(await c.query("SELECT * FROM origen_institutions WHERE slug=$1 AND published IS NOT NULL AND archived_at IS NULL AND verification_status='verified' AND parent_approval='approved'",[input.slug])).rows[0];
   if(!row)throw fail(404,'page_not_found');
-  if(input.metric==='link_click'&&(input.linkIndex===-1?!row.published.website:!row.published.links?.[input.linkIndex]))throw fail(400,'invalid_metric');
-  await database.query('INSERT INTO origen_institution_metrics(institution_id,month,metric,count) VALUES($1,$2,$3,1) ON CONFLICT(institution_id,month,metric) DO UPDATE SET count=origen_institution_metrics.count+1',[row.id,month,input.metric]);
-  return {ok:true};
+  if(row.parent_institution_id){const parent=(await c.query('SELECT published,archived_at,verification_status FROM origen_institutions WHERE id=$1',[row.parent_institution_id])).rows[0];if(!parent?.published||parent.archived_at||parent.verification_status!=='verified')throw fail(404,'page_not_found');}
+  if(input.metric==='link_click'){const valid=input.linkIndex===-1?row.published.website:input.linkIndex===-2?true:input.linkIndex===-3||input.linkIndex===-4?row.published.content?.events?.some(e=>e.id===input.eventId&&Date.parse(e.endsAt)>now.getTime()):input.linkIndex===-5?row.published.content?.offerings?.some(e=>e.id===input.offeringId&&e.url):row.published.links?.[input.linkIndex];if(!valid)throw fail(400,'invalid_metric');}
+  await c.query('INSERT INTO origen_institution_metrics(institution_id,month,metric,count) VALUES($1,$2,$3,1) ON CONFLICT(institution_id,month,metric) DO UPDATE SET count=origen_institution_metrics.count+1',[row.id,month,input.metric]);
+  const campaign=await validCampaign(c,row,input.campaignId,{now,eventId:input.eventId});if(campaign)await c.query('INSERT INTO origen_institution_campaign_metrics(campaign_id,month,metric,count) VALUES($1,$2,$3,1) ON CONFLICT(campaign_id,month,metric) DO UPDATE SET count=origen_institution_campaign_metrics.count+1',[campaign.id,month,input.metric]);
+  await c.query('COMMIT');return {ok:true};
+  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
  };
 }
 export function createMetricsHandler(database,clock){

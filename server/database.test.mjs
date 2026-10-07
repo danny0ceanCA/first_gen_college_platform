@@ -5,6 +5,9 @@ import {createDatabase,migrateDatabase,databaseReady} from './database.mjs';
 import {createApp} from './index.mjs';
 import {createGuidanceRepository,guidanceConfig} from './guidance-history.mjs';
 import {createHistoryRepository} from './history.mjs';
+import {adminUsers,adminUserDetail} from './admin-users.mjs';
+import {adminVoiceQuality,storeQualityEvent} from './voice-quality.mjs';
+import {adminInstitutionReport} from './admin-institutions.mjs';
 
 function fakePool({fail=false,applied=[]}={}){
  const calls=[];let released=false;
@@ -71,9 +74,26 @@ test('PostgreSQL migration, account boundaries and cascade deletion', {skip:!pro
   const scoped={connect:async()=>({query:(...args)=>client.query(...args),release:()=>{}}),query:(...args)=>client.query(...args)};
   await migrateDatabase(scoped);await migrateDatabase(scoped);
   assert.equal(await databaseReady(scoped),true);
-  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,16);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,24);
   const a=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|a') RETURNING id")).rows[0].id;
   const b=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|b') RETURNING id")).rows[0].id;
+  await client.query("UPDATE origen_accounts SET first_name='50%_Student',role='student',onboarding_started_at=now(),onboarding_completed_at=now() WHERE id=$1",[a]);
+  await client.query("INSERT INTO origen_voice_activity(id,account_id,topic,seconds) VALUES($1,$2,'planning',90)",[crypto.randomUUID(),a]);
+  const directory=await adminUsers(scoped,{search:'50%_',role:'student',status:'complete'});
+  assert.equal(directory.total,1);assert.equal(directory.users[0].id,a);assert.equal(Number(directory.funnel.completed),1);
+  assert.equal(Number(directory.funnel.first_conversation),1);
+  assert.equal((await adminUsers(scoped,{page:2})).users.length,0);
+  const detail=await adminUserDetail(scoped,{id:a,days:7});assert.equal(Number(detail.user.voice_minutes),1.5);assert.equal(detail.activity.length,1);
+  const quality={sessionId:crypto.randomUUID(),attemptId:crypto.randomUUID(),sequence:1,event:'session_start',mode:'planning',language:'es'};
+  await storeQualityEvent(scoped,'auth0|a',quality);await storeQualityEvent(scoped,'auth0|a',quality);
+  await storeQualityEvent(scoped,'auth0|a',{...quality,sequence:2,event:'connection_state',connectionState:'connected'});
+  const report=await adminVoiceQuality(scoped,7,new Date(Date.now()+1000),{topic:'planning',language:'es'});
+  assert.equal(Number(report.totals.attempts),1);assert.equal(Number(report.totals.connected),1);assert.equal(Number(report.totals.start_failures),0);
+  const institution=(await client.query("INSERT INTO origen_institutions(slug,draft) VALUES('test-college','{\"name\":\"Test College\"}') RETURNING id")).rows[0].id;
+  const reportClock=new Date('2026-10-07T19:00:00Z');
+  await client.query("INSERT INTO origen_institution_metrics(institution_id,month,metric,count) VALUES($1,'2026-09','page_view',9),($1,'2026-09','link_click',10)",[institution]);
+  const institutionReport=await adminInstitutionReport(scoped,{},reportClock);
+  assert.equal(institutionReport.institutions[0].page_views,null);assert.equal(Number(institutionReport.institutions[0].link_clicks),10);
   await client.query("INSERT INTO origen_students(account_id,id,name) VALUES ($1,'student','Sofia')",[a]);
   const insert="INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,conversation_at) VALUES ($1,'summary','student','finance','Discussed grants',now())";
   await assert.rejects(client.query(insert,[b]),{code:'23503'});

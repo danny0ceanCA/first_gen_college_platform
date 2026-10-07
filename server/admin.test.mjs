@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {isAdmin,hasAdminAccess,creditedSeconds,createAdminHandler} from './admin.mjs';
 import {fixture} from './family-fixture.mjs';
-import {readFile} from 'node:fs/promises';
 test('admin authorization is exact server subject allowlist, empty fails closed',()=>{
  assert.equal(isAdmin('auth0|owner',{}),false);assert.equal(isAdmin('auth0|owner',{ADMIN_SUBJECTS:' auth0|owner,google-oauth2|other '}),true);assert.equal(isAdmin('owner',{ADMIN_SUBJECTS:'auth0|owner'}),false);
 });
@@ -24,7 +23,6 @@ test('disconnected gaps and long calls have bounded connected-minute credit',()=
 });
 test('activity records deduplicate sign-ins and cascade on deletion',async()=>{
  const {pool,run}=await fixture();try{
- await pool.query(await readFile(new URL('./migrations/017_admin_activity.sql',import.meta.url),'utf8'));
  await run('auth0|owner',{action:'load'});const owner=(await pool.query('SELECT id FROM origen_accounts')).rows[0].id;
  const id=crypto.randomUUID();for(let i=0;i<2;i++)await pool.query('INSERT INTO origen_login_activity(id,account_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',[id,owner]);
  assert.equal((await pool.query('SELECT * FROM origen_login_activity')).rows.length,1);

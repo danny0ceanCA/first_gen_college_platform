@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {fixture} from './family-fixture.mjs';
-import {createInstitutionRepository,validateInstitution} from './institutions.mjs';
+import {createInstitutionRepository,validateInstitution,validateInstitutionPage} from './institutions.mjs';
 import {createApp} from './index.mjs';
 const representative={firstName:'Alex',workEmail:'alex@college.edu',jobRole:'Admissions outreach'};
 const page={name:'Example College',website:'https://college.edu/',description:'Programs and support.',programs:'Science programs',admissions:'See the official portal',financialAid:'Contact financial aid',events:'Campus visits',publicEmail:'outreach@college.edu',links:[{title:'Apply',url:'https://college.edu/apply'}]};
@@ -10,7 +10,7 @@ test('institution registration stays separate from family data and requires inde
  const {pool}=await fixture();const run=createInstitutionRepository(pool,['reviewer','owner']);
  const call=(sub,input)=>run(sub,validateInstitution(input));
  try{
-  let result=await call('owner',{action:'register',representative,page});const saved=result.institutions[0];
+  let result=await call('owner',{action:'register',registrationKey:crypto.randomUUID(),representative,page});const saved=result.institutions[0];
   assert.equal(saved.status,'draft');assert.equal((await pool.query('SELECT * FROM origen_accounts')).rows.length,0);
   assert.deepEqual((await call('foreign',{action:'load'})).institutions,[]);
   await assert.rejects(call('foreign',{action:'save',id:saved.id,revision:1,page}),{status:404});
@@ -29,7 +29,7 @@ test('institution registration stays separate from family data and requires inde
 test('draft changes preserve approved pages, invalidate changed identities and reject stale saves',async()=>{
  const {pool}=await fixture();const run=createInstitutionRepository(pool,['reviewer']);const call=(sub,input)=>run(sub,validateInstitution(input));
  try{
-  const i=(await call('owner',{action:'register',representative,page})).institutions[0];
+  const i=(await call('owner',{action:'register',registrationKey:crypto.randomUUID(),representative,page})).institutions[0];
   await call('owner',{action:'submit',id:i.id,revision:1});
   await call('reviewer',{action:'verify',id:i.id,revision:1,note:'Verified via official office'});await call('reviewer',{action:'publish',id:i.id,revision:1,note:'Approved'});
   await call('owner',{action:'save',id:i.id,revision:1,page:{...page,name:'Updated College'}});
@@ -47,8 +47,8 @@ test('published pages are anonymous while institution registration and reviews r
  const server=createServer(app);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
  try{
   const headers={Origin:'https://origen.example','Content-Type':'application/json'};
-  assert.equal((await fetch(base+'/api/institutions',{method:'POST',headers,body:JSON.stringify({action:'register',page,representative})})).status,401);
-  const response=await fetch(base+'/api/institutions',{method:'POST',headers:{...headers,Authorization:'Bearer owner'},body:JSON.stringify({action:'register',page,representative})});assert.equal(response.status,200);const i=(await response.json()).institutions[0];
+  assert.equal((await fetch(base+'/api/institutions',{method:'POST',headers,body:JSON.stringify({action:'register',registrationKey:crypto.randomUUID(),page,representative})})).status,401);
+  const response=await fetch(base+'/api/institutions',{method:'POST',headers:{...headers,Authorization:'Bearer owner'},body:JSON.stringify({action:'register',registrationKey:crypto.randomUUID(),page,representative})});assert.equal(response.status,200);const i=(await response.json()).institutions[0];
   assert.equal((await fetch(base+`/api/institutions/published/${i.slug}`)).status,404);
   const review=createInstitutionRepository(pool,['reviewer']);
   await review('owner',{action:'submit',id:i.id,revision:1});
@@ -59,8 +59,8 @@ test('published pages are anonymous while institution registration and reviews r
   const publicBody=await publicResponse.json();assert.deepEqual(publicBody.page,page);
   assert.doesNotMatch(JSON.stringify(publicBody),/alex@college.edu|Confirmed affiliation|auth0/);
   assert.equal((await fetch(base+'/api/institutions',{method:'POST',headers:{...headers,Authorization:'Bearer owner'},body:JSON.stringify({action:'queue'})})).status,403);
-  assert.throws(()=>validateInstitution({action:'register',page:{...page,website:'javascript:alert(1)'},representative}),{status:400});
-  assert.throws(()=>validateInstitution({action:'register',page,representative:{...representative,workEmail:'invalid'}}),{status:400});
+  assert.throws(()=>validateInstitutionPage({...page,website:'javascript:alert(1)'},true),{status:400});
+  assert.throws(()=>validateInstitution({action:'register',registrationKey:crypto.randomUUID(),page,representative:{...representative,workEmail:'invalid'}}),{status:400});
   assert.throws(()=>validateInstitution({action:'submit',id:'-'.repeat(36),revision:1}),{status:400});
  }finally{await new Promise(r=>server.close(r));await pool.end();}
 });

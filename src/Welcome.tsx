@@ -5,11 +5,13 @@ import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState} from 'react';
 import './Welcome.css';
 import ProfileVoice from './ProfileVoice';
+import {apiFetch} from './api';
 import {type StudentProfile} from './planning';
 
 export default function Welcome({language,setLanguage,complete,cloud=false,hasStudents=false,onRole,initialName="",initialRole,onComplete}:{language:'en'|'es';setLanguage:(v:'en'|'es')=>void;cloud?:boolean;hasStudents?:boolean;onRole?:(role:'parent'|'student')=>void;initialName?:string;initialRole?:'parent'|'student';onComplete:()=>void;complete:(firstName:string,role:'parent'|'student',student?:StudentProfile,options?:{keepOpen:boolean})=>Promise<boolean>}){
  const t=(en:string,es:string)=>language==='es'?es:en;
  const {user,logout}=useAuth0();
+ useEffect(()=>{if(!cloud)return;void apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'onboarding-start'})}).catch(()=>{});},[cloud,user?.sub]);
  const [leaving,setLeaving]=useState(false);
  const [recovery]=useState(()=>onboardingRecovery(localStorage,`origen.onboarding.${cloud?user?.sub:'preview'}.v1`));
  const [restored]=useState(()=>recovery.read<{name:string;step:'name'|'choice'|'voice'|'manual';role:'parent'|'student'|'';draft:StudentProfile}|null>(null,validOnboardingDraft));

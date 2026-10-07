@@ -30,6 +30,7 @@ export function validateFamily(input){
  };
  switch(input.action){
   case 'load':return {action:'load'};
+  case 'onboarding-start':return {action:'onboarding-start'};
   case 'voice-used':return {action:'voice-used'};
   case 'welcome-heard':return {action:'welcome-heard'};
   case 'save-account':{const details=account(input.account);if(!details.firstName)return invalid();return {action:input.action,account:details};}
@@ -80,6 +81,8 @@ export function createFamilyRepository(database,env=process.env){
    if(input.action==='save-account'||input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET first_name=$2,email=$3,updated_at=now() WHERE id=$1',[owner,input.account.firstName,input.account.email]);
    if((input.action==='save-account'||input.action==='complete-onboarding')&&input.account.role)await client.query('UPDATE origen_accounts SET role=$2 WHERE id=$1',[owner,input.account.role]);
    if(input.action==='complete-onboarding'&&input.student)await saveStudent(input.student);
+   if(input.action==='onboarding-start')await client.query('UPDATE origen_accounts SET onboarding_started_at=COALESCE(onboarding_started_at,now()) WHERE id=$1',[owner]);
+   if(input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET onboarding_completed_at=COALESCE(onboarding_completed_at,now()) WHERE id=$1',[owner]);
    if(input.action==='save-student')await saveStudent(input.student);
    if(input.action==='delete-student'){
     if((await client.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 AND owner_student_id=$2',[owner,input.id])).rows.length)throw Object.assign(new Error('unlink_before_deleting'),{status:409});

@@ -1,0 +1,10 @@
+export type Translation={name?:string;intro?:string;description?:string;programs?:string;admissions?:string;financialAid?:string;events?:string;linkTitles?:string[]};
+export type Offering={id:string;kind:'program'|'service'|'pathway';audiences:string[];title:string;description:string;eligibility:string;url:string;translations?:{es?:{title?:string;description?:string;eligibility?:string}}};
+export type InstitutionEvent={id:string;title:string;description:string;startsAt:string;endsAt:string;timeZone:string;location:string;registrationUrl:string;translations?:{es?:{title?:string;description?:string;location?:string}}};
+export type InstitutionPage={name:string;website:string;description:string;programs:string;admissions:string;financialAid:string;events:string;publicEmail:string;links:{title:string;url:string}[];intro?:string;logoUrl?:string;translations?:{es?:Translation};content?:{version:1;offerings:Offering[];events:InstitutionEvent[]}};
+export const audiences:string[];
+export const translatedFields:string[];
+export function safeInstitutionURL(value:string):string|undefined;
+export function localizedInstitution(page:InstitutionPage,language?:string):{page:InstitutionPage;missing:string[]};
+export function upcomingInstitutionEvents(events?:InstitutionEvent[],now?:number):InstitutionEvent[];
+export function institutionEventDate(event:InstitutionEvent,language?:string):string;

@@ -1,8 +1,8 @@
 import {useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
-export function recordInstitutionMetric(slug:string,metric:'page_view'|'link_click',linkIndex?:number){
+export function recordInstitutionMetric(slug:string,metric:'page_view'|'link_click',linkIndex?:number,context:{eventId?:string;offeringId?:string}={}){
  // No identity/token, URL, referrer, cookies or persistent visitor identifier.
- void fetch(`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/institution-metrics/event`,{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,metric,...(linkIndex===undefined?{}:{linkIndex})})}).catch(()=>{});
+ void fetch(`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/institution-metrics/event`,{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,metric,...context,...(new URLSearchParams(window.location.search).get('campaign')?{campaignId:new URLSearchParams(window.location.search).get('campaign')}:{}),...(linkIndex===undefined?{}:{linkIndex})})}).catch(()=>{});
 }
 type Report={month:string;pageViews:number|null;linkClicks:number|null};
 export default function InstitutionMetrics({id,es}:{id:string;es:boolean}){

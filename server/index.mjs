@@ -1,3 +1,6 @@
+import {createCampaignHandler} from './institution-campaigns.mjs';
+import {purgeInstitutionOutreach} from './institution-outreach-data.mjs';
+import {createInquiryHandler,purgeInstitutionInquiries} from './institution-inquiries.mjs';
 import {createAdminHandler} from './admin.mjs';
 import {createProgressHandler,assertProgressConfiguration,purgeProgressHistory} from './progress-history.mjs';
 import {createFamilyRepository} from './family.mjs';
@@ -31,9 +34,10 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const authenticate=verify||(async token=>{if(!jwks||!audience)throw new Error('Authentication not configured');return (await jwtVerify(token,jwks,{issuer:`https://${domain}/`,audience,algorithms:['RS256']})).payload;});
  const log=input=>writeLog(diagnosticRecord(input));
  const institutions=createInstitutionHandler(database,env);
+ const inquiries=createInquiryHandler(database);
  const metrics=createMetricsHandler(database);
  const lifecycle=createLifecycleHandler(database);
- const handlers=[createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
+ const handlers=[createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
  const buckets=new Map();
  return async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
@@ -53,8 +57,9 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
    res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, X-Origen-Session, X-Camino-Session, X-Origen-Segment');
    res.writeHead(204);return res.end();
   }
-  if(req.method==='GET'&&/^\/api\/institutions\/published\/[a-z0-9-]{1,100}$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
+  if(req.method==='GET'&&/^\/api\/institutions\/(?:directory|(?:published|pages|qr)\/[a-z0-9-]{1,100})$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
   if(req.method!=='POST')return send(405,'method_not_allowed');
+  if(req.url==='/api/institution-inquiries/public')return inquiries(req,res,()=>send(404,'not_found'));
   if(req.url==='/api/institution-metrics/event')return metrics(req,res,()=>send(404,'not_found'));
   const token=/^Bearer (.+)$/.exec(req.headers.authorization||'')?.[1];
   if(!token)return send(401,'authentication_required');
@@ -86,10 +91,12 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   else console.warn('DATABASE_URL is not set; persistent storage is unavailable.');
   await purgeMetrics(database);
   await purgeExpiredInvites(database);
+  await purgeInstitutionInquiries(database);
+  await purgeInstitutionOutreach(database);
   if(guidanceEnabled(process.env))await backfillGuidanceIdentities(database,`https://${process.env.AUTH0_DOMAIN}/`,process.env.GUIDANCE_LEGACY_ISSUER===`https://${process.env.AUTH0_DOMAIN}/`);
   await purgeGuidanceHistory(database);
   await purgeProgressHistory(database);
-  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
+  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
   const server=createServer(createApp(process.env,undefined,database));
   server.listen(Number(process.env.PORT||3001),'0.0.0.0',()=>console.log('Origen API listening'));
   let stopping=false;

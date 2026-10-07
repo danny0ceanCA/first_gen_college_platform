@@ -120,10 +120,11 @@ export function LocalProfileVoice({onProfileSaveComplete,onSaveProfile,onLanguag
   const usageQueue=useRef(Promise.resolve());
   function usageEvent(action:string,id=usage.current.id){if(!id)return;usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,topic:liveMode.current}),keepalive:true})).then(()=>{});}
   const logSession=useRef('');
+  const logAttempt=useRef('');
   const logSequence=useRef(0);
   function log(event:string,details:Record<string,unknown>={}){
     if(!logSession.current)return;
-    void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
+    void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,attemptId:logAttempt.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
   }
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
@@ -191,7 +192,7 @@ export function LocalProfileVoice({onProfileSaveComplete,onSaveProfile,onLanguag
     scopePending.current=false;
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
-    const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
+    const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logAttempt.current=crypto.randomUUID();logSequence.current=0;setDiagnosticId(sessionId);
     if(continuingSession)guidance.current.resetScope();else guidance.current.reset();const segmentId=crypto.randomUUID();finalReason.current='disconnected';
     log('session_start',{mode,language:sessionLanguage});
     const carriedRequest=spokenRequest||(continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
@@ -200,7 +201,7 @@ export function LocalProfileVoice({onProfileSaveComplete,onSaveProfile,onLanguag
     const version=++generation.current;
     saveCompletion.current=voiceSaveCompletion(()=>{log('profile_save_confirmation_finished');latestSaveComplete.current?.();});
     const abort=new AbortController();resources.current.abort=abort;
-    resources.current.deadline=setTimeout(()=>{if(generation.current===version){end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
+    resources.current.deadline=setTimeout(()=>{if(generation.current===version){log('connection_failure',{code:'connection_timeout'});end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
     try {
       if(summaryQueue.current.size){setNotice(t('Saving your previous conversation before reconnecting…','Guardando la conversacion anterior antes de reconectar…'));try{await summaryQueue.current.flush();await new Promise(resolve=>setTimeout(resolve,0));}catch{shared?.reportSave(true,false);setNotice(t('Some previous summaries could not be saved. You can talk, but those discussions may not be available to this guide yet.','Algunos resumenes anteriores no se guardaron. Puedes conversar, pero la guia puede no recordar esas conversaciones todavia.'));}if(generation.current!==version)return;}
       summaryToken.current=history.cloud?await getAccessTokenSilently():undefined;if(summaryToken.current)guidanceTokens.current.set(sessionId,summaryToken.current);summaryId.current=continuingSession?crypto.randomUUID():sessionId;holdConversation(summaryId.current);
@@ -295,7 +296,7 @@ export function LocalProfileVoice({onProfileSaveComplete,onSaveProfile,onLanguag
         }
         turns.request();
       };
-      dc.onclose=()=>{if(generation.current===version){end();setNotice(informational?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
+      dc.onclose=()=>{if(generation.current===version){log('connection_failure',{code:'connection_lost'});end();setNotice(informational?t('Conversation ended.','La conversación terminó.'):t('Conversation ended. Your suggestions are still available below.','La conversación terminó. Tus sugerencias siguen disponibles abajo.'));}};
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
@@ -466,7 +467,7 @@ export function LocalProfileVoice({onProfileSaveComplete,onSaveProfile,onLanguag
           if(called)turns.toolsCompleted();else turns.completed();
         }
       };
-      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
+      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
       resources.current.stopConnection=()=>connection.stop();
       let connectedRecorded=false;
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
