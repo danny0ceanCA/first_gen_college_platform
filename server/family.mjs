@@ -1,3 +1,4 @@
+import {progressEnabled,observeProfile} from './progress-history.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {accountClosed} from './account-lifecycle.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -48,7 +49,7 @@ export function validateFamily(input){
  }
 }
 
-export function createFamilyRepository(database){
+export function createFamilyRepository(database,env=process.env){
  return async(subject,input)=>{
   const client=await database.connect();let transaction=false;
   try{
@@ -63,13 +64,18 @@ export function createFamilyRepository(database){
     if(link){
      if(importing)return;
      const sharedFields=Object.keys(profileFields).filter(field=>!['needs','notes'].includes(field));
+     const sharedHistory=progressEnabled(env)?await observeProfile(client,link.owner_account_id,link.owner_student_id,Object.fromEntries(sharedColumns.map((column,i)=>[column,student[sharedFields[i]]]).filter(([column])=>!['name','color'].includes(column))),'linked-account'):null;
      await client.query(`UPDATE origen_students SET ${sharedColumns.map((c,i)=>`${c}=$${i+3}`).join(',')},updated_at=now() WHERE account_id=$1 AND id=$2`,[link.owner_account_id,link.owner_student_id,...sharedFields.map(field=>student[field])]);
      // Private annotations belong to the signed-in account, never the other person.
      await client.query('UPDATE origen_students SET needs=$3,notes=$4,updated_at=now() WHERE account_id=$1 AND id=$2',[owner,student.id,student.needs,student.notes]);
+     await sharedHistory?.();
      return;
     }
     const values=[owner,student.id,...Object.keys(profileFields).map(field=>student[field])];
+    const history=progressEnabled(env)?await observeProfile(client,owner,student.id,Object.fromEntries(columns.filter(column=>!['name','color','needs','notes'].includes(column)).map(column=>[column,student[column==='entry_term'?'entryTerm':column]])),importing?'imported':'user-reported'):null;
+    const existed=importing?(await client.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[owner,student.id])).rows.length:false;
     await client.query(`INSERT INTO origen_students(account_id,id,${columns.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) ON CONFLICT (account_id,id) ${importing?'DO NOTHING':`DO UPDATE SET ${columns.map(c=>`${c}=EXCLUDED.${c}`).join(',')}, updated_at=now()`}`,values);
+    if(!existed)await history?.();
    };
    if(input.action==='save-account'||input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET first_name=$2,email=$3,updated_at=now() WHERE id=$1',[owner,input.account.firstName,input.account.email]);
    if((input.action==='save-account'||input.action==='complete-onboarding')&&input.account.role)await client.query('UPDATE origen_accounts SET role=$2 WHERE id=$1',[owner,input.account.role]);

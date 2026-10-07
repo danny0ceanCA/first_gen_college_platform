@@ -1,0 +1,575 @@
+{
+  "formatVersion": 1,
+  "kind": "offline-software-contracts",
+  "catalogVersion": "origen-synthetic-cases-v1",
+  "catalogHash": "006fe2c9664845d181c52d13a5eda4f51ce2c0489776e83cb0276d045162a9e0",
+  "rubricVersion": "origen-guidance-rubric-v1",
+  "rubricHash": "f90b8bbe02a4f499edf2d2525a1f08b165321c3d0c90c74a7d6b2724314c6c5c",
+  "configurationHash": "1def993c3d866a7fa0a0e4f7f225e355e104d7bd4e877fb548dc5963b0564881",
+  "sourceHash": "eb20bbe1e32c414d8eef6887d29b0c72dba75a2e9b219f99533713f8f40b7daf",
+  "generatedAt": "2026-10-07T04:53:40.127Z",
+  "evaluatedCaseIds": [
+    "ambiguous-target-en",
+    "ambiguous-target-es",
+    "changing-policy-en",
+    "changing-policy-es",
+    "introduction-en",
+    "introduction-es",
+    "key-term-en",
+    "key-term-es",
+    "language-switch-en",
+    "language-switch-es",
+    "memory-correction-en",
+    "memory-correction-es",
+    "simple-explanation-en",
+    "simple-explanation-es",
+    "student-switch-en",
+    "student-switch-es",
+    "tool-failure-en",
+    "tool-failure-es",
+    "topic-transition-en",
+    "topic-transition-es"
+  ],
+  "evaluator": {
+    "id": "origen-contract-runner-v1",
+    "type": "automatic-software-check"
+  },
+  "sampleSize": 20,
+  "passed": 20,
+  "failed": [],
+  "cases": [
+    {
+      "id": "introduction-en",
+      "language": "en",
+      "category": "introduction",
+      "critical": false,
+      "configurationHash": "0152d7b2009e70cf70fae4fc979671a4c876d20d96ac64c3f76ff1a09b6350b9",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "warm opening and orientation before details",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "introduction-es",
+      "language": "es",
+      "category": "introduction",
+      "critical": false,
+      "configurationHash": "323ac3c0029dc86ce1b346a16e44d313039e74dd8b662ee6f06fb55ebbcdf0ad",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "warm opening and orientation before details",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "simple-explanation-en",
+      "language": "en",
+      "category": "simple-explanation",
+      "critical": false,
+      "configurationHash": "606f5a96f46cc7cba98316a0e75be2b5f2e0cefb1f63ac2e3577f5e2dd8f18ab",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "budget is not a bill",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "simple-explanation-es",
+      "language": "es",
+      "category": "simple-explanation",
+      "critical": false,
+      "configurationHash": "cf644dc85fad6ccd5527803ad6a01c7242693c61641c6e8a8533ddfba6f743a6",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "budget is not a bill",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "language-switch-en",
+      "language": "en",
+      "category": "language-switch",
+      "critical": true,
+      "configurationHash": "65556ac512ee1f8f0a11b24b030fc4b15c042b7d6aef305127e8b82bb48f318d",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "spoken preference changes before lookup",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "language-switch-es",
+      "language": "es",
+      "category": "language-switch",
+      "critical": true,
+      "configurationHash": "386581860b3c48dd753acdbd6e376120f579b6b78a87e8668ade238cf997ba9a",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "spoken preference changes before lookup",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "key-term-en",
+      "language": "en",
+      "category": "key-term",
+      "critical": false,
+      "configurationHash": "d664fab2f48b077ef3d02a7d843eefe64ecff5139f9f14b069eb25d9809d4c7f",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "English term does not change Spanish language",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "key-term-es",
+      "language": "es",
+      "category": "key-term",
+      "critical": false,
+      "configurationHash": "1f1fd672e37a81822a21f3396717d56d4188b3075c2982a617fe82c31c558e59",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "English term does not change Spanish language",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "topic-transition-en",
+      "language": "en",
+      "category": "topic-transition",
+      "critical": false,
+      "configurationHash": "a2eb1ff998b3922cf5e088b97e37fbf1428d6b461465b908ebcf31dccf684740",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "in-place continuity overrides greeting",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "topic-transition-es",
+      "language": "es",
+      "category": "topic-transition",
+      "critical": false,
+      "configurationHash": "bbab3a9587fa66d4d0c25af2b3ae5d47c9a9edc47f46286be2a96c0ca4cb854d",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "in-place continuity overrides greeting",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "ambiguous-target-en",
+      "language": "en",
+      "category": "ambiguous-target",
+      "critical": true,
+      "configurationHash": "df6cd61cc39700a7df53993473c05198a6bb8c17fe422f5a1dfe346f2e2239d2",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "unknown target has no private profile",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "ambiguous-target-es",
+      "language": "es",
+      "category": "ambiguous-target",
+      "critical": true,
+      "configurationHash": "06a11502b052ab169638caafc3493bdd46d1441962a622e9b89a82fe28303618",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "unknown target has no private profile",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "student-switch-en",
+      "language": "en",
+      "category": "student-switch",
+      "critical": true,
+      "configurationHash": "a379af163921a93b6d6720264d0bc228963e9093db28dd513af74b6a65d7102c",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "confirmed target reconnection avoids greeting",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "student-switch-es",
+      "language": "es",
+      "category": "student-switch",
+      "critical": true,
+      "configurationHash": "c0e78bb0816ffb6eb3ae3a547bb1fcade153708ce1a4409d5760ce8c46fe066d",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "confirmed target reconnection avoids greeting",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "memory-correction-en",
+      "language": "en",
+      "category": "memory-correction",
+      "critical": false,
+      "configurationHash": "2e579ca1c4b70b8fb257674dabe69134285a241c4b9dca66766a93789d872b7b",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "memory is not current verified policy",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "memory-correction-es",
+      "language": "es",
+      "category": "memory-correction",
+      "critical": false,
+      "configurationHash": "0753d908cd5ed4f1815f11b81053c03469b17e00adc972f02df1c4559cc74f86",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "memory is not current verified policy",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "tool-failure-en",
+      "language": "en",
+      "category": "tool-failure",
+      "critical": true,
+      "configurationHash": "81cee9afb9e6ebf4b3428b452ff37453647c21f3cf08deea63d03866f0cd35ab",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "failed lookup cannot be repeated indefinitely",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "tool-failure-es",
+      "language": "es",
+      "category": "tool-failure",
+      "critical": true,
+      "configurationHash": "42a89e6425f1feb838396c448839331ffc43fb42bcc48bbae31277506c988b47",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "failed lookup cannot be repeated indefinitely",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "changing-policy-en",
+      "language": "en",
+      "category": "changing-policy",
+      "critical": true,
+      "configurationHash": "81cee9afb9e6ebf4b3428b452ff37453647c21f3cf08deea63d03866f0cd35ab",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "fresh check bypasses cache",
+          "passed": true
+        },
+        {
+          "name": "exact cycle and evidence required",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "changing-policy-es",
+      "language": "es",
+      "category": "changing-policy",
+      "critical": true,
+      "configurationHash": "42a89e6425f1feb838396c448839331ffc43fb42bcc48bbae31277506c988b47",
+      "checks": [
+        {
+          "name": "language tool available",
+          "passed": true
+        },
+        {
+          "name": "save claims require acknowledgement",
+          "passed": true
+        },
+        {
+          "name": "fresh check bypasses cache",
+          "passed": true
+        },
+        {
+          "name": "exact cycle and evidence required",
+          "passed": true
+        },
+        {
+          "name": "bounded paid lookup attempts",
+          "passed": true
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "modelResponsesEvaluated": 0,
+  "latencyMs": null,
+  "costUSD": null,
+  "releaseReady": false,
+  "limitations": "Checks actual configuration and client helpers, not model behavior, speech quality, live sources, WebRTC latency or academic outcomes. Human-reviewed synthetic responses and measured costs are still required."
+}

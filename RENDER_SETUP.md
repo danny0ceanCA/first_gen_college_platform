@@ -94,6 +94,16 @@ Web and native entry points use Auth0 Universal Login without forcing the SMS co
 Passwords are managed by Auth0. Origen continues to store records under the verified Auth0 subject, never under a client-supplied email. Signing in with Google and signing up separately with email can create distinct accounts even when the emails match. Auth0 identity linking is not yet implemented; do not promise automatic merging. When SMS is enabled later, implement explicit ownership-verified identity linking before offering an existing user a new phone sign-in. Family profile sharing is a different feature.
 
 
-### Separate Origen tenant migration
+## Additional rollout notes
+
+### Operational guidance history (phase 2)
+
+Migration 015 adds account-scoped session/topic history and model provenance. Collection defaults off. Follow the [phase 2 rollout](docs/data-architecture/PHASE_2.md) before setting backend `GUIDANCE_HISTORY_ENABLED=true`, `GUIDANCE_DATA_OWNER`, and a known build revision. Legacy issuer mapping requires explicit provenance confirmation. No frontend environment variable is required; preview conversations are excluded and metadata expires after 90 days. This does not enable research or model training.
+
+### Separate Origen tenant migration details
 
 The web defaults and Blueprint now use `origenedu.us.auth0.com` and Origen Web client `SvPMuyj1thhZoowDmsvqsQ05qzEntXmd`. Existing Render environment overrides must be changed explicitly: frontend `VITE_AUTH0_DOMAIN`/`VITE_AUTH0_CLIENT_ID`, backend `AUTH0_DOMAIN`. Recreate Origen API in the new tenant with the same API identifier used by the backend `AUTH0_AUDIENCE` and frontend `VITE_AUTH0_AUDIENCE`; the identifier itself does not need to change. Deploy the matching frontend and backend after connection, callback, API, and recent-auth Action setup is complete. The new tenant also needs the existing `auth0/recent-auth-action.cjs` Action installed according to the fresh-auth guide above. Recreate reviewer role/permissions there if institution review is used. Native configuration and the Auth0 config plugin now use the new tenant and Origen Mobile client `8dHHGrPYL8SYWZjnlFWSzthTfsoEv8cU`; rebuild the development/native app because the plugin domain changed. Use the callback/logout URLs in DATABASE_PHASES.md. Existing Auth0 users are not migrated by changing configuration.
+
+### Phase 3 progress history (off by default)
+
+Migration 016 adds private academic observations, plan revisions and optional feedback/reported milestones. See [phase 3 rollout](docs/data-architecture/PHASE_3.md). Backend opt-in: `PROGRESS_HISTORY_ENABLED=true`, `PROGRESS_DATA_OWNER`, and an application revision. Frontend opt-in: `VITE_PROGRESS_HISTORY_ENABLED=true` after API readiness. Retention is 90 days; no research access or verified institutional outcomes are enabled. Validate on a dedicated staging PostgreSQL database before production collection.

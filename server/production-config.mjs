@@ -11,6 +11,10 @@ export function productionConfigIssues(env){
  }
  if(env.DATABASE_URL){try{const u=new URL(env.DATABASE_URL);if(!['postgres:','postgresql:'].includes(u.protocol)||!u.hostname||!u.pathname||u.pathname==='/')issues.push('DATABASE_URL: PostgreSQL database URL required');}catch{issues.push('DATABASE_URL: invalid database URL');}}
  if(env.ALLOW_PREVIEW_VOICE&&!['true','false'].includes(env.ALLOW_PREVIEW_VOICE))issues.push('ALLOW_PREVIEW_VOICE: use true or false');
+ if(env.GUIDANCE_HISTORY_ENABLED&&!['true','false'].includes(env.GUIDANCE_HISTORY_ENABLED))issues.push('GUIDANCE_HISTORY_ENABLED: use true or false');
+ if(env.GUIDANCE_HISTORY_ENABLED==='true'&&!env.GUIDANCE_DATA_OWNER?.trim())issues.push('GUIDANCE_DATA_OWNER: assign an operational data owner before enabling collection');
+ if(env.GUIDANCE_HISTORY_ENABLED==='true'&&!env.RENDER_GIT_COMMIT?.trim()&&!env.APPLICATION_REVISION?.trim())issues.push('APPLICATION_REVISION: a build revision is required when guidance collection is enabled');
+ if(env.GUIDANCE_LEGACY_ISSUER&&env.GUIDANCE_LEGACY_ISSUER!==`https://${env.AUTH0_DOMAIN}/`)issues.push('GUIDANCE_LEGACY_ISSUER: must match the verified configured tenant issuer');
  return issues;
 }
 export function assertProductionConfig(env){

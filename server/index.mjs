@@ -1,3 +1,5 @@
+import {createProgressHandler,assertProgressConfiguration,purgeProgressHistory} from './progress-history.mjs';
+import {createFamilyRepository} from './family.mjs';
 import {createInstitutionHandler} from './institutions.mjs';
 import {assertProductionConfig} from './production-config.mjs';
 import {createLifecycleHandler,accountClosed,purgeExpiredInvites} from './account-lifecycle.mjs';
@@ -17,9 +19,11 @@ import {createHistoryHandler} from './history.mjs';
 import {createFamilyHandler} from './family.mjs';
 import {createLinksHandler} from './account-links.mjs';
 import {instrumentRequest,safeErrorCode} from './api-logging.mjs';
+import {createGuidanceHandler,guidanceEnabled,backfillGuidanceIdentities,purgeGuidanceHistory,bindGuidanceIdentity} from './guidance-history.mjs';
 
 export function createApp(env=process.env,verify,database=null,writeLog=record=>console.log(JSON.stringify(record))){
  assertProductionConfig(env);
+ assertProgressConfiguration(env);
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  const domain=env.AUTH0_DOMAIN,audience=env.AUTH0_AUDIENCE;
  const jwks=domain?createRemoteJWKSet(new URL(`https://${domain}/.well-known/jwks.json`)):null;
@@ -28,7 +32,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const institutions=createInstitutionHandler(database,env);
  const metrics=createMetricsHandler(database);
  const lifecycle=createLifecycleHandler(database);
- const handlers=[lifecycle,metrics,institutions,createPlanHandler(database),createLinksHandler(database),createFamilyHandler(database),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log),createAdmissionsResearchHandler(env,fetch,log),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
+ const handlers=[createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
  const buckets=new Map();
  const previewPaths=new Set(['/api/profile-voice','/api/finance-research','/api/admissions-research','/api/voice-diagnostics','/api/conversation-summary']);
  let previewStarts={count:0,reset:0};
@@ -47,7 +51,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Access-Control-Expose-Headers','X-Request-ID');res.setHeader('Vary','Origin');}
   if(req.method==='OPTIONS'){
    res.setHeader('Access-Control-Allow-Methods','POST, GET, OPTIONS');
-   res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, X-Origen-Session, X-Camino-Session');
+   res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, X-Origen-Session, X-Camino-Session, X-Origen-Segment');
    res.writeHead(204);return res.end();
   }
   if(req.method==='GET'&&/^\/api\/institutions\/published\/[a-z0-9-]{1,100}$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
@@ -58,7 +62,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   const preview=!req.headers.authorization&&env.ALLOW_PREVIEW_VOICE==='true'&&!!origin&&previewPaths.has(path);
   if(!token&&!preview)return send(401,'authentication_required');
   let identity;
-  if(!preview){try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255)throw new Error();}catch{return send(401,'invalid_token');}}
+  if(!preview){try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255||domain&&identity.iss!==undefined&&identity.iss!==`https://${domain}/`)throw new Error();}catch{return send(401,'invalid_token');}}
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
   // Anonymous preview traffic shares a capped bucket; no untrusted client IP headers.
   const bucketKey=preview?'anonymous-preview':`account:${identity.sub}`;
@@ -74,6 +78,9 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   req.origenAuthorized=!preview;
   req.origenPreview=preview;
   req.origenIdentity=identity;
+  if(identity&&database&&guidanceEnabled(env)){
+   try{await bindGuidanceIdentity(database,identity.sub,`https://${domain}/`);}catch(error){if(error.status!==404)return send(error.status===403?403:503,'identity_mapping_unavailable');}
+  }
   let i=0;const next=()=>{const handler=handlers[i++];return handler?handler(req,res,next):send(404,'not_found');};
   try{await next();}catch(error){req.log({event:'api_error',level:'error',code:safeErrorCode(error)});if(!res.headersSent)send(500,'server_error');else res.end();}
  };
@@ -87,7 +94,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   else console.warn('DATABASE_URL is not set; persistent storage is unavailable.');
   await purgeMetrics(database);
   await purgeExpiredInvites(database);
-  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeExpiredInvites(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
+  if(guidanceEnabled(process.env))await backfillGuidanceIdentities(database,`https://${process.env.AUTH0_DOMAIN}/`,process.env.GUIDANCE_LEGACY_ISSUER===`https://${process.env.AUTH0_DOMAIN}/`);
+  await purgeGuidanceHistory(database);
+  await purgeProgressHistory(database);
+  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
   const server=createServer(createApp(process.env,undefined,database));
   server.listen(Number(process.env.PORT||3001),'0.0.0.0',()=>console.log('Origen API listening'));
   let stopping=false;
@@ -98,8 +108,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    server.close(async()=>{try{await database?.end();}finally{clearTimeout(deadline);}});
   };
   process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
- }catch{
-  console.error('Origen database initialization failed. Check DATABASE_URL and database availability.');
+ }catch(error){
+  console.error(['legacy_issuer_confirmation_required','identity_issuer_conflict'].includes(error.message)?`Origen startup stopped: ${error.message}. Check the guidance identity rollout instructions.`:'Origen database initialization failed. Check DATABASE_URL and database availability.');
   await database?.end();process.exitCode=1;
  }
 }

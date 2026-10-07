@@ -9,6 +9,7 @@ import {financeTool} from './finance-research.mjs';
 import {scopeRouting} from './voice-scope.mjs';
 import {createFamilyRepository} from './family.mjs';
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
+import {createGuidanceRepository,guidanceConfig,guidanceEnabled,bindGuidanceIdentity} from './guidance-history.mjs';
 export const profileFields = ['name','stage','gpa','school','interest','activities','goals','needs','notes','institutions','entryTerm'];
 
 export function voiceSession(input, env) {
@@ -87,12 +88,14 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
 
 export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, database = null) {
   let active = 0;
+  const guidance=createGuidanceRepository(database);
   return async(req,res,next) => {
     if(req.url?.split('?')[0] !== '/api/profile-voice') return next();
     const started=Date.now();
+    let execution,tracked,upstreamRequestId,storedRole='unknown';
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
-  const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
+  const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...body,...(tracked?{guidance:tracked}:{})}));};
     if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
     if(req.method!=='POST') return send(405,{error:'method_not_allowed'});
     if(!req.headers['content-type']?.startsWith('application/json')) return send(415,{error:'json_required'});
@@ -108,7 +111,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(input.routeConversations!==undefined&&typeof input.routeConversations!=='boolean'||input.targetConfirmed!==undefined&&typeof input.targetConfirmed!=='boolean'||input.routeConversations&&input.targetConfirmed&&input.studentId===undefined)return send(400,{error:'invalid_request'});
       if(req.origenAuthorized){
         input.memory=[];input.plans=[];
-        try{const family=await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'});input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};if(family.account.welcomeHeard&&input.replayWelcome!==true)input.onboarding=false;}catch{return send(503,{error:'history_unavailable'});}
+        try{const family=await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'});storedRole=family.account.role||'unknown';input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};if(family.account.welcomeHeard&&input.replayWelcome!==true)input.onboarding=false;}catch{return send(503,{error:'history_unavailable'});}
         if(input.routeConversations){
           try{
             const students=(await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'})).students;
@@ -128,10 +131,21 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(req.origenAuthorized&&input.mode==='planning'&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
         try{input.plans=(await createPlanRepository(database)(req.origenIdentity.sub,{action:'load',studentId:input.studentId})).plans.filter(p=>p.status==='active').slice(0,5);}catch{return send(503,{error:'plans_unavailable'});}
       }
-      if(updating){const config=voiceSession(input,env);return send(200,{session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice}});}
-      const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(voiceSession(input,env)));
+      const config=voiceSession(input,env);
+      if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
+        await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
+        // Hash the reusable policy with empty personal context, never store prompt text.
+        const base=voiceSession({...input,profile:{},students:[],memory:[],plans:[],continuity:undefined},env);
+        const version=guidanceConfig(config.model,'voice',base,env);
+        const confirmed=input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true);
+        tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);
+        if(!updating)execution=await guidance.startExecution(req.origenIdentity.sub,tracked,version,'voice');
+      }
+      if(updating)return send(200,{session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice},guidance:tracked});
+      const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(config));
       const response=await request('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});
   void (req.log||log)({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
+      upstreamRequestId=response.headers.get('x-request-id');
       if(!response.ok) {
         const data=await response.json().catch(()=>({}));
         const code=data.error?.code;
@@ -139,7 +153,8 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       const sdp=await response.text();
       if(!sdp.startsWith('v=0')) return send(502,{error:'voice_unavailable'});
-      return send(200,{sdp,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile')});
-    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send(502,{error:'voice_unavailable'});} finally {active--;}
+      if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
+      return send(200,{sdp,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
+    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
   };
 }

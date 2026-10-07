@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createDatabase,migrateDatabase,databaseReady} from './database.mjs';
 import {createApp} from './index.mjs';
+import {createGuidanceRepository,guidanceConfig} from './guidance-history.mjs';
+import {createHistoryRepository} from './history.mjs';
 
 function fakePool({fail=false,applied=[]}={}){
  const calls=[];let released=false;
@@ -69,23 +71,34 @@ test('PostgreSQL migration, account boundaries and cascade deletion', {skip:!pro
   const scoped={connect:async()=>({query:(...args)=>client.query(...args),release:()=>{}}),query:(...args)=>client.query(...args)};
   await migrateDatabase(scoped);await migrateDatabase(scoped);
   assert.equal(await databaseReady(scoped),true);
-  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,11);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,16);
   const a=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|a') RETURNING id")).rows[0].id;
   const b=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|b') RETURNING id")).rows[0].id;
   await client.query("INSERT INTO origen_students(account_id,id,name) VALUES ($1,'student','Sofia')",[a]);
   const insert="INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,conversation_at) VALUES ($1,'summary','student','finance','Discussed grants',now())";
   await assert.rejects(client.query(insert,[b]),{code:'23503'});
   await client.query(insert,[a]);
+  const scope={sessionId:crypto.randomUUID(),segmentId:crypto.randomUUID(),topic:'finance',language:'en',role:'parent',targetKind:'student',studentId:'student'};
+  await createGuidanceRepository(scoped).begin('auth0|a',scope,guidanceConfig('synthetic','voice',{instructions:'Test policy',tools:[]}));
+  // A valid summary insert followed by invalid attribution must roll back both.
+  await assert.rejects(createHistoryRepository(scoped)('auth0|a',{action:'save',item:{id:'rollback-summary',studentId:null,mode:'finance',date:new Date().toISOString(),sources:[],summary:'Synthetic'},attribution:{sessionId:scope.sessionId,segmentIds:[scope.segmentId],language:'en'}}),{status:409});
+  assert.equal((await client.query("SELECT count(*)::int AS count FROM origen_conversation_summaries WHERE id='rollback-summary'")).rows[0].count,0);
   await client.query("INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,conversation_at) VALUES ($1,'family',NULL,'planning','Discussed family goals',now())",[a]);
   const plan=(await client.query("INSERT INTO origen_plans(account_id,student_id,title,category) VALUES($1,NULL,'Family plan','education') RETURNING id",[a])).rows[0].id;
   await client.query("INSERT INTO origen_plan_steps(account_id,plan_id,id,position,title,due_date) VALUES($1,$2,'step',0,'Meet counselor','2026-11-01')",[a,plan]);
   assert.equal((await client.query("SELECT to_char(due_date,'YYYY-MM-DD') AS date FROM origen_plan_steps WHERE account_id=$1",[a])).rows[0].date,'2026-11-01');
   await assert.rejects(client.query("INSERT INTO origen_plan_steps(account_id,plan_id,id,position,title) VALUES($1,$2,'foreign',0,'Foreign step')",[b,plan]),{code:'23503'});
+  await client.query("INSERT INTO origen_profile_observations(account_id,student_id,field,reported_value,origin) VALUES($1,'student','stage','11th grade','user-reported')",[a]);
+  await client.query("INSERT INTO origen_plan_revisions(account_id,plan_id,version,snapshot) VALUES($1,$2,1,'{}')",[a,plan]);
+  await client.query("INSERT INTO origen_step_transitions(account_id,plan_id,version,step_id,kind,reported_status) VALUES($1,$2,1,'step','added','not-started')",[a,plan]);
   await client.query('DELETE FROM origen_accounts WHERE id=$1',[a]);
   assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_students')).rows[0].count,0);
   assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_conversation_summaries')).rows[0].count,0);
   assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_plans')).rows[0].count,0);
   assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_plan_steps')).rows[0].count,0);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_guidance_sessions')).rows[0].count,0);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_guidance_events')).rows[0].count,0);
+  for(const table of ['origen_profile_observations','origen_plan_revisions','origen_step_transitions','origen_progress_reports'])assert.equal((await client.query(`SELECT count(*)::int AS count FROM ${table}`)).rows[0].count,0);
  }finally{
   if(created)await client.query(`DROP SCHEMA ${schema} CASCADE`);
   client.release();await database.end();

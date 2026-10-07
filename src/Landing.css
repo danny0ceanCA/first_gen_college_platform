@@ -23,4 +23,3 @@
 
 .landing-copy .landing-preview-note{font-size:13px;line-height:1.6;margin:16px 0 0;max-width:435px}.landing-how{padding-left:24px}.landing-how li{padding-left:8px}.landing-how p{color:#d0c7b5;line-height:1.8}.landing-share-description{padding:16px 20px;border-left:2px solid #d5bd98}.landing-footer{flex-wrap:wrap}.landing-nav nav{justify-content:flex-end}@media(max-width:760px){.landing-nav{flex-wrap:wrap;gap:18px}.landing-nav nav{width:100%;justify-content:flex-start}.landing-nav nav>a{display:inline-flex;min-height:44px;align-items:center}.landing-nav .institution-register-link{display:none}.landing-nav nav>a{font-size:12px}.landing-copy .landing-eyebrow{max-width:320px}}
 
-@media(max-width:760px){.landing-copy{grid-row:1}.landing-map.pueblo-scene{grid-row:2}.landing-hero{padding-top:85px}}

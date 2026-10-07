@@ -17,7 +17,7 @@ export default function Entry(){
  useEffect(()=>{const update=()=>setRoute(window.location.hash);window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  useEffect(()=>{const frame=requestAnimationFrame(()=>{if(route==='#about'||route==='#privacy'){window.scrollTo(0,0);return;}const section=document.getElementById(route.slice(1));if(section)section.scrollIntoView({block:'start'});else window.scrollTo(0,0);});return()=>cancelAnimationFrame(frame);},[route]);
  if(closed)return <main><p role="status">Your Origen account is closed. Tu cuenta de Origen está cerrada.</p><a href="/">Return to Origen / Volver a Origen</a></main>;
- if(isLoading&&window.location.search.includes('code='))return <p role="status">Completing sign-in…</p>;
+ if(isLoading&&(inside||route==='#institutions'||route.startsWith('#invite/')||window.location.search.includes('code=')))return <main className="application-panel"><p role="status">Loading Origen… / Cargando Origen…</p></main>;
  if(error&&window.location.search.includes('error='))return <div><p role="alert">Sign-in could not be completed. Please try again.</p><a href="/">Return to Origen</a></div>;
  if(route==='#institutions')return <InstitutionPortal key={isAuthenticated?user?.sub:'anonymous'}/>;
  if(route==='#about'||route==='#privacy')return <LandingInformation page={route==='#about'?'about':'privacy'}/>;

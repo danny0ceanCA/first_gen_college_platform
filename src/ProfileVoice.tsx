@@ -1,17 +1,19 @@
 import {voiceProfileSaveTools,type VoiceProfileSaveResult} from './voiceProfileSave.mjs';
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
 import {voiceDraft} from './voiceDraft.mjs';
+import {guidanceHistory} from './guidanceHistory.mjs';
 import {onboardingRecovery} from './onboardingRecovery.mjs';
-import {voiceLanguageControl,voiceLanguageTools} from './voiceLanguage.mjs';
+import {voiceLanguageControl,voiceLanguageTools,spokenLanguageFromText} from './voiceLanguage.mjs';
 import {onboardingWelcome} from './voiceWelcome.mjs';
 import VoiceWave from './VoiceWave';
 import {SharedVoiceContext} from './SharedVoiceContext';
-import {voiceResearchCache} from './voiceResearchCache.mjs';
+import {voiceResearchCache,voiceResearchBudget,wantsFreshLookup} from './voiceResearchCache.mjs';
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
 import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
+import {voiceErrorEndsSession,voiceReplyCanRetry} from './voiceErrors.mjs';
 import {voiceConnectionRecovery,voiceProfile} from './voiceConnection.mjs';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from './voiceMemory.mjs';
@@ -55,6 +57,8 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
   const profile=voiceProfile(mode,initialProfile,family.students,target.id);
   const summaryScope=useRef<{id:string|null;name:string;confirmed:boolean}>({id:initialProfile.id||null,name:initialProfile.name,confirmed:!routing});
   const summaryToken=useRef<string|undefined>(undefined);const summaryId=useRef('');
+  const guidanceTokens=useRef(new Map<string,string>());
+  const guidance=useRef(guidanceHistory(body=>{const token=guidanceTokens.current.get((body as {sessionId:string}).sessionId);if(!token)return Promise.resolve();return apiFetch('/api/guidance-history',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),keepalive:true}).then(response=>{if(!response.ok)throw new Error('guidance_event_failed');});}));
   const sessionTurns=useRef<{role:'user'|'assistant';text:string}[]>([]);
   const sessionSources=useRef<{title:string;url:string;checkedAt:string}[]>([]);
   const memorySaved=useRef(true);
@@ -71,7 +75,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     if(!sessionTurns.current.some(turn=>turn.role==='user')||!summaryId.current||!summaryScope.current.confirmed)return;
     const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
     const records=store.read<Record<string,unknown>>({});
-    records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,sources:sessionSources.current};
+    records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,sources:sessionSources.current,guidance:guidance.current.attribution()};
     if(!store.write(records))setNotice(t('Keep this page open until the summary saves.','Mantén esta página abierta hasta guardar el resumen.'));
   }
   async function saveSummary(){
@@ -79,7 +83,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     const studentId=summaryScope.current.id,scopeName=summaryScope.current.name;
     checkpointSummary();
     memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
-    const body=JSON.stringify({turns,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources});
+    const body=JSON.stringify({turns,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources,guidance:guidance.current.attribution()});
     const savedMode=liveMode.current;
     const subject=history.cloud?user?.sub:undefined,date=new Date().toISOString();
     summaryQueue.current.add(id,async()=>{let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});{const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${subject||'preview'}`);store.removeEntry(id);}});
@@ -120,9 +124,12 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
   const [seconds,setSeconds]=useState(0);
   const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans')=>Promise<boolean>}>({});
   const generation=useRef(0);
+  const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
+  const preserveLogicalSession=useRef(false);
   const audio=useRef<HTMLAudioElement>(null);
   function cleanup(){
     void saveSummary();releaseConversation(summaryId.current);
+    if(!preserveLogicalSession.current)void guidance.current.event('voice.ended',{reason:finalReason.current})?.catch(()=>{});
     log('session_cleanup');logSession.current='';
     generation.current++;
     const r=resources.current;resources.current={};
@@ -134,9 +141,9 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     r.stream?.getTracks().forEach(track=>track.stop());
     if(audio.current){audio.current.pause();audio.current.srcObject=null;}
   }
-  function end(){cleanup();setResearching(false);setState('idle');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  function end(){cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function handoffContext():VoiceHandoff{return {studentId:summaryScope.current.id,confirmed:summaryScope.current.confirmed,language:spokenLanguage.current,turns:sessionTurns.current.slice(-8).map(turn=>({...turn,text:turn.text.slice(0,2000)}))};}
-  function finishCall(drain=true){
+  function finishCall(drain=true,preserveSession=false){
     if(finishPromise.current)return finishPromise.current;
     setFinishing(true);
     resources.current.stream?.getAudioTracks().forEach(track=>{track.enabled=false;});
@@ -146,7 +153,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
       const deadline=Date.now()+15000;
       while(drain&&resources.current.dc?.readyState==='open'&&(awaitingTranscription.current.size||assistantSpeaking.current||resources.current.turnsBusy?.())&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));
       if(drain&&resources.current.dc?.readyState==='open'&&(awaitingTranscription.current.size||resources.current.turnsBusy?.()))setError(t('The last reply did not finish. Review your profile for missing details before saving.','La última respuesta no terminó. Revisa si faltan datos en tu perfil antes de guardar.'));
-      end();
+      preserveLogicalSession.current=preserveSession;finalReason.current=drain?'completed':'disconnected';end();
     });
     finishPromise.current=task.finally(()=>{setFinishing(false);finishPromise.current=null;});
     return finishPromise.current;
@@ -168,7 +175,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
   const latestCleanup=useRef(cleanup);
   useEffect(()=>{latestCleanup.current=cleanup;});
   useEffect(()=>()=>{latestCleanup.current();onActive(false);shared?.claim(ownerId,false);},[]);
-  async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest=''){
+  async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest='',continuingSession=''){
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
     const profile=voiceProfile(mode,initialProfile,family.students,scope.id);
@@ -177,7 +184,8 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     scopePending.current=false;
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
-    const sessionId=crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
+    const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logSequence.current=0;setDiagnosticId(sessionId);
+    if(continuingSession)guidance.current.resetScope();else guidance.current.reset();const segmentId=crypto.randomUUID();finalReason.current='disconnected';
     log('session_start',{mode,language:sessionLanguage});
     const carriedRequest=spokenRequest||(continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
@@ -187,7 +195,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     resources.current.deadline=setTimeout(()=>{if(generation.current===version){end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
     try {
       if(summaryQueue.current.size){setNotice(t('Saving your previous conversation before reconnecting…','Guardando la conversacion anterior antes de reconectar…'));try{await summaryQueue.current.flush();await new Promise(resolve=>setTimeout(resolve,0));}catch{shared?.reportSave(true,false);setNotice(t('Some previous summaries could not be saved. You can talk, but those discussions may not be available to this guide yet.','Algunos resumenes anteriores no se guardaron. Puedes conversar, pero la guia puede no recordar esas conversaciones todavia.'));}if(generation.current!==version)return;}
-      summaryToken.current=history.cloud?await getAccessTokenSilently():undefined;summaryId.current=sessionId;holdConversation(sessionId);
+      summaryToken.current=history.cloud?await getAccessTokenSilently():undefined;if(summaryToken.current)guidanceTokens.current.set(sessionId,summaryToken.current);summaryId.current=continuingSession?crypto.randomUUID():sessionId;holdConversation(summaryId.current);
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
       const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
       if(generation.current!==version){stream.getTracks().forEach(track=>track.stop());return;}
@@ -211,21 +219,24 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
         dc.send(JSON.stringify({...event as Record<string,unknown>,event_id}));
         return event_id;
       };
-      const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);}}});resources.current.stopGuide=()=>languageControl.stop();
+      const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);void guidance.current.event('guidance.language_changed',{language:next,basis:'model-detection'})?.catch(()=>{});}}});resources.current.stopGuide=()=>languageControl.stop();
       let changingGuide=false;
       resources.current.switchGuide=async next=>{
         if(next===liveMode.current)return true;
         if(!summaryScope.current.confirmed||changingGuide)return false;
         changingGuide=true;
+        let nextGuidance:ReturnType<typeof guidance.current.current>;
         setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
           await languageControl.configure(async currentLanguage=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role,routeConversations:routing,targetConfirmed:summaryScope.current.confirmed,studentId:summaryScope.current.id,students:family.students.map(({id,name})=>({id,name})),profile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,summaryScope.current.id)}),signal:abort.signal});
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role,routeConversations:routing,targetConfirmed:summaryScope.current.confirmed,studentId:summaryScope.current.id,students:family.students.map(({id,name})=>({id,name})),profile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,summaryScope.current.id)}),signal:abort.signal});
             const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error('guide_config_unavailable');
             if(generation.current!==version)throw new Error('voice_session_stopped');
+            nextGuidance=data.guidance;
             return data.session;
           },()=>{
             if(generation.current!==version)return;
+            guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             liveMode.current=next;checkpointSummary();setMode(next);onGuideChanged?.(next);setNotice('');log('guide_update_complete',{mode:next});
           });
           if(generation.current!==version)return false;
@@ -234,8 +245,19 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
         }catch{if(generation.current===version){log('guide_update_failed',{mode:next});setNotice(t('I could not change topics yet. You can keep talking or try again.','No pude cambiar de tema todavía. Puedes seguir hablando o intentar de nuevo.'));}return false;}
         finally{changingGuide=false;if(generation.current===version)setSwitchingGuide(false);}
       };
-      const cache=voiceResearchCache();const speechTimes=new Map<string,number>();
+      const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
       const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onMissing:itemId=>{setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
+      let replyRecoveryUsed=false;
+      const recoverReply=(responseId:string|undefined,code:string)=>{
+        const retry=!replyRecoveryUsed&&voiceReplyCanRetry(code);
+        if(retry)replyRecoveryUsed=true;
+        assistantSpeaking.current=false;
+        if(turns.failed(responseId,retry)){
+          setActivity(retry?'thinking':'listening');
+          setNotice(retry?t('One moment, I’m trying that reply again.','Un momento, estoy intentando responder de nuevo.'):t('I couldn’t finish that reply. We’re still connected; you can ask again.','No pude terminar esa respuesta. Seguimos conectados; puedes preguntar de nuevo.'));
+          log('reply_recovered',{code});
+        }
+      };
       let progressTimer:ReturnType<typeof setInterval>|undefined;
       const stopProgress=()=>{clearInterval(progressTimer);progressTimer=undefined;};
       resources.current.stopProgress=stopProgress;
@@ -279,8 +301,8 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
         if(turns.progressEvent(e))return;
         if(['error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
-        if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();}
-        if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);}
+        if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
+        if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);if(['completed','failed','cancelled','incomplete'].includes(e.response?.status))void guidance.current.event('response.finished',{status:e.response.status})?.catch(()=>{});}
         if(e.type==='input_audio_buffer.speech_started'){speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
@@ -290,9 +312,23 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
         if(e.type==='response.done'&&e.response?.status==='cancelled')log('response_cancelled',{responseId:e.response.id,reason:e.response.status_details?.reason,toolCount:(e.response.output||[]).filter((item:{type:string})=>item.type==='function_call').length});
         if(e.type==='conversation.item.input_audio_transcription.failed')turns.transcript(e.item_id,'');
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
-          const valid=e.type.startsWith('conversation')?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
-          if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:e.type.startsWith('conversation')?'user':'assistant',text:e.transcript});checkpointSummary();}
-          if(valid&&!e.type.startsWith('conversation')&&!scopePending.current)setLatestAnswer(e.transcript);
+          const userTurn=e.type.startsWith('conversation');
+          if(userTurn&&e.item_id){if(handledTranscripts.has(e.item_id))return;handledTranscripts.add(e.item_id);}
+          const release=userTurn?turns.holdReply():()=>{};
+          try{
+            if(userTurn){
+              const next=spokenLanguageFromText(e.transcript,languageControl.language());
+              if(next!==languageControl.language()){
+                try{await languageControl.change(next);log('spoken_language_changed',{language:next});}
+                catch{log('spoken_language_update_failed');}
+                if(generation.current!==version)return;
+              }
+            }
+            const valid=userTurn?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
+            if(valid&&userTurn){replyRecoveryUsed=false;setNotice('');}
+            if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:e.transcript});checkpointSummary();}
+            if(valid&&!userTurn&&!scopePending.current)setLatestAnswer(e.transcript);
+          }finally{release();}
         }
         if(e.type==='error'){
           const code=String(e.error?.code||'unknown_error').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80);
@@ -300,12 +336,19 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
           if(turns.recover(code)){log('error_recovered',{code});return;}
           const operation=sentEvents.get(e.error?.event_id)||'server';
           const parameter=String(e.error?.param||'').replace(/[^a-zA-Z0-9_.\[\]-]/g,'').slice(0,100);
+          if(!voiceErrorEndsSession(code)){
+            if(operation==='response.create')recoverReply(undefined,code);
+            else setNotice(t('That request could not finish. We’re still connected; you can keep talking.','No se pudo completar esa petición. Seguimos conectados; puedes seguir hablando.'));
+            log('request_error_recovered',{code,operation});return;
+          }
           setError(t('Voice stopped. Please start a new conversation. Error code: ','La voz se detuvo. Inicia otra conversación. Código: ')+code+' · '+operation+(parameter?' · '+parameter:''));end();return;
         }
         if(e.type==='response.done'){
           if(e.response?.status==='failed'){
-            log('response_failed',{responseId:e.response.id,code:e.response.status_details?.error?.code});
-            end();setError(t('Origen could not finish that reply. Start another conversation to reconnect. Your discussion so far will be summarized.','Origen no pudo terminar esa respuesta. Inicia otra conversacion para reconectar. Se resumira lo que conversamos hasta ahora.'));return;
+            const code=String(e.response.status_details?.error?.code||'response_failed');
+            log('response_failed',{responseId:e.response.id,code});
+            if(voiceErrorEndsSession(code)){end();setError(t('The voice session ended. Please reconnect.','La sesión de voz terminó. Vuelve a conectar.'));return;}
+            recoverReply(e.response.id,code);return;
           }
           const hasTools=(e.response?.output||[]).some((item:{type:string})=>item.type==='function_call');
           if(!turns.beginDone(e.response?.id,hasTools,e.response?.status==='cancelled'))return;
@@ -333,13 +376,14 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
                 scopePending.current=true;
                 const nextScope={id:next,confirmed:true};
                 const nextLanguage=spokenLanguage.current;
-                await finishCall(false);setTarget(nextScope);void start(nextScope,nextLanguage,spokenRequest);return;
+                await finishCall(false,true);setTarget(nextScope);void start(nextScope,nextLanguage,spokenRequest,sessionId);return;
               }
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'invalid_target',instruction:'Ask one short spoken clarification. Do not request an on-screen confirmation.'})}});
               continue;
             }
             const researchMode=researchModeForTool(item.name,liveMode.current);
             if(researchMode){
+              let budgetExceeded=false;
               let output:unknown={error:'lookup_failed',instruction:'Explain that current official information could not be verified. Do not invent facts.'};
               log('lookup_start',{callId:item.call_id});
               researchStarted.current=Date.now();setResearching(true);
@@ -347,12 +391,14 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
                 const args=JSON.parse(item.arguments);
                 const lookupLanguage=languageControl.language();
                 if(typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw new Error('invalid_lookup');
-                const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution};
+                const latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'';
+                const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution,forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};
                 let result=cache.get(query);
                 if(result){log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});}
                 else {
+                  if(!researchBudget.take(query)){budgetExceeded=true;throw new Error('research_budget_reached');}
                   startProgress();
-                  const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal:abort.signal});
+                  const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,...(guidance.current.current()?{'X-Origen-Segment':guidance.current.current()!.segmentId}:{})},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal:abort.signal});
                   result=await response.json();
                   if(generation.current!==version)return;
                   if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error('lookup_failed');
@@ -366,7 +412,8 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
               }catch{
                 if(generation.current!==version)return;
                 log('lookup_failure',{callId:item.call_id});
-                setNotice(t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
+                if(budgetExceeded)output={error:'research_budget_reached',instruction:'Do not retry research in this call. Explain the limit briefly and use already verified evidence only when its scope and year match; otherwise offer the official source or counselor as the next step. Keep the conversation open and never invent a policy.'};
+                setNotice(budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
               }finally{stopProgress();}
               if(generation.current!==version)return;
               setResearching(false);
@@ -399,10 +446,13 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
       };
       const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
       resources.current.stopConnection=()=>connection.stop();
-      pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version)connection.change(pc.connectionState);};
+      let connectedRecorded=false;
+      pc.onconnectionstatechange=()=>{log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
+      if(generation.current!==version)return;
+      guidance.current.accept(data?.guidance);
       if(!response.ok)throw new Error(data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
@@ -411,6 +461,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     }catch(err){
       if(generation.current!==version)return;
       const code=err instanceof Error?err.message:'';
+      finalReason.current='failed';void guidance.current.event('voice.start_failed',{phase:'transport'})?.catch(()=>{});
       const messages:Record<string,[string,string]>={
         summary_pending:['Your previous conversation could not be saved yet. Retry saving its summary before reconnecting.','La conversacion anterior aun no se ha guardado. Intenta guardar su resumen antes de reconectar.'],
         authentication_required:['Sign in to Origen before starting a voice conversation.','Inicia sesión en Origen antes de comenzar una conversación de voz.'],
@@ -443,6 +494,7 @@ export function LocalProfileVoice({onSaveProfile,onLanguageChanged,onAccountDraf
     <h3 id={`${mode}-voice-title`}>{mode==='loans'?t('Talk through student loans','Conversemos sobre los préstamos estudiantiles'):mode==='planning'?t('Talk through your plan','Conversemos sobre tu plan'):mode==='admissions'?t('Talk through college applications','Conversemos sobre las solicitudes universitarias'):mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
     <p>{mode==='loans'?t('Ask about loan types, interest, repayment or pausing payments. Origen checks official Federal Student Aid guidance.','Pregunta sobre tipos de préstamos, intereses, pagos o pausas. Origen consulta la información oficial de Federal Student Aid.'):mode==='planning'?t('Talk through course choices, college paths, transfer, degree goals or next steps. Build a plan that fits your stage and interests—in English or Spanish.','Conversa sobre cursos, caminos universitarios, transferencias, metas o próximos pasos. Crea un plan para tu etapa e intereses, en español o inglés.'):mode==='admissions'?t('Ask about UC applications, Cal State Apply, Common App or community college. We can explain a form field, check requirements, or help you understand your next step—in English or Spanish.','Pregunta sobre solicitudes de UC, Cal State Apply, Common App o colegios comunitarios. Podemos explicar una pregunta del formulario, consultar requisitos o ayudarte a entender el siguiente paso, en español o inglés.'):mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Origen to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Origen. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Origen. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
     {!onboarding&&<p className="small-text">{routing?t('AI-generated voice · Starting sends microphone audio and student names to OpenAI. After you confirm whom you mean, their profile context and previous summaries are included. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y los nombres de estudiantes. Después de confirmar de quién hablas, se incluye su contexto y los resúmenes anteriores. Las sesiones terminan a los 10 minutos.'):informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Los cambios del perfil requieren tu revisión. La sesión termina a los 10 minutos.')}</p>}
+    {history.cloud&&<p className="small-text">{t('When enabled, private session details are kept for 90 days to diagnose problems. This adds no stored audio or transcript and does not enroll you in research.','Cuando está habilitado, los detalles privados de la sesión se conservan durante 90 días para diagnosticar problemas. Esto no agrega audio ni transcripciones guardadas y no te inscribe en investigación.')}</p>}
     {state==='live'&&switchGuideMode&&<div className="voice-guide-switch"><span>{t('This page has a different guide: ','Esta página tiene otra guía: ')}{switchGuideLabel}</span><button type="button" className="text-button" disabled={finishing||switchingGuide||researching||activity!=='listening'} onClick={()=>void resources.current.switchGuide?.(switchGuideMode)}>{t('Switch guide','Cambiar guía')}</button></div>}
     <div className="voice-controls">
       {state==='idle'?<button type="button" className="button primary" onClick={()=>onRestart?onRestart():void start()}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>

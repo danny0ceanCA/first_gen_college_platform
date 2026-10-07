@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "performedAt": "2026-10-07T05:10:04.145Z",
+  "status": "passed",
+  "method": "isolated pg-mem synthetic stale snapshot, closure replay twice",
+  "checks": [
+    "stale restore reproduces resurrection risk",
+    "closure receipt blocks closed identity",
+    "private student rows removed",
+    "surviving account preserved",
+    "replay idempotent"
+  ],
+  "limitations": [
+    "Not PostgreSQL backup/PITR evidence",
+    "Only accounts/students/summaries snapshot; no production or phase 2/3 tables",
+    "Linked family and institution conflicts require operator review before reopening traffic",
+    "No measured RPO/RTO or provider identity deletion"
+  ]
+}

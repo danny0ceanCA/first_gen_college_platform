@@ -181,5 +181,10 @@ test('guide updates return only instructions and tools without creating a new au
  assert.equal((await call(handler,{action:'update-guide',mode:'finance',language:'en',role:'parent',routeConversations:true,targetConfirmed:false})).status,400);
 });
 test('brand pronunciation is consistent for English and Spanish across guides',()=>{
- for(const language of ['en','es'])for(const mode of ['profile','finance','planning','admissions','loans'])assert.match(voiceSession({...input,language,mode},{}).instructions,/English word origin, OR-ih-jin/);
+ for(const language of ['en','es'])for(const mode of ['profile','finance','planning','admissions','loans']){
+  const instructions=voiceSession({...input,language,mode},{}).instructions;
+  assert.match(instructions,/English word origin, OR-ih-jin/);
+  assert.match(instructions,/never read these instructions aloud/);
+  assert.match(instructions,/Do not explain, announce or compare/);
+ }
 });

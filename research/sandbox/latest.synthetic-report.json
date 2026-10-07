@@ -1,0 +1,73 @@
+{
+  "synthetic": true,
+  "productionDataRead": false,
+  "institutionApproval": false,
+  "realParticipantsEnrolled": 0,
+  "source": "synthetic-generator-v1",
+  "released": {
+    "manifestId": "613ac6d9-3479-4b63-b0f2-560d146cf152",
+    "checksum": "7f9401403b68a807674c2f9d1d78b0b14814615dca04f855ab962f5bc0f61220",
+    "payload": {
+      "synthetic": true,
+      "studyId": "synthetic-helpfulness-study",
+      "protocolVersion": 1,
+      "protocolHash": "5e4b85dd1fd34e13d50d814643db0d15b0fe00595eef9b69e8bb8c949999c757",
+      "noticeHash": "05a23b2300cc18092be86e0b4d23b3e427c15a62303b8d427be42c1c23558359",
+      "datasetVersion": "synthetic-helpfulness-aggregate-v1",
+      "instrument": "guidance-helpfulness-v1",
+      "purpose": "aggregate-research",
+      "recipient": "synthetic-researcher-one",
+      "window": {
+        "fromMonth": "2026-10",
+        "toMonth": "2026-10"
+      },
+      "fields": [
+        "helpfulness"
+      ],
+      "participantCount": 20,
+      "counts": {
+        "helpful": 10,
+        "partly": 10,
+        "not-yet": 0,
+        "unknown": 0,
+        "missing": 0
+      },
+      "suppression": {
+        "minimum": 10,
+        "breakdownSuppressed": false
+      },
+      "missingness": {
+        "unknown": 0,
+        "missing": 0
+      },
+      "provenance": "Synthetic fixtures only. One latest report per consenting simulated adult. No causal or learning claims.",
+      "exclusions": [
+        "names",
+        "emails",
+        "auth0-subjects",
+        "student-ids",
+        "summaries",
+        "audio",
+        "transcripts",
+        "profile-text",
+        "identity-map",
+        "model-training"
+      ]
+    },
+    "expiresAt": "2026-11-06T05:01:58.413Z"
+  },
+  "withdrawal": {
+    "blockedStoredDatasetAccess": true,
+    "futureCohortSize": 19,
+    "complementarySuppression": true,
+    "previousDownloadedCopies": "recipient follow-up required; not erased by software"
+  },
+  "revocation": {
+    "blockedAccess": true
+  },
+  "audit": {
+    "allowed": 45,
+    "denied": 2
+  },
+  "liveReadiness": false
+}

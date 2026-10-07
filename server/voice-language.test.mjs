@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {voiceLanguageControl,voiceLanguageInstructions,voiceLanguageTools} from '../src/voiceLanguage.mjs';
+import {voiceLanguageControl,voiceLanguageInstructions,voiceLanguageTools,spokenLanguageFromText} from '../src/voiceLanguage.mjs';
 import {voiceSession} from './profile-voice.mjs';
 import {voiceTurns} from '../src/voiceTurns.mjs';
 
@@ -109,4 +109,49 @@ test('closing the call stops pending and queued configuration changes without se
  const {control,events}=harness();const first=control.change('es'),second=control.change('en');
  await tick();control.stop();await assert.rejects(first,/stopped/);await assert.rejects(second,/stopped/);
  assert.equal(events.length,1);
+});
+
+
+test('clear Spanish speech switches automatically while names and English terms do not',()=>{
+ assert.equal(spokenLanguageFromText('Mi hija quiere estudiar medicina y necesito ayuda para la universidad.','en'),'es');
+ assert.equal(spokenLanguageFromText('I need help with my daughter and her college applications.','es'),'en');
+ assert.equal(spokenLanguageFromText('FAFSA','es'),'es');
+ assert.equal(spokenLanguageFromText('Common App','es'),'es');
+ assert.equal(spokenLanguageFromText('Sofia','en'),'en');
+ assert.equal(spokenLanguageFromText('financial aid','es'),'es');
+ assert.equal(spokenLanguageFromText('Mi hija necesita ayuda con financial aid.','en'),'es');
+ assert.equal(spokenLanguageFromText('Please answer in Spanish','en'),'es');
+ assert.equal(spokenLanguageFromText('Responde en ingles por favor','es'),'en');
+ assert.equal(spokenLanguageFromText('Tengo una pregunta pero responde en ingles por favor','es'),'en');
+});
+
+test('transcription cannot trigger an old-language reply while an acknowledged language change is pending',async()=>{
+ const {control,events,ack,languages}=harness();const sent=[];
+ const turns=voiceTurns(event=>sent.push(event));
+ turns.speechStarted('spanish-question');
+ const release=turns.holdReply();
+ const change=control.change(spokenLanguageFromText('Mi hija quiere estudiar medicina.','en'));
+ // Even a transcription deadline or another request cannot flush while language is updating.
+ turns.transcript('spanish-question','Mi hija quiere estudiar medicina.');
+ turns.request();await tick();assert.equal(sent.length,0);
+ ack(0);await change;release();release();
+ assert.deepEqual(languages,['es']);
+ assert.equal(sent.filter(event=>event.type==='response.create').length,1);
+ turns.stop();control.stop();
+});
+
+test('stopping a call during a language update never releases a new response',()=>{
+ const sent=[],turns=voiceTurns(event=>sent.push(event));
+ const release=turns.holdReply();turns.request();turns.stop();release();
+ assert.equal(sent.length,0);
+});
+
+test('language rules require full Spanish replies and translation of the animated registration draft',()=>{
+ const instructions=voiceLanguageInstructions('Profile setup context','es');
+ assert.match(instructions,/EVERY complete sentence/);
+ assert.match(instructions,/Do not alternate English and Spanish sentences/);
+ assert.match(instructions,/immediately defined in Spanish/);
+ assert.match(instructions,/reissue translated descriptive draft fields/);
+ assert.match(instructions,/Preserve personal names/);
+ assert.match(instructions,/Keep the stage field in its canonical schema value/);
 });

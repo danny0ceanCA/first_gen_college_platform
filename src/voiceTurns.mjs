@@ -1,6 +1,6 @@
 // Serialize replies across transcription, interruptions and asynchronous tool calls.
 export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,cancel=clearTimeout,transcriptionTimeout=12000,onMissing=()=>{}}={}) {
-  let active = false, pending = false, tools = 0;
+  let active = false, pending = false, tools = 0, replyHolds = 0;
   let interrupted = false, heardSpeech = false, recoveryUsed = false, resume = false;
   const seen = new Set(), finished = new Set(), awaiting = new Set();
   const timers=new Map();
@@ -9,7 +9,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   const progressResponses = new Set();
   const progressRequests = new Set();
   function flush() {
-    if (!pending || active || progressActive || tools || awaiting.size) return;
+    if (!pending || active || progressActive || tools || replyHolds || awaiting.size) return;
     active = true; pending = false;
     if (resume) {
       resume = false; recoveryUsed = true; onRecovery();
@@ -18,8 +18,13 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   }
   function request() { pending = true; flush(); }
   return {
-    busy(){return !stopped&&Boolean(active||pending||tools||awaiting.size||progressActive);},
+    busy(){return !stopped&&Boolean(active||pending||tools||replyHolds||awaiting.size||progressActive);},
     request,
+    holdReply(){
+      if(stopped)return ()=>{};
+      replyHolds++;let released=false;
+      return ()=>{if(released)return;released=true;replyHolds=Math.max(0,replyHolds-1);if(!stopped)flush();};
+    },
     speechStopped(itemId){
       if(stopped||!awaiting.has(itemId)||timers.has(itemId))return;
       timers.set(itemId,schedule(()=>{timers.delete(itemId);awaiting.delete(itemId);onMissing(itemId);flush();},transcriptionTimeout));
@@ -66,6 +71,14 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
       return true;
     },
     toolsCompleted() { tools = Math.max(0, tools - 1); request(); },
+    failed(responseId, retry = false) {
+      if(stopped || responseId && finished.has(responseId))return false;
+      if(responseId)finished.add(responseId);
+      active=false;resume=false;
+      // Keep a newer user request queued, but never retry permanently on errors.
+      if(retry)pending=true;
+      flush();return true;
+    },
     completed(continueTool = false) {
       active = false;
       if (continueTool) pending = true;

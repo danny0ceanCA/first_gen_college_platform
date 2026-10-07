@@ -1,3 +1,4 @@
+import ProgressPanel from './ProgressPanel';
 import {ExternalLink,GraduationCap,Route,NotebookPen} from 'lucide-react';
 import ProfileVoice from './ProfileVoice';
 import ConversationHistory from './ConversationHistory';
@@ -23,6 +24,7 @@ export default function Planning({profile,role,language,t}:{profile:StudentProfi
    <article><GraduationCap size={21}/><h3>{t('Choose the next few steps','Elige los próximos pasos')}</h3><p>{t('Ask for a short plan for this semester. Conversation summaries keep agreed actions and open questions together.','Pide un plan breve para este semestre. Los resúmenes reúnen las acciones acordadas y preguntas pendientes.')}</p></article>
   </section>
   <section className="planning-resources"><h2>{t('Official sources, close at hand','Fuentes oficiales, a la mano')}</h2><p>{t('A–G approval, high school graduation and college-course transferability are separate checks. Origen verifies the relevant source and year when you ask.','La aprobación A–G, la graduación de preparatoria y la transferibilidad de cursos universitarios son consultas distintas. Origen verifica la fuente y el año correspondientes cuando preguntas.')}</p><div>{resources.map(r=><a href={r.url} target="_blank" rel="noreferrer" key={r.url}><span><strong>{t(r.name,r.es)}</strong><small>{t(r.detail,r.detailEs)}</small></span><ExternalLink size={17}/></a>)}</div></section>
+  <ProgressPanel key={profile.id} studentId={profile.id} language={language} t={t}/>
   <ConversationHistory studentId={profile.id} mode="planning" t={t}/>
  </div>;
 }

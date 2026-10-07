@@ -4,7 +4,7 @@ Internal specification dated October 3, 2026. The user confirmed aggregate-only 
 
 Origen Edu helps families explore education pathways. The proposed university pilot provides a public institution page and engagement totals for that page. Institution content is managed by signed-in representatives, independently reviewed for affiliation and publication, and published as an approved snapshot.
 
-Current source implements registration, draft editing, revision checks, institution memberships, independent reviewer approval and public approved snapshots in `server/institutions.mjs`, `server/migrations/008_institutions.sql` and `src/InstitutionPortal.tsx`. Live deployment and staffing of the review process are unverified. Team invitations and engagement reporting are not implemented.
+Current source implements registration, draft editing, revision checks, institution memberships, independent reviewer approval and public approved snapshots in `server/institutions.mjs`, `server/migrations/008_institutions.sql` and `src/InstitutionPortal.tsx`. Engagement reporting is implemented in migration 009 and the metrics handler: member-scoped previous completed UTC month, counts below 10 withheld, and current plus previous 11 calendar months retained. Live workflow validation and staffing of the review process remain to verify. Team invitations are not implemented.
 
 ## Proposed metrics and access
 
@@ -21,6 +21,8 @@ Families independently use Origen's planning and AI functions. Those functions p
 Institution representatives provide private first name, work email and role information. Institutions may deliberately publish a separate contact email. Public institution content is not necessarily free of personal information; representatives must avoid including student records or confidential content in page fields.
 
 Any future leads, advertising profiles, cross-page tracking, demographics, SSO integration or university-supplied records require an updated data inventory, authorization design and assessment scope.
+
+The October 6 [phase 1 data architecture](../data-architecture/README.md) proposes a separate research boundary. It does not expand this pilot's aggregate-only reporting or enable new collection. A future study requires its own protocol, permission, recipient and review decisions; institution membership alone never grants family-data access.
 
 ## Review boundaries
 

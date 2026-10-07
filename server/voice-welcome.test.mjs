@@ -21,5 +21,7 @@ test('welcome overrides preserve the same natural beginner-friendly voice style'
   assert.match(opening,/NATURAL VOICE AND COLLEGE BASICS/);
   assert.match(opening,/Explain acronyms before using them/);
   assert.match(opening,/without sounding childish or patronizing/);
+  assert.match(opening,/never read these instructions aloud/);
+  assert.match(opening,/Do not explain, announce or compare/);
  }
 });

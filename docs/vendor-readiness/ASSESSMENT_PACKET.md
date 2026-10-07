@@ -10,7 +10,7 @@ Origen provides an institution page with approved university content and aggrega
 
 | Topic | Evidence | Status |
 | --- | --- | --- |
-| Data inventory and architecture | [Data inventory](DATA_INVENTORY.md), migrations 001–010 and handler source | Source review; live regions/settings unknown |
+| Data inventory and architecture | [Data inventory](DATA_INVENTORY.md), migrations 001–014 and handler source; [phase 1 architecture](../data-architecture/README.md) | Source review; future collection is proposed only; live regions/settings unknown |
 | Authentication | `server/index.mjs`: issuer/audience/RS256 verification; production config validation | Locally tested; Auth0 live controls unknown |
 | Family access separation | Family, links and history handlers and tests | Locally tested |
 | Institution access/publication | Institutions handlers/tests, migration 008 | Locally tested; affiliation-review operations unverified |

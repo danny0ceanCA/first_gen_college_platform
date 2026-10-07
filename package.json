@@ -12,7 +12,14 @@
     "start": "node server/index.mjs",
     "db:migrate": "node server/migrate.mjs",
     "check:production": "node server/production-config.mjs",
-    "test": "node --test server/*.test.mjs"
+    "test": "node --test server/*.test.mjs",
+    "eval:contracts": "node server/model-evaluation.mjs contracts",
+    "eval:review": "node server/model-evaluation.mjs review",
+    "eval:compare": "node server/model-evaluation.mjs compare",
+    "research:sandbox": "node research/sandbox/demo.mjs",
+    "ops:readiness": "node ops/readiness.mjs",
+    "ops:rehearse": "node ops/recovery-rehearsal.mjs",
+    "test:ops": "node --test ops/*.test.mjs"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.28.0",

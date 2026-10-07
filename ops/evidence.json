@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "scope": "Phase 6 operations; synthetic research only; no launch authorization",
+  "gates": [
+    {
+      "id": "hosting",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "API health check blank; database external inbound allows everywhere; review and approved remediation pending"
+    },
+    {
+      "id": "provider-retention",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Need Render/Auth0/OpenAI project-specific region, log/backup/data retention and agreements"
+    },
+    {
+      "id": "restore",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Dedicated real PostgreSQL restore exercise pending; synthetic rehearsal is insufficient"
+    },
+    {
+      "id": "deletion-replay",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Synthetic exercise available; independent closure ledger retention and real restored database replay pending"
+    },
+    {
+      "id": "admin-access",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Actual access roster, roles, MFA and emergency access review pending"
+    },
+    {
+      "id": "accessibility",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Public web smoke only; full keyboard/screen-reader/voice/native evaluation pending"
+    },
+    {
+      "id": "security",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Source scan in progress; remediation and reviewer decision pending"
+    },
+    {
+      "id": "incident-ownership",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Named primary and backup responder plus tabletop pending"
+    },
+    {
+      "id": "pilot-commitments",
+      "status": "pending",
+      "owner": null,
+      "approvedBy": null,
+      "checkedAt": null,
+      "expiresAt": null,
+      "evidence": [],
+      "reason": "Sponsor-approved scope, realistic recovery commitments and review pending"
+    }
+  ]
+}

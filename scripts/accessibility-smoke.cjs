@@ -25,7 +25,7 @@ const {chromium}=resolve('playwright');
     results.push({route,width,...report,languageSwitch:'passed',keyboardSkip:'passed'});
    }
   }
-  mkdirSync('artifacts/vendor-readiness',{recursive:true});writeFileSync('artifacts/vendor-readiness/accessibility-smoke.json',JSON.stringify({date:'2026-10-03',method:'Playwright Chromium; synthetic public page; no authenticated staff/voice/native testing',results},null,2));
+  mkdirSync('artifacts/vendor-readiness',{recursive:true});writeFileSync('artifacts/vendor-readiness/accessibility-smoke.json',JSON.stringify({date:new Date().toISOString(),method:'Playwright Chromium; synthetic public page; reduced motion; no authenticated staff/voice/native testing',results},null,2));
   await page.screenshot({path:'artifacts/vendor-readiness/institution-mobile.png',fullPage:true});console.log(JSON.stringify(results));
  }finally{await browser.close();}
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

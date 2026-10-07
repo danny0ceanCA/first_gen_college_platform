@@ -1,6 +1,7 @@
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {allowedRequest} from './origin.mjs';
+import {attachSummarySegments,reconcileSummaryAttribution} from './guidance-history.mjs';
 
 const fail=(status,error)=>Object.assign(new Error(error),{status});
 const identifier=value=>typeof value==='string'&&value.length>0&&value.length<=128;
@@ -33,9 +34,11 @@ export function createHistoryRepository(database){
      // Imports skip summaries for students that were deleted or never belonged to this account.
      const student=item.studentId===null?{id:null}:(await client.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[owner,item.studentId])).rows[0];
      if(!student){if(input.action==='import')continue;throw fail(404,'student_not_found');}
-     const existing=(await client.query('SELECT student_id FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,item.id])).rows[0];
-     if(existing&&existing.student_id!==item.studentId)throw fail(409,'summary_conflict');
+     const existing=(await client.query('SELECT student_id,mode FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,item.id])).rows[0];
+     if(existing&&(existing.student_id!==item.studentId||existing.mode!==item.mode))throw fail(409,'summary_conflict');
      await client.query('INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,sources,conversation_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(account_id,id) DO NOTHING',[owner,item.id,item.studentId,item.mode,item.summary,JSON.stringify(item.sources),item.date]);
+     if(input.action==='save'&&input.attribution)await attachSummarySegments(client,owner,item,input.attribution);
+     if(input.action==='save')await reconcileSummaryAttribution(client,owner,item);
     }
    }
    if(input.action==='delete'){
@@ -61,7 +64,7 @@ export function createHistoryHandler(database){
   if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
   if(!allowedRequest(req))return send(403,{error:'origin_not_allowed'});
   try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2000000)return send(413,{error:'too_large'});}let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
-   if(!['load','delete','clear','import','save'].includes(input?.action)||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='clear'&&(input.studentId===undefined||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode))||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
+   if(!['load','delete','clear','import','save'].includes(input?.action)||input.attribution!==undefined||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='clear'&&(input.studentId===undefined||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode))||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
    if(input.action==='save')input.item=validateMemory(input.item);
    return send(200,await run(req.origenIdentity.sub,input));
   }catch(error){if(![400,403,404,409].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}

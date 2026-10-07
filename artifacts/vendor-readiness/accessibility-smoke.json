@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-03",
-  "method": "Playwright Chromium; synthetic public page; no authenticated staff/voice/native testing",
+  "date": "2026-10-07T05:11:32.084Z",
+  "method": "Playwright Chromium; synthetic public page; reduced motion; no authenticated staff/voice/native testing",
   "results": [
     {
       "route": "#institutions",

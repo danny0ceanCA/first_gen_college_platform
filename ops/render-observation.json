@@ -1,0 +1,38 @@
+{
+  "observedAt": "2026-10-07T05:08:52.970Z",
+  "source": "Render MCP read-only metadata, confirmed workspace",
+  "services": [
+    {
+      "id": "srv-db02or0u01pc738ktekg",
+      "type": "web_service",
+      "region": "oregon",
+      "healthCheckPath": "",
+      "buildCommand": "npm ci",
+      "startCommand": "npm start"
+    },
+    {
+      "id": "srv-db02o8ou01pc738krjb0",
+      "type": "static_site",
+      "region": "global/static location unspecified",
+      "healthCheckPath": null,
+      "buildCommand": "npm ci && npm run build",
+      "startCommand": null
+    }
+  ],
+  "database": {
+    "id": "dpg-db0806hsrm7s73efcupg-a",
+    "region": "oregon",
+    "status": "available",
+    "version": "18",
+    "diskSizeGB": 1,
+    "highAvailabilityEnabled": false,
+    "externalInboundCIDRs": [
+      "0.0.0.0/0"
+    ]
+  },
+  "limitations": [
+    "Metadata only, no query of customer records",
+    "Backup/log retention and MFA not verified",
+    "No provider settings changed"
+  ]
+}

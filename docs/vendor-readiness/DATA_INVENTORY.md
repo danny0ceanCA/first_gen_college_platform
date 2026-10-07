@@ -1,13 +1,13 @@
 # Origen data inventory
 
-Source review: October 3, 2026. Deployment configuration, provider agreements and actual production records have not been inspected. Retention values marked unknown are gaps, not assertions of indefinite provider retention.
+Source inventory updated October 6, 2026, against migrations 001–014 and handler source. This inventory does not verify individual production records, provider agreements or backup settings. Retention values marked unknown are gaps, not assertions of indefinite provider retention. See the [phase 1 architecture](../data-architecture/README.md) for the current dictionary and proposed future collection; that design adds no collection today.
 
 | Data category | Location / recipient | Purpose and access | Lifecycle evidence | Gaps to resolve |
 | --- | --- | --- | --- | --- |
-| Account subject, first name, email | PostgreSQL `origen_accounts`; authenticated API | Account identity/profile; account-scoped queries | `001_family_storage.sql`, `server/family.mjs` | Complete account deletion/export, inactivity policy, region, backup expiry |
+| Account subject, first name, email, role and first voice/welcome timestamps | PostgreSQL `origen_accounts`; authenticated API | Account identity/profile and first-use experience; account-scoped queries | Migrations 001/013/014, `server/family.mjs`, account lifecycle handler | Inactivity policy, issuer mapping, region, backup expiry; first-use timestamps do not prove comprehension |
 | Student name, stage, GPA, school, interests, activities, goals, needs, notes, selected institutions/term | PostgreSQL `origen_students`; browser/mobile copies | Family planning; shared academic fields via explicit account links; private notes/needs remain account-scoped | `server/family.mjs`, `server/account-links.mjs`, `src/FamilyStore.tsx` | Age/guardian rules, free-text sensitivity, device cleanup, retention |
-| Conversation summaries, source links and dates | PostgreSQL `origen_conversation_summaries`; client preview/import storage | Guidance history and bounded voice context | History routes, migrations 001/003/005/006 | Account-wide export/deletion, local backups, linkage semantics |
-| Plans, steps, notes, sources and summary references | PostgreSQL planning tables | Private education planning | `007_planning_records.sql`, `server/plans.mjs` | Retention and full account lifecycle |
+| Conversation summaries, source links and dates | PostgreSQL `origen_conversation_summaries`; client preview/import storage | Guidance history and bounded voice context; profile/finance/admissions/planning/loans topics | History routes, migrations 001/003/005/006/012; eligible account export/deletion implemented | Local backups, explicit session/language/model provenance, approved retention |
+| Plans, steps, notes, sources and summary references | PostgreSQL planning tables | Private education planning | `007_planning_records.sql`, `server/plans.mjs`; eligible account export/deletion implemented | Retention, immutable revision history, external/provider lifecycle |
 | Family links and invitation hashes | PostgreSQL links/invite tables; pending invitation on devices | Family sharing and invitation acceptance | `004_account_links.sql`, `server/account-links.mjs` | Expired invite cleanup, local token expiry/cleanup, account deletion effects |
 | Institution representative subject, name, work email and role | PostgreSQL representative/membership tables | Institution management; private representative metadata | `008_institutions.sql`, `server/institutions.mjs` | Deprovisioning, representative deletion/export, multiple-staff onboarding |
 | Institution draft/public snapshot, contact email, links | PostgreSQL institution table; published content to all visitors | Public page and publication workflow | Public endpoint selects approved snapshot only | Content policy, unpublish/deletion, draft retention |
@@ -19,15 +19,20 @@ Source review: October 3, 2026. Deployment configuration, provider agreements an
 | Request/diagnostic metadata | API stdout/hosting logs; local `.camino-logs` in local diagnostics | Troubleshooting, response timing and safe error codes | `server/api-logging.mjs`, `server/diagnostics.mjs` allowlist; local log rotates by size | Hosting IP/access logs, expiry, support access, time-based retention |
 | Browser/device copies, settings, legacy import backups | localStorage / mobile device storage | Preview, language preferences and migration of existing records | Family/history/planning clients; database phase documentation | Inventory exact keys by account; shared-device exposure; deletion and logout behavior |
 | Database backups | Hosting provider configuration, unverified | Recovery | No restore exercise verified | Region, encryption, expiry, permissions, restore handling and deletion propagation |
-| Engagement metrics | Not implemented; proposed aggregate counters in PostgreSQL | Institution-level views/clicks | `SERVICE_SCOPE.md` proposal only | Final counting/suppression, retention, abuse protections and staff authorization |
+| Engagement metrics | PostgreSQL `origen_institution_metrics`; aggregate counters only | Institution-level accepted page-view/link-click requests; member-scoped reports | Migration 009, metrics handler/tests; previous completed UTC month, counts below 10 withheld; current and previous 11 calendar months retained | Repeat requests/bots may count; live reporting validation and operational evidence still required |
+| Closure receipts and subject locks | PostgreSQL subject-hash tables | Prevent closed-account recreation and coordinate lifecycle writes | Migrations 010/011; hashed receipts/lock keys retained after eligible closure | Pseudonymous retained exceptions, no configured expiry; document purpose and provider/backup deletion separately |
 
 ## Simplified flows
 
 1. Family browser/native client authenticates through Auth0, then calls the API with a token. The API verifies the token and accesses account-scoped PostgreSQL records.
 2. User-requested AI features send selected context to OpenAI. Voice uses WebRTC; summaries can be stored in PostgreSQL. The institution report must not receive that content.
 3. Institution representatives authenticate through the same identity infrastructure but use separate institution tables. Approved snapshots are readable publicly; drafts and representative data are restricted.
-4. Proposed page engagement collection produces only validated aggregate counters for institution reporting. Infrastructure request metadata may still exist outside the application analytics database.
+4. Implemented page engagement collection produces validated aggregate counters for institution reporting. Infrastructure request metadata may still exist outside the application analytics database.
+
+Eligible account export/deletion is implemented in `server/account-lifecycle.mjs`. Active family links and institutional responsibilities can require resolution before closure; Auth0 identity and backup handling are separate. Future research/session tables must extend this lifecycle before collection is enabled.
 
 ## Ownership register
 
 Business owner, security contact, privacy contact and production administrators: assign named people before submitting the packet. For a solo business these can be the same person, with realistic availability and escalation arrangements. Do not invent staff, certifications, policies or assessment results.
+
+Phase 3 additive source: migration 016 stores private academic observations (excludes names/private annotations), plan revisions/transitions, versioned optional service-feedback definitions, and self-reported milestones. Account/student/plan deletion and export cover these records; new histories/reports expire after 90 days. Collection is off by default, no production deployment is claimed, and no institution/research access or verified outcomes are added. See [phase 3](../data-architecture/PHASE_3.md).

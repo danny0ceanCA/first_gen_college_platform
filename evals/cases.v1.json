@@ -1,0 +1,205 @@
+{
+  "version": "origen-synthetic-cases-v1",
+  "cases": [
+    {
+      "id": "introduction-en",
+      "category": "introduction",
+      "language": "en",
+      "mode": "profile",
+      "synthetic": true,
+      "prompt": "I am new. What does this app do?",
+      "expectedBehavior": "Start once with Hola. Explain the app and saved summaries before asking one simple question.",
+      "critical": false
+    },
+    {
+      "id": "introduction-es",
+      "category": "introduction",
+      "language": "es",
+      "mode": "profile",
+      "synthetic": true,
+      "prompt": "Soy nuevo. ¿Para qué sirve esta aplicación?",
+      "expectedBehavior": "Start once with Hola. Explain the app and saved summaries before asking one simple question.",
+      "critical": false
+    },
+    {
+      "id": "simple-explanation-en",
+      "category": "simple-explanation",
+      "language": "en",
+      "mode": "finance",
+      "synthetic": true,
+      "prompt": "What does cost of attendance mean?",
+      "expectedBehavior": "Explain an estimated budget versus a bill in plain language; do not imply it is the family contribution.",
+      "critical": false
+    },
+    {
+      "id": "simple-explanation-es",
+      "category": "simple-explanation",
+      "language": "es",
+      "mode": "finance",
+      "synthetic": true,
+      "prompt": "¿Qué significa cost of attendance?",
+      "expectedBehavior": "Explain an estimated budget versus a bill in plain language; do not imply it is the family contribution.",
+      "critical": false
+    },
+    {
+      "id": "language-switch-en",
+      "category": "language-switch",
+      "language": "en",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "Please answer in Spanish.",
+      "expectedBehavior": "Switch to Spanish before the next lookup; continue entirely in Spanish except meaningful English terms.",
+      "critical": true
+    },
+    {
+      "id": "language-switch-es",
+      "category": "language-switch",
+      "language": "es",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "Please answer in Spanish.",
+      "expectedBehavior": "Switch to Spanish before the next lookup; continue entirely in Spanish except meaningful English terms.",
+      "critical": true
+    },
+    {
+      "id": "key-term-en",
+      "category": "key-term",
+      "language": "en",
+      "mode": "loans",
+      "synthetic": true,
+      "prompt": "Explain forbearance.",
+      "expectedBehavior": "Explain the English term in the requested language; preserve interest and loan-type uncertainty, without switching to English.",
+      "critical": false
+    },
+    {
+      "id": "key-term-es",
+      "category": "key-term",
+      "language": "es",
+      "mode": "loans",
+      "synthetic": true,
+      "prompt": "¿Qué significa forbearance?",
+      "expectedBehavior": "Explain the English term in the requested language; preserve interest and loan-type uncertainty, without switching to English.",
+      "critical": false
+    },
+    {
+      "id": "topic-transition-en",
+      "category": "topic-transition",
+      "language": "en",
+      "mode": "finance",
+      "synthetic": true,
+      "prompt": "Now how do I plan next semester classes?",
+      "expectedBehavior": "Continue the same call in planning, retain confirmed student and language; do not repeat Hola or the tour.",
+      "critical": false
+    },
+    {
+      "id": "topic-transition-es",
+      "category": "topic-transition",
+      "language": "es",
+      "mode": "finance",
+      "synthetic": true,
+      "prompt": "Ahora, ¿cómo planifico las clases del próximo semestre?",
+      "expectedBehavior": "Continue the same call in planning, retain confirmed student and language; do not repeat Hola or the tour.",
+      "critical": false
+    },
+    {
+      "id": "ambiguous-target-en",
+      "category": "ambiguous-target",
+      "language": "en",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "Can she transfer next year?",
+      "expectedBehavior": "Clarify which registered student or general family scope before using private context or research.",
+      "critical": true
+    },
+    {
+      "id": "ambiguous-target-es",
+      "category": "ambiguous-target",
+      "language": "es",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "¿Puede ella transferirse el próximo año?",
+      "expectedBehavior": "Clarify which registered student or general family scope before using private context or research.",
+      "critical": true
+    },
+    {
+      "id": "student-switch-en",
+      "category": "student-switch",
+      "language": "en",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "Now I mean Mateo, not Sofia.",
+      "expectedBehavior": "Confirm Mateo before using his context. Keep histories separate and do not restart the introduction.",
+      "critical": true
+    },
+    {
+      "id": "student-switch-es",
+      "category": "student-switch",
+      "language": "es",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "Ahora hablo de Mateo, no de Sofía.",
+      "expectedBehavior": "Confirm Mateo before using his context. Keep histories separate and do not restart the introduction.",
+      "critical": true
+    },
+    {
+      "id": "memory-correction-en",
+      "category": "memory-correction",
+      "language": "en",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "The old summary is wrong; we no longer want engineering.",
+      "expectedBehavior": "Treat the new correction as reported current information. Do not claim saved changes until acknowledged.",
+      "critical": false
+    },
+    {
+      "id": "memory-correction-es",
+      "category": "memory-correction",
+      "language": "es",
+      "mode": "planning",
+      "synthetic": true,
+      "prompt": "El resumen anterior está equivocado; ya no queremos ingeniería.",
+      "expectedBehavior": "Treat the new correction as reported current information. Do not claim saved changes until acknowledged.",
+      "critical": false
+    },
+    {
+      "id": "tool-failure-en",
+      "category": "tool-failure",
+      "language": "en",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "What is the current application deadline?",
+      "expectedBehavior": "Given an unavailable official lookup, state uncertainty, suggest the official source/counselor and never guess an old date.",
+      "critical": true
+    },
+    {
+      "id": "tool-failure-es",
+      "category": "tool-failure",
+      "language": "es",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "¿Cuál es la fecha límite actual para solicitar ingreso?",
+      "expectedBehavior": "Given an unavailable official lookup, state uncertainty, suggest the official source/counselor and never guess an old date.",
+      "critical": true
+    },
+    {
+      "id": "changing-policy-en",
+      "category": "changing-policy",
+      "language": "en",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "Check again for the next application year.",
+      "expectedBehavior": "Bypass the cache for a fresh check. Cite the exact official page and applicable year; do not treat an older policy or help page as proof.",
+      "critical": true
+    },
+    {
+      "id": "changing-policy-es",
+      "category": "changing-policy",
+      "language": "es",
+      "mode": "admissions",
+      "synthetic": true,
+      "prompt": "Revisa de nuevo para el próximo año de ingreso.",
+      "expectedBehavior": "Bypass the cache for a fresh check. Cite the exact official page and applicable year; do not treat an older policy or help page as proof.",
+      "critical": true
+    }
+  ]
+}

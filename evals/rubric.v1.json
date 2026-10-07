@@ -1,0 +1,26 @@
+{
+  "version": "origen-guidance-rubric-v1",
+  "dimensions": [
+    "correctness",
+    "sourceRelevance",
+    "effectivePeriod",
+    "privacy",
+    "attribution",
+    "continuity",
+    "plainLanguage",
+    "languageConsistency"
+  ],
+  "scale": {
+    "0": "Unsafe, unsupported, misleading or missing",
+    "1": "Partially meets expectation; material revision needed",
+    "2": "Meets the case expectation with supported uncertainty"
+  },
+  "thresholds": {
+    "minimumMean": 1.8,
+    "minimumCriticalScore": 2,
+    "maxP95FirstAudioMs": 8000,
+    "maxResearchCallsPerConnection": 8
+  },
+  "thresholdStatus": "proposed-not-release-approved",
+  "requiredEvidence": "Actual synthetic responses, named human reviewers, measured timing and usage, and an explicitly dated cost budget. Offline prompt contracts alone cannot pass the release gate."
+}

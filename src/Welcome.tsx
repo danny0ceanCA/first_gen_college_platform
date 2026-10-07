@@ -1,4 +1,5 @@
 import WelcomeWriting from './WelcomeWriting';
+import {welcomeStageLabel} from './welcomeLanguage.mjs';
 import {onboardingRecovery,validOnboardingDraft} from './onboardingRecovery.mjs';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState} from 'react';
@@ -28,7 +29,7 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
  useEffect(()=>{if(step!=='voice')return;const frame=requestAnimationFrame(()=>{const node=story.current;if(node)node.scrollTo({top:node.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});return()=>cancelAnimationFrame(frame);},[name,role,draft,step]);
  useEffect(()=>{if(!completed.current)setStorageError(!recovery.write({name,step,role,draft}));},[name,step,role,draft,recovery]);
  useEffect(()=>{const warn=(event:BeforeUnloadEvent)=>{if(!completed.current&&(name.trim()||draft.name.trim()||active)){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[name,draft,active]);
- const finish=async(student?:StudentProfile,keepOpen=false)=>{
+ const finish=async(student?:StudentProfile)=>{
   if(saveLock.current)return false;
   const current=liveValues.current;
   if(!current.role||!current.name.trim()||(student&&!student.name.trim())){setError(t('Tell Origen your name, whether you are a student or parent, and the student’s name to save.','Dile a Origen tu nombre, si eres estudiante o madre/padre, y el nombre del estudiante para guardar.'));return false;}
@@ -36,9 +37,9 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
   const firstName=current.name.trim(),accountRole=current.role;
   const snapshot=student?{...student,name:student.name.trim()}:undefined;
   try{
-   if(await complete(firstName,accountRole,snapshot,{keepOpen})){
+   if(await complete(firstName,accountRole,snapshot,{keepOpen:false})){
     setSavedSnapshot(JSON.stringify({name:firstName,role:accountRole,draft:snapshot}));
-    if(!keepOpen){completed.current=true;recovery.clear();onRole?.(accountRole);}
+    completed.current=true;recovery.clear();onRole?.(accountRole);
     return true;
    }
    setError(t('Could not save. Your details are still here. Please try again.','No se pudo guardar. Tus datos siguen aquí. Intenta de nuevo.'));return false;
@@ -49,7 +50,7 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
   const current=liveValues.current;
   if(!current.name.trim()||!current.role||!current.draft.name.trim())return {status:'missing_details' as const,instruction:'Ask only for the missing account-holder name, student/parent role or student name, then save when supplied. No form or extra confirmation is needed.'};
   if(saveLock.current)return {status:'save_in_progress' as const,instruction:'A save is already in progress. Continue naturally; do not claim it succeeded yet.'};
-  return await finish(current.draft,true)?{status:'saved' as const,instruction:'The profile was saved successfully. Briefly tell the user in their current language, then continue the same conversation. Further changes need another save.'}:{status:'save_failed' as const,instruction:'The profile could not be saved. Tell the user and offer to retry. Keep talking without claiming a successful save.'};
+  return await finish(current.draft)?{status:'saved' as const,instruction:'The profile was saved successfully. Onboarding is complete and the app is opening the home page.'}:{status:'save_failed' as const,instruction:'The profile could not be saved. Tell the user and offer to retry. Keep talking without claiming a successful save.'};
  };
  const latestVoiceSave=useRef(saveByVoice);latestVoiceSave.current=saveByVoice;
  const saved=savedSnapshot===JSON.stringify({name:name.trim(),role,draft:{...draft,name:draft.name.trim()}});
@@ -59,10 +60,10 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
   <div className="welcome-live-notes" aria-label={t('Profile draft','Borrador del perfil')}>
    {name.trim()&&<section className="welcome-live-note"><h2>{t('About you','Sobre ti')}</h2><WelcomeWriting text={name.trim()+(role?' · '+(role==='student'?t('Student','Estudiante'):t('Parent or guardian','Madre, padre o tutor')):'')}/></section>}
    {!Object.entries(draft).some(([field,value])=>field!=='id'&&field!=='color'&&typeof value==='string'&&value.trim())&&<p className="welcome-empty-note">{role==='student'?t('Your story starts with whatever you’d like to share.','Tu historia empieza con lo que quieras compartir.'):t('Tell Origen a little about your student.','Cuéntale a Origen un poco sobre tu estudiante.')}</p>}
-   {([['name','Name','Nombre'],['stage','Education stage','Etapa educativa'],['school','School or college','Escuela o colegio'],['interest','Interests','Intereses'],['goals','Goals','Metas'],['activities','Activities and responsibilities','Actividades y responsabilidades'],['institutions','Colleges of interest','Universidades de interés'],['entryTerm','Intended entry term','Período de ingreso'],['needs','Practical needs','Necesidades prácticas'],['notes','Notes','Notas'],['gpa','Reported GPA','GPA reportado']] as const).filter(([field])=>draft[field]?.trim()).map(([field,en,es])=><section className="welcome-live-note" key={field}><h2>{t(en,es)}</h2><WelcomeWriting text={draft[field]||''}/></section>)}
+   {([['name','Name','Nombre'],['stage','Education stage','Etapa educativa'],['school','School or college','Escuela o colegio'],['interest','Interests','Intereses'],['goals','Goals','Metas'],['activities','Activities and responsibilities','Actividades y responsabilidades'],['institutions','Colleges of interest','Universidades de interés'],['entryTerm','Intended entry term','Período de ingreso'],['needs','Practical needs','Necesidades prácticas'],['notes','Notes','Notas'],['gpa','Reported GPA','GPA reportado']] as const).filter(([field])=>draft[field]?.trim()).map(([field,en,es])=><section className="welcome-live-note" key={field}><h2>{t(en,es)}</h2><WelcomeWriting text={field==='stage'?welcomeStageLabel(draft[field]||'',language):draft[field]||''}/></section>)}
   </div><p className="welcome-draft-status" role="status">{saved?t('Profile saved.','Perfil guardado.'):active?t('Drafting your profile · You can correct a detail out loud.','Creando tu perfil · Puedes corregir un dato en voz alta.'):draft.name.trim()?t('Your draft is ready to review. You can edit details before saving.','Tu borrador está listo para revisar. Puedes editarlo antes de guardar.'):t('Start a conversation to bring your profile to life.','Inicia una conversación para darle vida a tu perfil.')}</p></section>
   <footer className="welcome-conversation-dock"><ProfileVoice onSaveProfile={()=>latestVoiceSave.current()} onLanguageChanged={setLanguage} onboarding replayWelcome={!cloud} recoveryKey={`origen.onboarding.voice.${cloud?user?.sub:'preview'}.${draft.id}`} profile={draft} language={language} role={role||'parent'} t={t} onActive={setActive} onAccountDraft={updateAccount} onDraft={updateDraft} apply={updateDraft}/>
-   <div className="welcome-conversation-actions"><button className="text-button" disabled={active||saving} onClick={()=>setStep('manual')}>{t('Edit details','Editar datos')}</button><button className="button primary" disabled={saving} onClick={()=>void finish(liveValues.current.draft,active)}>{saving?t('Saving…','Guardando…'):t('Save profile','Guardar perfil')}</button></div>
+   <div className="welcome-conversation-actions"><button className="text-button" disabled={active||saving} onClick={()=>setStep('manual')}>{t('Edit details','Editar datos')}</button><button className="button primary" disabled={saving} onClick={()=>void finish(liveValues.current.draft)}>{saving?t('Saving…','Guardando…'):t('Save profile','Guardar perfil')}</button></div>
    {storageError&&<p role="alert">{t('Your draft could not be backed up. Keep this page open until you save.','No se pudo conservar el borrador. Mantén esta página abierta hasta guardar.')}</p>}{error&&<p role="alert">{error}</p>}
   </footer></main>;
  return <main className={`application-panel welcome-panel${step==='manual'?' welcome-profile-step':''}`}>
@@ -81,7 +82,7 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
  <p>{t('Leave anything you don’t know blank. Your student details are saved when you choose Save profile.','Deja en blanco lo que no sabes. Los datos del estudiante se guardan cuando seleccionas Guardar perfil.')}</p>
  <fieldset disabled={active||saving} style={{border:0,padding:0}}><form id="welcome-profile-form" onSubmit={e=>{e.preventDefault();if(!active&&draft.name.trim())finish({...draft,name:draft.name.trim()});}}>
  <label className="field">{role==='student'?t('Your name','Tu nombre'):t('Student name','Nombre del estudiante')}<input required maxLength={100} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
- <label className="field">{t('Education stage','Etapa educativa')}<select value={draft.stage} onChange={e=>setDraft({...draft,stage:e.target.value})}><option value="">{t('Not sure yet','No lo sé todavía')}</option>{['9th grade','10th grade','11th grade','12th grade','Community college','College'].map(s=><option key={s} value={s}>{t(s,s==='Community college'?'Colegio comunitario':s==='College'?'Universidad':`${s.match(/\d+/)?.[0]}.º grado`)}</option>)}</select></label>
+ <label className="field">{t('Education stage','Etapa educativa')}<select value={draft.stage} onChange={e=>setDraft({...draft,stage:e.target.value})}><option value="">{t('Not sure yet','No lo sé todavía')}</option>{['9th grade','10th grade','11th grade','12th grade','Community college','College'].map(s=><option key={s} value={s}>{welcomeStageLabel(s,language)}</option>)}</select></label>
  {([['interest','Interests','Intereses'],['activities','Activities and responsibilities','Actividades y responsabilidades'],['goals','Goals','Metas'],['school','School or college','Escuela o colegio'],['institutions','Colleges of interest','Universidades de interés'],['entryTerm','Intended entry term','Período de ingreso'],['needs','Practical needs','Necesidades prácticas'],['notes','Notes and who shared them','Notas y quién las compartió'],['gpa','Reported GPA (optional)','GPA reportado (opcional)']] as const).map(([field,en,es])=><label className="field" key={field}>{t(en,es)}<textarea maxLength={field==='gpa'?30:2000} value={draft[field]||''} onChange={e=>setDraft({...draft,[field]:e.target.value})}/></label>)}
  <p className="small-text muted">{cloud?t('Saved to your account after you confirm.','Se guarda en tu cuenta después de confirmar.'):t('Saved on this device’s browser.','Se guarda en el navegador de este dispositivo.')}</p>
  <div className="card-actions"><button type="button" className="button outline" disabled={active||saving} onClick={()=>setStep('voice')}>{t('Use voice instead','Usar voz')}</button></div>

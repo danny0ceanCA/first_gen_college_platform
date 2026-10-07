@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "approval": "synthetic-simulation",
+  "studyId": "synthetic-helpfulness-study",
+  "version": 1,
+  "question": "Can synthetic helpfulness reports be released only under current, scoped permission?",
+  "population": "Simulated adults sharing only their own synthetic service-feedback response.",
+  "adultSelfOnly": true,
+  "modelTraining": false,
+  "fields": ["helpfulness"],
+  "permittedUses": ["aggregate-research"],
+  "instrument": "guidance-helpfulness-v1",
+  "minCellSize": 10,
+  "retentionDays": 30,
+  "recipients": ["synthetic-researcher-one"],
+  "window": {"fromMonth": "2026-10", "toMonth": "2026-10"},
+  "notice": {
+    "en": "This is a synthetic demonstration, not enrollment in a real study. A simulated adult may choose to share their own fictional helpfulness response with the named simulated researcher for aggregate research only. Participation is optional and declining does not change ordinary service access. No audio, transcripts, summaries or family profiles are shared. This is not permission for model training. Withdrawal blocks future releases and access to affected stored demonstration datasets. Previously downloaded copies cannot be erased by the app; a real study must define recipient follow-up and retention.",
+    "es": "Esta es una demostración con datos ficticios, no una inscripción en un estudio real. Un adulto simulado puede elegir compartir su propia respuesta ficticia sobre la utilidad del servicio con el investigador simulado indicado, solo para investigación agregada. Participar es opcional y rechazarlo no cambia el acceso al servicio. No se comparten audio, transcripciones, resúmenes ni perfiles familiares. Esto no autoriza el entrenamiento de modelos. Retirarse bloquea entregas futuras y el acceso a los conjuntos guardados afectados. La aplicación no puede borrar copias ya descargadas; un estudio real debe definir el seguimiento con los destinatarios y la conservación."
+  },
+  "withdrawal": "Invalidate affected stored simulation datasets; exclude withdrawn participants from future releases; document that downloaded copies require recipient follow-up. No real notifications are sent.",
+  "reviewReference": "Synthetic exercise only. No institutional or research approval is claimed."
+}

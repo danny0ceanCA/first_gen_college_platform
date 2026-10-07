@@ -4,6 +4,8 @@ Prepared October 3, 2026. User reports no existing campus contact. No outreach h
 
 ## Immediate objective
 
+October 6 architecture supplement: [phase 1 design and research roadmap](../data-architecture/README.md). A research/evaluation partnership is a separate potential offering requiring a defined protocol and permissions. It does not change the aggregate-only institution-page scope below or imply any approval.
+
 Identify a department interested in an institution information page and aggregate engagement reports, then confirm the security/accessibility/procurement review scope with that department. Do not request a generic campus-wide vendor certification or claim Origen already satisfies every requirement.
 
 ## Scope brief for an initial conversation

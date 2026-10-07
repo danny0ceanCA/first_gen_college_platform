@@ -1,3 +1,4 @@
+import {progressEnabled,recordPlanRevision} from './progress-history.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -20,7 +21,7 @@ export function validatePlan(input){
  if(new Set(out.plan.steps.map(s=>s.id)).size!==out.plan.steps.length)throw fail(400,'invalid_plan');
  return out;
 }
-export function createPlanRepository(database){return async(subject,input)=>{
+export function createPlanRepository(database,env=process.env){return async(subject,input)=>{
  if(!database)throw fail(503,'plans_unavailable');
  const c=await database.connect();
  try{
@@ -40,6 +41,7 @@ export function createPlanRepository(database){return async(subject,input)=>{
    if(input.action==='delete')await c.query('DELETE FROM origen_plans WHERE account_id=$1 AND id=$2',[owner,planId]);
    else {
     const p=input.plan;await requireStudent(p.studentId);
+    const previous=progressEnabled(env)&&current?(await c.query('SELECT id,status FROM origen_plan_steps WHERE account_id=$1 AND plan_id=$2',[owner,planId])).rows:[];
     // A plan's target is immutable: moving it could mix two students' actions/history.
     if(current&&current.student_id!==p.studentId)throw fail(409,'plan_target_mismatch');
     for(const summaryId of p.summaryIds){const summary=(await c.query('SELECT student_id FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,summaryId])).rows[0];if(!summary||summary.student_id!==p.studentId)throw fail(400,'summary_target_mismatch');}
@@ -52,6 +54,7 @@ export function createPlanRepository(database){return async(subject,input)=>{
      for(const [n,source] of s.sources.entries())await c.query('INSERT INTO origen_plan_sources(account_id,plan_id,step_id,position,title,url) VALUES($1,$2,$3,$4,$5,$6)',[owner,planId,s.id,n,source.title,source.url]);
     }
     for(const summaryId of p.summaryIds)await c.query('INSERT INTO origen_plan_conversations(account_id,plan_id,summary_id) VALUES($1,$2,$3)',[owner,planId,summaryId]);
+    if(progressEnabled(env))await recordPlanRevision(c,owner,planId,current?current.version+1:1,p,previous);
    }
   }
   const rows=(await c.query(`SELECT * FROM origen_plans WHERE account_id=$1${input.studentId===null?' AND student_id IS NULL':input.studentId!==undefined?' AND student_id=$2':''} ORDER BY updated_at DESC,id LIMIT 100`,input.studentId!==undefined&&input.studentId!==null?[owner,input.studentId]:[owner])).rows;
@@ -67,7 +70,7 @@ export function createPlanRepository(database){return async(subject,input)=>{
   await c.query('COMMIT');return {plans};
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 };}
-export function createPlanHandler(database){const run=createPlanRepository(database);return async(req,res,next)=>{
+export function createPlanHandler(database,env=process.env){const run=createPlanRepository(database,env);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/plans')return next();
  const send=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
  if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
