@@ -1,0 +1,115 @@
+- generic [ref=f1e2]:
+  - link "Skip to content / Saltar al contenido" [ref=f1e3] [cursor=pointer]:
+    - /url: "#origen-main-content"
+  - generic [ref=f1e4]:
+    - banner [ref=f1e5]:
+      - link "Origen" [ref=f1e6] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=f1e7]: ○
+        - text: origen
+        - generic [ref=f1e8]: .
+      - navigation "Navigation" [ref=f1e9]:
+        - link "Register your institution" [ref=f1e10] [cursor=pointer]:
+          - /url: "#institutions"
+        - link "For educators" [ref=f1e11] [cursor=pointer]:
+          - /url: "#educators"
+        - link "About Origen" [ref=f1e12] [cursor=pointer]:
+          - /url: "#about"
+        - link "Data privacy" [ref=f1e13] [cursor=pointer]:
+          - /url: "#privacy"
+        - link "How it works" [ref=f1e14] [cursor=pointer]:
+          - /url: "#how"
+        - button "Ver en español" [ref=f1e15] [cursor=pointer]: Español
+        - button "Sign in" [ref=f1e16] [cursor=pointer]
+    - main [ref=f1e20]:
+      - generic [ref=f1e21]:
+        - generic [ref=f1e22]:
+          - generic [ref=f1e23]: COLLEGE GUIDANCE FOR STUDENTS AND FAMILIES
+          - heading [level=1] [ref=f1e25]:
+            - text: Their next chapter.
+            - emphasis [ref=f1e26]: Your journey, too.
+          - paragraph [ref=f1e27]: Origen helps students and families understand college—from exploring their options and navigating applications to making sense of financial aid and costs—with guidance in English and Spanish.
+          - generic [ref=f1e28]:
+            - button "Get started" [ref=f1e29] [cursor=pointer]
+            - button "Explore without signing in" [ref=f1e32] [cursor=pointer]
+          - paragraph [ref=f1e36]: Preview a sample family without an account. Sign in for AI guidance and account features.
+          - generic [ref=f1e37]: For students. For families. En español también.
+        - generic [ref=f1e38]:
+          - img "Two edges of a winding path each draw their own pueblo village and mountains" [ref=f1e39]
+          - generic [ref=f1e107]:
+            - generic [ref=f1e108]: MANY PATHS. ONE COMMUNITY.
+            - generic [ref=f1e109]:
+              - button "Pause" [ref=f1e110] [cursor=pointer]
+              - button "Replay ↗" [ref=f1e111] [cursor=pointer]
+      - region [ref=f1e112]:
+        - generic [ref=f1e113]: COLLEGE QUESTIONS, CLEARER NEXT STEPS
+        - heading "A place to begin. Room to ask." [level=2] [ref=f1e114]
+        - generic [ref=f1e115]:
+          - article [ref=f1e116]:
+            - heading "Understand college costs" [level=3] [ref=f1e117]
+            - paragraph [ref=f1e118]: Learn how FAFSA, financial aid offers, and college costs fit together.
+          - article [ref=f1e119]:
+            - heading "Navigate applications" [level=3] [ref=f1e120]
+            - paragraph [ref=f1e121]: Find official application portals for UC, Cal State, Common App, and California community colleges.
+          - article [ref=f1e122]:
+            - heading "Ask in your language" [level=3] [ref=f1e123]
+            - paragraph [ref=f1e124]: Explore explanations in English and Spanish, with AI guidance to help you understand unfamiliar steps.
+      - region [ref=f1e125]:
+        - generic [ref=f1e126]: HOW IT WORKS
+        - heading "Start with one question." [level=2] [ref=f1e127]
+        - list [ref=f1e128]:
+          - listitem [ref=f1e129]:
+            - heading "Explore a topic" [level=3] [ref=f1e130]
+            - paragraph [ref=f1e131]: Begin with college costs, financial aid, or applications. Preview the experience with a sample family.
+          - listitem [ref=f1e132]:
+            - heading "Ask your questions" [level=3] [ref=f1e133]
+            - paragraph [ref=f1e134]: Sign in to use AI guidance. Ask in English or Spanish and revisit anything unfamiliar.
+          - listitem [ref=f1e135]:
+            - heading "Follow official resources" [level=3] [ref=f1e136]
+            - paragraph [ref=f1e137]: Use source links to keep researching and confirm requirements with the college or aid provider.
+      - generic [ref=f1e139]:
+        - generic [ref=f1e140]: ONE THREAD. A WORLD OF POSSIBILITY.
+        - generic:
+          - generic:
+            - img "A family embraces their child, who steps forward"
+          - generic:
+            - generic: 01 / A PATH FORWARD
+            - heading "Their next chapter. Your support, every step." [level=2]
+            - paragraph: College may be new to your family. Keep your student’s interests and goals close, and find a place to begin together.
+      - region [ref=f1e141]:
+        - generic [ref=f1e142]: FOR EDUCATORS AND OUTREACH TEAMS
+        - heading "A resource worth passing along." [level=2] [ref=f1e143]
+        - paragraph [ref=f1e144]: Supporting students and families through outreach or enrollment? Explore Origen and share it as an additional resource for understanding college costs, financial aid, and applications.
+        - paragraph [ref=f1e145]: Origen complements the support your team provides. Students and families should confirm requirements and deadlines with the college or official aid provider.
+        - generic [ref=f1e146]:
+          - button "Copy description" [ref=f1e147] [cursor=pointer]
+          - button "Copy link" [ref=f1e148] [cursor=pointer]
+        - paragraph [ref=f1e149]: Origen helps students and families understand college, financial aid, and applications with guidance in English and Spanish. Explore it at https://origenedu.ai
+        - status
+        - link "origenedu.ai" [ref=f1e150] [cursor=pointer]:
+          - /url: https://origenedu.ai
+      - region [ref=f1e154]:
+        - generic [ref=f1e155]: CONTACT
+        - heading "Get in touch with Origen." [level=2] [ref=f1e156]
+        - paragraph [ref=f1e157]: Origen Edu is operated by Blueprint Holdings LLC.
+        - paragraph [ref=f1e158]: Questions about Origen, sharing it with your community, or your information? Email us. Please keep student records and sensitive details out of your message.
+        - link "daniel@origenedu.ai" [ref=f1e159] [cursor=pointer]:
+          - /url: mailto:daniel@origenedu.ai
+      - generic [ref=f1e160]:
+        - heading "You belong in this conversation." [level=2] [ref=f1e161]
+        - button "Let’s get started" [ref=f1e162] [cursor=pointer]
+    - contentinfo [ref=f1e165]:
+      - strong [ref=f1e166]: origen.
+      - link "Register your institution" [ref=f1e167] [cursor=pointer]:
+        - /url: "#institutions"
+      - link "Contact" [ref=f1e168] [cursor=pointer]:
+        - /url: "#contact"
+      - link "About Origen" [ref=f1e169] [cursor=pointer]:
+        - /url: "#about"
+      - link "Data privacy" [ref=f1e170] [cursor=pointer]:
+        - /url: "#privacy"
+      - generic [ref=f1e171]:
+        - text: Origen Edu is operated by Blueprint Holdings LLC.
+        - link "daniel@origenedu.ai" [ref=f1e172] [cursor=pointer]:
+          - /url: mailto:daniel@origenedu.ai
+      - button "Explore the preview" [ref=f1e173] [cursor=pointer]

@@ -15,7 +15,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: AUTH0_DOMAIN
-        value: dev-0dghf4l675sx6lf3.us.auth0.com
+        value: origenedu.us.auth0.com
       - key: AUTH0_AUDIENCE
         sync: false
       - key: ALLOWED_ORIGINS
@@ -33,8 +33,8 @@ services:
       - key: VITE_API_URL
         sync: false
       - key: VITE_AUTH0_DOMAIN
-        value: dev-0dghf4l675sx6lf3.us.auth0.com
+        value: origenedu.us.auth0.com
       - key: VITE_AUTH0_CLIENT_ID
-        value: KGR1dIEl4G9ZskORHBkvAc1tXaDoCtTt
+        value: SvPMuyj1thhZoowDmsvqsQ05qzEntXmd
       - key: VITE_AUTH0_AUDIENCE
         sync: false

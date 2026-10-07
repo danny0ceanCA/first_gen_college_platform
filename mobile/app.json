@@ -34,7 +34,7 @@
       [
         "react-native-auth0",
         {
-          "domain": "dev-0dghf4l675sx6lf3.us.auth0.com",
+          "domain": "origenedu.us.auth0.com",
           "customScheme": "origen"
         }
       ]

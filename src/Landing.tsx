@@ -10,7 +10,7 @@ export default function Landing({enter}:{enter:()=>void}){
  const [copyStatus,setCopyStatus]=useState('');
  const copy=async(value:string)=>{try{await navigator.clipboard.writeText(value);setCopyStatus(t('Copied. Ready to share.','Copiado. Listo para compartir.'));}catch{setCopyStatus(t('Copy was unavailable. Select the description or link below to copy it.','No se pudo copiar. Selecciona la descripción o el enlace para copiarlo.'));}};
  const [signinError,setSigninError]=useState(false);
- const signIn=()=>{setSigninError(false);void loginWithRedirect({authorizationParams:{connection:'sms',ui_locales:es?'es':'en'}}).catch(()=>setSigninError(true));};
+ const signIn=()=>{setSigninError(false);void loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{ui_locales:es?'es':'en'}}).catch(()=>setSigninError(true));};
  const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
  const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false),heroVisible=useRef(true);
  const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
@@ -50,7 +50,7 @@ export default function Landing({enter}:{enter:()=>void}){
     total=step.finish;previous=stroke.end;return step;
    });
    const pen={distance:0};
-   animations.push(animate(pen,{distance:[0,total],duration:total/0.22,delay:index*220,ease:'linear',
+   animations.push(animate(pen,{distance:[0,total],duration:9000,delay:index*120,ease:'linear',
     onUpdate:()=>{
      const active=steps.find(step=>pen.distance<=step.finish)||steps[steps.length-1];
      steps.forEach(step=>{step.path.style.strokeDashoffset=String(step.length-Math.max(0,Math.min(step.length,pen.distance-step.ink)));});
@@ -89,7 +89,7 @@ export default function Landing({enter}:{enter:()=>void}){
     arms:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-arm'))};
   });
   const village={time:0};
-  animations.push(animate(village,{time:[0,1],duration:64000,delay:30000,loop:true,ease:'linear',onUpdate:()=>{
+  animations.push(animate(village,{time:[0,1],duration:64000,delay:9300,loop:true,ease:'linear',onUpdate:()=>{
    residents.forEach(({visitor,index,order,arrival,departure,arrivalLength,departureLength,legs,arms})=>{
     const phase=(village.time+order/residents.length)%1;
     const travel=Math.min(1,phase/0.30),totalLength=arrivalLength+departureLength;
@@ -113,7 +113,7 @@ export default function Landing({enter}:{enter:()=>void}){
    const outward=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!,homeward=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
    const outwardLength=outward.getTotalLength(),homewardLength=homeward.getTotalLength();
    const legs=Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),wander={time:0};
-   animations.push(animate(wander,{time:[0,1],duration:burro?38000:27000,delay:burro?30000:33000,loop:true,ease:'linear',onUpdate:()=>{
+   animations.push(animate(wander,{time:[0,1],duration:burro?38000:27000,delay:burro?9300:11000,loop:true,ease:'linear',onUpdate:()=>{
     const back=wander.time>=0.5,progress=back?(wander.time-0.5)*2:wander.time*2;
     const route=back?homeward:outward,length=back?homewardLength:outwardLength,distance=length*progress;
     const point=route.getPointAtLength(distance),next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
@@ -262,6 +262,6 @@ export default function Landing({enter}:{enter:()=>void}){
    <section className="landing-closing"><h2>{t('You belong in this conversation.','Tu voz tiene un lugar aquí.')}</h2><button onClick={()=>setLogin(true)}>{t('Let’s get started','Empecemos')}<ArrowRight size={18}/></button></section>
   </main>
   <footer className="landing-footer"><strong>origen.</strong><a href="#institutions">{t('Register your institution','Registra tu institución')}</a>{publicContactEmail&&<a href="#contact">{t('Contact','Contacto')}</a>}<a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><span>{t('Origen Edu is operated by Blueprint Holdings LLC.','Origen Edu es operado por Blueprint Holdings LLC.')}{publicContactEmail&&<> <a href={`mailto:${publicContactEmail}`}>{publicContactEmail}</a></>}</span><button onClick={enter}>{t('Explore the preview','Explorar la vista previa')}<ArrowUpRight size={14}/></button></footer>
-  <dialog ref={dialog} className="landing-dialog" aria-labelledby="landing-signin-title" onCancel={()=>setLogin(false)}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>setLogin(false)}><X size={22}/></button><span className="landing-eyebrow">{t('WELCOME TO ORIGEN','BIENVENIDO A ORIGEN')}</span><h2 id="landing-signin-title">{t('Your path starts here.','Tu camino empieza aquí.')}</h2><p>{t('One simple step to create an account or come back to your family.','Un paso sencillo para crear una cuenta o volver a tu familia.')}</p><p>{t('Continue to secure phone sign-in. Enter your number there and verify the code sent by text.','Continúa al acceso seguro por teléfono. Ingresa tu número allí y verifica el código enviado por texto.')}</p><button className="landing-primary" disabled={isLoading} onClick={signIn}>{t('Continue with phone number','Continuar con número de teléfono')}<ArrowRight size={18}/></button>{(signinError||error)&&<p role="alert">{t('Could not complete sign-in. Please try again.','No se pudo completar el acceso. Intenta de nuevo.')}</p>}<p>{t('The preview uses a sample family. AI guidance requires sign-in.','La vista previa usa una familia de ejemplo. La orientación de IA requiere iniciar sesión.')}</p><button className="landing-preview-link" onClick={enter}>{t('Explore Origen without signing in','Explorar Origen sin iniciar sesión')}<ArrowRight size={17}/></button></dialog>
+  <dialog ref={dialog} className="landing-dialog" aria-labelledby="landing-signin-title" onCancel={()=>setLogin(false)}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>setLogin(false)}><X size={22}/></button><span className="landing-eyebrow">{t('WELCOME TO ORIGEN','BIENVENIDO A ORIGEN')}</span><h2 id="landing-signin-title">{t('Your path starts here.','Tu camino empieza aquí.')}</h2><p>{t('One simple step to create an account or come back to your family.','Un paso sencillo para crear una cuenta o volver a tu familia.')}</p><p>{t('Continue with Google, or use an email address from any provider and an Origen password. New here? Choose Sign up on the next screen.','Continúa con Google o usa un correo de cualquier proveedor y una contraseña de Origen. ¿Es tu primera vez? Elige Registrarse en la siguiente pantalla.')}</p><button className="landing-primary" disabled={isLoading} onClick={signIn}>{t('Sign in or create an account','Iniciar sesión o crear una cuenta')}<ArrowRight size={18}/></button>{(signinError||error)&&<p role="alert">{t('Could not complete sign-in. Please try again.','No se pudo completar el acceso. Intenta de nuevo.')}</p>}<p>{t('Google sign-in shares your basic profile and email address. Origen does not request access to your inbox.','El acceso con Google comparte tu perfil básico y correo electrónico. Origen no solicita acceso a tu bandeja de entrada.')}</p><button className="landing-preview-link" onClick={enter}>{t('Explore Origen without signing in','Explorar Origen sin iniciar sesión')}<ArrowRight size={17}/></button></dialog>
  </div>;
 }

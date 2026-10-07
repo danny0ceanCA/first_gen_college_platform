@@ -45,8 +45,8 @@ Deploy backend before frontend. Startup applies `002_local_imports.sql`. No Rend
 Native sign-in requires a development/EAS build, not Expo Go. The existing Auth0 config plugin and `origen` scheme are used. Add both URLs to the **Origen Mobile** Auth0 application's Allowed Callback URLs and Allowed Logout URLs:
 
 ```text
-origen://dev-0dghf4l675sx6lf3.us.auth0.com/ios/com.danny0ceanca.origen/callback
-origen://dev-0dghf4l675sx6lf3.us.auth0.com/android/com.danny0ceanca.origen/callback
+origen://origenedu.us.auth0.com/ios/com.danny0ceanca.origen/callback
+origen://origenedu.us.auth0.com/android/com.danny0ceanca.origen/callback
 ```
 
 Use the same passwordless SMS connection on the web and native clients so a person has the same Auth0 subject. Enable refresh token rotation and offline access for the API/native client if persistent native sessions are desired. Auth0 manages native tokens through its credentials manager; tokens are not stored in AsyncStorage.
