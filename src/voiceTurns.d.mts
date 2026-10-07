@@ -2,6 +2,7 @@ export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>voi
   request:()=>void;
   holdReply:()=>()=>void;
   busy:()=>boolean;
+  playback:(event:{type:string;response_id?:string})=>void;
   speechStopped:(itemId:string)=>void;
   stop:()=>void;
   progress:(sentence:string)=>boolean;

@@ -112,3 +112,18 @@
  .story-chapter{padding-left:48px;padding-right:48px;box-sizing:border-box}
  .story-caption{left:52px}
 }
+
+/* A narrower desktop tile leaves a generous botanical border on both sides. */
+@media(min-width:1100px){
+ .story-stage{--story-border-space:clamp(144px,12vw,210px)}
+ .story-stage::before,.story-thread{left:var(--story-border-space);right:var(--story-border-space)}
+ .story-chapter{width:calc(100% - 2 * var(--story-border-space));max-width:1240px;padding-left:32px;padding-right:32px}
+ .story-caption{left:calc(var(--story-border-space) + 32px)}
+}
+
+@media(min-width:1100px){
+ .story-stage{--story-tile-width:min(1224px,calc(100% - 2 * var(--story-border-space)))}
+ .story-stage::before,.story-thread{width:var(--story-tile-width);left:50%;right:auto;transform:translateX(-50%)}
+ .story-chapter{width:var(--story-tile-width);max-width:1224px}
+ .story-caption{left:calc((100% - var(--story-tile-width))/2 + 32px)}
+}

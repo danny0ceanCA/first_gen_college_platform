@@ -5,6 +5,7 @@ import {onboardingRecovery} from './onboardingRecovery.mjs';
 import {FamilyProvider,useFamily} from './FamilyStore';
 import {ConversationHistoryProvider} from './ConversationHistory';
 import Welcome from './Welcome';
+import {type StudentProfile} from './planning';
 
 type Init={subject:string;firstName:string;role?:'parent'|'student';language:'en'|'es'};
 type NativeWindow=Window&{ReactNativeWebView?:{postMessage:(message:string)=>void};origenNativeReply?:(message:{id:string;value?:unknown;error?:boolean})=>void};
@@ -38,12 +39,12 @@ export default function NativeWelcome(){
 }
 function NativeStory({init}:{init:Init}){
  const family=useFamily();const [language,setLanguage]=useState(init.language);const loaded=useRef(false);
- if(!family.loading&&!family.error)loaded.current=true;
- if(family.loading||(family.error&&!loaded.current))return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
- return <Welcome onRole={()=>send({id:crypto.randomUUID(),type:'closed'})} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{
-  if(!await family.completeOnboarding(firstName,role,student))return false;
+ const completion=useRef<{firstName:string;role:'parent'|'student';student?:StudentProfile;language:'en'|'es'}|undefined>(undefined);
+ const [finishError,setFinishError]=useState(false);
+ const close=async()=>{try{
   // Finish deferred onboarding memory before the native host closes this screen.
-  if(family.cloud&&student&&!options?.keepOpen){
+  const student=completion.current?.student;
+  if(family.cloud&&student){
    const recovery=onboardingRecovery(localStorage,`origen.onboarding-summaries.${init.subject}`);
    for(const [id,record] of Object.entries(recovery.read<Record<string,{studentId:string}>>({}))){
     if(record.studentId!==student.id)continue;
@@ -52,6 +53,11 @@ function NativeStory({init}:{init:Init}){
     recovery.removeEntry(id);
    }
   }
-  await request('complete',{firstName,role,student,language});return true;
- }}/>;
+await request('complete',completion.current);send({id:crypto.randomUUID(),type:'closed'});}catch{setFinishError(true);}};
+ if(!family.loading&&!family.error)loaded.current=true;
+ if(family.loading||(family.error&&!loaded.current))return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
+ return <>{finishError&&<p role="alert">Could not open home. / No se pudo abrir el inicio. <button onClick={()=>void close()}>Retry / Reintentar</button></p>}<Welcome onComplete={()=>void close()} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{
+  if(!await family.completeOnboarding(firstName,role,student))return false;
+  completion.current={firstName,role,student,language};if(!options?.keepOpen)await close();return true;
+ }}/></>;
 }

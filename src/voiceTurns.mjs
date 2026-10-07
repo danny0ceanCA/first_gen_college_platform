@@ -4,12 +4,13 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   let interrupted = false, heardSpeech = false, recoveryUsed = false, resume = false;
   const seen = new Set(), finished = new Set(), awaiting = new Set();
   const timers=new Map();
+  const playing=new Set();
   let stopped=false;
   let progressActive = false, progressId = '', progressEvent = '';
   const progressResponses = new Set();
   const progressRequests = new Set();
   function flush() {
-    if (!pending || active || progressActive || tools || replyHolds || awaiting.size) return;
+    if (stopped || !pending || active || progressActive || tools || replyHolds || awaiting.size || playing.size) return;
     active = true; pending = false;
     if (resume) {
       resume = false; recoveryUsed = true; onRecovery();
@@ -18,7 +19,14 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   }
   function request() { pending = true; flush(); }
   return {
-    busy(){return !stopped&&Boolean(active||pending||tools||replyHolds||awaiting.size||progressActive);},
+    busy(){return !stopped&&Boolean(active||pending||tools||replyHolds||awaiting.size||progressActive||playing.size);},
+    playback(event){
+      if(event.type==='output_audio_buffer.started')playing.add(event.response_id||'audio');
+      if(event.type==='output_audio_buffer.stopped'||event.type==='output_audio_buffer.cleared'){
+        if(event.response_id)playing.delete(event.response_id);else playing.clear();
+        flush();
+      }
+    },
     request,
     holdReply(){
       if(stopped)return ()=>{};
@@ -29,9 +37,9 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
       if(stopped||!awaiting.has(itemId)||timers.has(itemId))return;
       timers.set(itemId,schedule(()=>{timers.delete(itemId);awaiting.delete(itemId);onMissing(itemId);flush();},transcriptionTimeout));
     },
-    stop(){stopped=true;for(const timer of timers.values())cancel(timer);timers.clear();awaiting.clear();},
+    stop(){stopped=true;for(const timer of timers.values())cancel(timer);timers.clear();awaiting.clear();playing.clear();},
     progress(sentence) {
-      if (!tools || active || progressActive || awaiting.size) return false;
+      if (stopped || !tools || active || progressActive || awaiting.size || playing.size) return false;
       progressActive = true;
       progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress'},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Say exactly this brief status update and nothing else: ${sentence}`}}) || '';
       if (progressEvent) progressRequests.add(progressEvent);
