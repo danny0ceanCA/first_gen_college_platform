@@ -29,7 +29,7 @@ function Bud({x,y,rotation=0}:{x:number;y:number;rotation?:number}){
  </g>;
 }
 export default function StoryFlora(){
- return <div className="story-flora" aria-hidden="true"><svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
+ return <div className="story-flora" aria-hidden="true"><svg className="floral-frame floral-frame-left" viewBox="-40 0 270 830" preserveAspectRatio="xMidYMid meet" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
   <g className="floral-spray floral-spray-left">
    <path className="floral-stroke floral-stem" d="M-25 735 C90 660 15 557 104 490 C198 418 19 346 86 247 C124 190 99 128 64 69"/>
    <path className="floral-stroke" d="M86 247 C33 231 10 200 17 167 C57 177 85 208 86 247 M84 251 Q45 200 24 178 M99 283 C130 266 158 268 180 289 C158 315 121 315 99 283 M105 285 Q141 292 170 289 M73 359 C29 360 -1 332 -2 303 C35 306 60 328 73 359 M67 352 L8 312 M107 475 C144 425 176 439 202 414 C209 461 164 491 107 475 M116 471 Q165 450 193 426 M52 575 C13 563 5 532 9 507 C41 520 55 544 52 575 M49 565 L16 520 M44 630 C84 593 117 610 141 589 C140 636 96 654 44 630 M53 629 Q100 625 130 600"/>
@@ -41,6 +41,7 @@ export default function StoryFlora(){
    <path className="floral-stroke floral-engraving" d="M74 230 Q62 219 54 217 M67 214 Q57 204 45 201 M56 200 Q44 190 35 188 M40 549 Q31 540 25 538 M73 630 Q90 633 101 627 M87 621 Q99 621 110 615"/>
    <Flower x={65} y={113} size={1.32}/><Flower x={99} y={473} size={.72} petals={16}/>
   </g>
+  </svg><svg className="floral-frame floral-frame-right" viewBox="1000 0 280 830" preserveAspectRatio="xMidYMid meet" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
   <g className="floral-spray floral-spray-right">
    <path className="floral-stroke floral-stem" d="M1230 85 C1100 151 1205 270 1131 349 C1069 415 1191 516 1120 618 C1095 654 1107 703 1160 794"/>
    <path className="floral-stroke" d="M1149 216 C1095 206 1088 166 1058 147 C1066 199 1100 230 1149 216 M1139 212 Q1092 189 1068 157 M1137 337 C1175 315 1196 278 1183 249 C1150 266 1137 300 1137 337 M1142 326 L1178 263 M1118 421 C1076 391 1042 401 1029 374 C1018 423 1069 452 1118 421 M1106 420 Q1061 413 1038 387 M1151 540 C1196 507 1197 477 1211 461 C1223 511 1194 541 1151 540 M1164 533 L1209 476 M1106 653 C1058 635 1032 658 1009 641 C1026 687 1072 685 1106 653 M1095 657 L1023 650"/>

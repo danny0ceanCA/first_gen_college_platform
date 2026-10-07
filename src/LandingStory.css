@@ -46,7 +46,7 @@
 
 /* Fine botanical embroidery frames the story without crossing the reading area. */
 .story-flora{position:absolute;inset:0;pointer-events:none;color:#f4eee4;opacity:.22;overflow:hidden}.story-flora svg{display:block;width:100%;height:100%}.story-flora .floral-stroke{vector-effect:non-scaling-stroke}.story-flora .floral-stem{stroke-width:1.5}.story-flora .floral-inner{opacity:.7}.story-flora .floral-heart{fill:currentColor;stroke:none;opacity:.5}
-@media(max-width:760px){.story-flora{opacity:.16}.story-flora .floral-spray-right{transform:translateX(-385px)}.story-flora .floral-spray-left{transform:translateX(385px)}}
+@media(max-width:760px){.story-flora{opacity:.16}}
 @media(prefers-reduced-motion:reduce){.story-flora{display:none}}
 
 /* Botanicals grow behind an inset terracotta tile, emerging into the ivory surround. */
@@ -63,8 +63,6 @@
 @media(min-width:761px){
  .story-stage{overflow:visible}
  .story-flora{inset:0 -24px;opacity:.66}
- .story-flora .floral-spray-left{transform:translateX(-36px)}
- .story-flora .floral-spray-right{transform:translateX(36px)}
 }
 @media(min-width:1100px){
  .story-stage::before,.story-thread{left:72px;right:72px}
@@ -82,3 +80,35 @@
 .story-flora .floral-inner{opacity:.95}
 
 .story-flora .floral-engraving{stroke-width:.5;opacity:.62}.story-flora .floral-seed-sprig{opacity:.85}
+
+/* Independent portrait frames preserve complete petals on wide, short displays. */
+.story-flora .floral-frame{position:absolute;top:0;bottom:0;width:240px;height:100%;overflow:visible}
+.story-flora .floral-frame-left{left:0}
+.story-flora .floral-frame-right{right:0;width:250px}
+@media(max-width:760px){.story-flora .floral-frame{width:160px}.story-flora .floral-frame-right{width:166px}}
+
+/* Give the desktop story the full viewport while keeping its copy readable. */
+@media(min-width:761px){
+ .landing .landing-story{width:calc(100vw - 32px);margin-left:calc(50% - 50vw + 16px)}
+ .story-flora{inset:0}
+ .story-stage::before,.story-thread{left:96px;right:96px}
+ .story-chapter{max-width:1320px;margin-inline:auto;width:100%;box-sizing:border-box;padding-left:8%;padding-right:8%}
+ .story-caption{left:120px}
+}
+@media(min-width:1100px){.story-stage::before,.story-thread{left:112px;right:112px}.story-caption{left:144px}}
+
+/* Show more of each bloom outside the tile, with a compact phone border. */
+@media(min-width:761px){
+ .story-flora .floral-frame-left{left:-24px}
+ .story-flora .floral-frame-right{right:-32px}
+}
+@media(max-width:760px){
+ .landing .landing-story{width:calc(100vw - 16px);margin-left:calc(50% - 50vw + 8px)}
+ .story-flora{inset:0;opacity:.58}
+ .story-flora .floral-frame{width:100px}
+ .story-flora .floral-frame-left{left:0}
+ .story-flora .floral-frame-right{right:0;width:104px}
+ .story-stage::before,.story-thread{left:38px;right:38px}
+ .story-chapter{padding-left:48px;padding-right:48px;box-sizing:border-box}
+ .story-caption{left:52px}
+}
