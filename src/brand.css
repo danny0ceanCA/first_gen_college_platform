@@ -3,7 +3,7 @@
 :root{--brand-ivory:#f4eee4;--brand-ink:#2f343b;--brand-clay:#a4513c;--brand-clay-dark:#813e2e;--brand-muted:#756b63;--brand-border:#e4d7ca;--green:var(--brand-clay);--dark:var(--brand-clay-dark);--muted:var(--brand-muted);--line:var(--brand-border);--lime:#f0dfd0;color:var(--brand-ink);background:var(--brand-ivory)}
 .landing{background:var(--brand-ivory);color:var(--brand-ink)}
 .landing .landing-logo,.app-shell .brand{color:var(--brand-clay)}
-.landing .landing-logo .landing-mark,.app-shell .brand-symbol{color:var(--brand-ink)}
+.landing .landing-logo .landing-mark,.app-shell .brand-symbol{color:var(--brand-clay)}
 .landing .landing-logo>span:last-child{color:var(--brand-clay)}
 .landing .landing-nav,.landing .landing-resource{border-color:var(--brand-border)}
 .landing .landing-copy h1 em{color:var(--brand-clay)}
@@ -13,7 +13,8 @@
 .landing .landing-primary:hover{background:var(--brand-clay-dark);border-color:var(--brand-clay-dark)}
 .landing .landing-login{color:var(--brand-clay);border-color:var(--brand-clay)}
 .landing .landing-language{background:#ead9c8;color:var(--brand-ink)}
-.landing .pueblo-scene,.landing .hero-sky,.landing .ambient-lines{color:var(--brand-ink)}
+.landing .pueblo-scene,.landing .hero-sky,.landing .ambient-lines{color:var(--brand-clay)}
+.landing .village-visitor{color:var(--brand-clay-dark);stroke:currentColor;stroke-width:1.35}
 .landing .scene-caption,.landing .scene-caption button{color:#625b55}
 .landing .landscape-sky,.landing .drawing-tip{color:var(--brand-clay);filter:none}
 .landing .landing-hero+.landing-resource{background:var(--brand-clay);color:var(--brand-ivory);padding:36px;border-radius:16px}
@@ -23,7 +24,7 @@
 .landing .landing-footer strong{color:var(--brand-clay)}
 .landing .landing-information-main>h1,.landing .landing-nav a[aria-current="page"]{color:var(--brand-ink)}
 .landing .landing-nav a[aria-current="page"]{text-decoration-color:var(--brand-clay)}
-.landing .landing-story{background:var(--brand-clay);color:var(--brand-ivory);border-radius:16px}
+.landing .landing-story{background:transparent;color:var(--brand-ivory);border-radius:16px}
 .landing-story .story-art,.landing-story .story-copy .landing-eyebrow{color:var(--brand-ivory)}
 .landing-story .story-copy p{color:#fff0e0}
 .landing-story .story-thread svg{stroke:var(--brand-ivory)}

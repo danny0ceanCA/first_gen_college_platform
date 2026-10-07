@@ -43,3 +43,42 @@
 .story-chapter{will-change:opacity}
 @media(max-width:760px){.story-stage{contain:paint}.story-thread .thread-light{filter:none}}
 @media(prefers-reduced-motion:reduce){.story-nib,.thread-light{display:none}.story-chapter{will-change:auto}}
+
+/* Fine botanical embroidery frames the story without crossing the reading area. */
+.story-flora{position:absolute;inset:0;pointer-events:none;color:#f4eee4;opacity:.22;overflow:hidden}.story-flora svg{display:block;width:100%;height:100%}.story-flora .floral-stroke{vector-effect:non-scaling-stroke}.story-flora .floral-stem{stroke-width:1.5}.story-flora .floral-inner{opacity:.7}.story-flora .floral-heart{fill:currentColor;stroke:none;opacity:.5}
+@media(max-width:760px){.story-flora{opacity:.16}.story-flora .floral-spray-right{transform:translateX(-385px)}.story-flora .floral-spray-left{transform:translateX(385px)}}
+@media(prefers-reduced-motion:reduce){.story-flora{display:none}}
+
+/* Botanicals grow behind an inset terracotta tile, emerging into the ivory surround. */
+.story-stage{border:0;isolation:isolate}
+.story-stage::before{content:'';position:absolute;inset:28px 52px;background:var(--brand-clay,#a4513c);border-radius:22px;box-shadow:0 14px 42px #a4513c16,0 0 22px #a4513c0d;z-index:1;pointer-events:none}
+.story-flora{color:var(--brand-clay,#a4513c);opacity:.5;z-index:0}
+.story-thread{z-index:2;inset:28px 52px;overflow:hidden;border-radius:22px}
+.story-chapter{z-index:3;padding-left:6%;padding-right:6%;gap:5%}
+.story-caption{z-index:3;left:9%;top:9%}
+@media(max-width:760px){.story-stage::before{inset:24px 10px;border-radius:18px}.story-flora{opacity:.4}.story-thread{inset:24px 10px;border-radius:18px}.story-chapter{padding-left:26px;padding-right:26px;gap:12px}.story-caption{top:6%;left:28px;font-size:6px}}
+@media(prefers-reduced-motion:reduce){.story-stage::before{inset:0}.story-chapter{padding-top:50px;padding-bottom:50px}}
+
+/* Let desktop blooms emerge beyond the tile instead of clipping at its container. */
+@media(min-width:761px){
+ .story-stage{overflow:visible}
+ .story-flora{inset:0 -24px;opacity:.66}
+ .story-flora .floral-spray-left{transform:translateX(-36px)}
+ .story-flora .floral-spray-right{transform:translateX(36px)}
+}
+@media(min-width:1100px){
+ .story-stage::before,.story-thread{left:72px;right:72px}
+ .story-chapter{padding-left:8%;padding-right:8%}
+ .story-caption{left:11%}
+ .story-flora{inset:0 -40px}
+}
+
+/* Engraved petal folds and seed centers add detail without heavier outlines. */
+.story-flora .floral-backing{fill:var(--brand-ivory,#f4eee4);stroke:none}
+.story-flora .floral-petal{fill:var(--brand-ivory,#f4eee4);stroke-width:1}
+.story-flora .floral-filigree{stroke-width:.55;opacity:.65}
+.story-flora .floral-tendril{stroke-width:.75;opacity:.8}
+.story-flora .floral-seed{stroke-width:1.7}
+.story-flora .floral-inner{opacity:.95}
+
+.story-flora .floral-engraving{stroke-width:.5;opacity:.62}.story-flora .floral-seed-sprig{opacity:.85}
