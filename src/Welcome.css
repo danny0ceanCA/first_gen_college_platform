@@ -41,3 +41,6 @@
 .welcome-conversation .profile-voice>.small-text{margin-bottom:8px;font-size:10px;line-height:1.45}
 @media(max-width:600px){.welcome-conversation{padding:14px 20px 0}.welcome-story{padding:26px 0 20px}.welcome-live-notes{gap:26px}.welcome-conversation .voice-activity{width:auto}.welcome-conversation .voice-controls{flex-wrap:nowrap}.welcome-conversation .voice-controls .button{padding:10px}.welcome-story-intro{font-size:14px}.welcome-conversation-header .button{min-height:40px}}
 @media(prefers-reduced-motion:reduce){.welcome-ink-letter{transform:none!important;filter:none!important;opacity:1!important}.welcome-ink-line{transform:none!important}}
+
+.welcome-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.welcome-header-actions .button{min-height:44px}.welcome-logout{white-space:nowrap}
+@media(max-width:600px){.welcome-conversation-header{gap:12px}.welcome-wordmark{font-size:28px}.welcome-header-actions{gap:8px}.welcome-header-actions .button{padding:10px 12px}}
