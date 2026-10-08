@@ -29,6 +29,7 @@
 
 .story-rider{transform-origin:200px 280px}
 .story-art{will-change:auto}
+.story-stage .story-art svg,.story-flora .floral-frame{transform:translateZ(0);backface-visibility:hidden}
 @media(max-width:760px){.story-stage{transform:translateZ(0);backface-visibility:hidden}.story-art{will-change:auto;transform:none!important}.landing-story{overflow-anchor:none}}
 
 @media(max-width:760px){.story-thread{opacity:.38}.story-thread svg{stroke-width:1.2}.story-thread .thread-light{stroke-width:1.8}}

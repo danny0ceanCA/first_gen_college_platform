@@ -24,8 +24,16 @@ export default function LandingStory({t}:{t:(en:string,es:string)=>string}){
    });
    original.style.stroke='none';
   });
-  const nibs=sections.map(()=>document.createElementNS('http://www.w3.org/2000/svg','path'));
-  nibs.forEach(p=>{p.setAttribute('class','story-nib');p.setAttribute('fill','none');});
+  // Keep pen layers in their SVG groups. Reparenting a pen while scrolling invalidates
+  // the drawing tree; a short dash follows the same contour without geometry reads.
+  const nibs=new Map<Element,SVGPathElement>();
+  fragments.forEach(path=>{const parent=path.parentElement!;if(nibs.has(parent))return;
+   const nib=document.createElementNS('http://www.w3.org/2000/svg','path');
+   nib.setAttribute('class','story-nib');nib.setAttribute('fill','none');nib.style.opacity='0';
+   parent.append(nib);nibs.set(parent,nib);
+  });
+  const activeNibs: (SVGPathElement|undefined)[]=sections.map(()=>undefined);
+  const activeStrokes: (SVGPathElement|undefined)[]=sections.map(()=>undefined);
   const strokeData=sections.map(section=>{
    // Keep authored layer order, but draw each independent contour with the same pen.
    const paths=fragments.filter(path=>section.contains(path));
@@ -75,9 +83,9 @@ export default function LandingStory({t}:{t:(en:string,es:string)=>string}){
    });
   };
   measureBridges();let bridgeChapter=-1;
-  const update=(time=performance.now())=>{frame=0;if(disposed)return;const elapsed=lastFrame?Math.min(64,time-lastFrame):16.67;lastFrame=time;const progress=Math.max(0,Math.min(1,(window.scrollY-storyTop)/Math.max(1,travel)));const target=progress*3.95;if(displayPosition===target)return;displayPosition=displayPosition===undefined?target:displayPosition+(target-displayPosition)*(1-Math.exp(-elapsed/(mobile?65:45)));if(Math.abs(target-displayPosition)<.0005)displayPosition=target;const position=displayPosition;const floraTime=Math.min(1,(position+.15)/3.5)*floraDuration;const current=Math.min(3,Math.floor(position+.15));
+  const update=(time=performance.now())=>{frame=0;if(disposed)return;const elapsed=lastFrame?Math.min(32,time-lastFrame):16.67;lastFrame=time;const progress=Math.max(0,Math.min(1,(window.scrollY-storyTop)/Math.max(1,travel)));const target=progress*3.95;if(displayPosition===target)return;displayPosition=displayPosition===undefined?target:displayPosition+(target-displayPosition)*(1-Math.exp(-elapsed/110));if(Math.abs(target-displayPosition)<.0005)displayPosition=target;const position=displayPosition;const floraTime=Math.min(1,(position+.15)/3.5)*floraDuration;const current=Math.min(3,Math.floor(position+.04));
    floraData.forEach(stroke=>{const p=Math.max(0,Math.min(1,(floraTime-stroke.delay)/1400));const offset=Number((stroke.length*(1+Math.cos(Math.PI*p))/2).toFixed(3));if(offset!==stroke.offset){stroke.path.style.strokeDashoffset=String(offset);stroke.offset=offset;}});
-   sections.forEach((section,i)=>{const local=Math.max(0,Math.min(1,position-i));const fadeIn=i===0?1:Math.max(0,Math.min(1,(position-i+.20)/.18));const fadeOut=i===3?1:Math.max(0,Math.min(1,(i+.98-position)/.26));const opacity=Number((fadeIn*fadeOut).toFixed(3));const active=opacity>.001;
+   sections.forEach((section,i)=>{const local=Math.max(0,Math.min(1,position-i));const fadeIn=i===0?1:Math.max(0,Math.min(1,(position-i+.04)/.12));const fadeOut=i===3?1:Math.max(0,Math.min(1,(i+.96-position)/.16));const opacity=Number((fadeIn*fadeOut).toFixed(3));const active=opacity>.001;
     if(chapterOpacity[i]!==opacity){section.classList.toggle('story-visible',active);section.style.opacity=String(opacity);section.style.visibility=active?'visible':'hidden';chapterOpacity[i]=opacity;}
     const hidden=String(i!==current);if(section.getAttribute('aria-hidden')!==hidden)section.setAttribute('aria-hidden',hidden);
     // The thread arrives first, then lends its single pen to the illustration.
@@ -90,12 +98,12 @@ export default function LandingStory({t}:{t:(en:string,es:string)=>string}){
      });
      drawnPositions[i]=inkTime;
      const stroke=steps.find(s=>distance>=s.begin&&distance<s.end);
-     const nib=nibs[i];nib.style.opacity=stroke&&distance>=stroke.ink&&inkTime>0?'1':'0';
-     if(stroke){
-      const at=Math.max(0,distance-stroke.ink);
-      const a=stroke.path.getPointAtLength(Math.max(0,at-5)),b=stroke.path.getPointAtLength(at);
-      nib.setAttribute('d',`M${a.x} ${a.y} L${b.x} ${b.y}`);
-      if(stroke.path.nextSibling!==nib)stroke.path.after(nib);
+     const drawing=stroke&&distance>=stroke.ink&&inkTime>0?stroke:undefined;
+     const nib=drawing?nibs.get(drawing.path.parentElement!):undefined;
+     if(activeNibs[i]!==nib){if(activeNibs[i])activeNibs[i]!.style.opacity='0';if(nib)nib.style.opacity='1';activeNibs[i]=nib;}
+     if(drawing&&nib){
+      if(activeStrokes[i]!==drawing.path){nib.setAttribute('d',drawing.path.getAttribute('d')!);nib.style.strokeDasharray=`5 ${drawing.length+5}`;activeStrokes[i]=drawing.path;}
+      nib.style.strokeDashoffset=String(5-Math.max(0,distance-drawing.ink));
      }
     }
    });
