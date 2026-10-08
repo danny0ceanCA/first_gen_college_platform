@@ -1,5 +1,5 @@
 {
-  "version": "origen-synthetic-cases-v1",
+  "version": "origen-synthetic-cases-v1.1",
   "cases": [
     {
       "id": "introduction-en",
@@ -8,7 +8,7 @@
       "mode": "profile",
       "synthetic": true,
       "prompt": "I am new. What does this app do?",
-      "expectedBehavior": "Start once with Hola. Explain the app and saved summaries before asking one simple question.",
+      "expectedBehavior": "Start once with Hola. Collect profile details first, one simple question at a time. After a successful save, continue on home and explain features, saved summaries, and the bottom Talk bar.",
       "critical": false
     },
     {
@@ -18,7 +18,7 @@
       "mode": "profile",
       "synthetic": true,
       "prompt": "Soy nuevo. ¿Para qué sirve esta aplicación?",
-      "expectedBehavior": "Start once with Hola. Explain the app and saved summaries before asking one simple question.",
+      "expectedBehavior": "Start once with Hola. Collect profile details first, one simple question at a time. After a successful save, continue on home and explain features, saved summaries, and the bottom Talk bar.",
       "critical": false
     },
     {

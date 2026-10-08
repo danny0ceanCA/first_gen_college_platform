@@ -1,18 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {onboardingWelcome} from '../src/voiceWelcome.mjs';
-test('onboarding opening explicitly explains Origen before requesting student details in either language',()=>{
- const en=onboardingWelcome('en'),es=onboardingWelcome('es');
- for(const text of [en,es]){assert.match(text,/first response only/);assert.match(text,/Start with Hola/);assert.match(text,/BEFORE asking for student details/);assert.match(text,/Do not use profile tools/);}
- for(const section of ['Family home','Paying for college','Ready to apply for college','Planning'])assert.ok(en.includes(section));
- for(const section of ['Mi familia','Pagar la universidad','Listos para solicitar ingreso','Planificación'])assert.ok(es.includes(section));
- assert.ok(en.indexOf('Planning')<en.indexOf('What should I call'));
- assert.ok(es.indexOf('Planificación')<es.indexOf('Cómo se llama'));
+import {onboardingWelcome,homeVoiceIntroduction} from '../src/voiceWelcome.mjs';
+test('onboarding collects profile before introducing features in either language',()=>{
+ for(const language of ['en','es']){
+  const opening=onboardingWelcome(language,{canSaveProfile:true});
+  assert.match(opening,/focus on profile setup/);
+  assert.match(opening,/before the profile is saved/);
+  assert.match(opening,/Start with Hola/);
+  assert.doesNotMatch(opening,/Family home|Mi familia|Paying for college|Planificación/);
+  const home=homeVoiceIntroduction(language);
+  assert.match(home,/home page is now open/);
+  assert.match(home,/SAME conversation without Hola/);
+  assert.match(home,language==='en'?/Talk button on the bar at the bottom/:/botón Hablar en la barra de abajo/);
+  assert.match(home,language==='en'?/short summary/:/resumen breve/);
+ }
 });
-
-test('welcome explains summaries and accurately distinguishes browser previews',()=>{
- for(const lang of ['en','es']){const preview=onboardingWelcome(lang,{preview:true});assert.match(preview,lang==='en'?/summaries stay in this browser/:/resúmenes se quedan en este navegador/);}
- const live=onboardingWelcome('en');assert.match(live,/read summaries in Family home/);assert.match(live,/save it to keep its summary/);assert.doesNotMatch(live,/This is a preview/);assert.match(onboardingWelcome('en',{role:'student'}),/What should I call you/);
+test('home introduction distinguishes preview summary storage',()=>{
+ assert.match(homeVoiceIntroduction('en',{preview:true}),/summaries stay in this browser/);
+ assert.match(homeVoiceIntroduction('es',{preview:true}),/resúmenes se quedan en este navegador/);
+ assert.doesNotMatch(homeVoiceIntroduction('en'),/This is a preview/);
 });
 
 test('welcome overrides preserve the same natural beginner-friendly voice style',()=>{

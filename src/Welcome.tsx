@@ -1,14 +1,16 @@
+import {SharedVoiceContext} from './SharedVoiceContext';
 import WelcomeWriting from './WelcomeWriting';
 import {welcomeStageLabel} from './welcomeLanguage.mjs';
 import {onboardingRecovery,validOnboardingDraft} from './onboardingRecovery.mjs';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useRef,useState} from 'react';
+import {useContext,useEffect,useRef,useState} from 'react';
 import './Welcome.css';
 import ProfileVoice from './ProfileVoice';
 import {apiFetch} from './api';
 import {type StudentProfile} from './planning';
 
 export default function Welcome({language,setLanguage,complete,cloud=false,hasStudents=false,onRole,initialName="",initialRole,onComplete}:{language:'en'|'es';setLanguage:(v:'en'|'es')=>void;cloud?:boolean;hasStudents?:boolean;onRole?:(role:'parent'|'student')=>void;initialName?:string;initialRole?:'parent'|'student';onComplete:()=>void;complete:(firstName:string,role:'parent'|'student',student?:StudentProfile,options?:{keepOpen:boolean})=>Promise<boolean>}){
+ const sharedVoice=useContext(SharedVoiceContext);
  const t=(en:string,es:string)=>language==='es'?es:en;
  const {user,logout}=useAuth0();
  useEffect(()=>{if(!cloud)return;void apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'onboarding-start'})}).catch(()=>{});},[cloud,user?.sub]);
@@ -57,6 +59,11 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
   if(saveLock.current)return {status:'save_in_progress' as const,instruction:'A save is already in progress. Continue naturally; do not claim it succeeded yet.'};
   return await finish(current.draft,true)?{status:'saved' as const,instruction:'The profile was saved successfully. Say one brief confirmation in the current conversation language and explain that the home page is opening next. Do not ask another question. The app waits until your confirmation finishes playing.'}:{status:'save_failed' as const,instruction:'The profile could not be saved. Tell the user and offer to retry. Keep talking without claiming a successful save.'};
  };
+ const saveFromButton=async()=>{
+  if(await finish(liveValues.current.draft,!!sharedVoice?.active)){
+   if(sharedVoice?.active&&!sharedVoice.profileSaved())onComplete();
+  }
+ };
  const latestVoiceSave=useRef(saveByVoice);latestVoiceSave.current=saveByVoice;
  const saved=savedSnapshot===JSON.stringify({name:name.trim(),role,draft:{...draft,name:draft.name.trim()}});
  if(step==='voice')return <main className="welcome-conversation">
@@ -68,7 +75,7 @@ export default function Welcome({language,setLanguage,complete,cloud=false,hasSt
    {([['name','Name','Nombre'],['stage','Education stage','Etapa educativa'],['school','School or college','Escuela o colegio'],['interest','Interests','Intereses'],['goals','Goals','Metas'],['activities','Activities and responsibilities','Actividades y responsabilidades'],['institutions','Colleges of interest','Universidades de interés'],['entryTerm','Intended entry term','Período de ingreso'],['needs','Practical needs','Necesidades prácticas'],['notes','Notes','Notas'],['gpa','Reported GPA','GPA reportado']] as const).filter(([field])=>draft[field]?.trim()).map(([field,en,es])=><section className="welcome-live-note" key={field}><h2>{t(en,es)}</h2><WelcomeWriting text={field==='stage'?welcomeStageLabel(draft[field]||'',language):draft[field]||''}/></section>)}
   </div><p className="welcome-draft-status" role="status">{saved?t('Profile saved.','Perfil guardado.'):active?t('Drafting your profile · You can correct a detail out loud.','Creando tu perfil · Puedes corregir un dato en voz alta.'):draft.name.trim()?t('Your draft is ready to review. You can edit details before saving.','Tu borrador está listo para revisar. Puedes editarlo antes de guardar.'):t('Press below to start the conversation.','Presiona abajo para iniciar la conversación.')}</p></section>
   <footer className="welcome-conversation-dock">{!leaving&&<ProfileVoice onProfileSaveComplete={onComplete} onSaveProfile={()=>latestVoiceSave.current()} onLanguageChanged={setLanguage} onboarding replayWelcome={!cloud} recoveryKey={`origen.onboarding.voice.${cloud?user?.sub:'preview'}.${draft.id}`} profile={draft} language={language} role={role||'parent'} t={t} onActive={setActive} onAccountDraft={updateAccount} onDraft={updateDraft} apply={updateDraft}/>}
-   <div className="welcome-conversation-actions"><button className="text-button" disabled={active||saving} onClick={()=>setStep('manual')}>{t('Edit details','Editar datos')}</button><button className="button primary" disabled={saving} onClick={()=>void finish(liveValues.current.draft)}>{saving?t('Saving…','Guardando…'):t('Save profile','Guardar perfil')}</button></div>
+   <div className="welcome-conversation-actions"><button className="text-button" disabled={active||saving} onClick={()=>setStep('manual')}>{t('Edit details','Editar datos')}</button><button className="button primary" disabled={saving} onClick={()=>void saveFromButton()}>{saving?t('Saving…','Guardando…'):t('Save profile','Guardar perfil')}</button></div>
    {storageError&&<p role="alert">{t('Your draft could not be backed up. Keep this page open until you save.','No se pudo conservar el borrador. Mantén esta página abierta hasta guardar.')}</p>}{error&&<p role="alert">{error}</p>}
   </footer></main>;
  return <main className={`application-panel welcome-panel${step==='manual'?' welcome-profile-step':''}`}>

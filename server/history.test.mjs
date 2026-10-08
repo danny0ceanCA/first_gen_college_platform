@@ -146,9 +146,9 @@ test('voice reads the welcome receipt from Postgres across devices and preserves
   assert.equal(result.status,200);assert.equal(result.body.playWelcome,true);
   await run('auth0|one',{action:'welcome-heard'});
   result=await invoke(handler,input,'auth0|one','/api/profile-voice');
-  assert.equal(result.body.playWelcome,false);assert.match(session.instructions,/RETURNING USER/);assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION WELCOME/);
+  assert.equal(result.body.playWelcome,false);assert.match(session.instructions,/RETURNING USER/);assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION SETUP/);
   result=await invoke(handler,{...input,replayWelcome:true},'auth0|one','/api/profile-voice');
-  assert.equal(result.body.playWelcome,true);assert.match(session.instructions,/FIRST-REGISTRATION WELCOME/);
+  assert.equal(result.body.playWelcome,true);assert.match(session.instructions,/FIRST-REGISTRATION SETUP/);
   result=await invoke(handler,input,'auth0|two','/api/profile-voice');assert.equal(result.body.playWelcome,true);
  }finally{await pool.end();}
 });

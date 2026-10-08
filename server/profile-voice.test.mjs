@@ -99,14 +99,14 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
  assert.equal((await call(handler,{...input,mode:'admissions'})).status,200);
 });
 
-test('first-registration welcome explains the app before collecting student details only in onboarding',()=>{
+test('first-registration setup defers the app tour until the successful save',()=>{
  for(const language of ['en','es']){
   const welcome=voiceSession({...input,language,onboarding:true},{});
-  assert.match(welcome.instructions,/FIRST-REGISTRATION WELCOME/);
-  for(const place of ['Family home','Paying for college','Ready to apply for college','Planning'])assert.ok(welcome.instructions.includes(place));
-  assert.match(welcome.instructions,/review it before saving/);
-  assert.doesNotMatch(voiceSession({...input,language},{}).instructions,/FIRST-REGISTRATION WELCOME/);
-  assert.doesNotMatch(voiceSession({...input,language,onboarding:true,mode:'finance'},{}).instructions,/FIRST-REGISTRATION WELCOME/);
+  assert.match(welcome.instructions,/FIRST-REGISTRATION SETUP/);
+  assert.match(welcome.instructions,/Do not give an app tour or explain features or summaries before the successful save/);
+  assert.match(welcome.instructions,/collect the account holder name and role and student details one question at a time/);
+  assert.doesNotMatch(voiceSession({...input,language},{}).instructions,/FIRST-REGISTRATION SETUP/);
+  assert.doesNotMatch(voiceSession({...input,language,onboarding:true,mode:'finance'},{}).instructions,/FIRST-REGISTRATION SETUP/);
  }
 });
 
@@ -136,11 +136,11 @@ test('returning users skip tours across every guide while explicit onboarding re
   assert.match(session.instructions,/RETURNING USER/);
   assert.match(session.instructions,/Skip the app tour/);
   assert.match(session.instructions,/avoid repeating explanations already covered/);
-  assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION WELCOME/);
+  assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION SETUP/);
  }
  assert.match(voiceSession({...input,memory:[{summary:'Discussed college costs.'}]},{}).instructions,/RETURNING USER/);
  assert.doesNotMatch(voiceSession(input,{}).instructions,/RETURNING USER/);
- assert.match(voiceSession({...input,onboarding:true,experience:{usedApp:true,usedVoice:true}},{}).instructions,/FIRST-REGISTRATION WELCOME/);
+ assert.match(voiceSession({...input,onboarding:true,experience:{usedApp:true,usedVoice:true}},{}).instructions,/FIRST-REGISTRATION SETUP/);
 });
 
 test('every voice guide teaches college basics naturally across roles, languages, and routing states',()=>{

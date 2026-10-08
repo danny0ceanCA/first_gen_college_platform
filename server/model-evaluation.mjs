@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {voiceSession} from './profile-voice.mjs';
 import {financeResearchRequest} from './finance-research.mjs';
 import {admissionsResearchRequest} from './admissions-research.mjs';
-import {onboardingWelcome} from '../src/voiceWelcome.mjs';
+import {onboardingWelcome,homeVoiceIntroduction} from '../src/voiceWelcome.mjs';
 import {spokenLanguageFromText} from '../src/voiceLanguage.mjs';
 import {voiceResearchCache,wantsFreshLookup,voiceResearchBudget} from '../src/voiceResearchCache.mjs';
 export const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -20,7 +20,7 @@ export function contractCase(c){
  check('language tool available',config.tools.some(t=>t.name==='set_conversation_language'));
  check('save claims require acknowledgement',text.includes('Never claim a summary was saved'));
  switch(c.category){
-  case 'introduction':{const opening=onboardingWelcome(c.language);check('warm opening and orientation before details',opening.includes('Start with Hola')&&opening.includes('BEFORE asking for student details')&&opening.includes(c.language==='es'?'resúmenes':'summaries'));break;}
+  case 'introduction':{const opening=onboardingWelcome(c.language);check('profile setup precedes home orientation',opening.includes('Start with Hola')&&opening.includes('focus on profile setup')&&homeVoiceIntroduction(c.language).includes('home page is now open')&&homeVoiceIntroduction(c.language).includes('bar at the bottom'));break;}
   case 'simple-explanation':check('budget is not a bill',/not necessarily a bill/.test(text));break;
   case 'language-switch':check('spoken preference changes before lookup',spokenLanguageFromText(c.prompt,'en')==='es'&&text.includes('before any scope, guide or lookup'));break;
   case 'key-term':check('English term does not change Spanish language',text.includes('continue the explanation in Spanish')&&spokenLanguageFromText('Work-study','es')==='es');break;

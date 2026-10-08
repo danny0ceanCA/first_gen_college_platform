@@ -43,4 +43,5 @@
 @media(prefers-reduced-motion:reduce){.welcome-ink-letter{transform:none!important;filter:none!important;opacity:1!important}.welcome-ink-line{transform:none!important}}
 
 .welcome-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.welcome-header-actions .button{min-height:44px}.welcome-logout{white-space:nowrap}
+body:has(.shared-voice) .welcome-conversation{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
 @media(max-width:600px){.welcome-conversation-header{gap:12px}.welcome-wordmark{font-size:28px}.welcome-header-actions{gap:8px}.welcome-header-actions .button{padding:10px 12px}}

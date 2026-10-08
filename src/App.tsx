@@ -2,6 +2,7 @@ import {AdminLink} from './AdminDashboard';
 import ProfileVoice from './ProfileVoice';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import SharedVoice from './SharedVoice';
+import {useOnboardingTransition} from './useOnboardingTransition';
 import Planning from './PlanningModule';
 import Loans from './LoansModule';
 import {ConversationHistoryProvider} from './ConversationHistory';
@@ -41,6 +42,7 @@ export default function App() {
  return <FamilyProvider previewStudents={[]}><ConversationHistoryProvider><SharedVoice><FamilyApp/></SharedVoice></ConversationHistoryProvider></FamilyProvider>;
 }
 function FamilyApp() {
+  const transitionFromOnboarding=useOnboardingTransition();
   const sharedVoice=useContext(SharedVoiceContext);
   const family=useFamily();
   const {isAuthenticated,user,logout}=useAuth0();
@@ -132,7 +134,7 @@ function FamilyApp() {
   };
   if(family.loading)return <main className="application-panel" role="status">{t('Loading your family…','Cargando tu familia…')}</main>;
   if(family.error&&!welcomeChecked.current)return <main className="application-panel"><p role="alert">{t('Your family could not be loaded. Your saved information has not been replaced.','No se pudo cargar tu familia. No se ha reemplazado tu información guardada.')}</p><button className="button primary" onClick={family.reload}>{t('Try again','Intentar de nuevo')}</button><button className="button outline" onClick={logOut}>{t('Log out','Cerrar sesión')}</button></main>;
-  const finishWelcome=()=>{go('home');setModal(null);setWelcoming(false);window.location.hash='app';};
+  const finishWelcome=()=>transitionFromOnboarding(()=>{go('home');setModal(null);setWelcoming(false);window.location.hash='app';});
   if(welcoming)return <Welcome onComplete={finishWelcome} onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added,options)=>{setLanguages(previous=>({...previous,[accountRole]:liveLanguage.current}));if(!await family.completeOnboarding(firstName,accountRole,added))return false;if(added)setSelected(added.id);if(!options?.keepOpen)finishWelcome();return true;}}/>;
   return <div className="app-shell">
     {mobile && <button className="sidebar-shade" onClick={() => setMobile(false)} aria-label="Close navigation" />}
