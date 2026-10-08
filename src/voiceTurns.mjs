@@ -21,8 +21,13 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   return {
     busy(){return !stopped&&Boolean(active||pending||tools||replyHolds||awaiting.size||progressActive||playing.size);},
     playback(event){
+      if(stopped)return;
       if(event.type==='output_audio_buffer.started')playing.add(event.response_id||'audio');
       if(event.type==='output_audio_buffer.stopped'||event.type==='output_audio_buffer.cleared'){
+        const clearedAnswer=event.type==='output_audio_buffer.cleared'&&(event.response_id?playing.has(event.response_id)&&!progressResponses.has(event.response_id):[...playing].some(id=>!progressResponses.has(id)));
+        // Generation can finish before playback. Noise may clear that buffered
+        // audio without producing another response.done cancellation event.
+        if(clearedAnswer&&interrupted&&!heardSpeech&&!recoveryUsed){resume=true;pending=true;}
         if(event.response_id)playing.delete(event.response_id);else playing.clear();
         flush();
       }
@@ -35,7 +40,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     },
     speechStopped(itemId){
       if(stopped||!awaiting.has(itemId)||timers.has(itemId))return;
-      timers.set(itemId,schedule(()=>{timers.delete(itemId);awaiting.delete(itemId);onMissing(itemId);flush();},transcriptionTimeout));
+      timers.set(itemId,schedule(()=>{timers.delete(itemId);awaiting.delete(itemId);onMissing(itemId);if(resume&&!awaiting.size)pending=true;flush();},transcriptionTimeout));
     },
     stop(){stopped=true;for(const timer of timers.values())cancel(timer);timers.clear();awaiting.clear();playing.clear();},
     progress(sentence) {
@@ -66,7 +71,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     },
     created() { active = true; interrupted = false; heardSpeech = false; },
     speechStarted(itemId) {
-      if (itemId) { awaiting.add(itemId); if (active) interrupted = true; }
+      if (itemId) { awaiting.add(itemId); if (active||[...playing].some(id=>!progressResponses.has(id))) interrupted = true; }
       if (progressActive && progressId) {
         const id = send({type:'response.cancel',response_id:progressId});
         if (id) progressRequests.add(id);

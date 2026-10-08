@@ -17,6 +17,7 @@ import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
 import {voiceErrorEndsSession,voiceReplyCanRetry} from './voiceErrors.mjs';
 import {voiceConnectionRecovery,voiceProfile} from './voiceConnection.mjs';
+import {voiceWakeLock,type VoiceWakeLockStatus} from './voiceWakeLock.mjs';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from './voiceMemory.mjs';
 import {resolveScope,beforeScopeRequest} from './conversationScope.mjs';
@@ -115,6 +116,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [audioBlocked,setAudioBlocked]=useState(false);
+  const [wakeStatus,setWakeStatus]=useState<VoiceWakeLockStatus>('hidden');
   const [draftRecovery]=useState(()=>recoveryKey?onboardingRecovery(localStorage,recoveryKey):null);
   const [draftSuggestions]=useState(()=>voiceDraft<Suggestions>(draftRecovery,!!onDraft));
   const [changes,setChanges]=useState<Suggestions>(()=>draftSuggestions.read());
@@ -136,7 +138,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true})=>Promise<boolean>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true})=>Promise<boolean>}>({});
   const generation=useRef(0);
   const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
   const preserveLogicalSession=useRef(false);
@@ -150,7 +152,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
     const r=resources.current;resources.current={};
     r.abort?.abort();clearInterval(r.timer);clearTimeout(r.deadline);
     transitionToHome.current=null;
-    r.stopProgress?.();
+    r.stopWake?.();r.stopProgress?.();
     r.stopConnection?.();r.stopTurns?.();r.stopGuide?.();
     if(r.dc){r.dc.onclose=null;r.dc.close();}
     if(r.pc){r.pc.onconnectionstatechange=null;r.pc.close();}
@@ -300,6 +302,10 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
       dc.onopen=()=>{
         if(generation.current!==version)return;
         clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
+        if(!resources.current.stopWake){
+          const wake=voiceWakeLock(status=>{if(generation.current===version)setWakeStatus(status);});
+          resources.current.stopWake=()=>wake.stop();
+        }
         const started=Date.now();
         resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){void finishCall();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
         if(spokenRequest){
@@ -539,6 +545,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>void finishCall()}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
       </>}
+      {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
     <audio ref={audio} autoPlay controls hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     <div className="voice-session-details" hidden={ownerId==='shared'&&!detailsOpen}>

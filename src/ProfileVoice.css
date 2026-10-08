@@ -3,6 +3,7 @@
 
 .profile-delete { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #ddd; }
 .profile-delete h3 { color: #984336; }
+.voice-controls .voice-wake-notice{flex-basis:100%;margin:0;font-size:12px;line-height:1.5}
 
 .voice-scope{margin:16px 0;padding:14px 16px;border:1px solid #e4d7ca;border-radius:12px;background:#fbf8f3}.scope-confirmation label{display:grid;gap:8px;font-size:14px;font-weight:600}.scope-confirmation select{min-height:46px;padding:10px;border:1px solid #e4d7ca;border-radius:9px;background:white;color:#a4513c;width:100%;font:inherit}.scope-confirmation .button{margin:8px 12px 8px 0}.scope-confirmation .text-button{min-height:44px}
 

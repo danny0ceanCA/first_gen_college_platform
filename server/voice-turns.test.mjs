@@ -119,3 +119,55 @@ test('transcription timeout starts after speech stops and is cancelled on comple
  turns.speechStarted('pending');turns.speechStopped('pending');turns.stop();assert.equal(timers.size,0);
  assert.equal(turns.transcript('pending','late words'),false);
 });
+
+for(const transcriptFirst of [false,true])test(`noise during buffered audio resumes after generation already finished, transcript first: ${transcriptFirst}`,()=>{
+ const events=[],recoveries=[],turns=voiceTurns(e=>events.push(e),()=>recoveries.push(true));
+ turns.request();turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'answer'});
+ turns.beginDone('answer');turns.completed();
+ turns.speechStarted('noise');
+ if(transcriptFirst)turns.transcript('noise','');
+ turns.playback({type:'output_audio_buffer.cleared',response_id:'answer'});
+ if(!transcriptFirst)turns.transcript('noise','');
+ assert.equal(events.length,2,'recover interrupted playback even though response.done arrived earlier');
+ assert.equal(recoveries.length,1);
+});
+
+test('a real interruption during buffered playback answers the new question once',()=>{
+ const events=[],recoveries=[],turns=voiceTurns(e=>events.push(e),()=>recoveries.push(true));
+ turns.request();turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'answer'});
+ turns.beginDone('answer');turns.completed();turns.speechStarted('question');
+ turns.transcript('question','What about community college?');
+ turns.playback({type:'output_audio_buffer.cleared',response_id:'answer'});
+ assert.equal(events.length,2);assert.equal(recoveries.length,0);
+});
+
+test('a missing transcript after cancellation releases one recovery after speech stops',()=>{
+ const events=[],timers=[];
+ const turns=voiceTurns(e=>events.push(e),()=>{},{schedule:fn=>{timers.push(fn);return timers.length;},cancel:()=>{}});
+ turns.request();turns.created();turns.speechStarted('lost');turns.beginDone('answer',false,true);turns.completed();turns.speechStopped('lost');
+ timers[0]();assert.equal(events.length,2);
+});
+
+test('normal playback drain, progress-audio cancellation and stop never replay an answer',()=>{
+ const events=[],recoveries=[],turns=voiceTurns(e=>{events.push(e);return `e${events.length}`;},()=>recoveries.push(true));
+ turns.request();turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'answer'});
+ turns.beginDone('answer');turns.completed();turns.playback({type:'output_audio_buffer.stopped',response_id:'answer'});
+ assert.equal(events.length,1);
+ turns.request();turns.beginDone('tool',true);turns.progress('Checking.');
+ turns.progressEvent({type:'response.created',response:{id:'progress',metadata:{topic:'origen_lookup_progress'}}});
+ turns.playback({type:'output_audio_buffer.started',response_id:'progress'});turns.speechStarted('noise');
+ turns.playback({type:'output_audio_buffer.cleared',response_id:'progress'});turns.transcript('noise','');
+ turns.progressEvent({type:'response.done',response:{id:'progress'}});
+ turns.toolsCompleted();assert.equal(recoveries.length,0,'status audio is never an interrupted answer');
+ const before=events.length;turns.stop();turns.playback({type:'output_audio_buffer.cleared'});assert.equal(events.length,before);
+});
+
+test('repeated noise during buffered playback cannot cause endless paid recovery replies',()=>{
+ const events=[],turns=voiceTurns(e=>events.push(e));
+ for(let i=0;i<2;i++){
+  if(i===0)turns.request();turns.created();
+  turns.playback({type:'output_audio_buffer.started',response_id:`answer${i}`});turns.beginDone(`answer${i}`);turns.completed();
+  turns.speechStarted(`noise${i}`);turns.playback({type:'output_audio_buffer.cleared',response_id:`answer${i}`});turns.transcript(`noise${i}`,'');
+ }
+ assert.equal(events.length,2);
+});
