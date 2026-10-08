@@ -245,8 +245,12 @@ export default function Landing(){
     </div>
    </section>
    <section className="landing-resource" id="how" aria-labelledby="how-title">
-    <span className="landing-eyebrow">{t('HOW IT WORKS','CÓMO FUNCIONA')}</span><h2 id="how-title">{t('Start with one question.','Empieza con una pregunta.')}</h2>
-    <ol className="landing-resource-grid landing-how"><li><h3>{t('Explore a topic','Explora un tema')}</h3><p>{t('Create an account and start with what matters to you: college options, transfer planning, applications, or paying for college.','Crea una cuenta y empieza con lo que te importa: opciones universitarias, planificación de transferencia, solicitudes o costos.')}</p></li><li><h3>{t('Ask your questions','Haz tus preguntas')}</h3><p>{t('Sign in to use AI guidance. Ask in English or Spanish and revisit anything unfamiliar.','Inicia sesión para usar la orientación de IA. Pregunta en inglés o español y vuelve a lo que no conozcas.')}</p></li><li><h3>{t('Follow official resources','Consulta recursos oficiales')}</h3><p>{t('Use source links to keep researching and confirm requirements with the college or aid provider.','Usa los enlaces para seguir investigando y confirma los requisitos con la institución o el proveedor de ayuda.')}</p></li></ol>
+    <span className="landing-eyebrow">{t('GETTING STARTED','PARA EMPEZAR')}</span><h2 id="how-title">{t('How it works','Cómo funciona')}</h2>
+    <ol className="landing-resource-grid landing-how">
+     <li><h3>{t('Create your account','Crea tu cuenta')}</h3><p>{t('Register as a student or a parent supporting a student.','Regístrate como estudiante o como madre, padre o tutor que apoya a un estudiante.')}</p></li>
+     <li><h3>{t('Have a conversation with Origen','Conversa con Origen')}</h3><p>{t('Ask your questions in English or Spanish. Origen uses official sources such as Federal Student Aid, University of California, Cal State and ASSIST.org to help you understand your options.','Haz tus preguntas en español o inglés. Origen consulta fuentes oficiales como Federal Student Aid, University of California, Cal State y ASSIST.org para ayudarte a entender tus opciones.')}</p></li>
+     <li><h3>{t('Explore your next steps','Explora tus próximos pasos')}</h3><p>{t('After saving your profile, ask about college, transferring, applications or paying for school. Find conversation summaries on your home page, and press Talk on the bottom bar whenever you want to talk again.','Después de guardar tu perfil, pregunta sobre la universidad, transferencias, solicitudes o cómo pagar tus estudios. Consulta los resúmenes de conversaciones en tu página principal y presiona Hablar en la barra de abajo cuando quieras conversar de nuevo.')}</p></li>
+    </ol>
    </section>
    <LandingStory t={t}/>
    <section className="landing-resource" id="educators" aria-labelledby="educators-title">
