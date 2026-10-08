@@ -88,6 +88,22 @@ test('voice context is the most recent six summaries of the selected student',as
  assert.equal((await invoke(voice,{sdp:'v=0',profile:{},language:'en',role:'parent',mode:'finance',studentId:'missing'},'auth0|one','/api/profile-voice')).status,404);
  }finally{await pool.end();}
 });
+
+test('topic-aware stored context excludes other accounts and family scope and requires an explicit target',async()=>{
+ const {pool,run}=await fixture();const history=createHistoryRepository(pool);
+ try{
+  await run('auth0|one',{action:'save-student',student});await run('auth0|two',{action:'save-student',student});
+  for(let n=1;n<=12;n++)await history('auth0|one',{action:'save',item:{...item,id:`topic-${n}`,mode:n<=4?'planning':'finance',date:`2026-09-${String(n).padStart(2,'0')}T12:00:00Z`,summary:`Topic ${n}`}});
+  await history('auth0|one',{action:'save',item:{...item,id:'family-private',studentId:null,mode:'planning',summary:'Family private'}});
+  await history('auth0|two',{action:'save',item:{...item,id:'foreign-private',mode:'planning',summary:'Foreign private'}});
+  const context=await history('auth0|one',{action:'context',studentId:student.id,mode:'planning'});
+  assert.equal(context.items.length,6);assert.equal(context.items.filter(x=>x.mode==='planning').length,3);
+  assert.ok(context.items.some(x=>x.summary==='Topic 12'));assert.ok(context.items.every(x=>!x.summary.includes('private')));
+  const family=await history('auth0|one',{action:'context',studentId:null,mode:'planning'});
+  assert.deepEqual(family.items.map(x=>x.summary),['Family private']);
+  await assert.rejects(history('auth0|one',{action:'context',mode:'planning'}),{status:400});
+ }finally{await pool.end();}
+});
 test('summary generation stores only a summary, is idempotent and refuses another family student',async()=>{
  const {pool,run}=await fixture();const history=createHistoryRepository(pool);let calls=0;
  const handler=createSummaryHandler({OPENAI_API_KEY:'test'},async()=>{calls++;return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:item.summary}]}]})};},pool);

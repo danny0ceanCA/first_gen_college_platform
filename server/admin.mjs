@@ -1,6 +1,8 @@
+import {reviewConversationFinding} from './conversation-reviews.mjs';
 import {adminOverview} from './admin-overview.mjs';
 import {adminUsers,adminUserDetail} from './admin-users.mjs';
 import {adminVoiceQuality} from './voice-quality.mjs';
+import {adminConversationQuality} from './conversation-quality-store.mjs';
 import {adminInstitutionReport} from './admin-institutions.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,7 +19,13 @@ export function createAdminHandler(database,env){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(413,{error:'request_too_large'});}
   let data;try{data=JSON.parse(raw);}catch{return send(400,{error:'invalid_request'});}
   if(path==='/api/admin'){
+   if(data.action==='conversation-review'){
+    try{return send(200,await reviewConversationFinding(database,req.origenIdentity.sub,data));}catch(error){if([400,404,409].includes(error.status))return send(error.status,{error:error.message});throw error;}
+   }
    if(data.action==='access')return send(200,{admin:true});
+   if(data.action==='conversation-quality'){
+    try{return send(200,await adminConversationQuality(database,data));}catch(error){if(error.status===400)return send(400,{error:error.message});throw error;}
+   }
    if(data.action==='institution-report'){
     try{return send(200,await adminInstitutionReport(database,data));}catch(error){if(error.status===400)return send(400,{error:error.message});throw error;}
    }

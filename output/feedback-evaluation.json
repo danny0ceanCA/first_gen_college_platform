@@ -1,0 +1,284 @@
+{
+  "version": "feedback-evaluation-v1",
+  "synthetic": true,
+  "live": false,
+  "model": null,
+  "createdAt": "2026-10-08T21:36:32.505Z",
+  "total": 28,
+  "checked": 8,
+  "notRun": 20,
+  "failed": 0,
+  "precision": 1,
+  "recall": 1,
+  "byLanguage": {
+    "en": {
+      "total": 15,
+      "checked": 5,
+      "failed": 0,
+      "precision": 1,
+      "recall": 1
+    },
+    "es": {
+      "total": 13,
+      "checked": 3,
+      "failed": 0,
+      "precision": 1,
+      "recall": 1
+    }
+  },
+  "byKind": {
+    "conversation": {
+      "total": 8,
+      "checked": 8,
+      "failed": 0,
+      "precision": 1,
+      "recall": 1
+    },
+    "summary": {
+      "total": 20,
+      "checked": 0,
+      "failed": 0,
+      "precision": null,
+      "recall": null
+    }
+  },
+  "results": [
+    {
+      "id": "correction-en-defect",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "correction-en-faithful",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "correction-es-defect",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "correction-es-faithful",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "open-question-en-defect",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "open-question-en-faithful",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "open-question-es-defect",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "open-question-es-faithful",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "unsupported-en-defect",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "unsupported-en-faithful",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "unsupported-es-defect",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "unsupported-es-faithful",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "suggestion-en-defect",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "suggestion-en-faithful",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "suggestion-es-defect",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "suggestion-es-faithful",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "uncertainty-en-defect",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "uncertainty-en-faithful",
+      "kind": "summary",
+      "language": "en",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "uncertainty-es-defect",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "uncertainty-es-faithful",
+      "kind": "summary",
+      "language": "es",
+      "status": "not_run",
+      "passed": null
+    },
+    {
+      "id": "english-repeat",
+      "kind": "conversation",
+      "language": "en",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 1,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "spanish-clarity",
+      "kind": "conversation",
+      "language": "es",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 1,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "spanish-label",
+      "kind": "conversation",
+      "language": "es",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 0,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "spanish-drift",
+      "kind": "conversation",
+      "language": "es",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 1,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "pending-answer",
+      "kind": "conversation",
+      "language": "en",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 0,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "missing-answer",
+      "kind": "conversation",
+      "language": "en",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 1,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "smooth-topic-change",
+      "kind": "conversation",
+      "language": "en",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 0,
+      "falsePositive": 0,
+      "falseNegative": 0
+    },
+    {
+      "id": "failed-topic-change",
+      "kind": "conversation",
+      "language": "en",
+      "status": "checked",
+      "passed": true,
+      "missed": [],
+      "unexpected": [],
+      "truePositive": 2,
+      "falsePositive": 0,
+      "falseNegative": 0
+    }
+  ],
+  "limitations": "Synthetic category checks do not measure real-user outcomes, speech audio, pronunciation, latency or independent academic-policy correctness. Offline summary cases are not evaluated."
+}

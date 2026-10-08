@@ -61,7 +61,7 @@ test('finance voice uses teaching instructions, minimal context and no profile e
     assert.match(session.instructions,/one idea at a time/);
     assert.match(session.instructions,/usually 3 to 5 short sentences/);
     assert.match(session.instructions,/If they say yes, start explaining/);
-    assert.match(session.instructions,/I gave you too much at once/);
+    assert.match(session.instructions,/Do not require a fixed apology or acknowledgement/);
     assert.equal(session.audio.output.speed,1);
     assert.match(session.instructions,/not a bill/);
     assert.match(session.instructions,/lookup_financial_aid/);

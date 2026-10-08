@@ -1,12 +1,15 @@
+import {createSummaryReviewer} from './summary-quality.mjs';
 import {safeErrorCode} from './api-logging.mjs';
+import {recordConversationQuality} from './conversation-quality-store.mjs';
 import {createHistoryRepository,validateMemory} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
 import {narrativeSummaryInstructions} from './summary-style.mjs';
 import {createConversationOverview} from './conversation-overview.mjs';
 import {guidanceEnabled,guidanceConfig,validateSummarySegments,deferSummaryAttribution,createGuidanceRepository} from './guidance-history.mjs';
-export function createSummaryHandler(env,request=fetch,database=null){const overview=createConversationOverview(env,request,database);return async(req,res,next)=>{
+export function createSummaryHandler(env,request=fetch,database=null){const overview=createConversationOverview(env,request,database);const reviewSummary=createSummaryReviewer(env,request);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/conversation-summary')return next();
  const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+ const analyze=async(item,input)=>{if(!req.origenAuthorized||!item)return;try{await recordConversationQuality(database,req.origenIdentity.sub,item,input,reviewSummary);}catch{req.log?.({event:'conversation_quality_error',level:'error',code:'operation_failed'});}};
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
  if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
  let execution,completed=false;const executionStarted=Date.now();
@@ -24,7 +27,7 @@ export function createSummaryHandler(env,request=fetch,database=null){const over
    try{await validateSummarySegments(database,req.origenIdentity.sub,metadata,attribution);}catch(error){if(error.status===404&&Date.parse(metadata.date)<Date.now()-90*86400000)attribution=undefined;else throw error;}
   }
   const previous=input.defer===true&&metadata.studentId!==null?{items:[]}:await createHistoryRepository(database)(req.origenIdentity.sub,{action:'find',id:metadata.id});
-  const existing=previous.items.find(item=>item.id===metadata.id);if(existing){if(existing.studentId!==metadata.studentId||existing.mode!==metadata.mode)return send(409,{error:'summary_conflict'});if(attribution)await createHistoryRepository(database)(req.origenIdentity.sub,{action:'save',item:existing,attribution});return send(200,{summary:existing.summary,item:existing});}
+  const existing=previous.items.find(item=>item.id===metadata.id);if(existing){if(existing.studentId!==metadata.studentId||existing.mode!==metadata.mode)return send(409,{error:'summary_conflict'});if(attribution)await createHistoryRepository(database)(req.origenIdentity.sub,{action:'save',item:existing,attribution});await analyze(existing,input);return send(200,{summary:existing.summary,item:existing});}
  }
  if(!env.OPENAI_API_KEY)return send(503,{error:'missing_api_key'});
  if(attribution)execution=await createGuidanceRepository(database).startExecution(req.origenIdentity.sub,{sessionId:attribution.sessionId,segmentId:attribution.segmentIds.at(-1)},attribution.configuration,'summary');
@@ -33,6 +36,7 @@ export function createSummaryHandler(env,request=fetch,database=null){const over
  if(!response.ok)return send(502,{error:'summary_unavailable'});const data=await response.json();if(data.status&&data.status!=='completed')return send(502,{error:'incomplete_summary'});const summary=(data.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');if(!summary.trim())return send(502,{error:'empty_summary'});const item=metadata?{...metadata,summary:summary.slice(0,4000)}:undefined;
  if(item&&(input.defer!==true||item.studentId===null))await createHistoryRepository(database)(req.origenIdentity.sub,{action:'save',item,attribution});
  if(item&&input.defer===true&&item.studentId!==null&&attribution)await deferSummaryAttribution(database,req.origenIdentity.sub,item,attribution);
+ if(item)await analyze(item,input);
  if(execution){await createGuidanceRepository(database).finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-executionStarted,upstreamRequestId:response.headers?.get('x-request-id'),usage:data.usage,resolvedModel:data.model});completed=true;}
  return send(200,{summary:summary.slice(0,4000),item});
  }catch(error){if(![400,404,409].includes(error.status))req.log?.({event:'summary_error',level:'error',code:safeErrorCode(error)});const status=[400,404,409,503].includes(error.status)?error.status:502;return send(status,{error:status===502?'summary_unavailable':status===503?'history_unavailable':error.message});}finally{if(execution&&!completed)await createGuidanceRepository(database).finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-executionStarted,errorCode:'summary_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}

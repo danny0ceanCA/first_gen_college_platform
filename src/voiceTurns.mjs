@@ -41,7 +41,10 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     progress(sentence) {
       if (stopped || !tools || active || progressActive || awaiting.size || playing.size) return false;
       progressActive = true;
-      progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress'},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Say exactly this brief status update and nothing else: ${sentence}`}}) || '';
+      try{
+        progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress'},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Keep the same warm voice, volume and pace as this call. No greeting, filler or extra claims. Say only this brief status update: ${sentence}`}}) || '';
+      }catch{progressActive=false;progressEvent='';return false;}
+      if(!progressEvent){progressActive=false;return false;}
       if (progressEvent) progressRequests.add(progressEvent);
       return true;
     },

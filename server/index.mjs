@@ -1,4 +1,5 @@
 import {createCampaignHandler} from './institution-campaigns.mjs';
+import {purgeConversationQuality} from './conversation-quality-store.mjs';
 import {purgeInstitutionOutreach} from './institution-outreach-data.mjs';
 import {createInquiryHandler,purgeInstitutionInquiries} from './institution-inquiries.mjs';
 import {createAdminHandler} from './admin.mjs';
@@ -96,7 +97,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(guidanceEnabled(process.env))await backfillGuidanceIdentities(database,`https://${process.env.AUTH0_DOMAIN}/`,process.env.GUIDANCE_LEGACY_ISSUER===`https://${process.env.AUTH0_DOMAIN}/`);
   await purgeGuidanceHistory(database);
   await purgeProgressHistory(database);
-  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
+  await purgeConversationQuality(database);
+  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database),purgeConversationQuality(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
   const server=createServer(createApp(process.env,undefined,database));
   server.listen(Number(process.env.PORT||3001),'0.0.0.0',()=>console.log('Origen API listening'));
   let stopping=false;

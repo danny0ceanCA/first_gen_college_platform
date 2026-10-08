@@ -26,6 +26,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
     students:await rows('origen_students'),summaries:await rows('origen_conversation_summaries'),plans:await rows('origen_plans'),planSteps:await rows('origen_plan_steps'),planSources:await rows('origen_plan_sources'),planConversations:await rows('origen_plan_conversations'),representatives,memberships};
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_login_activity'")).rows.length)data.activity={logins:await rows('origen_login_activity'),voice:await rows('origen_voice_activity')};
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_voice_quality_events'")).rows.length)data.voiceQuality=await rows('origen_voice_quality_events');
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_conversation_quality'")).rows.length)data.conversationQuality=await rows('origen_conversation_quality');
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_login_activity'")).rows.length)data.activity={logins:await rows('origen_login_activity'),voice:await rows('origen_voice_activity')};
    // Optional for older schemas during additive rollout. Never query another account.
    const guidanceTables=(await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_guidance_sessions'")).rows;

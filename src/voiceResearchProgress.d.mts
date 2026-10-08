@@ -1,0 +1,2 @@
+export function voiceResearchProgress(options:{speak:(sentence:string)=>boolean;language?:()=>string;isCurrent?:()=>boolean;onProgress?:(elapsed:number)=>void;now?:()=>number;schedule?:(callback:()=>void,delay:number)=>any;cancel?:(timer:any)=>void}):{start:()=>void;stop:()=>void};
+export function researchEvidence(result:{sources:unknown[];text?:unknown;checkedAt?:unknown},reused:boolean):{text:unknown;sources:unknown[];checkedAt:unknown;status:string;instruction:string};

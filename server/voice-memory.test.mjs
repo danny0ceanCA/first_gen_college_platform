@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from '../src/voiceMemory.mjs';
+import {appendConversationTurn,mergeConversationSources,recentConversationMemory,selectConversationMemory} from '../src/voiceMemory.mjs';
 import {flushPendingHistory} from '../src/pendingHistory.mjs';
 import {validateMemory} from './history.mjs';
+import {voiceSession} from './profile-voice.mjs';
+import {voiceStartingPoints} from '../src/voiceStartingPoints.mjs';
 
 test('live summary retains early facts across sixty exchanges',()=>{
  let turns=[];for(let i=0;i<120;i++)turns=appendConversationTurn(turns,{role:i%2?'assistant':'user',text:`Fact ${i}`});
@@ -21,6 +23,27 @@ test('voice receives the latest six memories regardless of server or browser ord
  assert.deepEqual(recentConversationMemory(items,'one').map(x=>x.id),expected);
  assert.deepEqual(recentConversationMemory([...items].reverse(),'one').map(x=>x.id),expected);
  assert.deepEqual(recentConversationMemory(items,'other'),[]);
+});
+
+test('topic-aware context retains older relevant discussions, latest corrections and another topic without crossing students',()=>{
+ const items=Array.from({length:12},(_,i)=>({id:`m-${i}`,studentId:'one',date:`2026-09-${String(i+1).padStart(2,'0')}T00:00:00Z`,mode:i<4?'planning':'finance',summary:`Discussion ${i}`}));
+ const mixed=[...items,{...items[0],id:'private',studentId:'other',date:'2026-10-01T00:00:00Z',summary:'Other student secret'}];
+ const selected=recentConversationMemory(mixed,'one','planning');
+ assert.equal(selected.length,6);assert.ok(selected.some(x=>x.id==='m-11'));assert.ok(selected.some(x=>x.id==='m-10'));
+ assert.equal(selected.filter(x=>x.mode==='planning').length,3);assert.ok(!selected.some(x=>x.id==='private'));
+ assert.deepEqual(recentConversationMemory([...mixed].reverse(),'one','planning'),selected);
+ assert.equal(selectConversationMemory([...items,...items,{date:'bad',summary:'invalid'}],'planning').length,6);
+});
+
+test('long memory retains final corrections and unconfirmed scope cannot embed private history',()=>{
+ const items=Array.from({length:6},(_,i)=>({id:`long-${i}`,date:`2026-09-${String(i+1).padStart(2,'0')}T00:00:00Z`,mode:'planning',summary:`Earlier goal. ${'x'.repeat(5000)} Corrected goal: nursing.`}));
+ const input={language:'es',role:'parent',mode:'planning',memory:items,profile:{},students:[],routeConversations:true};
+ const confirmed=voiceSession({...input,targetConfirmed:true,studentId:'one'},{});
+ assert.match(confirmed.instructions,/Corrected goal: nursing/);assert.match(confirmed.instructions,/middle omitted/);
+ // Keep the existing memory/base budget separate from the bounded phase 3 policy.
+ assert.ok(confirmed.instructions.length-voiceStartingPoints(input).length<30000);
+ const unresolved=voiceSession({...input,targetConfirmed:false},{});
+ assert.doesNotMatch(unresolved.instructions,/Corrected goal: nursing|Earlier goal/);
 });
 test('deferred onboarding summaries save after student creation and survive a failed save',async()=>{
  const item={id:'summary',studentId:'new-student'};const pending=new Map([[item.id,item]]);let calls=0;

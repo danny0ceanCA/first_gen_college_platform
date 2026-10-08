@@ -1,0 +1,338 @@
+{
+  "reports": [
+    {
+      "version": "conversation-quality-v1",
+      "synthetic": true,
+      "coverage": {
+        "transcriptAvailable": true,
+        "turns": 5,
+        "userTurns": 3,
+        "assistantTurns": 2,
+        "events": 0,
+        "summaries": 0,
+        "complete": true
+      },
+      "findings": [
+        {
+          "category": "clarification_request",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "turn",
+              "index": 2
+            }
+          ],
+          "reason": "Explicit request for clarification or simpler wording; this may be normal learning rather than a defect.",
+          "topic": "finance",
+          "language": "en",
+          "needsReview": true
+        },
+        {
+          "category": "repeated_question",
+          "confidence": "medium",
+          "evidence": [
+            {
+              "kind": "turn",
+              "index": 0
+            },
+            {
+              "kind": "turn",
+              "index": 4
+            }
+          ],
+          "reason": "The same normalized question was asked again. Confirm whether repetition was necessary or caused by confusion.",
+          "topic": "finance",
+          "language": "en",
+          "needsReview": true
+        },
+        {
+          "category": "possibly_unanswered",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "turn",
+              "index": 4
+            }
+          ],
+          "reason": "No subsequent assistant text in the completed capture. Check for a user-ended call, missing transcription or intentionally postponed answer.",
+          "topic": "finance",
+          "language": "en",
+          "needsReview": true
+        }
+      ],
+      "counts": {
+        "repeated_question": 1,
+        "clarification_request": 1,
+        "language_drift": 0,
+        "possibly_unanswered": 1,
+        "topic_transition_failure": 0,
+        "tool_failure": 0,
+        "language_update_failure": 0,
+        "reply_failure": 0,
+        "transcription_failure": 0,
+        "connection_failure": 0
+      },
+      "limitations": [
+        "Signals require review; there is no overall quality score or automatic model update.",
+        "Summary prose cannot establish repetition, comprehension, response language or whether a spoken question was answered.",
+        "Semantic answer correctness, paraphrased repetition, pronunciation and audio cutoffs require further evaluation.",
+        "No real-user collection is enabled while phase 1 is deferred."
+      ]
+    },
+    {
+      "version": "conversation-quality-v1",
+      "synthetic": true,
+      "coverage": {
+        "transcriptAvailable": true,
+        "turns": 2,
+        "userTurns": 1,
+        "assistantTurns": 1,
+        "events": 1,
+        "summaries": 0,
+        "complete": true
+      },
+      "findings": [
+        {
+          "category": "language_drift",
+          "confidence": "medium",
+          "evidence": [
+            {
+              "kind": "turn",
+              "index": 1
+            }
+          ],
+          "reason": "Assistant language may differ from the established preference. Review mixed-language labels, explicit preferences and detector limitations.",
+          "topic": "admissions",
+          "language": "es",
+          "needsReview": true
+        },
+        {
+          "category": "topic_transition_failure",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "event",
+              "index": 0
+            }
+          ],
+          "reason": "Recorded technical event: guide_update_failed. This does not establish the cause or whether recovery succeeded.",
+          "topic": "admissions",
+          "language": "en",
+          "needsReview": true
+        }
+      ],
+      "counts": {
+        "repeated_question": 0,
+        "clarification_request": 0,
+        "language_drift": 1,
+        "possibly_unanswered": 0,
+        "topic_transition_failure": 1,
+        "tool_failure": 0,
+        "language_update_failure": 0,
+        "reply_failure": 0,
+        "transcription_failure": 0,
+        "connection_failure": 0
+      },
+      "limitations": [
+        "Signals require review; there is no overall quality score or automatic model update.",
+        "Summary prose cannot establish repetition, comprehension, response language or whether a spoken question was answered.",
+        "Semantic answer correctness, paraphrased repetition, pronunciation and audio cutoffs require further evaluation.",
+        "No real-user collection is enabled while phase 1 is deferred."
+      ]
+    },
+    {
+      "version": "conversation-quality-v1",
+      "synthetic": true,
+      "coverage": {
+        "transcriptAvailable": true,
+        "turns": 2,
+        "userTurns": 1,
+        "assistantTurns": 1,
+        "events": 1,
+        "summaries": 0,
+        "complete": true
+      },
+      "findings": [
+        {
+          "category": "clarification_request",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "turn",
+              "index": 0
+            }
+          ],
+          "reason": "Explicit request for clarification or simpler wording; this may be normal learning rather than a defect.",
+          "topic": "loans",
+          "language": "es",
+          "needsReview": true
+        },
+        {
+          "category": "tool_failure",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "event",
+              "index": 0
+            }
+          ],
+          "reason": "Recorded technical event: lookup_failure. This does not establish the cause or whether recovery succeeded.",
+          "topic": "loans",
+          "language": "es",
+          "needsReview": true
+        }
+      ],
+      "counts": {
+        "repeated_question": 0,
+        "clarification_request": 1,
+        "language_drift": 0,
+        "possibly_unanswered": 0,
+        "topic_transition_failure": 0,
+        "tool_failure": 1,
+        "language_update_failure": 0,
+        "reply_failure": 0,
+        "transcription_failure": 0,
+        "connection_failure": 0
+      },
+      "limitations": [
+        "Signals require review; there is no overall quality score or automatic model update.",
+        "Summary prose cannot establish repetition, comprehension, response language or whether a spoken question was answered.",
+        "Semantic answer correctness, paraphrased repetition, pronunciation and audio cutoffs require further evaluation.",
+        "No real-user collection is enabled while phase 1 is deferred."
+      ]
+    },
+    {
+      "version": "conversation-quality-v1",
+      "synthetic": true,
+      "coverage": {
+        "transcriptAvailable": false,
+        "turns": 0,
+        "userTurns": 0,
+        "assistantTurns": 0,
+        "events": 2,
+        "summaries": 1,
+        "complete": true
+      },
+      "findings": [
+        {
+          "category": "transcription_failure",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "event",
+              "index": 0
+            }
+          ],
+          "reason": "Recorded technical event: transcription_timeout. This does not establish the cause or whether recovery succeeded.",
+          "topic": "unknown",
+          "language": "unknown",
+          "needsReview": true
+        },
+        {
+          "category": "connection_failure",
+          "confidence": "high",
+          "evidence": [
+            {
+              "kind": "event",
+              "index": 1
+            }
+          ],
+          "reason": "Recorded technical event: connection_failure. This does not establish the cause or whether recovery succeeded.",
+          "topic": "unknown",
+          "language": "unknown",
+          "needsReview": true
+        }
+      ],
+      "counts": {
+        "repeated_question": 0,
+        "clarification_request": 0,
+        "language_drift": 0,
+        "possibly_unanswered": 0,
+        "topic_transition_failure": 0,
+        "tool_failure": 0,
+        "language_update_failure": 0,
+        "reply_failure": 0,
+        "transcription_failure": 1,
+        "connection_failure": 1
+      },
+      "limitations": [
+        "Signals require review; there is no overall quality score or automatic model update.",
+        "Summary prose cannot establish repetition, comprehension, response language or whether a spoken question was answered.",
+        "Semantic answer correctness, paraphrased repetition, pronunciation and audio cutoffs require further evaluation.",
+        "No real-user collection is enabled while phase 1 is deferred."
+      ]
+    }
+  ],
+  "trends": {
+    "version": "conversation-quality-v1",
+    "synthetic": true,
+    "conversations": 4,
+    "transcriptsAvailable": 3,
+    "groups": [
+      {
+        "category": "clarification_request",
+        "topic": "finance",
+        "language": "en",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "clarification_request",
+        "topic": "loans",
+        "language": "es",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "connection_failure",
+        "topic": "unknown",
+        "language": "unknown",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "language_drift",
+        "topic": "admissions",
+        "language": "es",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "possibly_unanswered",
+        "topic": "finance",
+        "language": "en",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "repeated_question",
+        "topic": "finance",
+        "language": "en",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "tool_failure",
+        "topic": "loans",
+        "language": "es",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "topic_transition_failure",
+        "topic": "admissions",
+        "language": "en",
+        "signals": 1,
+        "conversationsFlagged": 1
+      },
+      {
+        "category": "transcription_failure",
+        "topic": "unknown",
+        "language": "unknown",
+        "signals": 1,
+        "conversationsFlagged": 1
+      }
+    ],
+    "limitations": "Counts describe this supplied sample, not all users. Missing or summary-only captures are not treated as successful conversations."
+  }
+}

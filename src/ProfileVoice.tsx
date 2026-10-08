@@ -9,6 +9,7 @@ import {onboardingWelcome,homeVoiceIntroduction} from './voiceWelcome.mjs';
 import VoiceWave from './VoiceWave';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import {voiceResearchCache,voiceResearchBudget,wantsFreshLookup} from './voiceResearchCache.mjs';
+import {voiceResearchProgress,researchEvidence} from './voiceResearchProgress.mjs';
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
@@ -68,7 +69,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
   const summaryToken=useRef<string|undefined>(undefined);const summaryId=useRef('');
   const guidanceTokens=useRef(new Map<string,string>());
   const guidance=useRef(guidanceHistory(body=>{const token=guidanceTokens.current.get((body as {sessionId:string}).sessionId);if(!token)return Promise.resolve();return apiFetch('/api/guidance-history',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),keepalive:true}).then(response=>{if(!response.ok)throw new Error('guidance_event_failed');});}));
-  const sessionTurns=useRef<{role:'user'|'assistant';text:string}[]>([]);
+  const sessionTurns=useRef<{role:'user'|'assistant';text:string;topic?:string;language?:'en'|'es';expectedLanguage?:'en'|'es'}[]>([]);
   const sessionSources=useRef<{title:string;url:string;checkedAt:string}[]>([]);
   const memorySaved=useRef(true);
   const [savingSummary,setSavingSummary]=useState(false);
@@ -84,7 +85,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
     if(!sessionTurns.current.some(turn=>turn.role==='user')||!summaryId.current||!summaryScope.current.confirmed)return;
     const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
     const records=store.read<Record<string,unknown>>({});
-    records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,sources:sessionSources.current,guidance:guidance.current.attribution()};
+    records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,qualitySessionId:logSession.current,qualityComplete:false,sources:sessionSources.current,guidance:guidance.current.attribution()};
     if(!store.write(records))setNotice(t('Keep this page open until the summary saves.','Mantén esta página abierta hasta guardar el resumen.'));
   }
   async function saveSummary(){
@@ -92,7 +93,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
     const studentId=summaryScope.current.id,scopeName=summaryScope.current.name;
     checkpointSummary();
     memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
-    const body=JSON.stringify({turns,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources,guidance:guidance.current.attribution()});
+    const body=JSON.stringify({turns,qualitySessionId:logSession.current,qualityComplete:true,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources,guidance:guidance.current.attribution()});
     const savedMode=liveMode.current;
     const subject=history.cloud?user?.sub:undefined,date=new Date().toISOString();
     summaryQueue.current.add(id,async()=>{let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});{const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${subject||'preview'}`);store.removeEntry(id);}});
@@ -248,7 +249,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
         setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
           await languageControl.configure(async currentLanguage=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:routing,targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:family.students.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id)}),signal:abort.signal});
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:routing,targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:family.students.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal:abort.signal});
             const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error('guide_config_unavailable');
             if(generation.current!==version)throw new Error('voice_session_stopped');
             nextGuidance=data.guidance;
@@ -293,21 +294,9 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
           log('reply_recovered',{code});
         }
       };
-      let progressTimer:ReturnType<typeof setInterval>|undefined;
-      const stopProgress=()=>{clearInterval(progressTimer);progressTimer=undefined;};
+      const progress=voiceResearchProgress({speak:sentence=>turns.progress(sentence),language:()=>spokenLanguage.current,isCurrent:()=>generation.current===version&&!abort.signal.aborted,onProgress:elapsed=>log('lookup_progress',{durationMs:elapsed})});
+      const stopProgress=progress.stop;
       resources.current.stopProgress=stopProgress;
-      const startProgress=()=>{
-        stopProgress();const started=Date.now();let count=0;
-        progressTimer=setInterval(()=>{
-          if(generation.current!==version||abort.signal.aborted){stopProgress();return;}
-          const elapsed=Date.now()-started;
-          if(count<3&&elapsed>=[10000,35000,65000][count]){
-            const spoken=(en:string,es:string)=>spokenLanguage.current==='es'?es:en;
-            const sentence=count===0?spoken('I’m still checking the official guidance for your question.','Sigo consultando la guía oficial para tu pregunta.'):spoken('This is taking a little longer. I’m still checking the official sources.','Está tardando un poco más. Sigo consultando las fuentes oficiales.');
-            if(turns.progress(sentence)){count++;log('lookup_progress',{durationMs:elapsed});}
-          }
-        },1000);
-      };
       dc.onopen=()=>{
         if(generation.current!==version)return;
         clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
@@ -364,7 +353,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
             }
             const valid=userTurn?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
             if(valid&&userTurn){replyRecoveryUsed=false;setNotice('');}
-            if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:e.transcript});checkpointSummary();}
+            if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:e.transcript,topic:liveMode.current,...(userTurn?{language:spokenLanguage.current}:{expectedLanguage:spokenLanguage.current})});checkpointSummary();}
             if(valid&&!userTurn&&!scopePending.current)setLatestAnswer(e.transcript);
           }finally{release();}
         }
@@ -440,10 +429,11 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
                 const latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'';
                 const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution,forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};
                 let result=cache.get(query);
+                const reused=Boolean(result);
                 if(result){log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});}
                 else {
                   if(!researchBudget.take(query)){budgetExceeded=true;throw new Error('research_budget_reached');}
-                  startProgress();
+                  progress.start();
                   const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,...(guidance.current.current()?{'X-Origen-Segment':guidance.current.current()!.segmentId}:{})},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal:abort.signal});
                   result=await response.json();
                   if(generation.current!==version)return;
@@ -451,7 +441,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
                   cache.put(query,result);
                 }
                 log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
-                output={text:result.text,sources:result.sources,checkedAt:result.checkedAt};
+                output=researchEvidence(result,reused);
                 sessionSources.current=mergeConversationSources(sessionSources.current,result.sources);
                 setSources(sessionSources.current);
                 setNotice('');
@@ -496,7 +486,7 @@ export function LocalProfileVoice({profileSaved,onProfileSaveComplete,onSaveProf
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
       log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
       if(generation.current!==version)return;
       guidance.current.accept(data?.guidance);

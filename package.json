@@ -19,7 +19,8 @@
     "research:sandbox": "node research/sandbox/demo.mjs",
     "ops:readiness": "node ops/readiness.mjs",
     "ops:rehearse": "node ops/recovery-rehearsal.mjs",
-    "test:ops": "node --test ops/*.test.mjs"
+    "test:ops": "node --test ops/*.test.mjs",
+    "eval:feedback": "node scripts/evaluate-feedback.mjs"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.28.0",

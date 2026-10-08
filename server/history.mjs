@@ -2,6 +2,8 @@ import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {allowedRequest} from './origin.mjs';
 import {attachSummarySegments,reconcileSummaryAttribution} from './guidance-history.mjs';
+import {selectConversationMemory} from '../src/voiceMemory.mjs';
+import {linkConversationQuality} from './conversation-quality-store.mjs';
 
 const fail=(status,error)=>Object.assign(new Error(error),{status});
 const identifier=value=>typeof value==='string'&&value.length>0&&value.length<=128;
@@ -13,6 +15,7 @@ export function validateMemory(value){
 const memory=row=>({id:row.id,studentId:row.student_id,mode:row.mode,summary:row.summary,date:new Date(row.conversation_at).toISOString(),sources:row.sources});
 export function createHistoryRepository(database){
  return async(subject,input)=>{
+  if(input.action==='context'&&(input.studentId===undefined||input.studentId!==null&&!identifier(input.studentId)))throw fail(400,'memory_scope_required');
   if(!database)throw fail(503,'database_unavailable');
   const client=await database.connect();
   try{
@@ -39,6 +42,7 @@ export function createHistoryRepository(database){
      await client.query('INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,sources,conversation_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(account_id,id) DO NOTHING',[owner,item.id,item.studentId,item.mode,item.summary,JSON.stringify(item.sources),item.date]);
      if(input.action==='save'&&input.attribution)await attachSummarySegments(client,owner,item,input.attribution);
      if(input.action==='save')await reconcileSummaryAttribution(client,owner,item);
+     await linkConversationQuality(client,owner,item);
     }
    }
    if(input.action==='delete'){
@@ -51,8 +55,9 @@ export function createHistoryRepository(database){
     const rows=(await client.query('SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,input.id])).rows;
     await client.query('COMMIT');return {items:rows.map(memory)};
    }
-   const rows=(await client.query(`SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1${input.studentId===null?' AND student_id IS NULL':input.studentId?' AND student_id=$2':''} ORDER BY conversation_at DESC,id DESC LIMIT ${input.action==='context'?6:100}`,input.studentId?[owner,input.studentId]:[owner])).rows;
-   await client.query('COMMIT');return {items:rows.map(memory).reverse()};
+   const rows=(await client.query(`SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1${input.studentId===null?' AND student_id IS NULL':input.studentId?' AND student_id=$2':''} ORDER BY conversation_at DESC,id DESC LIMIT ${input.action==='context'?24:100}`,input.studentId?[owner,input.studentId]:[owner])).rows;
+   const items=input.action==='context'?selectConversationMemory(rows.map(memory),input.mode):rows.map(memory).reverse();
+   await client.query('COMMIT');return {items};
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  };
 }
