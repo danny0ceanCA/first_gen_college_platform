@@ -1,4 +1,5 @@
 import {progressEnabled,observeProfile} from './progress-history.mjs';
+import {onboardingUUID,recordOnboardingSave} from './onboarding-events.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {accountClosed} from './account-lifecycle.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -36,7 +37,8 @@ export function validateFamily(input){
   case 'save-account':{const details=account(input.account);if(!details.firstName)return invalid();return {action:input.action,account:details};}
   case 'complete-onboarding':{
    const details=account(input.account);if(!details.firstName||!details.role)return invalid();
-   return {action:input.action,account:details,...(input.student===undefined?{}:{student:student(input.student)})};
+   if(input.onboardingAttemptId!==undefined&&!onboardingUUID(input.onboardingAttemptId))return invalid();
+   return {action:input.action,account:details,...(input.onboardingAttemptId?{onboardingAttemptId:input.onboardingAttemptId}:{}),...(input.student===undefined?{}:{student:student(input.student)})};
   }
   case 'save-student':return {action:input.action,student:student(input.student)};
   case 'delete-student':return {action:input.action,id:id(input.id)};
@@ -83,6 +85,7 @@ export function createFamilyRepository(database,env=process.env){
    if(input.action==='complete-onboarding'&&input.student)await saveStudent(input.student);
    if(input.action==='onboarding-start')await client.query('UPDATE origen_accounts SET onboarding_started_at=COALESCE(onboarding_started_at,now()) WHERE id=$1',[owner]);
    if(input.action==='complete-onboarding')await client.query('UPDATE origen_accounts SET onboarding_completed_at=COALESCE(onboarding_completed_at,now()) WHERE id=$1',[owner]);
+   if(input.action==='complete-onboarding')await recordOnboardingSave(client,owner,input.onboardingAttemptId);
    if(input.action==='save-student')await saveStudent(input.student);
    if(input.action==='delete-student'){
     if((await client.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 AND owner_student_id=$2',[owner,input.id])).rows.length)throw Object.assign(new Error('unlink_before_deleting'),{status:409});

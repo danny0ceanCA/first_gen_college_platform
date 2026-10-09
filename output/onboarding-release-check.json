@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-09T22:14:40.050Z",
+  "completedAt": "2026-10-09T22:16:21.882Z",
+  "scope": "Local synthetic onboarding release verification",
+  "sourceFingerprint": "13690ee8acf13f11d027b194e9c0fba996d9df37c71d532ebdb11bcc09a73454",
+  "sourceUnchanged": true,
+  "checks": {
+    "server": {
+      "status": "passed",
+      "counts": {
+        "tests": 352,
+        "pass": 348,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 4,
+        "todo": 0
+      },
+      "durationMs": 16226
+    },
+    "build": {
+      "status": "passed",
+      "durationMs": 14377
+    },
+    "browser": {
+      "status": "passed",
+      "scenarios": [
+        {
+          "scenario": "phase-1",
+          "status": "passed",
+          "durationMs": 14527
+        },
+        {
+          "scenario": "phase-2",
+          "status": "passed",
+          "durationMs": 9776
+        },
+        {
+          "scenario": "phase-3",
+          "status": "passed",
+          "durationMs": 12305
+        },
+        {
+          "scenario": "phase-4",
+          "status": "passed",
+          "durationMs": 9845
+        },
+        {
+          "scenario": "phase-5",
+          "status": "passed",
+          "durationMs": 10917
+        },
+        {
+          "scenario": "phase-6",
+          "status": "passed",
+          "durationMs": 12792
+        }
+      ]
+    }
+  },
+  "passed": true,
+  "productionVerified": false,
+  "remainingChecks": [
+    "Real Auth0 registration and sign-in on the deployed origin",
+    "Dedicated PostgreSQL integration checks if skipped",
+    "Human listening check for Spanish/English pronunciation, volume and interruptions",
+    "Deployed migration and admin permission verification"
+  ],
+  "deployed": false
+}

@@ -1,0 +1,1 @@
+export function onboardingVoiceDiagnostics(record:(name:string,metadata?:Record<string,unknown>)=>void,options?:{now?:()=>number}):{provider:(event:any)=>void;transcript:(id:string,status:'accepted'|'empty'|'failed'|'timeout')=>void;playback:(state:'playing'|'paused'|'blocked'|'silent')=>void;ready:()=>boolean;stop:()=>void};

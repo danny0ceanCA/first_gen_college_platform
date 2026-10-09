@@ -1,0 +1,3 @@
+export type OnboardingTracker={id:string;started:boolean;event:(name:string,metadata?:Record<string,unknown>)=>void;flush:()=>Promise<void>;resume:()=>void;pause:()=>void;clear:()=>void;open:(metadata:Record<string,unknown>)=>void;fields:(fields:Record<string,boolean>)=>void;logout:()=>Promise<void>;homeReached:()=>void};
+export function onboardingEvents(send:(body:{attemptId:string;events:unknown[]})=>Promise<unknown>,options?:{enabled?:boolean;id?:string;storage?:Storage;scope?:string}):OnboardingTracker;
+export function onboardingFieldPresence(name:string,role:string,draft:unknown):Record<string,boolean>;

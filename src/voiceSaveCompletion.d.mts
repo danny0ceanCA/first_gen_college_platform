@@ -1,1 +1,1 @@
-export function voiceSaveCompletion(complete:()=>void):{arm:()=>void;event:(event:any)=>void;ended:()=>void};
+export function voiceSaveCompletion(complete:(reason:string)=>void,options?:{onEvent?:(name:string,metadata?:Record<string,unknown>)=>void;now?:()=>number;retryAfterInterruption?:boolean}):{arm:()=>void;event:(event:any)=>void;ended:(reason?:string)=>void};

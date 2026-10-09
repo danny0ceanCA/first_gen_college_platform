@@ -1,6 +1,9 @@
 import {reviewConversationFinding} from './conversation-reviews.mjs';
 import {adminOverview} from './admin-overview.mjs';
 import {adminUsers,adminUserDetail} from './admin-users.mjs';
+import {adminOnboardingTimeline,adminOnboardingAttempt} from './admin-onboarding.mjs';
+import {adminOnboardingMetrics} from './admin-onboarding-metrics.mjs';
+import {adminOnboardingAlerts} from './onboarding-alerts.mjs';
 import {adminVoiceQuality} from './voice-quality.mjs';
 import {adminConversationQuality} from './conversation-quality-store.mjs';
 import {adminInstitutionReport} from './admin-institutions.mjs';
@@ -23,6 +26,17 @@ export function createAdminHandler(database,env){
     try{return send(200,await reviewConversationFinding(database,req.origenIdentity.sub,data));}catch(error){if([400,404,409].includes(error.status))return send(error.status,{error:error.message});throw error;}
    }
    if(data.action==='access')return send(200,{admin:true});
+   if(data.action==='onboarding-metrics'){
+    try{return send(200,await adminOnboardingMetrics(database,data,new Date(),env));}
+    catch(error){return send(error.status===400?400:503,{error:error.status===400?error.message:'onboarding_metrics_unavailable'});}
+   }
+   if(data.action==='onboarding-alerts'){
+    try{return send(200,await adminOnboardingAlerts(database,env));}catch{return send(503,{error:'onboarding_alerts_unavailable'});}
+   }
+   if(['onboarding-timeline','onboarding-attempt'].includes(data.action)){
+    try{return send(200,await (data.action==='onboarding-timeline'?adminOnboardingTimeline:adminOnboardingAttempt)(database,data,new Date(),env));}
+    catch(error){return send([400,404].includes(error.status)?error.status:503,{error:[400,404].includes(error.status)?error.message:'onboarding_history_unavailable'});}
+   }
    if(data.action==='conversation-quality'){
     try{return send(200,await adminConversationQuality(database,data));}catch(error){if(error.status===400)return send(400,{error:error.message});throw error;}
    }

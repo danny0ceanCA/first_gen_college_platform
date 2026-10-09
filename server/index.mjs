@@ -1,4 +1,6 @@
 import {createCampaignHandler} from './institution-campaigns.mjs';
+import {createOnboardingHandler,purgeOnboardingEvents} from './onboarding-events.mjs';
+import {onboardingSettings} from './onboarding-settings.mjs';
 import {purgeConversationQuality} from './conversation-quality-store.mjs';
 import {purgeInstitutionOutreach} from './institution-outreach-data.mjs';
 import {createInquiryHandler,purgeInstitutionInquiries} from './institution-inquiries.mjs';
@@ -29,6 +31,7 @@ import {createGuidanceHandler,guidanceEnabled,backfillGuidanceIdentities,purgeGu
 export function createApp(env=process.env,verify,database=null,writeLog=record=>console.log(JSON.stringify(record))){
  assertProductionConfig(env);
  assertProgressConfiguration(env);
+ onboardingSettings(env);
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  const domain=env.AUTH0_DOMAIN,audience=env.AUTH0_AUDIENCE;
  const jwks=domain?createRemoteJWKSet(new URL(`https://${domain}/.well-known/jwks.json`)):null;
@@ -38,7 +41,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const inquiries=createInquiryHandler(database);
  const metrics=createMetricsHandler(database);
  const lifecycle=createLifecycleHandler(database);
- const handlers=[createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
+ const handlers=[createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env)];
  const buckets=new Map();
  return async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
@@ -98,7 +101,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   await purgeGuidanceHistory(database);
   await purgeProgressHistory(database);
   await purgeConversationQuality(database);
-  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database),purgeConversationQuality(database)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
+  await purgeOnboardingEvents(database,new Date(),process.env);
+  const metricsCleanup=setInterval(()=>{void Promise.all([purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database),purgeConversationQuality(database),purgeOnboardingEvents(database,new Date(),process.env)]).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
   const server=createServer(createApp(process.env,undefined,database));
   server.listen(Number(process.env.PORT||3001),'0.0.0.0',()=>console.log('Origen API listening'));
   let stopping=false;

@@ -1,6 +1,8 @@
 import {Auth0Context,useAuth0,type Auth0ContextInterface} from '@auth0/auth0-react';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {apiFetch,setAPITokenProvider} from './api';
+import {apiFetch,setAPITokenProvider,onboardingTransport} from './api';
+import {onboardingEvents} from './onboardingEvents.mjs';
+import {useOnboardingDelivery,onboardingStorage} from './useOnboardingDelivery';
 import {onboardingRecovery} from './onboardingRecovery.mjs';
 import {FamilyProvider,useFamily} from './FamilyStore';
 import {ConversationHistoryProvider} from './ConversationHistory';
@@ -39,9 +41,11 @@ export default function NativeWelcome(){
 }
 function NativeStory({init}:{init:Init}){
  const family=useFamily();const [language,setLanguage]=useState(init.language);const loaded=useRef(false);
+ const [tracker]=useState(()=>onboardingEvents(onboardingTransport(init.subject,token),{enabled:family.cloud,storage:onboardingStorage(),scope:init.subject}));
+ useOnboardingDelivery(tracker,!family.loading&&(loaded.current||!family.error));
  const completion=useRef<{firstName:string;role:'parent'|'student';student?:StudentProfile;language:'en'|'es'}|undefined>(undefined);
  const [finishError,setFinishError]=useState(false);
- const close=async()=>{try{
+ const close=async()=>{const began=performance.now();try{
   // Finish deferred onboarding memory before the native host closes this screen.
   const student=completion.current?.student;
   if(family.cloud&&student){
@@ -53,11 +57,11 @@ function NativeStory({init}:{init:Init}){
     recovery.removeEntry(id);
    }
   }
-await request('complete',completion.current);send({id:crypto.randomUUID(),type:'closed'});}catch{setFinishError(true);}};
+tracker.event('native_handoff_requested',{surface:'native'});await request('complete',completion.current);tracker.event('native_handoff_acknowledged',{surface:'native',durationMs:Math.round(Math.min(600000,performance.now()-began))});await Promise.race([tracker.flush(),new Promise(resolve=>setTimeout(resolve,500))]);send({id:crypto.randomUUID(),type:'closed'});}catch{tracker.event('native_handoff_failed',{surface:'native',reason:'request_failed'});void tracker.flush();setFinishError(true);}};
  if(!family.loading&&!family.error)loaded.current=true;
  if(family.loading||(family.error&&!loaded.current))return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
- return <>{finishError&&<p role="alert">Could not open home. / No se pudo abrir el inicio. <button onClick={()=>void close()}>Retry / Reintentar</button></p>}<Welcome onComplete={()=>void close()} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{
-  if(!await family.completeOnboarding(firstName,role,student))return false;
+ return <>{finishError&&<p role="alert">Could not open home. / No se pudo abrir el inicio. <button onClick={()=>void close()}>Retry / Reintentar</button></p>}<Welcome surface="native" tracker={tracker} onComplete={()=>void close()} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{
+  if(!await family.completeOnboarding(firstName,role,student,options?.attemptId))return false;
   completion.current={firstName,role,student,language};if(!options?.keepOpen)await close();return true;
  }}/></>;
 }

@@ -1,0 +1,1 @@
+export function onboardingTransition<T>(options:{exit:()=>unknown;open:()=>unknown;home:()=>T|Promise<T>;enter:(node:NonNullable<T>)=>unknown;restore:()=>void;record?:(name:string,metadata?:Record<string,unknown>)=>void;signal?:AbortSignal;now?:()=>number}):Promise<void>;

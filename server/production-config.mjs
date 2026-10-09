@@ -1,4 +1,5 @@
 import {pathToFileURL} from 'node:url';
+import {onboardingConfigIssues} from './onboarding-settings.mjs';
 
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
@@ -15,7 +16,7 @@ export function productionConfigIssues(env){
  if(env.GUIDANCE_HISTORY_ENABLED==='true'&&!env.GUIDANCE_DATA_OWNER?.trim())issues.push('GUIDANCE_DATA_OWNER: assign an operational data owner before enabling collection');
  if(env.GUIDANCE_HISTORY_ENABLED==='true'&&!env.RENDER_GIT_COMMIT?.trim()&&!env.APPLICATION_REVISION?.trim())issues.push('APPLICATION_REVISION: a build revision is required when guidance collection is enabled');
  if(env.GUIDANCE_LEGACY_ISSUER&&env.GUIDANCE_LEGACY_ISSUER!==`https://${env.AUTH0_DOMAIN}/`)issues.push('GUIDANCE_LEGACY_ISSUER: must match the verified configured tenant issuer');
- return issues;
+ return [...issues,...onboardingConfigIssues(env)];
 }
 export function assertProductionConfig(env){
  if(env.NODE_ENV!=='production')return;

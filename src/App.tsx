@@ -1,3 +1,6 @@
+import {onboardingEvents} from './onboardingEvents.mjs';
+import {onboardingTransport} from './api';
+import {useOnboardingDelivery,onboardingStorage} from './useOnboardingDelivery';
 import {AdminLink} from './AdminDashboard';
 import ProfileVoice from './ProfileVoice';
 import {SharedVoiceContext} from './SharedVoiceContext';
@@ -45,9 +48,15 @@ function FamilyApp() {
   const transitionFromOnboarding=useOnboardingTransition();
   const sharedVoice=useContext(SharedVoiceContext);
   const family=useFamily();
-  const {isAuthenticated,user,logout}=useAuth0();
+  const onboardingAccountLoaded=useRef(false);
+  if(!family.loading&&!family.error)onboardingAccountLoaded.current=true;
+  const {isAuthenticated,user,logout,getAccessTokenSilently}=useAuth0();
   const storageScope=isAuthenticated&&user?.sub?`origen.user.${user.sub}`:'camino';
+  const [onboardingTracker]=useState(()=>onboardingEvents(onboardingTransport(user?.sub,()=>getAccessTokenSilently()),{enabled:family.cloud,storage:onboardingStorage(),scope:user?.sub}));
+  useOnboardingDelivery(onboardingTracker,!family.loading&&(onboardingAccountLoaded.current||!family.error));
   const [welcoming,setWelcoming]=useState(false);
+  const homePending=useRef(false);
+  useEffect(()=>{if(homePending.current&&!welcoming&&page==='home'){homePending.current=false;onboardingTracker.homeReached();}});
   const welcomeChecked=useRef(false);
   useEffect(()=>{if(!family.loading&&!family.error&&!welcomeChecked.current){welcomeChecked.current=true;setWelcoming((isAuthenticated&&(!family.account.firstName||!family.account.role)));}},[family.loading,family.error,family.account.firstName,family.account.role,isAuthenticated]);
   const logOut=()=>{if(isAuthenticated)void logout({logoutParams:{returnTo:window.location.origin}});else window.location.hash='';};
@@ -134,8 +143,8 @@ function FamilyApp() {
   };
   if(family.loading)return <main className="application-panel" role="status">{t('Loading your family…','Cargando tu familia…')}</main>;
   if(family.error&&!welcomeChecked.current)return <main className="application-panel"><p role="alert">{t('Your family could not be loaded. Your saved information has not been replaced.','No se pudo cargar tu familia. No se ha reemplazado tu información guardada.')}</p><button className="button primary" onClick={family.reload}>{t('Try again','Intentar de nuevo')}</button><button className="button outline" onClick={logOut}>{t('Log out','Cerrar sesión')}</button></main>;
-  const finishWelcome=()=>transitionFromOnboarding(()=>{go('home');setModal(null);setWelcoming(false);window.location.hash='app';});
-  if(welcoming)return <Welcome onComplete={finishWelcome} onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added,options)=>{setLanguages(previous=>({...previous,[accountRole]:liveLanguage.current}));if(!await family.completeOnboarding(firstName,accountRole,added))return false;if(added)setSelected(added.id);if(!options?.keepOpen)finishWelcome();return true;}}/>;
+  const finishWelcome=()=>transitionFromOnboarding(()=>{homePending.current=true;go('home');setModal(null);setWelcoming(false);window.location.hash='app';},onboardingTracker.event);
+  if(welcoming)return <Welcome tracker={onboardingTracker} onComplete={finishWelcome} onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added,options)=>{setLanguages(previous=>({...previous,[accountRole]:liveLanguage.current}));if(!await family.completeOnboarding(firstName,accountRole,added,options?.attemptId))return false;if(added)setSelected(added.id);if(!options?.keepOpen)finishWelcome();return true;}}/>;
   return <div className="app-shell">
     {mobile && <button className="sidebar-shade" onClick={() => setMobile(false)} aria-label="Close navigation" />}
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
