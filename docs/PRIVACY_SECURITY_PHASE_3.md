@@ -1,5 +1,16 @@
 # Phase 3 — Staff, institution, and family access
 
+## Administrator sign-in update — 2026-10-10
+
+At the owner's request, administrative reports now accept regular, verified Auth0
+sign-in with the required API permissions. The administrator dashboard does not
+require an authenticator enrollment or MFA timestamp and does not display the
+two-step verification banner. Permission checks, suspension, auditing, database
+isolation and exclusion of private conversation text remain enforced. Admin write
+actions still require login proof within five minutes; token issuance is not proof
+of a new login. Institutional staff routes retain their existing MFA policy.
+The earlier MFA statements below apply to institutional access, not admin reports.
+
 Implemented locally on 2026-10-10. Requires migrations 035/036, runtime grants,
 Auth0 configuration, and deployment before these protections operate in production.
 No production database, Auth0 tenant, or staff assignment was changed.

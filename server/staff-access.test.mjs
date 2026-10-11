@@ -43,10 +43,13 @@ test('audit is an allowlisted receipt and never copies sensitive request fields'
  const db=database();await requireStaffAccess(db,identity,{scope:'admin',action:'overview',target:'PRIVATE email and name',summary:'PRIVATE conversation',token:'PRIVATE bearer'});
  assert.equal(db.audit[0].length,6);assert.match(db.audit[0][1],/^[a-f0-9]{64}$/);assert.match(db.audit[0][4],/^[a-f0-9]{64}$/);assert.doesNotMatch(JSON.stringify(db.audit),/PRIVATE|auth0/);
 });
-test('staff HTTP routes cannot bypass MFA, method, or fine-grained permissions',async()=>{
+test('admin reads use normal sign-in while write freshness and institution MFA remain enforced',async()=>{
  const db=database(),admin=createAdminHandler(db,{}),reader={sub:'auth0|reader',permissions:['read:activity']};
  assert.equal((await request(admin,'/api/admin',{action:'access'},reader)).body.admin,true);
- assert.equal((await request(admin,'/api/admin',{action:'overview',mfa:true},reader)).body.error,'staff_mfa_required');
+ assert.equal((await request(admin,'/api/admin',{action:'access'},reader)).body.authenticationRequired,null);
+ await requireStaffAccess(db,reader,{scope:'admin',action:'overview',permission:'read:activity'});
+ assert.equal(db.audit.at(-1)[5],'authorized');
+ assert.equal((await request(admin,'/api/admin',{action:'review-decision',mfa:true},{...reader,permissions:['write:reviews']})).body.error,'reauthentication_required');
  for(const action of ['user-detail','conversation-review','review-decision','institution-snapshot-save'])assert.equal((await request(admin,'/api/admin',{action},{...identity,permissions:['read:activity']})).body.error,'staff_permission_required');
  assert.equal((await request(admin,'/api/admin',{action:'__proto__'},reader)).status,400);
  assert.equal((await request(admin,'/api/admin',null,reader)).status,400);
@@ -57,6 +60,16 @@ test('staff HTTP routes cannot bypass MFA, method, or fine-grained permissions',
   [createCampaignHandler(db),'/api/institution-campaigns',{action:'list',institutionId:id}],
   [createMetricsHandler(db),'/api/institution-metrics/report',{id}],
  ]){const r=await request(handler,url,body,{sub:'auth0|staff'});assert.equal(r.body.error,'staff_mfa_required',JSON.stringify(r));}
+});
+test('regular admin access does not require MFA claims, but fresh mutations need actual login proof',async()=>{
+ const normal={sub:'auth0|admin',iat:seconds,permissions:['read:activity','write:reviews']};
+ assert.equal(adminCapabilities(normal,{}).authenticationRequired,null);
+ assert.equal(staffAuthenticationError(normal,{now,requireMfa:false}),null);
+ for(const value of [undefined,null,'123',0,seconds+1,seconds-301])assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:value},{now,fresh:true,requireMfa:false}),'reauthentication_required');
+ assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:seconds},{now,fresh:true,requireMfa:false}),null);
+ await requireStaffAccess(database(),{...normal,[AUTH_TIME_CLAIM]:seconds},{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true});
+ await assert.rejects(requireStaffAccess(database(),normal,{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true}),{message:'reauthentication_required'});
+ await assert.rejects(requireStaffAccess(database(),normal,{scope:'admin',action:'users',permission:'read:users'}),{message:'staff_permission_required'});
 });
 test('Auth0 challenge and proof Actions distinguish enrollment, completed MFA, and refresh',async()=>{
  const require=createRequire(import.meta.url),challenge=require('../auth0/staff-mfa-action.cjs'),proof=require('../auth0/recent-auth-action.cjs');

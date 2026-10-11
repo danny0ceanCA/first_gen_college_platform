@@ -19,10 +19,11 @@ export function staffPermissions(identity,env={}){
  if((env.INSTITUTION_REVIEWER_SUBJECTS||'').split(',').map(s=>s.trim()).filter(Boolean).includes(identity?.sub))permissions.add('manage:institutions');
  return [...permissions];
 }
-export function staffAuthenticationError(identity,{fresh=false,now=Date.now()}={}){
+export function staffAuthenticationError(identity,{fresh=false,requireMfa=true,now=Date.now()}={}){
+ if(!requireMfa&&!fresh)return null;
  const seconds=Math.floor(now/1000),maximum=fresh?300:43200;
  const valid=time=>Number.isSafeInteger(time)&&time>0&&time<=seconds&&seconds-time<=maximum;
- if(!valid(identity?.[MFA_TIME_CLAIM]))return 'staff_mfa_required';
+ if(requireMfa&&!valid(identity?.[MFA_TIME_CLAIM]))return 'staff_mfa_required';
  if(!valid(identity?.[AUTH_TIME_CLAIM]))return 'reauthentication_required';
  return null;
 }
@@ -30,7 +31,7 @@ export function adminCapabilities(identity,env){
  const permissions=staffPermissions(identity,env);
  return {admin:Object.values(ADMIN_ACTIONS).some(p=>permissions.includes(p)),permissions,
   actions:Object.entries(ADMIN_ACTIONS).filter(([,p])=>permissions.includes(p)).map(([a])=>a),
-  authenticationRequired:staffAuthenticationError(identity)};
+  authenticationRequired:staffAuthenticationError(identity,{requireMfa:false})};
 }
 
 // No arbitrary payloads, names, email addresses, notes, tokens, or conversation
@@ -41,7 +42,7 @@ export async function auditStaffDecision(database,identity,{scope,action,target,
   [randomUUID(),staffHash(identity.sub),scope,action,typeof target==='string'&&target?staffHash(target):null,outcome]);
 }
 export async function requireStaffAccess(database,identity,{scope,action,target,permission,env={},fresh=false}){
- let error=permission&&!staffPermissions(identity,env).includes(permission)?'staff_permission_required':staffAuthenticationError(identity,{fresh});
+ let error=permission&&!staffPermissions(identity,env).includes(permission)?'staff_permission_required':staffAuthenticationError(identity,{fresh,requireMfa:scope!=='admin'});
  if(!error){
   const control=(await database.query('SELECT blocked,token_valid_after FROM origen_staff_access_controls WHERE subject_hash=$1',[staffHash(identity.sub)])).rows[0];
   if(control&&(control.blocked||!Number.isSafeInteger(identity.iat)||identity.iat*1000<=new Date(control.token_valid_after).getTime()))error='staff_access_revoked';
