@@ -1,5 +1,6 @@
 import {createDatabase} from './database.mjs';
 import {pathToFileURL} from 'node:url';
+import {isolateDatabase,assertRuntimeIsolation,runOperatorReport} from './account-isolation.mjs';
 
 // Operator-only aggregate report. No account/student/session IDs are output.
 export async function guidanceReport(database){
@@ -11,5 +12,5 @@ export async function guidanceReport(database){
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const database=createDatabase();if(!database)throw new Error('DATABASE_URL is required');
- try{console.log(JSON.stringify(await guidanceReport(database),null,2));}finally{await database.end();}
+ try{await assertRuntimeIsolation(database);console.log(JSON.stringify(await runOperatorReport(()=>guidanceReport(isolateDatabase(database))),null,2));}finally{await database.end();}
 }

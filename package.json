@@ -11,6 +11,8 @@
     "mobile:web": "npm --prefix mobile run web",
     "start": "node server/index.mjs",
     "db:migrate": "node server/migrate.mjs",
+    "db:grant-runtime": "node scripts/provision-database-runtime.mjs",
+    "db:check-runtime": "node scripts/check-database-runtime.mjs",
     "check:production": "node server/production-config.mjs",
     "test": "node --test server/*.test.mjs",
     "eval:contracts": "node server/model-evaluation.mjs contracts",

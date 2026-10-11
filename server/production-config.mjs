@@ -4,6 +4,15 @@ import {onboardingConfigIssues} from './onboarding-settings.mjs';
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
  const issues=[];
+ if(env.PRIVACY_RESTORE_PENDING==='true')issues.push('PRIVACY_RESTORE_PENDING: replay and verify the latest deletion journal before serving restored data');
+ if(env.NODE_TLS_REJECT_UNAUTHORIZED==='0')issues.push('NODE_TLS_REJECT_UNAUTHORIZED: certificate verification must remain enabled');
+ if(env.DATABASE_TLS_MODE&&!['verify-full','render-internal'].includes(env.DATABASE_TLS_MODE))issues.push('DATABASE_TLS_MODE: use verify-full or render-internal');
+ if(env.DATABASE_TLS_MODE==='render-internal'){
+  let internal=false;try{internal=env.RENDER==='true'&&/^dpg-[a-z0-9-]+$/.test(new URL(env.DATABASE_URL).hostname);}catch{}
+  if(!internal)issues.push('DATABASE_TLS_MODE: render-internal requires Render and a private dpg hostname');
+ }
+ if(env.AUTH0_MANAGEMENT_TOKEN?.trim())issues.push('AUTH0_MANAGEMENT_TOKEN: keep identity-deletion credentials in the operator environment only');
+ if(env.MIGRATION_DATABASE_URL?.trim())issues.push('MIGRATION_DATABASE_URL: keep the migration credential out of the API environment; run migrations separately');
  for(const name of ['AUTH0_DOMAIN','AUTH0_AUDIENCE','ALLOWED_ORIGINS','DATABASE_URL','OPENAI_API_KEY'])if(!env[name]?.trim())issues.push(`${name}: required`);
  if(env.AUTH0_DOMAIN&&!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(env.AUTH0_DOMAIN))issues.push('AUTH0_DOMAIN: use a hostname without protocol or path');
  if(env.ALLOWED_ORIGINS){

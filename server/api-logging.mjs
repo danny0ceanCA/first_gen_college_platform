@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {diagnosticRecord} from './diagnostics.mjs';
 
-const routes=new Set(['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report','api/ai','api/chat','api/family','api/onboarding-events','api/plans','api/institutions','api/institution-campaigns','api/institution-inquiries/public','api/institution-inquiries/staff','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research','api/guidance-history','api/progress']);
+const routes=new Set(['api/admin','api/privacy','api/activity','healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report','api/ai','api/chat','api/family','api/onboarding-events','api/plans','api/topic-notes','api/workspace-sheets','api/institutions','api/institution-campaigns','api/institution-inquiries/public','api/institution-inquiries/staff','api/account-links','api/conversation-history','api/conversation-summary','api/voice-diagnostics','api/profile-voice','api/finance-research','api/admissions-research','api/guidance-history','api/progress']);
 // Never log error messages: database errors can include SQL, values or credentials.
 export function safeErrorCode(error){
  const code=error?.code;
@@ -12,7 +12,7 @@ export function safeErrorCode(error){
  return 'operation_failed';
 }
 
-export function instrumentRequest(req,res,write){
+export function instrumentRequest(req,res,write,observe=()=>{}){
  const started=performance.now();
  const route=(req.url||'').split('?')[0].replace(/^\//,'');
  const endpoint=routes.has(route)?route.replaceAll('/','.'):'unknown_route';
@@ -32,6 +32,7 @@ export function instrumentRequest(req,res,write){
  const complete=aborted=>{
   if(completed)return;completed=true;
   const status=aborted?499:res.statusCode;
+  try{observe({subject:req.origenIdentity?.sub,endpoint,status});}catch{/* Response delivery does not depend on best-effort denial monitoring. */}
   // Successful probe requests are omitted to keep production logs useful.
   if(!aborted&&status<400&&['healthz','readyz','api/account-data','api/institution-metrics/event','api/institution-metrics/report'].includes(endpoint))return;
   emit({event:aborted?'api_aborted':'api_request',level:status>=500?'error':status>=400?'warn':'info',httpStatus:status,durationMs:Math.round(performance.now()-started),code:aborted?'client_disconnected':code});

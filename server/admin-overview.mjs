@@ -20,21 +20,21 @@ export function adminSeries(rows,window,measuredSince){
  }
  return series;
 }
-export async function adminOverview(database,days=30,now=new Date()){
+export async function adminOverview(database,days=30,now=new Date(),{includePeople=true}={}){
  const window=adminWindow(days,now);
  const [current,previous,count,users,activity,daily,tracking]=await Promise.all([
  database.query(periodSQL,[window.start,window.end]),
  database.query(periodSQL,[window.previousStart,window.start]),
  database.query('SELECT count(*) AS users FROM origen_accounts'),
- database.query(`SELECT a.id,a.first_name,a.created_at,
+ includePeople?database.query(`SELECT a.id,a.first_name,a.created_at,
  (SELECT count(*) FROM origen_login_activity l WHERE l.account_id=a.id AND l.created_at >= $1 AND l.created_at < $2) AS logins,
  (SELECT max(created_at) FROM origen_login_activity l WHERE l.account_id=a.id) AS last_login,
  (SELECT coalesce(sum(seconds),0)::double precision/60 FROM origen_voice_activity v WHERE v.account_id=a.id AND v.started_at >= $1 AND v.started_at < $2) AS voice_minutes
- FROM origen_accounts a ORDER BY a.created_at DESC LIMIT 200`,[window.start,window.end]),
- database.query(`SELECT * FROM (
+ FROM origen_accounts a ORDER BY a.created_at DESC LIMIT 200`,[window.start,window.end]):{rows:[]},
+ includePeople?database.query(`SELECT * FROM (
  SELECT l.id,l.account_id,a.first_name,'sign_in' AS event,l.created_at AS occurred_at,0::double precision AS minutes,'' AS topic FROM origen_login_activity l JOIN origen_accounts a ON a.id=l.account_id
  UNION ALL SELECT v.id,v.account_id,a.first_name,'voice_call',v.started_at,v.seconds::double precision/60,v.topic FROM origen_voice_activity v JOIN origen_accounts a ON a.id=v.account_id
- ) events WHERE occurred_at >= $1 AND occurred_at < $2 ORDER BY occurred_at DESC LIMIT 50`,[window.start,window.end]),
+ ) events WHERE occurred_at >= $1 AND occurred_at < $2 ORDER BY occurred_at DESC LIMIT 50`,[window.start,window.end]):{rows:[]},
  database.query(`SELECT to_char(date,'YYYY-MM-DD') AS date,sum(new_users) AS new_users,sum(logins) AS logins,sum(voice_minutes) AS voice_minutes,sum(calls) AS calls FROM (
  SELECT date_trunc('day',created_at AT TIME ZONE 'UTC') AS date,count(*) AS new_users,0 AS logins,0::double precision AS voice_minutes,0 AS calls FROM origen_accounts WHERE created_at >= $1 AND created_at < $2 GROUP BY 1
  UNION ALL SELECT date_trunc('day',created_at AT TIME ZONE 'UTC'),0,count(*),0::double precision,0 FROM origen_login_activity WHERE created_at >= $1 AND created_at < $2 GROUP BY 1

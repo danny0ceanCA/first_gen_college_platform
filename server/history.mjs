@@ -13,6 +13,12 @@ export function validateMemory(value){
  return {id:value.id,studentId:value.studentId,mode:value.mode,summary:value.summary.trim(),date:new Date(value.date).toISOString(),sources};
 }
 const memory=row=>({id:row.id,studentId:row.student_id,mode:row.mode,summary:row.summary,date:new Date(row.conversation_at).toISOString(),sources:row.sources});
+async function reserveConversation(client,owner,item){
+ const existing=(await client.query('SELECT student_id,mode,deleted_at FROM origen_conversation_lifecycle WHERE account_id=$1 AND id=$2',[owner,item.id])).rows[0];
+ if(existing?.deleted_at)throw fail(410,'summary_deleted');
+ if(existing&&(existing.student_id!==item.studentId||existing.mode!==item.mode))throw fail(409,'summary_conflict');
+ if(!existing)await client.query('INSERT INTO origen_conversation_lifecycle(account_id,id,student_id,mode) VALUES($1,$2,$3,$4)',[owner,item.id,item.studentId,item.mode]);
+}
 export function createHistoryRepository(database){
  return async(subject,input)=>{
   if(input.action==='context'&&(input.studentId===undefined||input.studentId!==null&&!identifier(input.studentId)))throw fail(400,'memory_scope_required');
@@ -26,6 +32,11 @@ export function createHistoryRepository(database){
    const owner=account.id;
    const requireStudent=async id=>{if(!(await client.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[owner,id])).rows.length)throw fail(404,'student_not_found');};
    if(input.studentId)await requireStudent(input.studentId);
+   if(input.action==='reserve-summary'){
+    const item=validateMemory(input.item);
+    if(item.studentId!==null&&!input.deferred)await requireStudent(item.studentId);
+    await reserveConversation(client,owner,item);await client.query('COMMIT');return {items:[]};
+   }
    if(input.action==='save'||input.action==='import'){
     let values=input.action==='save'?[validateMemory(input.item)]:input.items.map(validateMemory);
     if(input.action==='import'){
@@ -37,6 +48,7 @@ export function createHistoryRepository(database){
      // Imports skip summaries for students that were deleted or never belonged to this account.
      const student=item.studentId===null?{id:null}:(await client.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[owner,item.studentId])).rows[0];
      if(!student){if(input.action==='import')continue;throw fail(404,'student_not_found');}
+     try{await reserveConversation(client,owner,item);}catch(error){if(input.action==='import'&&error.status===410)continue;throw error;}
      const existing=(await client.query('SELECT student_id,mode FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,item.id])).rows[0];
      if(existing&&(existing.student_id!==item.studentId||existing.mode!==item.mode))throw fail(409,'summary_conflict');
      await client.query('INSERT INTO origen_conversation_summaries(account_id,id,student_id,mode,summary,sources,conversation_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(account_id,id) DO NOTHING',[owner,item.id,item.studentId,item.mode,item.summary,JSON.stringify(item.sources),item.date]);
@@ -46,9 +58,13 @@ export function createHistoryRepository(database){
     }
    }
    if(input.action==='delete'){
-    if(!(await client.query('DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2 RETURNING id',[owner,input.id])).rows.length)throw fail(404,'summary_not_found');
+    const known=(await client.query('SELECT id FROM origen_conversation_lifecycle WHERE account_id=$1 AND id=$2',[owner,input.id])).rows.length;
+    if(!known)throw fail(404,'summary_not_found');
+    await client.query('UPDATE origen_conversation_lifecycle SET deleted_at=now(),student_id=NULL,mode=NULL WHERE account_id=$1 AND id=$2',[owner,input.id]);
+    await client.query('DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,input.id]);
    }
    if(input.action==='clear'){
+    await client.query(`UPDATE origen_conversation_lifecycle SET deleted_at=now(),student_id=NULL,mode=NULL WHERE account_id=$1 AND ${input.studentId===null?'student_id IS NULL':'student_id=$2'}${input.mode?` AND mode=$${input.studentId===null?2:3}`:''} AND deleted_at IS NULL`,[owner,...(input.studentId===null?[]:[input.studentId]),...(input.mode?[input.mode]:[])]);
     await client.query(`DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND ${input.studentId===null?'student_id IS NULL':'student_id=$2'}${input.mode?` AND mode=$${input.studentId===null?2:3}`:''}`,[owner,...(input.studentId===null?[]:[input.studentId]),...(input.mode?[input.mode]:[])]);
    }
    if(input.action==='find'){
@@ -72,6 +88,6 @@ export function createHistoryHandler(database){
    if(!['load','delete','clear','import','save'].includes(input?.action)||input.attribution!==undefined||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='clear'&&(input.studentId===undefined||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode))||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
    if(input.action==='save')input.item=validateMemory(input.item);
    return send(200,await run(req.origenIdentity.sub,input));
-  }catch(error){if(![400,403,404,409].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
+  }catch(error){if(![400,403,404,409,410].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409,410].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
  };
 }

@@ -1,0 +1,16 @@
+export type SheetKind='meeting'|'colleges'|'checklist'|'aid';
+export type SheetEntry={kind:'note'|'question'|'action';text:string;done:boolean};
+export type SheetSource={title:string;url:string;checkedAt:string|null};
+export type CollegeRow={name:string;program:string;location:string;format:string;cost:string;requirements:string;questions:string;url:string};
+export type AidOffer={name:string;period:string;cost:number|null;grants:number|null;scholarships:number|null;loans:number|null;workStudy:number|null;url:string};
+export type WorkspaceSheet={kind:SheetKind;language:'en'|'es';title:string;person:string;goal:string;entries:SheetEntry[];sources:SheetSource[];colleges:CollegeRow[];offers:AidOffer[]};
+export const sheetKinds:SheetKind[];
+export const sheetTitles:Record<SheetKind,[string,string]>;
+export function blankSheet(kind:SheetKind,language?:'en'|'es'):WorkspaceSheet;
+export function validateSheet(input:unknown):WorkspaceSheet;
+export function safeSheetURL(value:string):string;
+export function offerNetCost(offer:AidOffer):number|null;
+export function offerPeriodsMatch(offers:AidOffer[]):boolean;
+export function sheetText(sheet:WorkspaceSheet):string;
+export function sheetHTML(sheet:WorkspaceSheet):string;
+export function escapeSheetHTML(text:string):string;

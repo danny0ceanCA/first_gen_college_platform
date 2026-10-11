@@ -140,3 +140,22 @@ test('production collection requires an owner and reproducible build revision',(
  assert.deepEqual(productionConfigIssues({...env,GUIDANCE_DATA_OWNER:'designated-owner',APPLICATION_REVISION:'synthetic-revision'}),[]);
  assert.ok(productionConfigIssues({...env,GUIDANCE_LEGACY_ISSUER:'https://other.example/'}).some(issue=>issue.startsWith('GUIDANCE_LEGACY_ISSUER')));
 });
+
+test('summary diagnostics distinguish upstream failure from storage failure and retain successful retry evidence',async()=>{
+ const {pool,repo}=await setup();try{
+  const scope=start();await repo.begin('owner',scope,config);
+  let failure='generation',calls=0;
+  const database={query:(...args)=>pool.query(...args),connect:async()=>{const c=await pool.connect();return {release:()=>c.release(),query:async(sql,args)=>{if(failure==='storage'&&sql.startsWith('INSERT INTO origen_conversation_summaries('))throw Error('synthetic write failure');return c.query(sql,args);}};}};
+  const handler=createSummaryHandler({OPENAI_API_KEY:'test',GUIDANCE_HISTORY_ENABLED:'true'},async()=>{calls++;return failure==='generation'?new Response('{}',{status:502}):new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:'Synthetic summary'}]}]}));},database);
+  const input={...summary('retry-summary'),language:'en',turns:[{role:'user',text:'Synthetic question'}],guidance:{sessionId:scope.sessionId,segmentIds:[scope.segmentId]}};
+  const call=async()=>{let status;await handler(Object.assign(Readable.from([JSON.stringify(input)]),{url:'/api/conversation-summary',method:'POST',headers:{origin:'http://127.0.0.1:5173',host:'127.0.0.1:5173'},origenAuthorized:true,origenIdentity:{sub:'owner'}}),{writeHead:s=>status=s,end:()=>{}},()=>assert.fail());return status;};
+  assert.equal(await call(),502);failure='storage';assert.equal(await call(),502);failure='none';assert.equal(await call(),200);assert.equal(await call(),200);assert.equal(calls,3);
+  const rows=(await pool.query('SELECT status,error_code FROM origen_ai_executions')).rows;
+  assert.ok(rows.some(r=>r.status==='failed'&&r.error_code==='summary_unavailable'));
+  assert.ok(rows.some(r=>r.status==='failed'&&r.error_code==='summary_storage_failed'));
+  assert.equal(rows.filter(r=>r.status==='completed').length,1);
+  assert.equal((await pool.query("SELECT * FROM origen_conversation_summaries WHERE id='retry-summary'")).rows.length,1);
+  const receipts=(await pool.query("SELECT * FROM origen_guidance_events WHERE name='summary.saved'")).rows;
+  assert.ok(receipts.length>0);assert.deepEqual([...new Set(receipts.map(r=>r.payload.summaryId))],['retry-summary']);
+ }finally{await pool.end();}
+});

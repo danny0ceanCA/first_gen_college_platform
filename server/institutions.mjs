@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {accessActions,validateAccess,runAccess,accessEvent,invitationIdentity} from './institution-access.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
-import {recentlyAuthenticated} from './recent-auth.mjs';
+import {requireStaffAccess,staffPermissions} from './staff-access.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const text=(v,max,required=false)=>{if(typeof v!=='string'||v.length>max||(required&&!v.trim()))throw fail(400,'invalid_institution');return v.trim();};
 const https=v=>{const value=text(v,2000,true);let url;try{url=new URL(value);}catch{throw fail(400,'invalid_institution');}if(url.protocol!=='https:'||url.username||url.password)throw fail(400,'invalid_institution');return url.href;};
@@ -38,7 +38,8 @@ export function validateInstitution(input){
  return out;
 }
 const view=row=>({contentSchemaVersion:row.content_schema_version,id:row.id,slug:row.slug,verificationStatus:row.verification_status,status:row.status,revision:row.revision,page:row.draft,publishedRevision:row.published_revision,publishedAt:row.published_at,publishedPage:row.published,updatedAt:row.updated_at,draftSavedAt:row.draft_saved_at,archivedAt:row.archived_at,parentInstitutionId:row.parent_institution_id,unitType:row.unit_type,parentApproval:row.parent_approval,membershipRole:row.membership_role});
-export function createInstitutionRepository(database,reviewers=[]){const canReview=sub=>reviewers.includes(sub);return async(subject,input,identity={})=>{
+export function createInstitutionRepository(database,reviewers=[]){return async(subject,input,identity={})=>{
+ const canReview=sub=>reviewers.includes(sub)||identity.sub===sub&&staffPermissions(identity).includes('manage:institutions');
  if(!database)throw fail(503,'institutions_unavailable');const c=await database.connect();let registeredInstitutionId;
  try{
   await c.query('BEGIN');
@@ -148,7 +149,11 @@ export function createInstitutionHandler(database,env={}){
    let input={action:'public',slug:publicSlug?.[1]||sharing?.[2]};
    if(directory){const search=requestURL.searchParams.get('q')||'',cursor=requestURL.searchParams.get('cursor')||'';if(search.length>120||cursor&&!/^[a-z0-9-]{1,100}$/.test(cursor))return send(400,{error:'invalid_directory'});input={action:'directory',search,cursor};}
    if(!publicRequest){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>1000000)return send(413,{error:'too_large'});}try{input=validateInstitution(JSON.parse(raw));}catch{return send(400,{error:'invalid_institution'});}}
-   if(['verify','publish','request-changes','transfer-owner','review-affiliation'].includes(input.action)&&!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
+   if(!publicRequest&&!['access','parents','request-affiliation'].includes(input.action)){
+    const review=['queue','verify','publish','request-changes','review-affiliation'].includes(input.action);
+    await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:input.action,target:input.id,env,permission:review?'manage:institutions':undefined,
+     fresh:['verify','publish','request-changes','review-affiliation','invite','accept-invite','revoke-invite','remove-member','set-role','transfer-owner','approve-unit','reject-unit','archive','unpublish','restore'].includes(input.action)});
+   }
    const identity=input.action==='accept-invite'?await invitationIdentity(req,env):req.origenIdentity;
    const result=await run(req.origenIdentity?.sub,input,identity);
    if(sharing){const language=requestURL.searchParams.get('lang')||'en',eventId=requestURL.searchParams.get('event')||'';if(!['en','es'].includes(language)||eventId&&!/^[0-9a-f-]{36}$/i.test(eventId))return send(400,{error:'invalid_public_page'});if(eventId&&!result.page.content?.events?.some(e=>e.id===eventId))return send(404,{error:'event_not_found'});

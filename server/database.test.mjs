@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+import {readdir} from 'node:fs/promises';
 import {createDatabase,migrateDatabase,databaseReady} from './database.mjs';
 import {createApp} from './index.mjs';
 import {createGuidanceRepository,guidanceConfig} from './guidance-history.mjs';
@@ -74,7 +75,8 @@ test('PostgreSQL migration, account boundaries and cascade deletion', {skip:!pro
   const scoped={connect:async()=>({query:(...args)=>client.query(...args),release:()=>{}}),query:(...args)=>client.query(...args)};
   await migrateDatabase(scoped);await migrateDatabase(scoped);
   assert.equal(await databaseReady(scoped),true);
-  assert.equal((await client.query('SELECT count(*)::int AS count FROM origen_schema_migrations')).rows[0].count,24);
+  const migrationNames=(await readdir(new URL('./migrations/',import.meta.url))).filter(name=>name.endsWith('.sql')).sort();
+  assert.deepEqual((await client.query('SELECT name FROM origen_schema_migrations ORDER BY name')).rows.map(row=>row.name),migrationNames);
   const a=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|a') RETURNING id")).rows[0].id;
   const b=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|b') RETURNING id")).rows[0].id;
   await client.query("UPDATE origen_accounts SET first_name='50%_Student',role='student',onboarding_started_at=now(),onboarding_completed_at=now() WHERE id=$1",[a]);

@@ -2,20 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {adminUsers,adminUserDetail,userFilters} from './admin-users.mjs';
-import {createAdminHandler} from './admin.mjs';
+import {createAuditedAdminHandler as createAdminHandler,staffTestIdentity} from './staff-test-fixture.mjs';
 import {fixture} from './family-fixture.mjs';
 test('directory validates sort, role, pagination and period before querying',()=>{
  assert.equal(userFilters({}).page,1);
- for(const input of [{sort:'created_at; DROP TABLE users'},{role:'admin'},{status:'lost'},{page:0},{page:1.5},{days:365},{direction:'sideways'},{search:'a'.repeat(101)}])assert.throws(()=>userFilters(input),{status:400});
+ assert.equal(userFilters({sort:'last_activity',journey:'save_unconfirmed'}).journey,'save_unconfirmed');
+ for(const input of [{sort:'created_at; DROP TABLE users'},{role:'admin'},{status:'lost'},{journey:'abandoned'},{page:0},{page:1.5},{days:365},{direction:'sideways'},{search:'a'.repeat(101)}])assert.throws(()=>userFilters(input),{status:400});
 });
 test('search is literal and bound; pagination and reporting windows are stable',async()=>{
  const queries=[],now=new Date('2026-10-07T19:00:00Z');
  const db={query:async(sql,params)=>{queries.push({sql,params});return {rows:sql.includes('AS total')?[{total:'51'}]:sql.includes('WITH tracking')?[{registered:'0'}]:[]};}};
  const result=await adminUsers(db,{search:'50%_\\',page:3,sort:'voice_minutes',direction:'asc',role:'student',status:'complete',days:7},now);
  assert.equal(result.total,51);assert.equal(result.pageSize,25);
- assert.equal(queries[0].params[0],'%50\\%\\_\\\\%');assert.equal(queries[1].params.at(-1),50);
- assert.match(queries[1].sql,/ORDER BY voice_minutes ASC NULLS LAST,a.id ASC LIMIT 25/);
- assert.equal(queries[1].params[3],'2026-09-30T19:00:00.000Z');
+ assert.equal(queries[0].params[2],'%50\\%\\_\\\\%');assert.equal(queries[1].params.at(-1),50);
+ assert.match(queries[1].sql,/ORDER BY voice_minutes ASC NULLS LAST,id ASC LIMIT 25/);
+ assert.equal(queries[1].params[0],'2026-09-30T19:00:00.000Z');
  assert.match(queries[2].sql,/v.seconds>0/);assert.match(queries[2].sql,/v.started_at>=cohort.onboarding_completed_at/);
  assert.match(queries[2].sql,/018_onboarding_milestones/);
  for(const q of queries)assert.doesNotMatch(q.sql,/auth0_subject|email|transcript|summary/i);
@@ -33,6 +34,17 @@ test('admin directory and details are inaccessible without server-granted permis
   await handler(req,{writeHead:s=>{status=s;},end:()=>{}},()=>{});
   assert.equal(status,403);assert.equal(queried,false);
  }
+});
+
+test('admin access evidence uses the verified caller and server configuration, never requested roles',async()=>{
+ const accountId=crypto.randomUUID(),queries=[];let payload;
+ const database={query:async(sql,params)=>{queries.push({sql,params});return {rows:sql.startsWith('SELECT id FROM origen_accounts')?[{id:accountId}]:sql.includes('AS total')?[{total:1}]:sql.startsWith('WITH tracking')?[{registered:0}]:[{id:accountId,role:'student',journey_stage:'registered'}]};}};
+ const handler=createAdminHandler(database,{ADMIN_SUBJECTS:'auth0|configured'});
+ const req=Object.assign(Readable.from([JSON.stringify({action:'users',adminSubjects:['auth0|forged'],admin_access:'confirmed'})]),{url:'/api/admin',method:'POST',origenAuthorized:true,origenIdentity:staffTestIdentity('auth0|operator')});
+ await handler(req,{writeHead:status=>assert.equal(status,200),end:value=>payload=JSON.parse(value)},()=>assert.fail('wrong route'));
+ assert.deepEqual(queries.at(-1).params,[[accountId],['auth0|configured','auth0|operator']]);
+ assert.equal(payload.users[0].admin_access,'confirmed');assert.equal(payload.users[0].role,'student');
+ assert.doesNotMatch(JSON.stringify(payload),/auth0\||forged|permissions/);
 });
 test('onboarding milestones are server-owned, idempotent, and scoped to the account',async()=>{
  const {pool,run}=await fixture();

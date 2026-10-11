@@ -3,7 +3,9 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {apiFetch,setAPITokenProvider,onboardingTransport} from './api';
 import {onboardingEvents} from './onboardingEvents.mjs';
 import {useOnboardingDelivery,onboardingStorage} from './useOnboardingDelivery';
-import {onboardingRecovery} from './onboardingRecovery.mjs';
+import {privateRecovery} from './privateRecovery';
+import PrivateSession from './PrivateSession';
+import {browserPrivacy} from './browserPrivacy.mjs';
 import {FamilyProvider,useFamily} from './FamilyStore';
 import {ConversationHistoryProvider} from './ConversationHistory';
 import Welcome from './Welcome';
@@ -31,16 +33,18 @@ export default function NativeWelcome(){
   host.origenNativeReply=message=>{const job=pending.get(message.id);if(!job)return;pending.delete(message.id);if(message.error)job.reject();else job.resolve(message.value);};
   const receive=(event:MessageEvent)=>{if(document.referrer&&event.source===window.parent&&event.origin===new URL(document.referrer).origin&&event.data&&typeof event.data.id==='string')host.origenNativeReply?.(event.data);};
   window.addEventListener('message',receive);
+  const exit=()=>{active=false;browserPrivacy.destroy();};window.addEventListener('pagehide',exit);
   let active=true;
-  void request('ready').then(value=>{const data=value as Init;if(!data||typeof data.subject!=='string'||typeof data.firstName!=='string'||!['en','es'].includes(data.language))throw new Error();if(active){setAPITokenProvider(data.subject?token:undefined);setInit(data);}}).catch(()=>{if(active)setError(true);});
-  return()=>{active=false;window.removeEventListener('message',receive);delete host.origenNativeReply;for(const job of pending.values())job.reject();pending.clear();setAPITokenProvider(undefined);};
+  void request('ready').then(async value=>{const data=value as Init;if(!data||typeof data.subject!=='string'||typeof data.firstName!=='string'||!['en','es'].includes(data.language))throw new Error();if(!active)return;const access=await token();const claim=JSON.parse(atob(access.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(claim.sub!==data.subject)throw new Error('native_account_changed');if(active){browserPrivacy.start(data.subject,{fresh:true});setAPITokenProvider(token);setInit(data);}}).catch(()=>{if(active)setError(true);});
+  return()=>{active=false;window.removeEventListener('pagehide',exit);window.removeEventListener('message',receive);delete host.origenNativeReply;for(const job of pending.values())job.reject();pending.clear();setAPITokenProvider(undefined);};
  },[]);
  const auth=useMemo(()=>({...base,isLoading:false,isAuthenticated:!!init?.subject,user:init?.subject?{sub:init.subject}:undefined,getAccessTokenSilently:token as Auth0ContextInterface['getAccessTokenSilently']}),[base,init]);
  if(!init)return <main className="welcome-conversation"><p role={error?'alert':'status'}>{error?'Could not connect. Close and reopen onboarding. / No se pudo conectar. Cierra y vuelve a abrir.':'Opening Origen… / Abriendo Origen…'}</p></main>;
- return <Auth0Context.Provider value={auth}><FamilyProvider previewStudents={[]}><ConversationHistoryProvider><NativeStory init={init}/></ConversationHistoryProvider></FamilyProvider></Auth0Context.Provider>;
+ return <Auth0Context.Provider value={auth}><PrivateSession><FamilyProvider previewStudents={[]}><ConversationHistoryProvider><NativeStory init={init}/></ConversationHistoryProvider></FamilyProvider></PrivateSession></Auth0Context.Provider>;
 }
 function NativeStory({init}:{init:Init}){
  const family=useFamily();const [language,setLanguage]=useState(init.language);const loaded=useRef(false);
+ const [privacyLease]=useState(()=>browserPrivacy.capture());
  const [tracker]=useState(()=>onboardingEvents(onboardingTransport(init.subject,token),{enabled:family.cloud,storage:onboardingStorage(),scope:init.subject}));
  useOnboardingDelivery(tracker,!family.loading&&(loaded.current||!family.error));
  const completion=useRef<{firstName:string;role:'parent'|'student';student?:StudentProfile;language:'en'|'es'}|undefined>(undefined);
@@ -49,15 +53,17 @@ function NativeStory({init}:{init:Init}){
   // Finish deferred onboarding memory before the native host closes this screen.
   const student=completion.current?.student;
   if(family.cloud&&student){
-   const recovery=onboardingRecovery(localStorage,`origen.onboarding-summaries.${init.subject}`);
+   const recovery=privateRecovery(`origen.onboarding-summaries.${init.subject}`);
    for(const [id,record] of Object.entries(recovery.read<Record<string,{studentId:string}>>({}))){
     if(record.studentId!==student.id)continue;
-    const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...record,defer:false})});
+    privacyLease.assert();const lease=browserPrivacy.capture({...record,id});
+    const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...record,defer:false}),signal:lease.signal});
+    privacyLease.assert();lease.assert();lease.release();
     if(!response.ok)throw new Error('Could not save your conversation. Please try again.');
     recovery.removeEntry(id);
    }
   }
-tracker.event('native_handoff_requested',{surface:'native'});await request('complete',completion.current);tracker.event('native_handoff_acknowledged',{surface:'native',durationMs:Math.round(Math.min(600000,performance.now()-began))});await Promise.race([tracker.flush(),new Promise(resolve=>setTimeout(resolve,500))]);send({id:crypto.randomUUID(),type:'closed'});}catch{tracker.event('native_handoff_failed',{surface:'native',reason:'request_failed'});void tracker.flush();setFinishError(true);}};
+privacyLease.assert();tracker.event('native_handoff_requested',{surface:'native'});await request('complete',completion.current);privacyLease.assert();tracker.event('native_handoff_acknowledged',{surface:'native',durationMs:Math.round(Math.min(600000,performance.now()-began))});await Promise.race([tracker.flush(),new Promise(resolve=>setTimeout(resolve,500))]);privacyLease.assert();send({id:crypto.randomUUID(),type:'closed'});}catch{if(privacyLease.valid()){tracker.event('native_handoff_failed',{surface:'native',reason:'request_failed'});void tracker.flush();setFinishError(true);}}};
  if(!family.loading&&!family.error)loaded.current=true;
  if(family.loading||(family.error&&!loaded.current))return <main className="welcome-conversation"><p role="status">{family.error?'Could not load your account. / No se pudo cargar tu cuenta.':'Loading your account… / Cargando tu cuenta…'}</p>{family.error&&<button onClick={family.reload}>Retry / Reintentar</button>}</main>;
  return <>{finishError&&<p role="alert">Could not open home. / No se pudo abrir el inicio. <button onClick={()=>void close()}>Retry / Reintentar</button></p>}<Welcome surface="native" tracker={tracker} onComplete={()=>void close()} cloud={family.cloud} initialName={init.firstName} initialRole={init.role} language={language} setLanguage={setLanguage} complete={async(firstName,role,student,options)=>{

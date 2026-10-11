@@ -11,7 +11,7 @@ test('onboarding collects profile before introducing features in either language
   const home=homeVoiceIntroduction(language);
   assert.match(home,/home page is now open/);
   assert.match(home,/SAME conversation without Hola/);
-  assert.match(home,language==='en'?/Talk button on the bar at the bottom/:/botón Hablar en la barra de abajo/);
+  assert.match(home,language==='en'?/Origen circle button on the bar at the bottom/:/botón con el círculo de Origen en la barra de abajo/);
   assert.match(home,language==='en'?/short summary/:/resumen breve/);
  }
 });

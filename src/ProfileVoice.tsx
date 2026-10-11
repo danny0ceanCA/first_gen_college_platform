@@ -1,19 +1,23 @@
+import {workspaceGuide,voiceWorkspaceQueue,type WorkspaceSelection} from './voiceWorkspace.mjs';
 import {voiceSaveCompletion} from './voiceSaveCompletion.mjs';
 import {onboardingVoiceDiagnostics} from './onboardingVoiceDiagnostics.mjs';
 import {voiceProfileSaveTools,type VoiceProfileSaveResult} from './voiceProfileSave.mjs';
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
 import {voiceDraft} from './voiceDraft.mjs';
 import {guidanceHistory} from './guidanceHistory.mjs';
-import {onboardingRecovery} from './onboardingRecovery.mjs';
+import {privateRecovery} from './privateRecovery';
+import {browserPrivacy} from './browserPrivacy.mjs';
 import {voiceLanguageControl,voiceLanguageTools,spokenLanguageFromText} from './voiceLanguage.mjs';
 import {onboardingWelcome,homeVoiceIntroduction} from './voiceWelcome.mjs';
 import VoiceWave from './VoiceWave';
+import VoiceStartButton from './VoiceStartButton';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import {voiceResearchCache,voiceResearchBudget,wantsFreshLookup} from './voiceResearchCache.mjs';
 import {voiceResearchProgress,researchEvidence} from './voiceResearchProgress.mjs';
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
+import {withRequestDeadline} from './requestDeadline.mjs';
 import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
 import {voiceErrorEndsSession,voiceReplyCanRetry} from './voiceErrors.mjs';
@@ -33,18 +37,20 @@ const labels = {
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export type VoiceHandoff={studentId:string|null;confirmed:boolean;language:'en'|'es';turns:{role:'user'|'assistant';text:string}[]};
-export type VoiceProps={onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
  useEffect(()=>{if(props.onboarding)shared?.syncOnboarding(props);},[props.profile,props.role,props.language]);
- if(shared&&props.onboarding)return <section className="profile-voice voice-launcher"><button type="button" className="button primary" onClick={()=>{if(!shared.active)props.onOnboardingEvent?.('voice_button_pressed',{language:props.language});shared.active?shared.open():shared.launch(props);}}>{shared.active?props.t('Open current conversation','Abrir conversación actual'):props.t('Start live conversation','Iniciar conversación en vivo')}</button></section>;
+ if(shared&&props.onboarding)return <section className="profile-voice voice-launcher"><VoiceStartButton label={shared.active?props.t('Open current conversation','Abrir conversación actual'):props.t('Talk with Origen','Hablar con Origen')} onClick={()=>{if(!shared.active)props.onOnboardingEvent?.('voice_button_pressed',{language:props.language});shared.active?shared.open():shared.launch(props);}}/></section>;
  if(!shared)return <LocalProfileVoice {...props}/>;
- if(props.mode&&props.mode!=='profile')return <section className="profile-voice voice-launcher"><h3>{props.t('Talk with Origen','Hablar con Origen')}</h3><p>{props.t('Keep talking while you explore the app. Your current guide stays with you until you end the conversation.','Sigue conversando mientras exploras la app. Tu guia continua contigo hasta que termines la conversacion.')}</p><button className="button primary" onClick={()=>shared.active?shared.open():shared.launch(props)}>{shared.active?props.t('Open current conversation','Abrir conversacion actual'):props.t('Start live conversation','Iniciar conversacion en vivo')}</button></section>;
+ if(props.mode&&props.mode!=='profile')return <section className="profile-voice voice-launcher"><h3>{props.t('Talk with Origen','Hablar con Origen')}</h3><p>{props.t('Keep talking while you explore the app. Your current guide stays with you until you end the conversation.','Sigue conversando mientras exploras la app. Tu guía continúa contigo hasta que termines la conversación.')}</p><VoiceStartButton label={shared.active?props.t('Open current conversation','Abrir conversación actual'):props.t('Talk with Origen','Hablar con Origen')} onClick={()=>shared.active?shared.open():shared.launch(props)}/></section>;
  if(shared.active&&shared.owner!==localOwner.current)return <p role="status">{props.t('End your current voice conversation before starting profile setup.','Termina la conversacion actual antes de iniciar el perfil.')} <button className="text-button" onClick={shared.open}>{props.t('Open conversation','Abrir conversacion')}</button></p>;
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
-export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+  const workspaceSeen=useRef<string|undefined>(undefined);
+  const currentWorkspace=useRef<WorkspaceSelection|undefined>(workspaceFocus);
   const latestOnboardingEvent=useRef(onOnboardingEvent);latestOnboardingEvent.current=onOnboardingEvent;
   const onboardingEndReason=useRef('unknown');
   function trackOnboarding(name:string,metadata:Record<string,unknown>={}){try{latestOnboardingEvent.current?.(name,{...metadata,voiceSessionId:logSession.current,voiceAttemptId:logAttempt.current});}catch{/* Tracking never interrupts a conversation. */}}
@@ -63,12 +69,13 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
   const shared=useContext(SharedVoiceContext);
   const history=useConversationHistory();
   const latestHistory=useRef(history);latestHistory.current=history;
-  const family=useFamily();const {getAccessTokenSilently,user}=useAuth0();
+  const family=useFamily();const latestFamily=useRef(family);latestFamily.current=family;const {getAccessTokenSilently,user}=useAuth0();
+  const [privacyLease]=useState(()=>browserPrivacy.capture());
   const voiceUsageKey=user?.sub?`origen.user.${user.sub}.voice-used.v1`:'camino.voice-used.v1';
   const spokenLanguage=useRef(continuity?.language||language);
   const screenLanguage=useRef(language);
   const routing=role==='parent'&&mode!=='profile';
-  const [target,setTarget]=useState<{id:string|null;confirmed:boolean}>({id:continuity?continuity.studentId:initialProfile.id||null,confirmed:continuity?.confirmed||false});
+  const [target,setTarget]=useState<{id:string|null;confirmed:boolean}>({id:workspaceFocus?workspaceFocus.studentId:continuity?continuity.studentId:initialProfile.id||null,confirmed:continuity?.confirmed||!!workspaceFocus});
 
   const scopePending=useRef(false);
   const profile=voiceProfile(mode,initialProfile,family.students,target.id);
@@ -89,21 +96,23 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
     finally{setSavingSummary(false);if(!summaryQueue.current.size)shared?.reportSave(false,false);}
   }
   function checkpointSummary(){
-    if(!sessionTurns.current.some(turn=>turn.role==='user')||!summaryId.current||!summaryScope.current.confirmed)return;
-    const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
+    if(!privacyLease.valid()||!sessionTurns.current.some(turn=>turn.role==='user')||!summaryId.current||!summaryScope.current.confirmed)return;
+    const store=privateRecovery(`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
     const records=store.read<Record<string,unknown>>({});
     records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,qualitySessionId:logSession.current,qualityComplete:false,sources:sessionSources.current,guidance:guidance.current.attribution()};
     if(!store.write(records))setNotice(t('Keep this page open until the summary saves.','Mantén esta página abierta hasta guardar el resumen.'));
   }
   async function saveSummary(){
-    if(memorySaved.current||!summaryScope.current.confirmed||!sessionTurns.current.some(t=>t.role==='user'))return;
+    if(!privacyLease.valid()||memorySaved.current||!summaryScope.current.confirmed||!sessionTurns.current.some(t=>t.role==='user'))return;
     const studentId=summaryScope.current.id,scopeName=summaryScope.current.name;
     checkpointSummary();
     memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
     const body=JSON.stringify({turns,qualitySessionId:logSession.current,qualityComplete:true,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources,guidance:guidance.current.attribution()});
     const savedMode=liveMode.current;
     const subject=history.cloud?user?.sub:undefined,date=new Date().toISOString();
-    summaryQueue.current.add(id,async()=>{let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok)throw new Error();const {summary}=await response.json();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});{const store=onboardingRecovery(localStorage,`origen.onboarding-summaries.${subject||'preview'}`);store.removeEntry(id);}});
+    const lease=browserPrivacy.capture({id,studentId,mode:savedMode});
+    lease.signal.addEventListener('abort',()=>{summaryQueue.current.remove(id);lease.release();},{once:true});
+    summaryQueue.current.add(id,async signal=>{privacyLease.assert();lease.assert();let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}privacyLease.assert();lease.assert();const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,signal:AbortSignal.any([signal,lease.signal]),keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok){if(response.status===410){summaryQueue.current.remove(id);privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);return;}throw new Error();}const {summary}=await response.json();privacyLease.assert();lease.assert();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);lease.release();});
     await retrySummaries();
   }
   const informational=mode!=='profile';
@@ -123,7 +132,7 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
   const [notice,setNotice]=useState('');
   const [audioBlocked,setAudioBlocked]=useState(false);
   const [wakeStatus,setWakeStatus]=useState<VoiceWakeLockStatus>('hidden');
-  const [draftRecovery]=useState(()=>recoveryKey?onboardingRecovery(localStorage,recoveryKey):null);
+  const [draftRecovery]=useState(()=>recoveryKey?privateRecovery(recoveryKey):null);
   const [draftSuggestions]=useState(()=>voiceDraft<Suggestions>(draftRecovery,!!onDraft));
   const [changes,setChanges]=useState<Suggestions>(()=>draftSuggestions.read());
   useEffect(()=>{if(!draftSuggestions.write(changes))setNotice(t('Keep this page open until you save; voice suggestions could not be backed up.','Mantén la página abierta hasta guardar; no se pudo conservar las sugerencias.'));},[changes,draftSuggestions]);
@@ -133,7 +142,7 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
 
   const usage=useRef<{id:string;timer?:ReturnType<typeof setInterval>}>({id:''});
   const usageQueue=useRef(Promise.resolve());
-  function usageEvent(action:string,id=usage.current.id){if(!id)return;usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,topic:liveMode.current}),keepalive:true})).then(()=>{});}
+  function usageEvent(action:string,id=usage.current.id){if(!id)return;usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>{privacyLease.assert();return apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,topic:liveMode.current}),keepalive:true});}).then(()=>{}).catch(()=>{});}
   const logSession=useRef('');
   const logAttempt=useRef('');
   const logSequence=useRef(0);
@@ -145,12 +154,14 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true})=>Promise<boolean>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection)=>Promise<boolean>}>({});
   const generation=useRef(0);
   const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
   const preserveLogicalSession=useRef(false);
   const audio=useRef<HTMLAudioElement>(null);
   function cleanup(){
+    resources.current.workspace?.stop();
+    resources.current.studentSelection?.stop();
     void saveSummary();releaseConversation(summaryId.current);
     if(!preserveLogicalSession.current)void guidance.current.event('voice.ended',{reason:finalReason.current})?.catch(()=>{});
     clearInterval(usage.current.timer);usageEvent('voice_end');usage.current={id:''};
@@ -169,7 +180,16 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
     r.stream?.getTracks().forEach(track=>track.stop());
     if(audio.current){audio.current.pause();audio.current.srcObject=null;}
   }
-  function end(){saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  useEffect(()=>browserPrivacy.subscribe(event=>{
+    if(event.type==='forget'){
+      if(!browserPrivacy.matches(event.target!,{id:summaryId.current,studentId:summaryScope.current.id,mode:liveMode.current}))return;
+      summaryQueue.current.remove(summaryId.current);
+    }else summaryQueue.current.clear();
+    memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
+    cleanup();setLatestAnswer('');setChanges({});setSources([]);setState('idle');onActive(false);shared?.claim(ownerId,false);
+  }),[]);
+  useEffect(()=>{if(state==='live'&&workspaceFocus&&workspaceSeen.current!==workspaceFocus.serial&&resources.current.workspace){workspaceSeen.current=workspaceFocus.serial;resources.current.workspace.select(workspaceFocus);}},[workspaceFocus?.serial,state]);
+  function end(){resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function handoffContext():VoiceHandoff{return {studentId:summaryScope.current.id,confirmed:summaryScope.current.confirmed,language:spokenLanguage.current,turns:sessionTurns.current.slice(-8).map(turn=>({...turn,text:turn.text.slice(0,2000)}))};}
   function finishCall(drain=true,preserveSession=false){
     if(finishPromise.current)return finishPromise.current;
@@ -189,23 +209,21 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
   const selectedProfileId=useRef(initialProfile.id);
   useEffect(()=>{
     if(selectedProfileId.current===initialProfile.id)return;
-    selectedProfileId.current=initialProfile.id;
     const id=initialProfile.id||null;
     if(routing&&state==='live'){
-
-
-      const dc=resources.current.dc;
-      if(dc?.readyState==='open'){
-        dc.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'The parent selected another student on screen. Ask one short spoken question to clarify whether they want to discuss that student. Once they answer clearly, call request_conversation_target. No on-screen confirmation is needed.'}]}}));
-      }
-    }else if(state==='idle')setTarget({id,confirmed:false});
+      selectedProfileId.current=initialProfile.id;resources.current.studentSelection?.select(id);
+    }else if(state==='idle'){selectedProfileId.current=initialProfile.id;setTarget({id,confirmed:false});}
   },[initialProfile.id,routing,state]);
   const latestCleanup=useRef(cleanup);
   useEffect(()=>{latestCleanup.current=cleanup;});
   useEffect(()=>()=>{latestCleanup.current();onActive(false);shared?.claim(ownerId,false);},[]);
   async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest='',continuingSession=''){
+    if(!privacyLease.valid())return;
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
+    const focus=workspaceFocus?.studentId===scope.id?workspaceFocus:undefined;
+    currentWorkspace.current=focus;
+    if(focus)workspaceSeen.current=focus.serial;
     const profile=voiceProfile(mode,initialProfile,family.students,scope.id);
     summaryScope.current={id:scope.id,name:profile.name,confirmed:!routing||scope.confirmed};
 
@@ -254,23 +272,27 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
       };
       const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);void guidance.current.event('guidance.language_changed',{language:next,basis:'model-detection'})?.catch(()=>{});}}});resources.current.stopGuide=()=>languageControl.stop();
       let changingGuide=false;
-      resources.current.switchGuide=async (next,initialScope)=>{
-        if(next===liveMode.current&&!initialScope)return true;
+      resources.current.switchGuide=async (next,initialScope,focus)=>{
+        if(next===liveMode.current&&!initialScope&&!focus)return true;
         if((!summaryScope.current.confirmed&&!initialScope)||changingGuide)return false;
         const updateScope=initialScope||summaryScope.current;
-        const updateProfile=voiceProfile(next,latestSetup.current.profile,family.students,updateScope.id);
+        const contextFocus=focus||(currentWorkspace.current?.studentId===updateScope.id?currentWorkspace.current:undefined);
+        const currentStudents=latestFamily.current.students;
+        const updateProfile=voiceProfile(next,latestSetup.current.profile,currentStudents,updateScope.id);
         changingGuide=true;
         let nextGuidance:ReturnType<typeof guidance.current.current>;
         setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
-          await languageControl.configure(async currentLanguage=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:routing,targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:family.students.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal:abort.signal});
-            const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error('guide_config_unavailable');
+          await languageControl.configure(currentLanguage=>withRequestDeadline(async signal=>{
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
+            const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
+            signal.throwIfAborted();
             if(generation.current!==version)throw new Error('voice_session_stopped');
             nextGuidance=data.guidance;
             return data.session;
-          },()=>{
+          },{signal:abort.signal}),()=>{
             if(generation.current!==version)return;
+            if(focus)currentWorkspace.current=focus;
             guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             if(initialScope){summaryScope.current={...initialScope,name:updateProfile.name};memorySaved.current=false;setTarget(initialScope);log('initial_target_confirmed');}
             liveMode.current=next;checkpointSummary();setMode(next);onGuideChanged?.(next);setNotice('');log('guide_update_complete',{mode:next});
@@ -278,7 +300,7 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
           if(generation.current!==version)return false;
           // A specialty change remains one conversation and one recovery record.
           return true;
-        }catch{if(generation.current===version){log('guide_update_failed',{mode:next});setNotice(t('I could not change topics yet. You can keep talking or try again.','No pude cambiar de tema todavía. Puedes seguir hablando o intentar de nuevo.'));}return false;}
+        }catch(error){if(focus)throw error;if(generation.current===version){log('guide_update_failed',{mode:next});setNotice(t('I could not change topics yet. You can keep talking or try again.','No pude cambiar de tema todavía. Puedes seguir hablando o intentar de nuevo.'));}return false;}
         finally{changingGuide=false;if(generation.current===version)setSwitchingGuide(false);}
       };
       transitionToHome.current=async()=>{
@@ -300,6 +322,32 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
       const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
+      resources.current.studentSelection=voiceWorkspaceQueue<string|null>({
+        busy:()=>turns.busy()||changingGuide,
+        apply:async id=>{
+          if(generation.current!==version||latestSetup.current.profile.id!==id||summaryScope.current.id===id)return;
+          const selected=latestFamily.current.students.find(student=>student.id===id);if(!selected)return;
+          send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:`The parent selected another student on screen: ${JSON.stringify({scope:'student:'+selected.id,name:selected.name})}. Ask one short spoken question to clarify whether they want to discuss that student. Keep the current conversation language and do not greet again. Selection alone does not authorize changing the saved conversation target or loading that student's private context. Only after a clear spoken answer, call request_conversation_target. No on-screen confirmation is needed.`}]}});
+          turns.request();
+        }
+      });
+      resources.current.workspace=voiceWorkspaceQueue<WorkspaceSelection>({
+        busy:()=>turns.busy()||changingGuide,
+        onPending:pending=>{if(pending)setNotice(t('We’ll pick this up after the current reply.','Retomaremos esto después de la respuesta actual.'));},
+        apply:async selection=>{
+          if(generation.current!==version)return;
+          if(summaryScope.current.confirmed&&summaryScope.current.id!==selection.studentId){setNotice(t('This call is about a different person or family scope. End it, then press Talk about this again for the selected plan or note.','Esta llamada trata de otra persona o del grupo familiar. Termínala y luego presiona Hablemos de esto para el plan o la nota elegida.'));return;}
+          if(liveMode.current==='profile'){setNotice(t('Save the profile before discussing saved work.','Guarda el perfil antes de hablar de tus notas o acciones.'));return;}
+          const release=turns.holdReply();
+          try{
+            const applied=await resources.current.switchGuide?.(workspaceGuide(selection.topic),summaryScope.current.confirmed?undefined:{id:selection.studentId,confirmed:true},selection);
+            if(applied&&generation.current===version){
+              send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'The person pressed Talk about this. Use the selected item or topic in the freshly loaded saved workspace context. This is a screen selection, not transcribed speech. Keep the current language and conversation. Do not repeat Hola or recap the previous answer. If a new spoken question is pending, address that first.'}]}});
+              turns.request();
+            }
+          }catch(error){if(generation.current===version)setNotice(t('Could not open that saved item. It may have changed or been deleted. Refresh your notes or plan and try again. Your call is still connected.','No se pudo abrir ese elemento guardado. Tal vez cambió o se eliminó. Actualiza tus notas o tu plan e inténtalo de nuevo. La llamada sigue conectada.'));}finally{release();}
+        }
+      });
       let replyRecoveryUsed=false;
       const recoverReply=(responseId:string|undefined,code:string)=>{
         const retry=!replyRecoveryUsed&&voiceReplyCanRetry(code);
@@ -414,9 +462,9 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
               const accepted=!!next&&['finance','admissions','planning','loans'].includes(next)&&await resources.current.switchGuide?.(next as 'finance'|'admissions'|'planning'|'loans');
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'guide_updated':'continue_current_guide',instruction:accepted?'Continue the pending question in this same call. Do not greet or say Hola again.':'Continue here; do not retry the same handoff repeatedly.'})}});continue;
             }
-            if(routing&&item.name==='request_conversation_target'){
+            if(latestSetup.current.role==='parent'&&liveMode.current!=='profile'&&item.name==='request_conversation_target'){
               let next:string|null|undefined;
-              try{next=resolveScope(JSON.parse(item.arguments).scope,family.students);}catch{/* Invalid model proposals cannot change storage scope. */}
+              try{next=resolveScope(JSON.parse(item.arguments).scope,latestFamily.current.students);}catch{/* Invalid model proposals cannot change storage scope. */}
               if(next!==undefined){
                 if(summaryScope.current.confirmed&&next===summaryScope.current.id){
                   send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'target_confirmed',instruction:'Continue with the current target. No screen confirmation is needed.'})}});continue;
@@ -461,7 +509,7 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
                   const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,...(guidance.current.current()?{'X-Origen-Segment':guidance.current.current()!.segmentId}:{})},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal:abort.signal});
                   result=await response.json();
                   if(generation.current!==version)return;
-                  if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error('lookup_failed');
+                  if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error(result?.error==='private_search_details'?'private_search_details':'lookup_failed');
                   cache.put(query,result);
                 }
                 log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
@@ -469,11 +517,13 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
                 sessionSources.current=mergeConversationSources(sessionSources.current,result.sources);
                 setSources(sessionSources.current);
                 setNotice('');
-              }catch{
+              }catch(error){
                 if(generation.current!==version)return;
+                const privateQuery=error instanceof Error&&error.message==='private_search_details';
+                if(privateQuery)output={error:'private_search_details',instruction:'This lookup was blocked before searching. Do not repeat these arguments. Explain briefly that searches should use a general college or aid question without private details or instructions to reveal data. Continue the conversation; do not read the blocked text aloud.'};
                 log('lookup_failure',{callId:item.call_id});
                 if(budgetExceeded)output={error:'research_budget_reached',instruction:'Do not retry research in this call. Explain the limit briefly and use already verified evidence only when its scope and year match; otherwise offer the official source or counselor as the next step. Keep the conversation open and never invent a policy.'};
-                setNotice(budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
+                setNotice(privateQuery?t('Please use a general college or aid question for this search.','Para esta búsqueda, usa una pregunta general sobre la universidad o ayuda financiera.'):budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
               }finally{stopProgress();}
               if(generation.current!==version)return;
               setResearching(false);
@@ -510,7 +560,7 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
       log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({workspaceFocus:focus,sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
       if(generation.current!==version)return;
       guidance.current.accept(data?.guidance);
@@ -524,6 +574,9 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
       const code=err instanceof Error?err.message:'';
       finalReason.current='failed';void guidance.current.event('voice.start_failed',{phase:'transport'})?.catch(()=>{});
       const messages:Record<string,[string,string]>={
+        workspace_item_changed:['This saved item changed. Refresh your notebook or plan, then choose Talk about this again.','Este elemento guardado cambió. Actualiza tu cuaderno o plan y vuelve a elegir Hablemos de esto.'],
+        workspace_item_unavailable:['This saved item is no longer available. Refresh your notebook or plan.','Este elemento guardado ya no está disponible. Actualiza tu cuaderno o plan.'],
+        workspace_unavailable:['Your saved work could not be loaded. Please try again.','No se pudieron cargar tus notas y acciones. Inténtalo de nuevo.'],
         summary_pending:['Your previous conversation could not be saved yet. Retry saving its summary before reconnecting.','La conversacion anterior aun no se ha guardado. Intenta guardar su resumen antes de reconectar.'],
         authentication_required:['Sign in to Origen before starting a voice conversation.','Inicia sesión en Origen antes de comenzar una conversación de voz.'],
         invalid_token:['Your sign-in could not be verified. Sign out and sign in again.','No se pudo verificar tu sesión. Cierra la sesión e inicia sesión de nuevo.'],
@@ -558,24 +611,26 @@ export function LocalProfileVoice({onOnboardingEvent,profileSaved,onProfileSaveC
     {history.cloud&&<p className="small-text">{t('When enabled, private session details are kept for 90 days to diagnose problems. This adds no stored audio or transcript and does not enroll you in research.','Cuando está habilitado, los detalles privados de la sesión se conservan durante 90 días para diagnosticar problemas. Esto no agrega audio ni transcripciones guardadas y no te inscribe en investigación.')}</p>}
     {state==='live'&&switchGuideMode&&<div className="voice-guide-switch"><span>{t('This page has a different guide: ','Esta página tiene otra guía: ')}{switchGuideLabel}</span><button type="button" className="text-button" disabled={finishing||switchingGuide||researching||activity!=='listening'} onClick={()=>void resources.current.switchGuide?.(switchGuideMode)}>{t('Switch guide','Cambiar guía')}</button></div>}
     <div className="voice-controls">
-      {state==='idle'?<button type="button" className="button primary" onClick={()=>{trackOnboarding('voice_button_pressed',{language});onRestart?onRestart():void start();}}><Mic size={18}/>{t('Start live conversation','Iniciar conversación en vivo')}</button>:<>
+      {state==='idle'?<VoiceStartButton label={t('Talk with Origen','Hablar con Origen')} onClick={()=>{trackOnboarding('voice_button_pressed',{language});onRestart?onRestart():void start();}}/>:<>
         <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):switchingGuide?t('Following your question…','Siguiendo tu pregunta…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{trackOnboarding(muted?'microphone_unmuted':'microphone_muted');resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>{onboardingEndReason.current='user_end';void finishCall();}}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
       </>}
       {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
+    {error&&<p role="alert" className="error">{error}</p>}
+    {notice&&<p className="voice-notice" role="status">{notice}</p>}
     <audio ref={audio} autoPlay controls onPlaying={event=>{setAudioBlocked(false);onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0?'silent':'playing');}} onPause={()=>onboardingVoice.current?.playback('paused')} onVolumeChange={event=>onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0||event.currentTarget.paused?'silent':'playing')} onError={()=>onboardingVoice.current?.playback('blocked')} hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     <div className="voice-session-details" hidden={ownerId==='shared'&&!detailsOpen}>
     {ownerId==='shared'&&<div className="voice-details-heading"><h3>{t('Conversation details','Detalles de la conversación')}</h3><button type="button" className="button outline" onClick={onCloseDetails}>{t('Close','Cerrar')}</button></div>}
-    <p className="small-text">{history.cloud?t('Relevant past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Los resúmenes anteriores pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
+    <p className="small-text">{history.cloud?t('Relevant saved notes, accepted actions and past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Las notas guardadas, las acciones aceptadas y los resúmenes pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {savingSummary&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
     {summaryFailed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><button type="button" className="button outline" disabled={savingSummary} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
     {latestAnswer&&<details className="voice-answer"><summary>{t('Latest answer','Última respuesta')}</summary><p>{latestAnswer}</p></details>}
     {sources.length>0&&<details className="voice-sources"><summary>{t('Official sources','Fuentes oficiales')} · {sources.length}</summary><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></details>}
-    {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}
+
     {!onDraft&&Object.keys(changes).length>0&&<div className="voice-review"><h4>{t('Review suggested changes','Revisa los cambios sugeridos')}</h4><p>{t('Edit or remove any suggestion. End the conversation, add the changes to the form, then select Save profile.','Edita o elimina cualquier sugerencia. Termina la conversación, agrega los cambios al formulario y selecciona Guardar perfil.')}</p>
       {(Object.keys(changes) as Field[]).map(field=><div key={field}><label className="field">{labels[field][language==='es'?1:0]}<textarea value={changes[field]} maxLength={field==='name'?100:field==='gpa'?30:2000} onChange={e=>setChanges(prev=>({...prev,[field]:e.target.value}))}/></label><button type="button" className="text-button" onClick={()=>setChanges(prev=>{const next={...prev};delete next[field];return next;})}>{t('Remove suggestion','Eliminar sugerencia')}</button></div>)}
       <button type="button" className="button primary" disabled={state!=='idle'} onClick={()=>{

@@ -1,3 +1,5 @@
+Current supplemental evidence: [privacy phase 4](../PRIVACY_SECURITY_PHASE_4.md), October 10, 2026. It distinguishes local controls, read-only production observations, and console settings still requiring verification.
+
 # Provider and external-resource inventory
 
 Observed in source October 3, 2026. Inclusion describes technical integrations, not a legal determination that every provider is a contracted subprocessor. Contracts, regions and configuration require verification.

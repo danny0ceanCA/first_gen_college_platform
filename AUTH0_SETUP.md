@@ -1,5 +1,18 @@
 # Origen Auth0 setup
 
+## Staff access update (privacy phase 3)
+
+For the current Origen staff permissions and two-step verification setup, follow
+[Privacy/security phase 3](docs/PRIVACY_SECURITY_PHASE_3.md). The legacy
+`read:activity` permission and `ADMIN_SUBJECTS` list now grant aggregate reporting
+only. Configure the documented permissions and ordered MFA Actions before rolling
+out phase 3. These changes belong in the Origen tenant, not CareSpend's tenant.
+
+The older setup notes below predate tenant separation. Use the currently configured
+Origen tenant and application values, not these legacy identifiers.
+
+## Historical initial setup
+
 Public tenant: `dev-0dghf4l675sx6lf3.us.auth0.com`.
 
 ## Origen Web (Single Page Application)

@@ -63,10 +63,15 @@ export function createFamilyRepository(database,env=process.env){
    const owner=accountRow.id;
    if(await accountClosed(client,subject))throw Object.assign(new Error('account_closed'),{status:403});
    const saveStudent=async(student,importing=false)=>{
-    const link=(await client.query('SELECT * FROM origen_student_links WHERE member_account_id=$1 AND member_student_id=$2 FOR UPDATE',[owner,student.id])).rows[0];
+    const link=(await client.query(`SELECT * FROM origen_student_links WHERE member_account_id=$1 AND member_student_id=$2${client.isolated?'':' FOR UPDATE'}`,[owner,student.id])).rows[0];
     if(link){
      if(importing)return;
      const sharedFields=Object.keys(profileFields).filter(field=>!['needs','notes'].includes(field));
+     if(client.isolated){
+      await client.query('SELECT origen_update_shared_profile($1,$2,$3)',[student.id,JSON.stringify(Object.fromEntries(sharedColumns.map((column,i)=>[column,student[sharedFields[i]]]))),progressEnabled(env)]);
+      await client.query('UPDATE origen_students SET needs=$3,notes=$4,updated_at=now() WHERE account_id=$1 AND id=$2',[owner,student.id,student.needs,student.notes]);
+      return;
+     }
      const sharedHistory=progressEnabled(env)?await observeProfile(client,link.owner_account_id,link.owner_student_id,Object.fromEntries(sharedColumns.map((column,i)=>[column,student[sharedFields[i]]]).filter(([column])=>!['name','color'].includes(column))),'linked-account'):null;
      await client.query(`UPDATE origen_students SET ${sharedColumns.map((c,i)=>`${c}=$${i+3}`).join(',')},updated_at=now() WHERE account_id=$1 AND id=$2`,[link.owner_account_id,link.owner_student_id,...sharedFields.map(field=>student[field])]);
      // Private annotations belong to the signed-in account, never the other person.
@@ -103,7 +108,8 @@ export function createFamilyRepository(database,env=process.env){
    if(input.action==='voice-used'||input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET voice_used_at=COALESCE(voice_used_at,now()),updated_at=now() WHERE id=$1',[owner]);
    if(input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET welcome_heard_at=COALESCE(welcome_heard_at,now()) WHERE id=$1',[owner]);
    const row=(await client.query('SELECT first_name,email,role,welcome_heard_at,voice_used_at FROM origen_accounts WHERE id=$1',[owner])).rows[0];
-   const students=(await client.query(`SELECT m.id,${sharedColumns.map(c=>`COALESCE(s.${c},m.${c}) AS "${c==='entry_term'?'entryTerm':c}"`).join(',')},m.needs,m.notes FROM origen_students m LEFT JOIN origen_student_links l ON l.member_account_id=m.account_id AND l.member_student_id=m.id LEFT JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id WHERE m.account_id=$1 ORDER BY m.created_at,m.id`,[owner])).rows;
+   const sharedJoin=client.isolated?'LEFT JOIN LATERAL origen_shared_profile(m.id) s ON true':'LEFT JOIN origen_student_links l ON l.member_account_id=m.account_id AND l.member_student_id=m.id LEFT JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id';
+   const students=(await client.query(`SELECT m.id,${sharedColumns.map(c=>`COALESCE(s.${c},m.${c}) AS "${c==='entry_term'?'entryTerm':c}"`).join(',')},m.needs,m.notes FROM origen_students m ${sharedJoin} WHERE m.account_id=$1 ORDER BY m.created_at,m.id`,[owner])).rows;
    await client.query('COMMIT');transaction=false;
    return {account:{firstName:row.first_name,email:row.email,...(row.role?{role:row.role}:{}),welcomeHeard:!!row.welcome_heard_at,usedVoice:!!row.voice_used_at},students};
   }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}

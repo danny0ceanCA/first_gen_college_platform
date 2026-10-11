@@ -1,17 +1,33 @@
+## Privacy phase 4 rollout
+
+See [phase 4](docs/PRIVACY_SECURITY_PHASE_4.md) before deploying: choose the production database TLS mode, complete migrations/runtime grants and Auth0 prerequisites, and apply the staged static-site headers to the existing service. The October 10 read-only check found production on migration 028, with database external access open to all IPs. Provider retention and backup settings remain unverified.
+
 # Deploy Origen to Render
+
+## Privacy phase 3 rollout
+
+Phase 3 additionally requires migration `036_privileged_access.sql`, reapplying
+the restricted runtime grants, and the Auth0 permissions/MFA Actions described in
+[the phase 3 rollout guide](docs/PRIVACY_SECURITY_PHASE_3.md). Configure Auth0 first,
+then migrate and apply grants in the operator environment, check the runtime role,
+and deploy the API/client together. The API now requires migration 036 for readiness.
+Staff gates fail closed if MFA proof or the audit store is missing. Keep the
+migration credential out of the API environment. Production rollout has not been
+performed as part of the local privacy implementation.
+
 
 ## Current production safeguards
 
 Set backend `NODE_ENV=production`. App access and AI endpoints require an authenticated account. `ALLOW_PREVIEW_VOICE` is retired and no longer enables anonymous access; remove it from the backend environment. Run `npm run check:production` before deployment. See [production controls](docs/vendor-readiness/PRODUCTION_CONTROLS.md) for live provider checks and restore/incident procedures.
 
-Current database readiness requires migration `011_subject_locks.sql`; older phase-specific migration references below are historical. Deploy the backend before the web frontend, verify `/readyz`, then verify signed-in data download and closure using synthetic accounts. Install and validate the Auth0 recent-auth Action before rollout: [fresh-auth and concurrency controls](docs/vendor-readiness/RECENT_AUTH_AND_CLOSURE.md). Provider identities, backups and mobile controls require the separate processes documented in [account lifecycle](docs/vendor-readiness/ACCOUNT_LIFECYCLE.md).
+Current database readiness requires migration `036_privileged_access.sql`; older phase-specific migration references below are historical. Follow the [phase 2 role and migration rollout](docs/PRIVACY_SECURITY_PHASE_2.md) before deployment: the API now requires a restricted non-owner database login and does not run migrations. Deploy the backend before the web frontend, verify `/readyz`, then verify signed-in data download and closure using synthetic accounts. Install and validate the Auth0 recent-auth Action before rollout: [fresh-auth and concurrency controls](docs/vendor-readiness/RECENT_AUTH_AND_CLOSURE.md). Provider identities, backups and mobile controls require the separate processes documented in [account lifecycle](docs/vendor-readiness/ACCOUNT_LIFECYCLE.md).
 
 Create a Blueprint from this repository using render.yaml, or configure two services manually. The Blueprint prompts for DATABASE_URL: use the existing Render database internal connection URL. It does not create another database. NODE_ENV is set to production; anonymous voice must remain disabled there.
 
 ## API web service
 Build: `npm ci`. Start: `npm start`. Health check: `/healthz`.
 Set OPENAI_API_KEY as a secret. AUTH0_DOMAIN is already provided.
-For PostgreSQL phase 1, set backend-only `DATABASE_URL` to your Render database's internal URL. `npm start` applies migrations before accepting traffic. Verify database readiness at `/readyz`; see [DATABASE_PHASES.md](DATABASE_PHASES.md) for the staged integration plan.
+Set backend-only `DATABASE_URL` to the restricted runtime login on your Render database's internal host. Apply migrations separately with `MIGRATION_DATABASE_URL` and `npm run db:migrate`, then grant runtime access with `npm run db:grant-runtime`. Keep the migration credential out of the API environment. `npm start` verifies runtime privileges and schema readiness before accepting traffic. Verify `/readyz`; historical architecture phases remain in [DATABASE_PHASES.md](DATABASE_PHASES.md).
 Create an API in Auth0 named Origen API with identifier `https://api.origen.edu` (an identifier, not a required live domain), signing algorithm RS256. Set AUTH0_AUDIENCE to that identifier.
 Set ALLOWED_ORIGINS to the exact frontend HTTPS origin, e.g. `https://origen-web.onrender.com`. Multiple origins can be comma-separated. Do not use a wildcard.
 

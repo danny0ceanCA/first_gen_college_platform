@@ -1,5 +1,5 @@
 import {bilingualTranscriptionPrompt,voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
-import {createPlanRepository} from './plans.mjs';
+import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions} from './voice-workspace.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {createHistoryRepository} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
@@ -89,6 +89,7 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
     session.instructions+=' LIVE PROFILE SAVING: The Save profile button works during the conversation, and you can also save through save_onboarding_profile when the person asks, for example "save my profile", "save it", "guarda mi perfil" or "guárdalo". First use propose_account and propose_profile for any newly supplied details, then save. This overrides earlier instructions requiring the person to end the call, add suggestions to a form or use only a button to save. Do not ask for another confirmation or show a form. Account-holder name, explicitly stated student/parent role and student name are required; education stage and other fields may be unknown. If details are missing, ask only for those. Only say the profile is saved when the tool returns saved. If storage fails, say so and offer to retry while the call stays open. After a successful save, say one short confirmation in the current language and explain that the home page opens next. The app waits for your spoken confirmation to finish before completing onboarding. Do not ask another onboarding question.';
   }
   session.instructions+=' '+voiceStartingPoints({mode:input.mode,language:input.language,scopePending:Boolean(routing&&!input.targetConfirmed)});
+  if(!routing||input.targetConfirmed)session.instructions+=workspaceInstructions(input.workspace,{continuing:input.continuing===true,selectedNow:input.workspaceRefreshOnly!==true});
   session.instructions=voiceLanguageInstructions(session.instructions,input.language);
   return session;
 }
@@ -112,37 +113,47 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
     try {
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
       let input; try {input=JSON.parse(raw);} catch {return send(400,{error:'invalid_request'});}
+      if(input&&typeof input==='object'){input.workspace=undefined;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
       const updating=input?.action==='update-guide';
       if(!input || (input.action!==undefined&&!updating) || (!updating&&(typeof input.sdp!=='string' || !input.sdp.startsWith('v=0') || input.sdp.length>64000)) || !['en','es'].includes(input.language) || !['parent','student'].includes(input.role) || (input.mode!==undefined && !['profile','finance','admissions','planning','loans'].includes(input.mode))) return send(400,{error:'invalid_request'});
       if(updating){if(!['finance','loans','admissions','planning'].includes(input.mode)||input.role==='parent'&&(!input.routeConversations||!input.targetConfirmed))return send(400,{error:'invalid_guide_update'});input.continuing=true;input.onboarding=false;}
       if(input.routeConversations!==undefined&&typeof input.routeConversations!=='boolean'||input.targetConfirmed!==undefined&&typeof input.targetConfirmed!=='boolean'||input.routeConversations&&input.targetConfirmed&&input.studentId===undefined)return send(400,{error:'invalid_request'});
+      if(input.workspaceFocus&&(!req.origenAuthorized||!['planning','finance','loans','admissions'].includes(input.mode)||input.workspaceFocus.studentId!==input.studentId||input.routeConversations&&!input.targetConfirmed))return send(400,{error:'invalid_workspace_focus'});
       if(req.origenAuthorized){
-        input.memory=[];input.plans=[];
-        try{const family=await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'});storedRole=family.account.role||'unknown';input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};if(family.account.welcomeHeard&&input.replayWelcome!==true)input.onboarding=false;}catch{return send(503,{error:'history_unavailable'});}
-        if(input.routeConversations){
-          try{
-            const students=(await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'})).students;
-            input.students=students.map(({id,name})=>({id,name}));
-            if(input.targetConfirmed){
-              if(input.studentId===null)input.profile={};
-              else {const selected=students.find(s=>s.id===input.studentId);if(!selected)return send(404,{error:'student_not_found'});input.profile=selected;}
-            }
-          }catch{return send(503,{error:'history_unavailable'});}
+        // Saved context is server-owned; callers may only supply an unsaved setup draft.
+        input.memory=[];input.plans=[];delete input.workspace;input.students=[];
+        let family;
+        try{family=await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'});storedRole=family.account.role||'unknown';input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};if(family.account.welcomeHeard&&input.replayWelcome!==true)input.onboarding=false;}catch{return send(503,{error:'history_unavailable'});}
+        const informational=['planning','finance','loans','admissions'].includes(input.mode);
+        if(input.routeConversations)input.students=family.students.map(({id,name})=>({id,name}));
+        if(informational){
+          input.profile={};
+          if(input.studentId!==undefined&&input.studentId!==null){
+            const selected=family.students.find(s=>s.id===input.studentId);
+            if(!selected)return send(404,{error:'student_not_found'});
+            if(!input.routeConversations||input.targetConfirmed)input.profile=selected;
+          }
         }
-        if(input.studentId!==undefined){
+        if(input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
           if(input.studentId!==null&&(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128))return send(400,{error:'invalid_request'});
           try{input.memory=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId,mode:input.mode})).items;}catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
         }
       }
       if(input.routeConversations&&!input.targetConfirmed){input.memory=[];input.plans=[];input.profile={};}
-      if(req.origenAuthorized&&input.mode==='planning'&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
-        try{input.plans=(await createPlanRepository(database)(req.origenIdentity.sub,{action:'load',studentId:input.studentId})).plans.filter(p=>p.status==='active').slice(0,5);}catch{return send(503,{error:'plans_unavailable'});}
+      if(req.origenAuthorized&&['planning','finance','loans','admissions'].includes(input.mode)&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
+        try{
+          try{input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,focus:input.workspaceFocus});}
+          catch(error){
+            if(updating&&input.workspaceRefreshOnly===true&&['workspace_item_changed','workspace_item_unavailable'].includes(error.message))input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode});
+            else throw error;
+          }
+        }catch(error){return send([400,404,409].includes(error.status)?error.status:503,{error:[400,404,409].includes(error.status)?error.message:'workspace_unavailable'});}
       }
       const config=voiceSession(input,env);
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.
-        const base=voiceSession({...input,profile:{},students:[],memory:[],plans:[],continuity:undefined},env);
+        const base=voiceSession({...input,profile:{},students:[],memory:[],plans:[],workspace:input.workspace?.available?{available:true,selection:input.workspace.selection||null,notes:[],actions:[]}:undefined,workspaceFocus:undefined,continuity:undefined},env);
         const version=guidanceConfig(config.model,'voice',base,env);
         const confirmed=input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true);
         tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);

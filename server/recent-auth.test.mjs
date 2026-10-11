@@ -21,10 +21,10 @@ test('Auth0 action retains the provider authentication time and omits missing se
  await onExecutePostLogin({refresh_token:{},session:{}},api);assert.equal(claims.length,1);
 });
 test('destructive HTTP operations reject stale identities before database connections',async()=>{
- let connections=0;const database={connect:async()=>{connections++;throw new Error();}};
+ let connections=0;const database={query:async()=>({rows:[]}),connect:async()=>{connections++;throw new Error();}};
  for(const [handler,input] of [[createLifecycleHandler(database),{action:'delete',confirmation:'DELETE'}],[createInstitutionHandler(database,{INSTITUTION_REVIEWER_SUBJECTS:'reviewer'}),{action:'verify',id:crypto.randomUUID(),revision:1,note:'Verified'}],[createInstitutionHandler(database),{action:'publish',id:crypto.randomUUID(),revision:1,note:'Approved'}]]){
   const req=Readable.from([JSON.stringify(input)]);Object.assign(req,{url:input.action==='delete'?'/api/account-data':'/api/institutions',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reviewer',iat:Math.floor(Date.now()/1000)}});
-  const res={writeHead(status){this.status=status;},end(body){this.body=JSON.parse(body);}};await handler(req,res,()=>assert.fail());assert.equal(res.status,403);assert.equal(res.body.error,'reauthentication_required');
+  const res={writeHead(status){this.status=status;},end(body){this.body=JSON.parse(body);}};await handler(req,res,()=>assert.fail());assert.equal(res.status,403);assert.equal(res.body.error,input.action==='delete'?'reauthentication_required':input.action==='publish'?'staff_permission_required':'staff_mfa_required');
  }assert.equal(connections,0);
 });
 test('account guard locks before checking closure and blocks writes when closure won the race',async()=>{

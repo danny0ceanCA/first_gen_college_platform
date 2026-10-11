@@ -1,3 +1,4 @@
+import {browserPrivacy} from './browserPrivacy.mjs';
 let tokenProvider:(()=>Promise<string|undefined>)|undefined;
 export function setAPITokenProvider(provider:typeof tokenProvider){tokenProvider=provider;}
 export function onboardingTransport(subject:string|undefined,getToken:()=>Promise<string|undefined>){
@@ -11,10 +12,16 @@ export function onboardingTransport(subject:string|undefined,getToken:()=>Promis
  };
 }
 export async function apiFetch(path:string,options:RequestInit={}){
+ const lease=browserPrivacy.capture();
+ try{
+ lease.assert();
  const base=(import.meta.env.VITE_API_URL||'').replace(/\/$/,'');
  const headers=new Headers(options.headers);
  if(headers.has('Authorization')){/* Keep the original live-session account through cleanup. */}
  else if(tokenProvider){const token=await tokenProvider();if(!token)throw new Error('Sign in to use Origen AI.');headers.set('Authorization',`Bearer ${token}`);}
  else throw new Error('Sign in to use Origen AI.');
- return fetch(`${base}${path}`,{...options,headers});
+ lease.assert();
+ const response=await fetch(`${base}${path}`,{...options,headers,signal:options.signal?AbortSignal.any([options.signal,lease.signal]):lease.signal});
+ lease.assert();return response;
+ }finally{lease.release();}
 }

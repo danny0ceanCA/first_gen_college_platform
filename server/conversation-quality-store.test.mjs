@@ -19,6 +19,8 @@ async function fixture(){
  db.public.none(await readFile(new URL('./migrations/019_voice_quality.sql',import.meta.url),'utf8'));
  db.public.none(await readFile(new URL('./migrations/025_conversation_quality.sql',import.meta.url),'utf8'));
  db.public.none(await readFile(new URL('./migrations/026_conversation_reviews.sql',import.meta.url),'utf8'));
+ db.public.registerFunction({name:'length',args:[DataType.text],returns:DataType.integer,implementation:value=>value.length});
+ db.public.none(await readFile(new URL('./migrations/034_conversation_deletion_guards.sql',import.meta.url),'utf8'));
  const {Pool}=db.adapters.createPg();const pool=new Pool();
  const one=(await pool.query("INSERT INTO origen_accounts(auth0_subject) VALUES('auth0|one') RETURNING id")).rows[0].id;
  const two=(await pool.query("INSERT INTO origen_accounts(auth0_subject) VALUES('auth0|two') RETURNING id")).rows[0].id;

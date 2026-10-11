@@ -15,10 +15,12 @@ test('synthetic research projection never exposes released or revoked datasets',
 });
 test('institution reports bind literal search, suppress small metrics in SQL, and avoid user affiliation joins',async()=>{
  const calls=[],database={query:async(sql,args)=>{calls.push({sql,args});return {rows:sql.includes('AS pages')?[{pages:'2',live_pages:'1',awaiting_review:'1',verified_pages:'1'}]:sql.includes('AS total')?[{total:'2'}]:[{id:'institution',page_views:null,link_clicks:'10'}]};}};
+ database.connect=async()=>({...database,release(){}});
  const report=await adminInstitutionReport(database,{search:'50%_',page:2,status:'submitted'},new Date('2026-10-07T19:00:00Z'),async()=>({research:{available:false},operational:{ready:false}}));
  assert.equal(report.month,'2026-09');assert.equal(report.page,2);assert.equal(report.minimumCount,10);
  const query=calls.find(c=>c.sql.includes('OFFSET'));
- assert.deepEqual(query.args,['%50\\%\\_%','submitted','2026-09',25]);
+ assert.deepEqual(query.args.slice(0,4),['%50\\%\\_%','submitted','2026-09',25]);
+ assert.equal(query.args[4].toISOString(),'2026-09-01T00:00:00.000Z');assert.equal(query.args[5].toISOString(),'2026-10-01T00:00:00.000Z');
  assert.match(query.sql,/page_views,0\)>=10 THEN m.page_views ELSE NULL/);assert.match(query.sql,/link_clicks,0\)>=10 THEN m.link_clicks ELSE NULL/);
  for(const call of calls)assert.doesNotMatch(call.sql,/origen_accounts|origen_students|origen_institution_members|work_email|auth0_subject|summary|transcript/);
  assert.equal(report.institutions[0].page_views,null);

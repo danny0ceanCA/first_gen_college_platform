@@ -1,3 +1,4 @@
+import {staffTestIdentity} from './staff-test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -43,7 +44,7 @@ test('draft changes preserve approved pages, invalidate changed identities and r
  }finally{await pool.end();}
 });
 test('published pages are anonymous while institution registration and reviews require verified identity',async()=>{
- const {pool}=await fixture();const app=createApp({ALLOWED_ORIGINS:'https://origen.example',ALLOW_PREVIEW_VOICE:'true',INSTITUTION_REVIEWER_SUBJECTS:'reviewer'},async token=>({sub:token}),pool,()=>{});
+ const {pool}=await fixture();const app=createApp({ALLOWED_ORIGINS:'https://origen.example',ALLOW_PREVIEW_VOICE:'true',INSTITUTION_REVIEWER_SUBJECTS:'reviewer'},async token=>staffTestIdentity(token,token==='admin'?undefined:[]),pool,()=>{});
  const server=createServer(app);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
  try{
   const headers={Origin:'https://origen.example','Content-Type':'application/json'};

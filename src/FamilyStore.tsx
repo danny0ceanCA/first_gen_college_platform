@@ -1,5 +1,7 @@
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
+import {apiFetch} from './api';
+import {browserPrivacy} from './browserPrivacy.mjs';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 
 export type Account={firstName:string;email:string;role?:'parent'|'student';welcomeHeard?:boolean;usedVoice?:boolean};
@@ -11,6 +13,7 @@ export function useFamily(){const store=useContext(Context);if(!store)throw new 
 export function FamilyProvider({children,previewStudents}:{children:ReactNode;previewStudents:StudentProfile[]}){
  const {isAuthenticated,user,getAccessTokenSilently}=useAuth0();
  const cloud=isAuthenticated&&!!user?.sub;
+ const [privacyLease]=useState(()=>browserPrivacy.capture());
  const scope=cloud?`origen.user.${user!.sub}`:'camino';
  const accountKey=cloud?`origen.account.${user!.sub}`:'origen.account-preview.v1';
  const [visitedBefore]=useState(()=>loadLocal<boolean>(`${scope}.visited.v1`,false)===true);
@@ -20,10 +23,12 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  const [errorCode,setErrorCode]=useState('');
  const busy=useRef(false);
  async function request(operation:Record<string,unknown>,signal?:AbortSignal):Promise<Family>{
+  privacyLease.assert();
   const token=await getAccessTokenSilently();
-  const base=(import.meta.env.VITE_API_URL||'').replace(/\/$/,'');
-  const response=await fetch(`${base}/api/family`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(operation),signal});
+  privacyLease.assert();
+  const response=await apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(operation),signal:signal?AbortSignal.any([signal,privacyLease.signal]):privacyLease.signal});
   const result=await response.json();
+  privacyLease.assert();
   if(!response.ok||!Array.isArray(result.students)||!result.account)throw new Error(result.error||'family_unavailable');
   return result;
  }
@@ -64,6 +69,6 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
   completeOnboarding:(firstName,role,student,onboardingAttemptId)=>{const account={...family.account,firstName,role};return mutate({action:'complete-onboarding',account,...(onboardingAttemptId?{onboardingAttemptId}:{}),...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
   saveAccount:details=>{const account={...family.account,...details};return mutate({action:'save-account',account},{...family,account});},
   saveStudent:student=>mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]}),
-  removeStudent:id=>mutate({action:'delete-student',id},{...family,students:family.students.filter(s=>s.id!==id)})
+  removeStudent:async id=>{const removed=await mutate({action:'delete-student',id},{...family,students:family.students.filter(s=>s.id!==id)});if(removed)browserPrivacy.forget({studentId:id});return removed;}
  }}>{children}</Context.Provider>;
 }

@@ -1,3 +1,4 @@
+import {staffTestIdentity} from './staff-test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -22,7 +23,7 @@ test('metrics only count approved page actions and report completed months to cu
  }finally{await pool.end();}
 });
 test('gateway keeps collection anonymous and report authentication, origin, schema and size boundaries intact',async()=>{
- const {pool}=await fixture();const i=await published(pool);const logs=[];const server=createServer(createApp({ALLOWED_ORIGINS:'https://origen.example'},async token=>({sub:token}),pool,r=>logs.push(r)));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
+ const {pool}=await fixture();const i=await published(pool);const logs=[];const server=createServer(createApp({ALLOWED_ORIGINS:'https://origen.example'},async token=>staffTestIdentity(token,token==='admin'?undefined:[]),pool,r=>logs.push(r)));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
  const post=(path,body,extra={})=>fetch(base+path,{method:'POST',headers:{Origin:'https://origen.example','Content-Type':'application/json',...extra},body:JSON.stringify(body)});
  try{
   assert.equal((await post('/api/institution-metrics/event',{slug:i.slug,metric:'page_view'})).status,200);

@@ -5,4 +5,6 @@ exports.onExecutePostLogin=async(event,api)=>{
  if(Number.isFinite(timestamp)&&timestamp>0){
   api.accessToken.setCustomClaim('https://origenedu.ai/auth_time',Math.floor(timestamp/1000));
  }
+ const completed=(event.authentication?.methods||[]).filter(m=>m.name==='mfa').map(m=>Date.parse(m.timestamp)).filter(t=>Number.isFinite(t)&&t>0);
+ if(completed.length)api.accessToken.setCustomClaim('https://origenedu.ai/mfa_time',Math.floor(Math.max(...completed)/1000));
 };

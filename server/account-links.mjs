@@ -2,6 +2,7 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {safeErrorCode} from './api-logging.mjs';
 import {accountClosed} from './account-lifecycle.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
+import {auditStaffDecision} from './staff-access.mjs';
 
 export const sharedColumns=['name','stage','interest','gpa','color','institutions','entry_term','school','activities','goals'];
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
@@ -35,7 +36,11 @@ export function createLinksRepository(database){
     const invite=(await client.query('INSERT INTO origen_family_invites(owner_account_id,student_id,target_role,token_hash) VALUES ($1,$2,$3,$4) RETURNING id,expires_at',[account,input.studentId,input.role,hash(token)])).rows[0];
     extra={token,inviteId:invite.id,expiresAt:invite.expires_at};
    }
-   if(input.action==='inspect'||input.action==='accept'){
+   if(client.isolated&&['inspect','accept','unlink'].includes(input.action)){
+    try{extra=(await client.query('SELECT origen_family_link_command($1,$2,$3) AS result',[input.action,input.action==='unlink'?input.id:hash(input.token),input.action==='accept'?`linked-${randomUUID()}`:null])).rows[0].result;}
+    catch(error){const statuses={invitation_unavailable:410,cannot_accept_own_invitation:409,already_linked:409,link_not_found:404};if(statuses[error.message])fail(statuses[error.message],error.message);throw error;}
+   }
+   if(!client.isolated&&(input.action==='inspect'||input.action==='accept')){
     const invite=(await client.query('SELECT * FROM origen_family_invites WHERE token_hash=$1 AND expires_at>now() AND consumed_at IS NULL AND revoked_at IS NULL FOR UPDATE',[hash(input.token)])).rows[0];
     if(!invite)fail(410,'invitation_unavailable');
     if(invite.owner_account_id===account)fail(409,'cannot_accept_own_invitation');
@@ -58,7 +63,7 @@ export function createLinksRepository(database){
    if(input.action==='revoke'){
     if(!(await client.query('UPDATE origen_family_invites SET revoked_at=now() WHERE id=$1 AND owner_account_id=$2 AND consumed_at IS NULL RETURNING id',[input.id,account])).rows.length)fail(404,'invitation_not_found');
    }
-   if(input.action==='unlink'){
+   if(!client.isolated&&input.action==='unlink'){
     const link=(await client.query('SELECT * FROM origen_student_links WHERE id=$1 AND (owner_account_id=$2 OR member_account_id=$2) FOR UPDATE',[input.id,account])).rows[0];
     if(!link)fail(404,'link_not_found');
     // Keep the last shared academic snapshot and each person's own private history.
@@ -66,8 +71,9 @@ export function createLinksRepository(database){
     if(snapshot)await client.query(`UPDATE origen_students SET ${sharedColumns.map((c,i)=>`${c}=$${i+3}`).join(',')},updated_at=now() WHERE account_id=$1 AND id=$2`,[link.member_account_id,link.member_student_id,...sharedColumns.map(c=>snapshot[c])]);
     await client.query('DELETE FROM origen_student_links WHERE id=$1',[link.id]);
    }
-   const links=(await client.query(`SELECT l.id,CASE WHEN l.owner_account_id=$1 THEN l.owner_student_id ELSE l.member_student_id END AS "studentId",s.name AS "studentName",a.first_name AS "personName",l.member_role AS role,(l.owner_account_id=$1) AS "isOwner" FROM origen_student_links l JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id JOIN origen_accounts a ON a.id=CASE WHEN l.owner_account_id=$1 THEN l.member_account_id ELSE l.owner_account_id END WHERE l.owner_account_id=$1 OR l.member_account_id=$1 ORDER BY l.created_at`,[account])).rows;
+   const links=client.isolated?(await client.query("SELECT origen_family_link_command('load',NULL) AS result")).rows[0].result:(await client.query(`SELECT l.id,CASE WHEN l.owner_account_id=$1 THEN l.owner_student_id ELSE l.member_student_id END AS "studentId",s.name AS "studentName",a.first_name AS "personName",l.member_role AS role,(l.owner_account_id=$1) AS "isOwner" FROM origen_student_links l JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id JOIN origen_accounts a ON a.id=CASE WHEN l.owner_account_id=$1 THEN l.member_account_id ELSE l.owner_account_id END WHERE l.owner_account_id=$1 OR l.member_account_id=$1 ORDER BY l.created_at`,[account])).rows;
    const invites=(await client.query(`SELECT i.id,i.student_id AS "studentId",s.name AS "studentName",i.target_role AS role,i.expires_at AS "expiresAt" FROM origen_family_invites i JOIN origen_students s ON s.account_id=i.owner_account_id AND s.id=i.student_id WHERE i.owner_account_id=$1 AND i.expires_at>now() AND i.revoked_at IS NULL AND i.consumed_at IS NULL ORDER BY i.created_at DESC`,[account])).rows;
+   if(['create','accept','revoke','unlink'].includes(input.action))await auditStaffDecision(client,{sub:subject},{scope:'family',action:input.action,target:input.studentId||input.id||extra.studentId,outcome:'completed'});
    await client.query('COMMIT');return {...extra,links,invites};
   }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
  };

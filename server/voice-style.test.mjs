@@ -20,7 +20,7 @@ test('onboarding and post-save response overrides preserve style and the require
   const setup=onboardingWelcome(language,{canSaveProfile:true}),home=homeVoiceIntroduction(language);
   assert.ok(setup.includes(collegeVoiceStyle));assert.ok(home.includes(collegeVoiceStyle));
   assert.match(setup,/focus on profile setup/);assert.match(setup,/before the profile is saved/);
-  assert.match(home,/SAME conversation without Hola/);assert.match(home,/Talk button on the bar at the bottom/);
+  assert.match(home,/SAME conversation without Hola/);assert.match(home,/circle logo button labeled Talk with Origen on the bar at the bottom/);
  }
 });
 

@@ -1,6 +1,6 @@
 import {validCampaign,recordInquiryFact,recordInquiryState} from './institution-outreach-data.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
-import {recentlyAuthenticated} from './recent-auth.mjs';
+import {requireStaffAccess} from './staff-access.mjs';
 import {createHash} from 'node:crypto';
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -88,11 +88,11 @@ export async function purgeInstitutionInquiries(database){if(database)await data
 export function createInquiryHandler(database){const run=createInquiryRepository(database),buckets=new Map();return async(req,res,next)=>{
  if(!['/api/institution-inquiries/public','/api/institution-inquiries/staff'].includes(req.url))return next();const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
- const isPublic=req.url.endsWith('/public');if(!isPublic&&!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
+ const isPublic=req.url.endsWith('/public');if(!isPublic&&(!req.origenAuthorized||!req.origenIdentity?.sub))return send(401,{error:'authentication_required'});
  if(isPublic){const now=Date.now();for(const [k,b]of buckets)if(b.until<now)buckets.delete(k);const key=req.socket?.remoteAddress||'unknown',b=buckets.get(key)||{count:0,until:now+60000};if(buckets.size>=10000&&!buckets.has(key))return send(429,{error:'rate_limited'});buckets.set(key,b);if(++b.count>30)return send(429,{error:'rate_limited'});}
  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16000)return send(413,{error:'too_large'});}let input;try{input=validateInquiry(JSON.parse(raw));}catch(error){return send(error.status||400,{error:error.message});}
  if(isPublic!==!!input.receipt)return send(403,{error:'invalid_action'});
- if(input.action==='export'&&!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
+ if(!isPublic)await requireStaffAccess(database,req.origenIdentity,{scope:'inquiry',action:input.action,target:input.institutionId,fresh:['export','request-transfer'].includes(input.action)});
  return send(200,await run(req.origenIdentity?.sub,input));
  }catch(error){const known=[400,403,404,409,410,429].includes(error.status);if(!known)req.log?.({event:'inquiry_storage_error',level:'error'});return send(known?error.status:503,{error:known?error.message:'inquiries_unavailable'});}
 };}

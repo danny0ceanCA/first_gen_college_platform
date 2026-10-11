@@ -11,7 +11,7 @@ test('Auth0 access-token permission grants access; profile roles and scope do no
  assert.equal(hasAdminAccess({sub:'auth0|user',role:'admin',scope:'read:activity',user_metadata:{role:'admin'}},{}),false);
  assert.equal(hasAdminAccess({sub:'auth0|user',permissions:['read:profile']},{}),false);
 });
-async function request(handler,subject,data,authorized=true){const req=Readable.from([JSON.stringify(data)]);Object.assign(req,{url:'/api/admin',origenAuthorized:authorized,origenIdentity:{sub:subject}});const out={};const res={writeHead(status){out.status=status;},end(body){out.body=body?JSON.parse(body):null;}};await handler(req,res,()=>{throw Error('unexpected next');});return out;}
+async function request(handler,subject,data,authorized=true){const req=Readable.from([JSON.stringify(data)]);Object.assign(req,{url:'/api/admin',method:'POST',origenAuthorized:authorized,origenIdentity:{sub:subject}});const out={};const res={writeHead(status){out.status=status;},end(body){out.body=body?JSON.parse(body):null;}};await handler(req,res,()=>{throw Error('unexpected next');});return out;}
 test('unauthenticated and ordinary users cannot query dashboard or touch database',async()=>{
  const handler=createAdminHandler({query(){throw Error('must not query');}},{ADMIN_SUBJECTS:'auth0|owner'});
  assert.equal((await request(handler,'auth0|owner',{action:'overview'},false)).status,401);

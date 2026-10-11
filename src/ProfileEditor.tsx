@@ -1,5 +1,6 @@
 import ProfileVoice from './ProfileVoice';
-import {useState} from 'react';
+import {useContext,useState} from 'react';
+import {SharedVoiceContext} from './SharedVoiceContext';
 
 import type {StudentProfile} from './planning';
 
@@ -7,7 +8,9 @@ export default function ProfileEditor({student,t,save,cancel,language,role,remov
 
  const [deleteFailed,setDeleteFailed]=useState(false);
  const [confirmDelete,setConfirmDelete]=useState(false);const [saving,setSaving]=useState(false);const [error,setError]=useState(false);
- const [draft,setDraft]=useState(student); const [voiceActive,setVoiceActive]=useState(false);
+ const [draft,setDraft]=useState(student); const [localVoiceActive,setVoiceActive]=useState(false);
+ const sharedVoice=useContext(SharedVoiceContext);
+ const voiceActive=localVoiceActive||sharedVoice?.active===true;
 
  const institutions=['UC Berkeley','UC Davis','UC Irvine','UCLA','UC Merced','UC Riverside','UC San Diego','UC Santa Barbara','UC Santa Cruz','California State University (CSU)','California community colleges'];
 

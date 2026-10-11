@@ -1,3 +1,4 @@
+import {staffTestIdentity} from './staff-test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -8,7 +9,7 @@ test('onboarding release journey preserves authoritative saves, replay, return v
  const {pool}=await fixture(),logs=[];
  await pool.query('CREATE TABLE origen_schema_migrations(name text,applied_at timestamptz)');
  await pool.query('INSERT INTO origen_schema_migrations VALUES($1,now())',['027_onboarding_events.sql']);
- const identities={one:{sub:'auth0|release-one'},two:{sub:'auth0|release-two'},admin:{sub:'auth0|release-admin',permissions:['read:activity']}};
+ const identities={one:{sub:'auth0|release-one'},two:{sub:'auth0|release-two'},admin:staffTestIdentity('auth0|release-admin')};
  const server=createServer(createApp({ALLOWED_ORIGINS:'https://synthetic.example',ONBOARDING_RETENTION_DAYS:'7'},async token=>{
   if(!identities[token])throw Error('invalid synthetic token');
   return {...identities[token],'https://origenedu.ai/auth_time':Math.floor(Date.now()/1000)};

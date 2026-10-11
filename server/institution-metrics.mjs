@@ -1,3 +1,4 @@
+import {requireStaffAccess} from './staff-access.mjs';
 import {validCampaign,campaignUUID} from './institution-outreach-data.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -53,7 +54,8 @@ export function createMetricsHandler(database,clock){
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>512)return send(413,{error:'too_large'});}
    let input;try{input=JSON.parse(raw);}catch{return send(400,{error:'invalid_metric'});}
    if(reporting){if(!input||Object.keys(input).some(k=>k!=='id'))return send(400,{error:'invalid_metric'});input={...input,action:'report'};}
+   if(reporting)await requireStaffAccess(database,req.origenIdentity,{scope:'metrics',action:'report',target:input.id});
    return send(200,await run(req.origenIdentity?.sub,input));
-  }catch(error){const known=[400,401,404].includes(error.status);if(!known)req.log?.({event:'database_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'metrics_unavailable'});}
+  }catch(error){const known=[400,401,403,404].includes(error.status);if(!known)req.log?.({event:'database_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'metrics_unavailable'});}
  };
 }

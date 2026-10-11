@@ -4,7 +4,7 @@ import {Readable} from 'node:stream';
 import {fixture} from './family-fixture.mjs';
 import {onboardingBatch,storeOnboardingBatch} from './onboarding-events.mjs';
 import {adminOnboardingTimeline,adminOnboardingAttempt} from './admin-onboarding.mjs';
-import {createAdminHandler} from './admin.mjs';
+import {createAuditedAdminHandler as createAdminHandler,staffTestIdentity} from './staff-test-fixture.mjs';
 
 test('history validates account, attempt, period and pagination before reads',async()=>{
  const db={query:()=>assert.fail('invalid input queried database')},id=crypto.randomUUID();
@@ -27,14 +27,14 @@ test('admin-only history reads deny regular users before queries and safely repo
   for(const authorized of [false,true]){
    let queried=false,status;
    const handler=createAdminHandler({query:async()=>{queried=true;}},{});
-   const req=Object.assign(Readable.from([JSON.stringify({action,id:crypto.randomUUID(),attemptId:crypto.randomUUID()})]),{url:'/api/admin',origenAuthorized:authorized,origenIdentity:{sub:'auth0|regular'}});
+   const req=Object.assign(Readable.from([JSON.stringify({action,id:crypto.randomUUID(),attemptId:crypto.randomUUID()})]),{url:'/api/admin',method:'POST',origenAuthorized:authorized,origenIdentity:{sub:'auth0|regular'}});
    await handler(req,{writeHead:value=>status=value,end:()=>{}},()=>{});
    assert.equal(status,authorized?403:401);assert.equal(queried,false);
   }
  }
  let status,payload;
  const handler=createAdminHandler({query:async()=>{throw new Error('private database detail');}},{});
- const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-timeline',id:crypto.randomUUID()})]),{url:'/api/admin',origenAuthorized:true,origenIdentity:{sub:'auth0|admin',permissions:['read:activity']}});
+ const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-timeline',id:crypto.randomUUID()})]),{url:'/api/admin',method:'POST',origenAuthorized:true,origenIdentity:staffTestIdentity('auth0|admin')});
  await handler(req,{writeHead:value=>status=value,end:value=>payload=JSON.parse(value)},()=>{});
  assert.equal(status,503);assert.deepEqual(payload,{error:'onboarding_history_unavailable'});
 });

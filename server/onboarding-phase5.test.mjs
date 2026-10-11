@@ -8,7 +8,7 @@ import {onboardingAlertReport,adminOnboardingAlerts} from './onboarding-alerts.m
 import {onboardingBatch,storeOnboardingBatch,purgeOnboardingEvents} from './onboarding-events.mjs';
 import {adminOnboardingMetrics} from './admin-onboarding-metrics.mjs';
 import {adminOnboardingTimeline} from './admin-onboarding.mjs';
-import {createAdminHandler} from './admin.mjs';
+import {createAuditedAdminHandler as createAdminHandler,staffTestIdentity} from './staff-test-fixture.mjs';
 import {fixture} from './family-fixture.mjs';
 const storage=()=>{const map=new Map();return {get length(){return map.size;},key:i=>[...map.keys()][i]??null,getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key),map};};
 function clock(){let at=Date.now(),next=0;const tasks=new Map();return {now:()=>at,advance:ms=>at+=ms,schedule:(cb,ms)=>{const id=++next;tasks.set(id,{cb,ms});return id;},cancel:id=>tasks.delete(id),tasks};}
@@ -101,7 +101,7 @@ test('configured retention cascades only inactive visits and alert SQL counts ob
  }finally{await pool.end();}
 });
 test('alerts are admin-only, unavailable capture is explicit and failures hide private database details',async()=>{
- let queried=false,status,payload;const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-alerts'})]),{url:'/api/admin',origenAuthorized:true,origenIdentity:{sub:'ordinary'}});await createAdminHandler({query:()=>queried=true},{})(req,{writeHead:s=>status=s,end:p=>payload=JSON.parse(p)},()=>{});assert.equal(status,403);assert.equal(queried,false);
+ let queried=false,status,payload;const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-alerts'})]),{url:'/api/admin',method:'POST',origenAuthorized:true,origenIdentity:{sub:'ordinary'}});await createAdminHandler({query:()=>queried=true},{})(req,{writeHead:s=>status=s,end:p=>payload=JSON.parse(p)},()=>{});assert.equal(status,403);assert.equal(queried,false);
  const absent=await adminOnboardingAlerts({query:async()=>({rows:[]})});assert.equal(absent.available,false);
- const broken=Object.assign(Readable.from([JSON.stringify({action:'onboarding-alerts'})]),{url:'/api/admin',origenAuthorized:true,origenIdentity:{sub:'admin',permissions:['read:activity']}});await createAdminHandler({query:async()=>{throw Error('private SQL');}},{})(broken,{writeHead:s=>status=s,end:p=>payload=JSON.parse(p)},()=>{});assert.equal(status,503);assert.deepEqual(payload,{error:'onboarding_alerts_unavailable'});
+ const broken=Object.assign(Readable.from([JSON.stringify({action:'onboarding-alerts'})]),{url:'/api/admin',method:'POST',origenAuthorized:true,origenIdentity:staffTestIdentity('admin')});await createAdminHandler({query:async()=>{throw Error('private SQL');}},{})(broken,{writeHead:s=>status=s,end:p=>payload=JSON.parse(p)},()=>{});assert.equal(status,503);assert.deepEqual(payload,{error:'onboarding_alerts_unavailable'});
 });

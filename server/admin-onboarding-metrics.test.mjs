@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {newDb,DataType} from 'pg-mem';
 import {adminWindow} from './admin-overview.mjs';
 import {adminOnboardingMetrics,onboardingCohortReport,onboardingCohortSQL} from './admin-onboarding-metrics.mjs';
-import {createAdminHandler} from './admin.mjs';
+import {createAuditedAdminHandler as createAdminHandler,staffTestIdentity} from './staff-test-fixture.mjs';
 
 const now=new Date('2026-10-09T20:00:00Z'),window=adminWindow(7,now);
 const visit=(overrides={})=>({account_id:'one',id:crypto.randomUUID(),started_at:'2026-10-07T20:00:00Z',saved_at:null,resumed:false,language:'en',method:'voice',phase3:true,voice_starts:1,connections:1,first_audio_ms:1000,...overrides});
@@ -59,9 +59,9 @@ test('metric reads validate periods, report unavailable capture and safely retai
  assert.doesNotMatch(onboardingCohortSQL,/auth0_subject|first_name|email|transcript\b|summary|e\.metadata[,\s]/);
 });
 test('metrics endpoint enforces admin access, bounds periods and hides database error text',async()=>{
- const invoke=async(identity,authorized,db,body)=>{let status,payload;const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-metrics',...body})]),{url:'/api/admin',origenAuthorized:authorized,origenIdentity:identity});await createAdminHandler(db,{})(req,{writeHead:s=>status=s,end:value=>payload=JSON.parse(value)},()=>{});return {status,payload};};
+ const invoke=async(identity,authorized,db,body)=>{let status,payload;const req=Object.assign(Readable.from([JSON.stringify({action:'onboarding-metrics',...body})]),{url:'/api/admin',method:'POST',origenAuthorized:authorized,origenIdentity:identity});await createAdminHandler(db,{})(req,{writeHead:s=>status=s,end:value=>payload=JSON.parse(value)},()=>{});return {status,payload};};
  for(const [authorized,status] of [[false,401],[true,403]])assert.equal((await invoke({sub:'auth0|user'},authorized,{query:()=>assert.fail('protected data read')},{})).status,status);
- const admin={sub:'auth0|admin',permissions:['read:activity']};
+ const admin=staffTestIdentity('auth0|admin');
  assert.equal((await invoke(admin,true,{query:()=>assert.fail('invalid filter queried')},{days:'7'})).status,400);
  const broken=await invoke(admin,true,{query:async()=>{throw new Error('private SQL details');}},{});assert.equal(broken.status,503);assert.deepEqual(broken.payload,{error:'onboarding_metrics_unavailable'});
  assert.equal((await invoke(admin,true,{query:async()=>({rows:[]})},{days:30})).status,200);

@@ -45,6 +45,6 @@ test('onboarding uncertainty helps with setup; only the post-save introduction s
   const home=homeVoiceIntroduction(language);
   assert.ok(home.includes(voiceStartingPoints({language})));
   assert.match(home,/SAME conversation without Hola/);
-  assert.match(home,/Talk button on the bar at the bottom/);
+  assert.match(home,/circle logo button labeled Talk with Origen on the bar at the bottom/);
  }
 });

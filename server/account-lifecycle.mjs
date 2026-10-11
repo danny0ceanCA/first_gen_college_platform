@@ -1,3 +1,4 @@
+import {recordPrivacyEvent} from './privacy-monitor.mjs';
 import {createHash} from 'node:crypto';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -27,13 +28,19 @@ export function createLifecycleRepository(database){return async(subject,input)=
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_login_activity'")).rows.length)data.activity={logins:await rows('origen_login_activity'),voice:await rows('origen_voice_activity')};
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_voice_quality_events'")).rows.length)data.voiceQuality=await rows('origen_voice_quality_events');
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_onboarding_attempts'")).rows.length)data.onboarding={attempts:await rows('origen_onboarding_attempts'),events:await rows('origen_onboarding_events')};
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_admin_issue_reviews'")).rows.length)data.technicalReviews=account?(await c.query('SELECT issue_key,status,reason,created_at FROM origen_admin_issue_reviews WHERE account_id=$1 ORDER BY id',[account.id])).rows:[];
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_conversation_quality'")).rows.length)data.conversationQuality=await rows('origen_conversation_quality');
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_login_activity'")).rows.length)data.activity={logins:await rows('origen_login_activity'),voice:await rows('origen_voice_activity')};
    // Optional for older schemas during additive rollout. Never query another account.
    const guidanceTables=(await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_guidance_sessions'")).rows;
    if(guidanceTables.length){data.formatVersion=2;data.guidance={};for(const table of ['origen_account_identities','origen_guidance_sessions','origen_guidance_segments','origen_guidance_events','origen_ai_executions','origen_tool_calls','origen_summary_segments','origen_guidance_summary_intents'])data.guidance[table]=await rows(table);const ids=new Set([...data.guidance.origen_guidance_segments,...data.guidance.origen_ai_executions,...data.guidance.origen_summary_segments,...data.guidance.origen_guidance_summary_intents].map(row=>row.configuration_id).filter(Boolean));data.guidance.configurations=[];for(const id of ids)data.guidance.configurations.push(...(await c.query('SELECT * FROM origen_ai_configurations WHERE id=$1',[id])).rows);}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_progress_reports'")).rows.length){data.formatVersion=3;data.progress={};for(const table of ['origen_profile_observations','origen_plan_revisions','origen_step_transitions','origen_progress_reports'])data.progress[table]=await rows(table);data.progress.definitions=(await c.query('SELECT * FROM origen_measurement_definitions')).rows;}
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_feedback_prompts'")).rows.length)data.feedbackPrompts=await rows('origen_feedback_prompts');
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_topic_notes'")).rows.length){data.topicNotes=await rows('origen_topic_notes');data.topicNoteBatches=await rows('origen_topic_note_batches');}
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_plan_creations'")).rows.length){data.planCreationReceipts=await rows('origen_plan_creations');data.planNoteLinks=await rows('origen_plan_note_links');}
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_workspace_sheets'")).rows.length){data.workspaceSheets=await rows('origen_workspace_sheets');data.workspaceSheetReceipts=await rows('origen_workspace_sheet_receipts');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length)data.institutionAffiliationRequests=(await c.query('SELECT parent_name,parent_website,unit_name,unit_type,status,review_note,created_at,updated_at FROM origen_institution_affiliation_requests WHERE auth0_subject=$1',[subject])).rows;
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_privacy_preferences'")).rows.length){data.formatVersion=4;data.privacyPreferences=await rows('origen_privacy_preferences');}
    // No invite tokens/hashes, other participants' private data or identity credentials.
    await c.query('COMMIT');return data;
   }
@@ -58,7 +65,10 @@ export function createLifecycleHandler(database){const run=createLifecycleReposi
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>512)return send(413,{error:'too_large'});}
   let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
   if(!input||Array.isArray(input)||!['export','delete'].includes(input.action)||Object.keys(input).some(k=>!['action','confirmation'].includes(k)))throw fail(400,'invalid_request');
-  if(input.action==='delete'&&!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
-  return send(200,await run(req.origenIdentity.sub,input));
+  if(!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
+  if(input.action==='export')await recordPrivacyEvent(database,req.origenIdentity.sub,'export_requested','account');
+  const result=await run(req.origenIdentity.sub,input);
+  if(input.action==='export')await recordPrivacyEvent(database,req.origenIdentity.sub,'export_prepared','account');
+  return send(200,result);
  }catch(error){const known=[400,403,409].includes(error.status);if(!known)req.log?.({event:'database_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'account_data_unavailable'});}
 };}

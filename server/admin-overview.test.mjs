@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {adminWindow,adminSeries,adminOverview} from './admin-overview.mjs';
-import {createAdminHandler} from './admin.mjs';
+import {createAuditedAdminHandler as createAdminHandler,staffTestIdentity} from './staff-test-fixture.mjs';
 test('reporting windows have equal previous durations and reject unsupported input',()=>{
  for(const days of [7,30,90]){const w=adminWindow(days,new Date('2026-10-07T19:20:00Z'));assert.equal(Date.parse(w.end)-Date.parse(w.start),days*86400000);assert.equal(Date.parse(w.start)-Date.parse(w.previousStart),days*86400000);}
  for(const days of [0,365,'30',NaN])assert.throws(()=>adminWindow(days),/invalid_period/);
@@ -34,6 +34,6 @@ test('overview uses bounded consistent current and previous windows, and suppres
 });
 test('invalid date selection returns 400 without querying any data',async()=>{
  const handler=createAdminHandler({query(){throw Error('must not query');}},{ADMIN_SUBJECTS:'admin'});
- const req=Readable.from([JSON.stringify({action:'overview',days:365})]);Object.assign(req,{url:'/api/admin',origenAuthorized:true,origenIdentity:{sub:'admin'}});
+ const req=Readable.from([JSON.stringify({action:'overview',days:365})]);Object.assign(req,{url:'/api/admin',method:'POST',origenAuthorized:true,origenIdentity:staffTestIdentity('admin')});
  let status;await handler(req,{writeHead(value){status=value;},end(){}},()=>{});assert.equal(status,400);
 });

@@ -7,8 +7,18 @@ const migrationDirectory=new URL('./migrations/',import.meta.url);
 export function createDatabase(env=process.env,Pool=pg.Pool){
  if(!env.DATABASE_URL?.trim())return null;
  // Five connections per API instance leaves room on the small Render database.
- // pg respects SSL settings in the URL. Use Render's internal URL in production.
- const pool=new Pool({connectionString:env.DATABASE_URL,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000});
+ // Production always requires TLS. Public connections verify certificates.
+ // Remove URL SSL options so pg cannot replace
+ // the explicit verification settings (notably sslmode=no-verify/require).
+ let connectionString=env.DATABASE_URL,ssl;
+ if(env.NODE_ENV==='production'){
+  const url=new URL(connectionString);
+  for(const key of ['ssl','sslmode','sslcert','sslkey','sslrootcert','uselibpqcompat'])url.searchParams.delete(key);
+  const internal=env.DATABASE_TLS_MODE==='render-internal';
+  if(internal&&(env.RENDER!=='true'||!/^dpg-[a-z0-9-]+$/.test(url.hostname)))throw new Error('invalid_database_tls_mode');
+  connectionString=url.href;ssl={rejectUnauthorized:!internal,...(!internal&&env.DATABASE_SSL_CA?{ca:env.DATABASE_SSL_CA}:{})};
+ }
+ const pool=new Pool({connectionString,...(ssl?{ssl}:{}),max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000});
  pool.on('error',()=>console.error('Origen database connection error.'));
  return pool;
 }
@@ -43,7 +53,7 @@ export async function migrateDatabase(pool,directory=migrationDirectory){
 export async function databaseReady(pool){
  if(!pool)return false;
  try{
-  const {rows}=await pool.query("SELECT EXISTS (SELECT 1 FROM origen_schema_migrations WHERE name = '024_institution_campaigns.sql') AS ready");
+  const {rows}=await pool.query("SELECT EXISTS (SELECT 1 FROM origen_schema_migrations WHERE name = '038_privacy_verification.sql') AS ready");
   return rows[0]?.ready===true;
  }catch{return false;}
 }

@@ -2,6 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {summarySaveQueue} from '../src/summarySaveQueue.mjs';
 
+test('logout aborts an in-flight save and prevents queued or late saves',async()=>{
+ const queue=summarySaveQueue();let release,signal;
+ queue.add('first',async s=>{signal=s;await new Promise(resolve=>release=resolve);if(s.aborted)throw new Error('cancelled');});
+ queue.add('second',async()=>assert.fail('dispatched after logout'));
+ const work=queue.flush();queue.clear();assert.equal(signal.aborted,true);queue.add('late',async()=>assert.fail('late job'));release();await work;assert.equal(queue.size,0);
+});
+
+test('deleted jobs never retry but unrelated transient failures remain retryable',async()=>{
+ const queue=summarySaveQueue();let release,count=0;
+ queue.add('deleted',async signal=>{await new Promise(resolve=>release=resolve);assert.equal(signal.aborted,true);throw new Error('aborted');});
+ queue.add('retry',async()=>{if(++count===1)throw new Error('offline');});
+ const work=queue.flush();queue.remove('deleted');release();await assert.rejects(work);assert.equal(queue.size,1);await queue.flush();assert.equal(count,2);
+ queue.add('deleted',async()=>assert.fail('deleted job reinserted'));assert.equal(queue.size,0);
+});
+
 test('failed summary saves can retry without changing the captured student or session',async()=>{
  const queue=summarySaveQueue();let calls=0;const targets=[];
  const captured={session:'session-one',student:'student-one'};
