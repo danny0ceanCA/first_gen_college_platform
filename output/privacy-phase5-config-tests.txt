@@ -1,0 +1,12 @@
+✔ production startup tolerates the retired preview setting and rejects invalid configuration without disclosing secrets (7.8009ms)
+{"time":"2026-10-10T19:15:22.821Z","requestId":"daf95dbe-5df2-4556-b16d-d636780da4dd","event":"api_request","code":"method_not_allowed","endpoint":"api.family","method":"GET","level":"warn","durationMs":0,"httpStatus":405}
+{"time":"2026-10-10T19:15:22.823Z","requestId":"eba261cb-2b5d-48b3-a993-7ec5807325f4","event":"api_request","code":"not_found","endpoint":"unknown_route","method":"GET","level":"warn","durationMs":0,"httpStatus":404}
+✔ API errors and health responses carry cache and browser safeguards (36.1973ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 426.65

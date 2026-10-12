@@ -1,0 +1,20 @@
+[   46641ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[   46692ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=vWx8nmkaRGhE' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[   46705ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=vWx8nmkaRGhE' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[   46707ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[   46771ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5192/api/admin:0
+[  135793ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://127.0.0.1:5192/api/plans:0
+[  137760ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  137779ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=vWx8nmkaRGhE' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  137782ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=vWx8nmkaRGhE' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  137782ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  137839ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5192/api/admin:0
+[  139105ms] [ERROR] Failed to load resource: the server responded with a status of 503 (Service Unavailable) @ http://127.0.0.1:5192/api/plans:0

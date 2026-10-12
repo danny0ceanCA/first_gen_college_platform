@@ -1,0 +1,47 @@
+✔ summary validates origin and transcript before calling OpenAI (6.7186ms)
+✔ summary disables API storage and returns summarized text only (1.9818ms)
+✔ long live conversations retain the first and final exchanges when summarized (7.6467ms)
+✔ voice receives bounded past summaries as data and rechecks changing facts (2.6504ms)
+✔ summaries use narrative instructions and an economical dedicated model with overrides (6.2706ms)
+✔ family histories remain account-private and survive student deletion (567.4144ms)
+✔ history belongs to the verified family and student, including matching IDs (247.7108ms)
+✔ planning summaries persist by student and feed the planning voice automatically (249.221ms)
+✔ history import is once per account, preserves saved summaries and cannot resurrect deletion (352.9333ms)
+✔ voice context is the most recent six summaries of the selected student (641.414ms)
+✔ topic-aware stored context excludes other accounts and family scope and requires an explicit target (337.9319ms)
+✔ summary generation stores only a summary, is idempotent and refuses another family student (130.2678ms)
+✔ history rejects unsafe sources, malformed input, unauthenticated access and hides storage errors (2.7205ms)
+✔ onboarding summary waits for a saved student, and failed generation stores nothing (320.0885ms)
+✔ summary retry lookup is account scoped and finds records outside the recent history window (2108.0217ms)
+✔ voice reads the welcome receipt from Postgres across devices and preserves explicit replay (225.499ms)
+✔ accepted plan creation is retry-safe and cannot resurrect after deletion (750.7958ms)
+✔ a note becomes an independent accepted action with validated owner, scope, version and source references (804.643ms)
+✔ decisions require explicit confirmation; extraction cannot infer a decision (550.2896ms)
+✔ creation and conversion metadata are exported and cascade with account closure (313.7986ms)
+✔ browser-only steps are scoped, batched, use stable retry IDs, and preserve uncertainty (5.9261ms)
+✔ home topics use only saved discussions attributed to the selected student (3.023ms)
+✔ home topics keep the newest discussion per topic and update after history is deleted (0.4792ms)
+✔ topic tools and progress wait for the previous spoken audio to drain (2.8709ms)
+✔ a real interruption releases buffered playback before answering the new question (0.8817ms)
+✔ profile save waits for its own completed confirmation AND actual playback in either event order (1.2117ms)
+✔ failed saves never navigate; interrupted confirmations wait for another reply or an explicit end (0.2354ms)
+✔ specialty updates cannot replace the voice, model or audio speed (10.0061ms)
+✔ guide update preserves the channel and waits for the matching effective session (7.7737ms)
+✔ rejected, concurrent, timed-out and ended updates are recoverable (1.4839ms)
+✔ late guide acknowledgement synchronizes the topic without reconnecting or losing the next update (0.5145ms)
+✔ a late rejected topic update is consumed instead of terminating the live call (0.8174ms)
+✔ workspace loads only saved entries for exact account/student/family and relevant topic (1014.056ms)
+✔ actions preserve self-reported status and dates, refresh edits, reject archived and deleted tasks (958.6846ms)
+✔ focused context remains bounded and retains older selected notes without inferring meaning (397.6524ms)
+✔ voice handler owns context, protects unresolved scopes, and updates focus without new realtime calls (485.7846ms)
+✔ derived notes bring only their owned source summary and disappear with that source (482.2799ms)
+✔ selection validation strips client content and rejects incomplete or conflicting references (1.7711ms)
+✔ workspace queue waits for actual audio, coalesces rapid clicks, and stops after hangup (1.1447ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5700.5845

@@ -1,0 +1,64 @@
+async page=>{
+ const origin='http://127.0.0.1:5192',errors=[],requests=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ const students=[{id:'synthetic-sofia',name:'Sofía',stage:'Community college',interest:'Environmental science',goals:'Transfer to a four-year university while continuing to work.',gpa:'',color:'lilac'},{id:'synthetic-mateo',name:'Mateo',stage:'10th grade',interest:'Design',gpa:'',color:'peach'}];
+ let scenario='returning',lang='en';
+ const items=[{id:'one',studentId:students[0].id,mode:'planning',date:'2026-10-08T12:00:00Z',summary:'Synthetic transfer discussion',sources:[]},{id:'two',studentId:students[0].id,mode:'finance',date:'2026-10-09T12:00:00Z',summary:'Synthetic costs discussion',sources:[]},{id:'family',studentId:null,mode:'admissions',date:'2026-10-09T13:00:00Z',summary:'Synthetic family discussion',sources:[]},{id:'mateo',studentId:students[1].id,mode:'loans',date:'2026-10-09T14:00:00Z',summary:'Synthetic loan discussion',sources:[]}];
+ await page.route('**/api/**',async route=>{
+  const path=new URL(route.request().url()).pathname,body=route.request().postDataJSON();requests.push({path,body});let json={ok:true};
+  if(path==='/api/family')json={account:{firstName:scenario==='onboarding'?'':'Alex',role:scenario==='onboarding'?undefined:scenario==='returning'||scenario==='error'?'parent':'student',email:'',welcomeHeard:true},students:scenario==='onboarding'?[]:scenario==='returning'||scenario==='error'?students:[students[0]]};
+  else if(path==='/api/conversation-history'){
+   if(scenario==='error')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'history_unavailable'})});
+   json={items:scenario==='returning'?items:[]};
+  }else if(path==='/api/conversation-summary')json={summary:scenario==='returning'?(body.language==='es'?'Resumen guardado para ': 'Saved summary for ')+(body.studentId===students[0].id?'Sofía':body.studentId===students[1].id?'Mateo':'the family')+'. '+(body.language==='es'?'Conversamos sobre tus opciones y las preguntas que quieres llevar a un consejero.':'We discussed your options and the questions you want to bring to a counselor.'):'',date:'2026-10-09T12:00:00Z',sources:[]};
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(json)});
+ });
+ const source=await(await page.request.get(origin+'/src/App.tsx')).text(),authModule=source.match(/\/node_modules\/\.vite\/deps\/@auth0_auth0-react\.js\?v=[a-z0-9]+/)[0];
+ await page.route('**/home-harness*',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import {Auth0Context} from '${authModule}';import App from '/src/App.tsx';import {setAPITokenProvider} from '/src/api.ts';import '/src/styles.css';import '/src/overview.css';import '/src/guidance.css';import '/src/accessibility.css';import '/src/brand.css';
+ localStorage.clear();localStorage.setItem('origen.language','${lang}');window.voicePresses=0;
+ Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{window.voicePresses++;throw new DOMException('Synthetic permission denial','NotAllowedError');},configurable:true});
+ const subject='auth0|synthetic-home',token='test.'+btoa(JSON.stringify({sub:subject}))+'.test',getToken=async()=>token;setAPITokenProvider(getToken);
+ const auth={isAuthenticated:true,isLoading:false,user:{sub:subject},getAccessTokenSilently:getToken,logout:async()=>{}};
+ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Auth0Context.Provider,{value:auth},React.createElement(App)));
+ </script></body></html>`}));
+ const assert=(value,message)=>{if(!value)throw Error(message);};
+ const checkWidth=async()=>assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow');
+ await page.setViewportSize({width:1440,height:1000});await page.goto(origin+'/home-harness');
+ await page.locator('.home-person h2').filter({hasText:'Sofía'}).waitFor();
+ await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.getByText(/^Saved summary for Sofía/).waitFor();
+ assert(await page.locator('.home-workspace .conversation-history').count()===1,'Expected one home summary');
+ assert(!await page.locator('.home-memory .conversation-history').evaluate(node=>!!node.closest('details')),'Summary collapsed');
+ assert(await page.locator('.home-topics .home-topic-card').count()===2,'Student topics mixed with family or sibling topics');
+ assert(!await page.locator('.home-topics').getByText('Student loans',{exact:true}).count(),'Sibling loan topic leaked');
+ await page.locator('.home-next-card').first().click();await page.locator('.shared-voice .voice-current-section').filter({hasText:'College costs'}).waitFor();
+ await page.locator('nav').getByRole('button',{name:'Home',exact:true}).click();
+ await page.locator('.home-summary-switch').getByRole('button',{name:'Family conversations'}).click();await page.getByText(/^Saved summary for the family/).waitFor();
+ await page.locator('.home-student-selector').getByRole('button',{name:'Mateo',exact:true}).click();await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.getByText(/^Saved summary for Mateo/).waitFor();
+ assert(await page.locator('.home-topics .home-topic-card').count()===1,'Student switching did not isolate topics');
+ assert(await page.locator('.home-topics').getByText('Student loans',{exact:true}).count()===1,'Selected student topic missing');
+ await page.locator('.home-student-selector').getByRole('button',{name:'Sofía',exact:true}).click();await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.getByText(/^Saved summary for Sofía/).waitFor();
+ await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'output/playwright/home-phase1-desktop.png',fullPage:true,animations:'disabled'});
+ const circle=page.locator('.shared-voice').getByRole('button',{name:'Talk with Origen',exact:true});assert(await circle.locator('svg circle').count()===1,'Voice logo is not a circle');
+ await page.setViewportSize({width:390,height:844});await checkWidth();await page.screenshot({path:'output/playwright/home-phase1-mobile.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('button',{name:/^ES/}).click();await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.getByText(/^Resumen guardado para Sofía/).waitFor();
+ assert(await page.getByRole('button',{name:'Hablar con Origen',exact:true}).count()===1,'Spanish voice label missing');
+ await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'output/playwright/home-phase1-spanish.png',fullPage:true,animations:'disabled'});await checkWidth();
+ await page.setViewportSize({width:320,height:720});await checkWidth();
+ scenario='new';lang='en';await page.goto(origin+'/home-harness?new');await page.getByRole('heading',{name:'Your next chapter.',exact:true}).waitFor();await page.locator('.home-topics-empty').waitFor();
+ assert(await page.locator('.home-next-card').count()===3,'New user missing starting choices');
+ assert(await page.locator('.home-topic-card').count()===0,'New user has invented topics');
+ assert(await page.locator('.home-person').getByText('Transfer to a four-year university while continuing to work.',{exact:true}).count()===1,'Saved goal missing');
+ assert(await page.getByRole('button',{name:'Add a student',exact:true}).count()===0,'Student sees parent add-student controls');
+ assert(!(await page.locator('.page-heading').innerText()).includes('family'),'Student heading uses family framing');await checkWidth();
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'output/playwright/home-phase1-new-user.png',fullPage:true,animations:'disabled'});
+ await page.locator('.shared-voice').getByRole('button',{name:'Talk with Origen',exact:true}).click();await page.getByText('Microphone access was not allowed. Enable it in your browser to start.',{exact:true}).waitFor();
+ assert(await page.evaluate(()=>window.voicePresses)===1,'Circle did not start voice exactly once');
+ assert(await page.locator('.shared-voice .voice-origen-button svg circle').count()===1,'Retry lost the circle');
+ scenario='error';await page.goto(origin+'/home-harness?error');await page.getByText('Your topics could not be loaded.',{exact:false}).waitFor();
+ assert(await page.locator('.home-topic-card').count()===0,'Error state pretends topics loaded');
+ scenario='onboarding';await page.goto(origin+'/home-harness?onboarding');await page.getByRole('button',{name:'Talk with Origen',exact:true}).waitFor();assert(await page.locator('.voice-launcher .voice-origen-button svg circle').count()===1,'Onboarding did not use circle');await checkWidth();
+ assert(!requests.some(r=>r.path==='/api/profile-voice'),'Unexpected real voice request');
+ assert(!errors.length,errors.join('; '));
+ return {passed:true,desktop:true,mobile390:true,mobile320:true,spanish:true,newUser:true,studentScope:true,familyScope:true,topicNavigation:true,voiceStartAndRetry:true,onboardingCircle:true,historyError:true};
+}

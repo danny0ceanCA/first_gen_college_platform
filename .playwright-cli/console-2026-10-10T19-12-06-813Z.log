@@ -1,0 +1,79 @@
+[    1592ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js?v=9094432e:22429
+[   71361ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[   71391ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[   71462ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[   71462ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[   71879ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://127.0.0.1:5176/api/privacy:0
+[   72019ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5176/api/privacy:0
+[   72148ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[   72156ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[   72169ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[   72169ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[   73069ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[   73081ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[   73103ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[   73103ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  198770ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  198784ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  198788ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  198788ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  199297ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://127.0.0.1:5176/api/privacy:0
+[  199460ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5176/api/privacy:0
+[  199633ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  199646ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  199656ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  199667ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  200978ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  200992ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  201008ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  201009ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  285970ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  285982ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  285990ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  285991ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  286689ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://127.0.0.1:5176/api/privacy:0
+[  286849ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5176/api/privacy:0
+[  286985ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  286996ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  287007ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  287007ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829
+[  287987ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5176/node_modules/.vite/deps/react-dom_client.js:22429
+[  287999ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:801
+[  288011ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5176/?token=_rQLD42KfsWt' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5176/@vite/client:814
+[  288015ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5176/ <--[HTTP]--> 127.0.0.1:5176/ (server)
+  (browser) 127.0.0.1:5176/ <--[WebSocket (failing)]--> 127.0.0.1:5176/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5176/@vite/client:829

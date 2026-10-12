@@ -1,0 +1,57 @@
+[  122937ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  122989ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  123004ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  123004ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  232910ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  232935ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  232939ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  232940ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  234666ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  234685ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  234711ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  234718ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  334377ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  334400ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  334404ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  334404ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  336555ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  336576ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  336581ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  336581ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  337203ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  337228ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  337233ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  337234ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829
+[  337323ms] [ERROR] Failed to load resource: the server responded with a status of 503 (Service Unavailable) @ http://127.0.0.1:5192/api/conversation-history:0
+[  337714ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[  337737ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:801
+[  337763ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=pUXJw3-boDrv' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5192/@vite/client:814
+[  337772ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5192/ <--[HTTP]--> 127.0.0.1:5192/ (server)
+  (browser) 127.0.0.1:5192/ <--[WebSocket (failing)]--> 127.0.0.1:5192/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5192/@vite/client:829

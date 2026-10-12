@@ -1,0 +1,10 @@
+[     274ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js?v=9094432e:22429
+[    3831ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[    3978ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5192/api/admin:0
+[   60614ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[   60700ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5192/api/admin:0
+[   64642ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://127.0.0.1:5192/api/workspace-sheets:0
+[   67221ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5192/node_modules/.vite/deps/react-dom_client.js:22429
+[   67308ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:5192/api/admin:0
+[   67511ms] [ERROR] Failed to load resource: the server responded with a status of 503 (Service Unavailable) @ http://127.0.0.1:5192/api/workspace-sheets:0
+[  307242ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5192/?token=ooCzRQuHRhD0' failed: WebSocket opening handshake timed out @ http://127.0.0.1:5192/@vite/client:801

@@ -1,0 +1,146 @@
+### Page
+- Page URL: http://127.0.0.1:5192/sheet-workspace-harness
+- Console: 4 errors, 0 warnings
+### Snapshot
+```yaml
+- generic [ref=f4e2]:
+  - generic [ref=f4e3]:
+    - complementary [ref=f4e4]:
+      - button "Origen home" [ref=f4e5] [cursor=pointer]:
+        - text: origen
+        - generic [ref=f4e7]: .
+      - generic [ref=f4e8]: UN CAMINO ADELANTE, JUNTOS
+      - generic [ref=f4e9]:
+        - button "Madre / padre" [ref=f4e10] [cursor=pointer]
+        - button "Estudiante" [ref=f4e16] [cursor=pointer]
+      - navigation "Navegación principal" [ref=f4e20]:
+        - button "Inicio" [ref=f4e21] [cursor=pointer]
+        - button "Pagar la universidad" [ref=f4e27] [cursor=pointer]
+        - button "Préstamos" [ref=f4e32] [cursor=pointer]
+        - button "Planificación" [ref=f4e36] [cursor=pointer]
+        - button "¿Listos para solicitar ingreso?" [ref=f4e40] [cursor=pointer]
+        - button "Recibir apoyo" [ref=f4e44] [cursor=pointer]
+      - region "Comunidad" [ref=f4e48]:
+        - heading "Aprendamos juntos" [level=2] [ref=f4e54]
+        - paragraph [ref=f4e55]: Haz preguntas y comparte experiencias.
+        - button "Foro de discusión" [ref=f4e56] [cursor=pointer]
+      - generic [ref=f4e60]:
+        - generic [ref=f4e61]:
+          - text: TUS ESTUDIANTES
+          - button "Agregar estudiante" [ref=f4e62] [cursor=pointer]
+        - button "S Sofía Colegio comunitario" [ref=f4e64] [cursor=pointer]:
+          - generic [ref=f4e65]: S
+          - generic [ref=f4e66]:
+            - text: Sofía
+            - generic [ref=f4e67]: Colegio comunitario
+        - button "M Mateo 10.º grado" [ref=f4e70] [cursor=pointer]:
+          - generic [ref=f4e71]: M
+          - generic [ref=f4e72]:
+            - text: Mateo
+            - generic [ref=f4e73]: 10.º grado
+      - generic [ref=f4e74]:
+        - generic [ref=f4e75]:
+          - strong [ref=f4e78]: Cada camino es personal.
+          - paragraph [ref=f4e79]: Encontraremos el tuyo, paso a paso.
+        - button "A Alex Cuenta con sesión iniciada" [ref=f4e80] [cursor=pointer]:
+          - generic [ref=f4e81]: A
+          - generic [ref=f4e82]:
+            - text: Alex
+            - generic [ref=f4e83]: Cuenta con sesión iniciada
+    - generic [ref=f4e87]:
+      - banner [ref=f4e88]:
+        - generic [ref=f4e89]:
+          - button "Abrir navegación" [ref=f4e90] [cursor=pointer]
+          - strong [ref=f4e92]: Inicio
+        - generic [ref=f4e93]:
+          - button "EN" [active] [ref=f4e94] [cursor=pointer]
+          - button "Cerrar sesión" [ref=f4e95] [cursor=pointer]
+          - button "Configuración" [ref=f4e99] [cursor=pointer]
+      - main [ref=f4e103]:
+        - generic [ref=f4e105]:
+          - heading "Hola, Alex." [level=1] [ref=f4e106]
+          - paragraph [ref=f4e107]: Vamos paso a paso.
+        - generic [ref=f4e109]:
+          - group "Elige un estudiante para esta página de inicio" [ref=f4e110]:
+            - generic [ref=f4e111]: Planificar para
+            - button "Sofía" [pressed] [ref=f4e112] [cursor=pointer]
+            - button "Mateo" [ref=f4e113] [cursor=pointer]
+          - region "Estudiante seleccionado" [ref=f4e114]:
+            - generic [ref=f4e115]:
+              - generic [aria-hidden] [ref=f4e116]: S
+              - generic [ref=f4e117]:
+                - generic [ref=f4e118]: PLANIFICAR PARA
+                - heading "Sofía" [level=2] [ref=f4e119]
+                - paragraph [ref=f4e120]: Colegio comunitario
+              - button "Editar perfil" [ref=f4e121] [cursor=pointer]
+            - group [ref=f4e124]:
+              - generic "Meta de tu perfil" [ref=f4e125] [cursor=pointer]
+          - region [ref=f4e126]:
+            - generic [ref=f4e127]:
+              - generic [ref=f4e128]: AQUÍ CONTIGO
+              - heading "Hablemos de tu próximo paso." [level=2] [ref=f4e129]
+              - paragraph [ref=f4e130]: Pregunta sobre la universidad, los costos o las transferencias. No necesitas saber por dónde empezar.
+              - generic [ref=f4e131]:
+                - button "Hablar con Origen" [ref=f4e132] [cursor=pointer]
+                - generic [aria-hidden] [ref=f4e135]: Hablar con Origen
+              - generic [ref=f4e136]: También puedes presionar el círculo de la barra inferior desde cualquier página.
+            - complementary [ref=f4e137]:
+              - text: ¿No sabes qué decir?
+              - paragraph [ref=f4e138]: “No sé por dónde empezar. ¿Me puedes ayudar?”
+              - generic [ref=f4e139]: Habla en inglés o español, a tu ritmo.
+          - generic [ref=f4e140]:
+            - region "Tus conversaciones guardadas" [ref=f4e141]:
+              - group "Elige qué resumen leer" [ref=f4e142]:
+                - button "Sofía" [pressed] [ref=f4e143] [cursor=pointer]
+                - button "Conversaciones familiares" [ref=f4e144] [cursor=pointer]
+              - region [ref=f4e145]:
+                - heading "Resumen de Sofía" [level=3] [ref=f4e146]
+                - paragraph [ref=f4e149]: Un resumen de tus conversaciones guardadas más recientes. Origen recuerda lo conversado.
+            - region [ref=f4e150]:
+              - generic [ref=f4e151]:
+                - heading "Tu próximo paso" [level=2] [ref=f4e152]
+                - paragraph [ref=f4e153]: Un pequeño paso, cuando estés listo.
+              - generic [ref=f4e154]:
+                - text: Sofía
+                - heading "Meet with my counselor" [level=3] [ref=f4e155]
+                - paragraph [ref=f4e156]: Ask about transfer courses.
+                - button "Marcar como hecho" [ref=f4e158] [cursor=pointer]
+                - button "Ver todos mis pasos" [ref=f4e162] [cursor=pointer]
+          - region [ref=f4e165]:
+            - generic [ref=f4e166]:
+              - heading "O explora un tema" [level=2] [ref=f4e167]
+              - paragraph [ref=f4e168]: Lee un poco. Pregunta cuando quieras.
+            - generic [ref=f4e169]:
+              - button "Retoma la conversación Pagar la universidad" [ref=f4e170] [cursor=pointer]:
+                - strong [ref=f4e174]: Retoma la conversación
+                - generic [ref=f4e175]: Pagar la universidad
+              - button "Explora un camino de transferencia Explora carreras, cursos y preguntas para un consejero." [ref=f4e178] [cursor=pointer]:
+                - strong [ref=f4e181]: Explora un camino de transferencia
+                - generic [ref=f4e182]: Explora carreras, cursos y preguntas para un consejero.
+              - button "Solicitudes universitarias Explora las solicitudes y prepara tus preguntas." [ref=f4e185] [cursor=pointer]:
+                - strong [ref=f4e189]: Solicitudes universitarias
+                - generic [ref=f4e190]: Explora las solicitudes y prepara tus preguntas.
+          - region "Tus notas y herramientas" [ref=f4e193]:
+            - group [ref=f4e194]:
+              - generic "Mis notas Lo que has aprendido y las preguntas que quieres retomar." [ref=f4e195] [cursor=pointer]:
+                - generic [ref=f4e198]:
+                  - strong [ref=f4e199]: Mis notas
+                  - generic [ref=f4e200]: Lo que has aprendido y las preguntas que quieres retomar.
+            - group [ref=f4e203]:
+              - generic "Prepárate para lo que viene Haz una lista, compara universidades o prepara una visita a consejería." [ref=f4e204] [cursor=pointer]:
+                - generic [ref=f4e208]:
+                  - strong [ref=f4e209]: Prepárate para lo que viene
+                  - generic [ref=f4e210]: Haz una lista, compara universidades o prepara una visita a consejería.
+        - generic [ref=f4e213]:
+          - generic [ref=f4e214]: origen.
+          - generic [ref=f4e215]: Diferentes caminos. Un futuro a tu medida.
+  - complementary "Guía de voz Origen" [ref=f4e216]:
+    - generic [ref=f4e217]:
+      - strong [ref=f4e218]: Origen
+      - generic [ref=f4e219]: Planificacion
+    - generic [ref=f4e221]:
+      - button "Hablar con Origen" [ref=f4e222] [cursor=pointer]
+      - generic [aria-hidden] [ref=f4e225]: Hablar con Origen
+```
+### Events
+- New console entries: .playwright-cli\console-2026-10-11T00-48-32-827Z.log#L10-L36

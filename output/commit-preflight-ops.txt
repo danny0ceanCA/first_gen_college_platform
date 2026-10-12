@@ -1,0 +1,11 @@
+✔ readiness fails closed for pending, missing, duplicate, stale and future evidence (2.2625ms)
+✔ synthetic stale restore cannot resurrect a closed account after replay (425.2571ms)
+✔ replay halts on family obligations rather than silently deleting shared students (139.1113ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 807.6539

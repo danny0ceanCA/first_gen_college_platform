@@ -1,0 +1,12 @@
+.account-opening{min-height:100svh;display:grid;place-items:center;padding:32px;background:#f4eee4;color:#756b63;box-sizing:border-box}
+.account-opening-content{text-align:center;width:min(100%,320px)}
+.account-opening-brand{display:flex;justify-content:center;align-items:center;gap:12px;color:#a4513c;font-size:38px;font-weight:700;letter-spacing:-1.8px}
+.account-opening-brand>span{width:29px;height:29px;border:2px solid currentColor;border-radius:50%}
+.account-opening-content>p{font-size:15px;margin:8px 0 22px;line-height:1.6}
+.account-opening-friend{display:block;width:120px;height:112px;margin:28px auto 0;color:#a4513c;overflow:visible}
+.account-opening-shadow{fill:#e4d7ca}
+.account-opening-wave{transform-origin:78px 39px;transform-box:view-box}
+.app-shell{animation:account-arrive 480ms ease-out both}
+.shared-voice.voice-ready{animation:account-arrive 480ms ease-out both}
+@keyframes account-arrive{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.app-shell,.shared-voice.voice-ready{animation:none}}

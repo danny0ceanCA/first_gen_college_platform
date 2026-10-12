@@ -1,0 +1,33 @@
+✔ admissions uses Sol and requires completed search with official citations (7.3944ms)
+✔ admissions endpoint rejects invalid requests, returns sources and logs no question (55.6338ms)
+✔ ASSIST citations are accepted only on official HTTPS domains with exact-agreement guidance (0.582ms)
+✔ diagnostics excludes content and writes ordered technical records (55.7351ms)
+✔ diagnostic endpoint requires local origin and bounds the payload (5.0123ms)
+✔ FSA searches restricted; school results require official citations and actual search (10.8667ms)
+✔ research endpoint validates origin/input, returns citations, and permits repeated calls (68.7231ms)
+✔ production startup tolerates the retired preview setting and rejects invalid configuration without disclosing secrets (13.6194ms)
+{"time":"2026-10-10T18:51:59.181Z","requestId":"48d64df0-adc4-4434-b1b4-b7d7425e9007","event":"api_request","code":"method_not_allowed","endpoint":"api.family","method":"GET","level":"warn","durationMs":1,"httpStatus":405}
+{"time":"2026-10-10T18:51:59.184Z","requestId":"86bb548a-55d1-4895-8cfc-9497c9b1f5c7","event":"api_request","code":"not_found","endpoint":"unknown_route","method":"GET","level":"warn","durationMs":0,"httpStatus":404}
+✔ API errors and health responses carry cache and browser safeguards (54.9837ms)
+✔ all live modes permit bilingual transcription and explicit language switching (9.8323ms)
+✔ voice rejects cross-origin, invalid sessions and oversized requests before contacting OpenAI (12.9517ms)
+✔ voice sends server-owned settings and returns SDP without exposing credentials (43.8232ms)
+✔ voice sanitizes errors and does not return upstream messages (4.7972ms)
+✔ finance voice uses teaching instructions, minimal context and no profile editing tools (4.6031ms)
+✔ admissions voice supports both languages and roles, VAD, minimal context and lookup only (4.9865ms)
+✔ first-registration setup defers the app tour until the successful save (1.1877ms)
+✔ all live guides open with Hola and explain English terms without leaving Spanish (1.8455ms)
+✔ Loans guide uses FSA lookup and preserves borrower-specific relief guidance (0.683ms)
+✔ returning users skip tours across every guide while explicit onboarding retains the welcome (2.0888ms)
+✔ every voice guide teaches college basics naturally across roles, languages, and routing states (6.8689ms)
+✔ specialty handoffs preserve one identity and carry bounded context only after scope is established (1.8283ms)
+✔ guide updates return only instructions and tools without creating a new audio call (2.4247ms)
+✔ brand pronunciation is consistent for English and Spanish across guides (1.493ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 698.2509

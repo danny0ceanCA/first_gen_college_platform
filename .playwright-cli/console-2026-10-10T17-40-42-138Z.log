@@ -1,0 +1,34 @@
+[     789ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js?v=9094432e:22429
+[  122616ms] The requested module '/node_modules/.vite/deps/react-dom_client.js' does not provide an export named 'createRoot'
+[  218038ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[  218079ms] Error: FamilyProvider is required
+    at useFamily (http://127.0.0.1:5198/src/FamilyStore.tsx?t=1791654172496:10:21)
+    at AccountConversationHistory (http://127.0.0.1:5198/src/ConversationHistory.tsx:28:18)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:20524:20)
+    at renderWithHooks (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:6183:24)
+    at updateFunctionComponent (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:8028:21)
+    at beginWork (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:9108:20)
+    at runWithFiberInDEV (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:1398:72)
+    at performUnitOfWork (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:13863:98)
+    at workLoopSync (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:13726:43)
+    at renderRootSync (http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:13710:13)
+[  218080ms] [WARNING] %s
+
+%s
+ An error occurred in the <AccountConversationHistory> component. Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries. @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:7505
+[  218081ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[  218083ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[  218083ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[  299254ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[  299290ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[  299313ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[  299317ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829

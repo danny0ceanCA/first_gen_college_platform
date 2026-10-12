@@ -16,4 +16,6 @@
 .history-entry a{font-size:11px;color:#756b63}
 .history-entry .history-delete{font-size:11px;color:#756b63;gap:5px;margin-top:8px}
 .history-overview .history-summary{margin-top:0;font-size:14px;line-height:1.85}.history-overview small{display:block;margin-top:16px}.history-sources{margin:14px 0 8px;font-size:12px;color:#a4513c}.history-sources summary{cursor:pointer;padding-block:6px}
+.history-overview .history-summary{max-height:min(22rem,50svh);overflow-y:auto;scrollbar-gutter:stable;padding-right:12px;overflow-wrap:anywhere;scrollbar-width:thin;scrollbar-color:#a4513c #f4eee4}
+.history-overview .history-summary:focus-visible{outline:2px solid #a4513c;outline-offset:4px;border-radius:4px}
 @media(max-width:600px){.conversation-history{margin-inline:16px}.history-heading{padding:12px}.history-content{padding-inline:12px}}

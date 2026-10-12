@@ -1,0 +1,1 @@
+[      76ms] [ERROR] Loading the script 'http://127.0.0.1:5192/node_modules/vite/dist/client/env.mjs' violates the following Content Security Policy directive: "default-src 'none'". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ http://127.0.0.1:5192/output/playwright/home-sheets-phase5-aid.html:0

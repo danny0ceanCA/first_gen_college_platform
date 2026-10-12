@@ -13,3 +13,10 @@
 .brand-symbol{border:2px solid currentColor;border-radius:50%;width:25px;height:25px}.brand-symbol>span{display:none}
 
 .logout-button{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border,#f4eee4);border-radius:8px;background:transparent;color:inherit;padding:9px 12px;font:inherit;font-size:12px;white-space:nowrap;cursor:pointer}.logout-button:hover{background:#f4eee4}.logout-button:focus-visible{outline:2px solid #a4513c;outline-offset:3px}@media(max-width:600px){.logout-button{padding:8px;gap:5px;font-size:11px}}
+
+/* Desktop navigation drawer; the edge tab stays available when closed. */
+.sidebar-pull-tab{position:fixed;left:232px;top:132px;z-index:40;width:32px;min-height:48px;display:grid;place-items:center;border:1px solid #d7bba7;border-radius:0 10px 10px 0;background:#fffaf5;color:#813e2e;box-shadow:2px 2px 8px #813e2e12}
+.sidebar-pull-tab svg{transform:rotate(180deg)}
+@media(min-width:761px){.sidebar-collapsed .sidebar{transform:translateX(-100%);visibility:hidden}.sidebar-collapsed .main-shell{margin-left:0;width:100%}.sidebar-collapsed .sidebar-pull-tab{left:0}.sidebar-collapsed .sidebar-pull-tab svg{transform:none}body:has(.app-shell.sidebar-collapsed) .shared-voice{left:0}}
+@media(min-width:761px) and (max-width:1200px){.sidebar-pull-tab{left:204px}}
+@media(max-width:760px){.sidebar-pull-tab{display:none}}

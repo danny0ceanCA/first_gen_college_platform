@@ -1,0 +1,130 @@
+✔ engagement validates filters and distinguishes no denominator from zero observed success (12.76ms)
+✔ missing tracking does not report zero engagement; reads and failures are admin protected (11.9875ms)
+✔ admin cohort exclusions only use backend configuration and verified request identity (2.2158ms)
+﹣ PostgreSQL cohorts mature fairly, deduplicate accounts and capture guidance without sign-ins (0.1547ms) # SKIP
+✔ cohorts deduplicate users while preserving retry visits, maturity and return outcomes (23.3107ms)
+✔ server cutoff, null latency and capture coverage never masquerade as successful zero-time outcomes (0.9394ms)
+✔ metric reads validate periods, report unavailable capture and safely retain query failures (3.7741ms)
+✖ metrics endpoint enforces admin access, bounds periods and hides database error text (8.5154ms)
+✔ stored visit rollups keep account boundaries, earliest audio and initial language (338.1956ms)
+﹣ PostgreSQL cohort query selects first audio, initial choices and receipt-scoped saves (0.2974ms) # SKIP
+✔ history validates account, attempt, period and pagination before reads (5.3371ms)
+✔ missing capture coverage is explicit and does not masquerade as zero attempts (1.2315ms)
+✔ admin-only history reads deny regular users before queries and safely report a failed read (8.819ms)
+✔ timeline follows return visits, separates browser/server saves and never borrows another account history (1064.5235ms)
+✔ attempt and event paging is bounded; the reporting period keeps a full retained attempt (1185.8527ms)
+✔ reporting windows have equal previous durations and reject unsupported input (3.272ms)
+✔ daily series distinguishes untracked days from measured zeros and preserves fractional minutes (0.8679ms)
+✔ overview uses bounded consistent current and previous windows, and suppresses incomplete comparisons (2.0902ms)
+✔ invalid date selection returns 400 without querying any data (14.0779ms)
+✔ queue inputs and decisions fail before querying; missing migration is explicit (6.6651ms)
+✔ queue, evidence, history and writes require admin permission and return safe errors (10.9868ms)
+﹣ PostgreSQL review queue groups explicit failures, verifies recovery, audits decisions and reopens new evidence (0.203ms) # SKIP
+✔ conversation readers validate ownership references, filters and cutoffs before querying (5.9485ms)
+✔ conversation reporting denies ordinary accounts and suppresses database details (9.4911ms)
+﹣ PostgreSQL conversation records bind accounts, preserve evidence and paginate without fabricated joins (0.1827ms) # SKIP
+✔ user history rejects invalid scope, filters and stale/future cutoffs before reading (6.3227ms)
+✔ unified history requires admin permission and hides database failures (12.578ms)
+✔ recaps and call descriptions preserve uncertainty without claiming abandonment or active calls (38.9504ms)
+﹣ PostgreSQL unified history isolates accounts, paginates, deduplicates saves and separates storage from generation (0.2086ms) # SKIP
+✔ directory validates sort, role, pagination and period before querying (3.3602ms)
+✔ search is literal and bound; pagination and reporting windows are stable (3.1544ms)
+✔ detail rejects forged IDs and reports deleted accounts without reading content (1.7966ms)
+✔ admin directory and details are inaccessible without server-granted permissions (2.6829ms)
+✔ admin access evidence uses the verified caller and server configuration, never requested roles (8.5523ms)
+✔ onboarding milestones are server-owned, idempotent, and scoped to the account (985.384ms)
+✔ adult consent, minimum data, retry deduplication and receipt secrecy (977.2722ms)
+✔ scoped owner/outreach inbox, revoked membership, notes and idempotent replies (767.5738ms)
+✔ named transfer needs both memberships and visitor permission; siblings and parents cannot inherit contacts (727.979ms)
+✔ withdrawal removes conversation, suppresses further writes, and expiry purges while retaining minimal audit (274.6151ms)
+✔ RSVP validates current approved event and does not imply confirmed reservation; exports audited (303.2802ms)
+✖ HTTP public/staff separation, body limit, fresh-auth export gate (287.7462ms)
+✔ inbox keyset pagination is stable for equal timestamps and excludes another institution (971.1694ms)
+✔ metrics only count approved page actions and report completed months to current members (1452.3616ms)
+✔ gateway keeps collection anonymous and report authentication, origin, schema and size boundaries intact (458.5411ms)
+✔ institution registration stays separate from family data and requires independent review (1097.0081ms)
+✔ draft changes preserve approved pages, invalidate changed identities and reject stale saves (773.559ms)
+✔ published pages are anonymous while institution registration and reviews require verified identity (350.6964ms)
+✔ failed delivery survives refresh, strips content and replays only the signed-in scope (8.6682ms)
+✔ backoff is bounded, respects Retry-After and waits for recovery after retry exhaustion or authentication failure (2.7241ms)
+✔ queue TTL, capacity, corruption and unavailable storage cannot interrupt onboarding (358.2171ms)
+✔ clear or ownership rejection prevents stale completion and cleanup callbacks from resurrecting local events (2.4547ms)
+✔ permanent batch rejection releases the rest of the queue and reports a bounded gap (2.1498ms)
+✔ scope capacity includes visits persisted by another tab (1.2944ms)
+✔ acknowledgement keeps concurrently appended events and per-visit storage avoids clobbering other tabs (1.1592ms)
+✔ tracker emits content-free retry recovery evidence and a lost acknowledgement is idempotent on the backend (1345.8123ms)
+✔ retention settings are bounded, shared by readers and remove only inactive diagnostics (3.3736ms)
+✔ review flags require observed denominators, sample size, affected floor and configured rates (1.4921ms)
+✔ configured retention cascades only inactive visits and alert SQL counts observed visits once (495.4905ms)
+✔ alerts are admin-only, unavailable capture is explicit and failures hide private database details (7.5871ms)
+✔ fresh authentication uses only the trusted authentication timestamp, never token issuance or request data (1.7295ms)
+✔ Auth0 action retains the provider authentication time and omits missing session timestamps (1.4631ms)
+✖ destructive HTTP operations reject stale identities before database connections (15.5343ms)
+✔ account guard locks before checking closure and blocks writes when closure won the race (1.8034ms)
+✔ closed identities cannot recreate family or institution records via repository transactions (1177.6761ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 56
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 5
+ℹ todo 0
+ℹ duration_ms 5161.1336
+
+✖ failing tests:
+
+test at server\admin-onboarding-metrics.test.mjs:61:1
+✖ metrics endpoint enforces admin access, bounds periods and hides database error text (8.5154ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  403 !== 400
+  
+      at TestContext.<anonymous> (file:///C:/Users/danie/Documents/ChatGPT/Project%20Elo-Em/server/admin-onboarding-metrics.test.mjs:65:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 403,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at server\institution-inquiries.test.mjs:14:1
+✖ HTTP public/staff separation, body limit, fresh-auth export gate (287.7462ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  401 !== 403
+  
+      at TestContext.<anonymous> (file:///C:/Users/danie/Documents/ChatGPT/Project%20Elo-Em/server/institution-inquiries.test.mjs:14:897)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 401,
+    expected: 403,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at server\recent-auth.test.mjs:23:1
+✖ destructive HTTP operations reject stale identities before database connections (15.5343ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'staff_mfa_required'
+  - 'reauthentication_required'
+  
+      at TestContext.<anonymous> (file:///C:/Users/danie/Documents/ChatGPT/Project%20Elo-Em/server/recent-auth.test.mjs:27:170)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'staff_mfa_required',
+    expected: 'reauthentication_required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

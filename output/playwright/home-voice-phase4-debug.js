@@ -1,0 +1,1 @@
+async page => page.evaluate(async () => ({calls:(await window.phase4Diagnostics()).requests.filter(r=>r.path === '/api/profile-voice').slice(-5).map(r=>({action:r.body.action,mode:r.body.mode,language:r.body.language,focus:r.body.workspaceFocus})),updates:window.voiceFixture.messages.filter(m=>m.type === 'session.update').slice(-3).map(m=>m.session.instructions.slice(-200))}))

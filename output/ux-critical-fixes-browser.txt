@@ -1,0 +1,84 @@
+### Result
+{"passed":true,"results":["Student selection waits for playback, asks for spoken confirmation, and preserves the connection","Shared call blocks UI deletion; failed deletion preserves it; successful provider deletion stops matching audio","503 keeps access unknown; retry restores the admin dashboard without onboarding","Stalled account probe times out and exposes working retry/logout","Explicit non-admin denial still opens the personal account"]}
+### Ran Playwright code
+```js
+await (async page=>{
+ const assert=(ok,message)=>{if(!ok)throw new Error(message);};
+ const origin='http://127.0.0.1:5192';const results=[];
+ // Expose only the synthetic provider action to exercise the deletion backstop.
+ await page.route('**/src/App.tsx*',async route=>{
+  const response=await route.fetch();const code=(await response.text()).replace('const family = useFamily();','const family = useFamily(); window.auditRemoveStudent = id => family.removeStudent(id);');
+  assert(code.includes('window.auditRemoveStudent'),'Family probe anchor missing');
+  await route.fulfill({response,body:code});
+ });
+ let students=[{id:'synthetic-sofia',name:'Sofía',stage:'Community college',interest:'Science',gpa:'',color:'lilac'},{id:'synthetic-mateo',name:'Mateo',stage:'10th grade',interest:'Art',gpa:'',color:'peach'}],deleteFails=false;
+ await page.route('**/api/family',async route=>{
+  const body=route.request().postDataJSON();
+  if(body.action==='delete-student'&&deleteFails)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'database_unavailable'})});
+  if(body.action==='delete-student')students=students.filter(s=>s.id!==body.id);
+  await route.fulfill({contentType:'application/json',body:JSON.stringify({account:{firstName:'Alex',role:'parent',email:'',welcomeHeard:true},students})});
+ });
+ await page.goto(origin+'/sheet-workspace-harness');await page.locator('.home-conversation').waitFor();
+ await page.getByRole('button',{name:'Talk with Origen',exact:true}).first().click();
+ await page.waitForFunction(()=>window.voiceFixture.connections===1);await page.waitForTimeout(200);
+ await page.evaluate(()=>window.voiceEmit({type:'response.done',response:{id:'confirm-target',status:'completed',output:[{type:'function_call',name:'request_conversation_target',call_id:'target',arguments:JSON.stringify({scope:'student:synthetic-sofia'})}]}}));
+ await page.waitForFunction(()=>window.voiceFixture.messages.some(e=>e.item?.call_id==='target'&&JSON.parse(e.item.output).status==='target_confirmed'));await page.waitForTimeout(120);
+ await page.evaluate(()=>{window.voiceFixture.hold=true;window.voiceEmit({type:'output_audio_buffer.started',response_id:'held-answer'});});
+ const before=await page.evaluate(()=>window.voiceFixture.messages.length);
+ await page.locator('.home-student-selector button').filter({hasText:'Mateo'}).click();await page.waitForTimeout(250);
+ assert(await page.evaluate(before=>!window.voiceFixture.messages.slice(before).some(e=>e.type==='response.create'),before),'Student selection interrupted playing audio');
+ await page.evaluate(()=>{window.voiceFixture.hold=false;window.voiceEmit({type:'output_audio_buffer.stopped',response_id:'held-answer'});});
+ await page.waitForFunction(before=>window.voiceFixture.messages.slice(before).some(e=>e.item?.role==='system'&&e.item.content[0].text.includes('student:synthetic-mateo')),before);
+ const clarification=await page.evaluate(before=>window.voiceFixture.messages.slice(before),before);
+ assert(clarification.some(e=>e.type==='response.create'),'Clarification did not request a spoken reply');
+ assert(await page.evaluate(()=>window.voiceFixture.connections===1&&window.voiceFixture.closed===0),'Screen selection restarted audio');
+ results.push('Student selection waits for playback, asks for spoken confirmation, and preserves the connection');
+ await page.locator('.home-person').getByRole('button',{name:'Edit profile'}).click();
+ assert(await page.getByRole('button',{name:'Delete student',exact:true}).isDisabled(),'Shared call does not block deletion');
+ deleteFails=true;
+ assert(await page.evaluate(()=>window.auditRemoveStudent('synthetic-sofia'))===false,'Failed deletion reported success');
+ assert(await page.evaluate(()=>window.voiceFixture.closed===0),'Failed deletion stopped the call');
+ deleteFails=false;
+ assert(await page.evaluate(()=>window.auditRemoveStudent('synthetic-sofia'))===true,'Synthetic deletion failed');
+ await page.waitForFunction(()=>window.voiceFixture.closed===1);
+ assert(!await page.getByRole('button',{name:'End conversation',exact:true}).count(),'Deleted student call remains active');
+ results.push('Shared call blocks UI deletion; failed deletion preserves it; successful provider deletion stops matching audio');
+ // Account access recovery: failed, denied, stalled and retried admin probes.
+ const source=await(await page.request.get(origin+'/src/App.tsx')).text();
+ const authModule=source.match(/\/node_modules\/\.vite\/deps\/@auth0_auth0-react\.js\?v=[a-z0-9]+/)[0];
+ let admin='failed';
+ await page.route('**/api/admin',async route=>{
+  if(admin==='stalled')return new Promise(()=>{});
+  if(admin==='failed')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'database_unavailable'})});
+  if(admin==='denied')return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:'admin_required'})});
+  return route.fulfill({contentType:'application/json',body:JSON.stringify({admin:true,permissions:[],actions:[],authenticationRequired:null})});
+ });
+ await page.route('**/api/institutions',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({memberships:[],hasPersonalAccount:false})}));
+ await page.route('**/entry-fixes-harness*',route=>route.fulfill({contentType:'text/html',body:`<html><body><div id="root"></div><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import {Auth0Context} from '${authModule}';import Entry from '/src/Entry.tsx';import {browserPrivacy} from '/src/browserPrivacy.mjs';import '/src/styles.css';
+ localStorage.clear();const subject='auth0|synthetic-admin',getToken=async()=>'test.'+btoa(JSON.stringify({sub:subject}))+'.test';browserPrivacy.start(subject,{fresh:true});
+ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Auth0Context.Provider,{value:{isAuthenticated:true,isLoading:false,user:{sub:subject},getAccessTokenSilently:getToken,logout:async()=>{window.auditLogout=true;}}},React.createElement(Entry)));
+ </script></body></html>`}));
+ await page.goto(origin+'/entry-fixes-harness#app');
+ await page.getByRole('alert').filter({hasText:'Could not open your account'}).waitFor();
+ assert(!await page.locator('.welcome-conversation').count(),'503 routed admin into onboarding');
+ admin='allowed';await page.getByRole('button',{name:'Try again / Intentar de nuevo',exact:true}).click();
+ await page.getByRole('heading',{name:'Activity overview',exact:true}).waitFor();results.push('503 keeps access unknown; retry restores the admin dashboard without onboarding');
+ admin='stalled';await page.reload();
+ await page.getByRole('button',{name:'Log out / Cerrar sesión',exact:true}).waitFor();
+ await page.getByRole('alert').filter({hasText:'Could not open your account'}).waitFor({timeout:14000});
+ assert(await page.getByRole('button',{name:'Try again / Intentar de nuevo',exact:true}).isEnabled(),'Timeout has no retry');
+ await page.getByRole('button',{name:'Log out / Cerrar sesión',exact:true}).click();
+ assert(await page.evaluate(()=>window.auditLogout===true),'Logout recovery failed');
+ results.push('Stalled account probe times out and exposes working retry/logout');
+ admin='denied';await page.reload();await page.locator('.home-conversation').waitFor();
+ results.push('Explicit non-admin denial still opens the personal account');
+ return {passed:true,results};
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:5192/entry-fixes-harness#app
+- Console: 5 errors, 0 warnings
+### Events
+- New console entries: .playwright-cli\console-2026-10-11T01-13-50-510Z.log#L30-L65

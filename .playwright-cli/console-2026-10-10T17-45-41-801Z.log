@@ -1,0 +1,46 @@
+[     193ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[     261ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[     305ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[     308ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[   79801ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[   79828ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[   79833ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[   79833ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[   81422ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[   81441ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[   81449ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[   81449ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[   81653ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5198/node_modules/.vite/deps/react-dom_client.js:22429
+[   81686ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[   81701ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[   81702ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[  202158ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[  202176ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[  202177ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829
+[  202366ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:801
+[  202373ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5198/?token=RLe1EXPRh8iq' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5198/@vite/client:814
+[  202373ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5198/ <--[HTTP]--> 127.0.0.1:5198/ (server)
+  (browser) 127.0.0.1:5198/ <--[WebSocket (failing)]--> 127.0.0.1:5198/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5198/@vite/client:829

@@ -1,0 +1,20 @@
+
+> origen-family-prototype@0.1.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+node_modules/@auth0/auth0-react/dist/auth0-react.esm.js (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/@auth0/auth0-react/dist/auth0-react.esm.js" was ignored.
+✓ 1821 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                      1.86 kB │ gzip:   0.69 kB
+dist/assets/index-CzSf6Dbj.css     195.56 kB │ gzip:  35.08 kB
+dist/assets/browser-D_MiuLy2.js     25.78 kB │ gzip:  10.13 kB
+dist/assets/index-WSgnZLqu.js    1,250.39 kB │ gzip: 378.71 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.02s

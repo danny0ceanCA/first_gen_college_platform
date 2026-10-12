@@ -5,3 +5,68 @@
 .notebook-conversations{margin-top:28px;padding-top:22px;border-top:1px solid #e4d7ca}.notebook-conversations h4{display:flex;gap:8px;align-items:center;margin:0 0 12px;font-size:15px}.notebook-conversations p{font-size:13px;color:#625b55;line-height:1.7}.notebook-conversations ul{list-style:none;padding:0;margin:16px 0 0;max-height:320px;overflow-y:auto}.notebook-conversations li{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid #e4d7ca}.notebook-conversations li>div strong{display:block;font-size:13px}.notebook-conversations li>div span{display:block;font-size:12px;color:#625b55;margin-top:5px}.notebook-generated{display:flex;gap:6px;align-items:center;font-size:11px;color:#625b55}.notebook-message{border-left:3px solid #a4513c;padding:12px 16px;background:#f4eee4;font-size:13px;line-height:1.6;overflow-wrap:anywhere}.notebook-message .text-button{margin-left:10px}
 @media(max-width:760px){.notebook-topics{grid-template-columns:1fr}.notebook-topic{padding:18px}.notebook-panel{padding:18px}.notebook-panel-heading{align-items:flex-start}.notebook-panel-heading h3{font-size:21px}.notebook-editor{padding:16px}.notebook-editor-fields{grid-template-columns:1fr}.notebook-note{padding:16px}.notebook-conversations li{align-items:flex-start;flex-wrap:wrap;gap:6px}.notebook-scope>span{width:100%;margin-left:0}.notebook-conversations h4{line-height:1.5}}
 .notebook-editor label.notebook-decision-confirm{flex-direction:row;align-items:center;line-height:1.6;margin:16px 0}.notebook-decision-confirm input{width:20px;height:20px;flex-shrink:0;accent-color:#a4513c}
+.notebook-conversations ul{padding-right:10px;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#a4513c #f4eee4}
+.notebook-conversation-description{flex:1;min-width:0;overflow-wrap:anywhere}
+.notebook-conversations li>div strong{font-size:15px;line-height:1.5}
+.notebook-conversations .notebook-conversation-preview{margin:8px 0 0;font-size:13px;line-height:1.65;color:#2f343b;max-width:65ch}
+.notebook-conversations li>button,.notebook-conversations li>.notebook-generated{flex-shrink:0}
+@media(max-width:760px){.notebook-conversation-description{flex-basis:100%}.notebook-conversations li>button{margin-top:4px}}
+/* Topic dividers stay above the open notebook page. */
+.notebook-topics{display:flex;gap:6px;overflow-x:auto;padding:4px 4px 0;scrollbar-width:thin}
+.notebook-topic{flex:1;min-width:150px;padding:16px 14px;border-radius:12px 12px 0 0;background:#f4eee4;align-items:flex-start;gap:10px}
+.notebook-topic strong{font-size:14px}.notebook-topic small{margin-top:5px;font-size:12px}
+.notebook-topic[aria-selected=true]{background:#fffcf8;border-color:#a4513c;border-bottom-color:#fffcf8;box-shadow:inset 0 3px #a4513c;color:#813e2e}
+.notebook-topic:focus-visible{outline:2px solid #813e2e;outline-offset:-5px}
+.notebook-panel{margin-top:0;border-radius:0 0 16px 16px}
+.notebook-panel:focus-visible{outline:2px solid #813e2e;outline-offset:3px}
+.notebook-conversations>summary{display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;font-size:14px;font-weight:600;color:#813e2e;list-style:none}
+.notebook-conversations>summary::-webkit-details-marker{display:none}
+.notebook-conversations>summary::after{content:'+';margin-left:auto;font-size:20px;font-weight:400}
+.notebook-conversations[open]>summary::after{content:'−'}
+.notebook-conversations>summary:focus-visible{outline:2px solid #813e2e;outline-offset:3px;border-radius:4px}
+@media(max-width:760px){.notebook-topic{flex:0 0 155px;padding:14px 12px}.notebook-panel{padding:18px}}
+.notebook-summary-page .conversation-history{border:0;background:transparent;border-radius:0}
+.notebook-summary-page .conversation-history>.history-heading{padding:0 0 16px}
+.notebook-summary-page .history-content{padding:0}
+.home-workspace>.topic-notebook{border:1px solid #d7bba7;border-radius:20px;padding:24px;background:#fffaf5;box-shadow:0 3px 16px #813e2e06}
+@media(max-width:760px){.home-workspace>.topic-notebook{padding:18px 12px;border-radius:16px}.home-workspace>.topic-notebook>.home-section-heading,.home-workspace>.topic-notebook>.home-summary-switch,.home-workspace>.topic-notebook>.notebook-scope{margin-inline:6px}}
+
+/* Raised dividers and a quiet paper surface make the notebook navigable at a glance. */
+.home-workspace>.topic-notebook{padding:28px;border-color:#d9bdab;border-radius:22px;background:linear-gradient(155deg,#fffaf5 0%,#f8eee3 100%);box-shadow:0 8px 28px #813e2e09}
+.topic-notebook>.home-section-heading{margin-bottom:22px}
+.topic-notebook>.home-section-heading h2{font-size:25px;letter-spacing:-.035em}
+.notebook-scope{margin-bottom:18px}
+.notebook-topics{gap:8px;padding:10px 3px 0;isolation:isolate;scroll-padding-inline:4px;align-items:stretch}
+.notebook-topic{position:relative;flex:1 0 150px;min-width:0;min-height:94px;padding:17px 14px 19px;border:1px solid #ddc9b9;border-bottom:0;border-radius:15px 15px 0 0;background:#ede0d2;gap:9px;transform:translateY(6px);transition:transform 160ms ease-out,background-color 160ms ease-out;box-shadow:inset 0 1px #ffffffb3}
+.notebook-topic>span:not(.notebook-tab-icon){flex:1;min-width:0}
+.notebook-topic .notebook-tab-icon{display:grid;place-items:center;flex:0 0 29px;width:29px;height:29px;border-radius:9px;background:#fffaf580;color:#985039;margin-top:-3px}
+.notebook-topic strong{font-size:13px;line-height:1.45;color:#514237;letter-spacing:0}
+.notebook-topic small{font-size:11px;line-height:1.4;margin-top:7px;color:#776251}
+.notebook-topic[aria-selected=true]{transform:translateY(0);background:#a4513c;border-color:#a4513c;box-shadow:0 -2px 10px #813e2e12,inset 0 1px #ffffff30;z-index:1}
+.notebook-topic[aria-selected=true] strong{color:#fffaf3}
+.notebook-topic[aria-selected=true] small{color:#f5e5d5}
+.notebook-topic[aria-selected=true] .notebook-tab-icon{color:#fff5e9;background:#ffffff1c}
+.notebook-topic:focus-visible{outline:2px solid #813e2e;outline-offset:2px;z-index:2}
+.notebook-topic[aria-selected=true]:focus-visible{outline-color:#fff5e9;outline-offset:-5px}
+@media(hover:hover){.notebook-topic:not([aria-selected=true]):hover{transform:translateY(2px);background:#f4e7d9;border-color:#c39d82}}
+.notebook-panel{position:relative;padding:28px;border:1px solid #dcc7b7;border-top:3px solid #a4513c;border-radius:0 0 15px 15px;background:#fffdfa;box-shadow:0 5px 0 -2px #eddfd0,0 10px 0 -5px #e7d6c5}
+.notebook-panel-heading h3{font-size:24px;margin:7px 0 0}
+.notebook-toolbar{gap:14px;margin:22px 0}
+.notebook-empty{padding:22px;border:1px dashed #dac3af;border-radius:12px;background:#faf4ec;color:#72604f;font-size:14px}
+.notebook-note{border-color:#e3d1c1;border-radius:14px;background:#fffdfa;box-shadow:0 2px 6px #813e2e05}
+.notebook-summary-page .history-summary{padding-right:18px;line-height:1.85}
+@media(max-width:760px){.home-workspace>.topic-notebook{padding:20px 12px 22px;border-radius:18px}.topic-notebook>.home-section-heading h2{font-size:22px}.notebook-topic{flex:0 0 165px;padding:16px 12px;min-height:90px}.notebook-panel{padding:20px 16px}.notebook-panel-heading h3{font-size:22px}.notebook-empty{padding:18px}}
+@media(prefers-reduced-motion:reduce){.notebook-topic{transition:none}.notebook-topic:not([aria-selected=true]):hover{transform:translateY(6px)}}
+
+/* Reference guides live beside personal notes without crowding the notebook. */
+.notebook-guides{margin-top:28px;border-top:1px solid #dfc8b5;padding-top:8px}
+.notebook-guides>summary{cursor:pointer;padding:16px 4px;color:#813e2e;font-weight:650;min-height:48px}
+.notebook-guides>summary:focus-visible{outline:2px solid #a4513c;outline-offset:3px;border-radius:6px}
+.notebook-guide-content{min-width:0;padding-top:16px;display:grid;gap:22px;overflow-wrap:anywhere}
+.notebook-guide-content .finance-guide,.notebook-guide-content .application-panel{max-width:100%;margin:0}
+.notebook-guide-content .planning-paths,.notebook-guide-content .explore-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.notebook-guide-content .segmented{display:flex;flex-wrap:wrap;gap:6px}
+.notebook-guide-content .research-search,.notebook-guide-content .material-form{display:flex;flex-wrap:wrap}
+.notebook-guide-content input{min-width:0}
+.notebook-guide-content .research-panel{padding:24px}
+@media(max-width:760px){.notebook-guide-content .research-panel,.notebook-guide-content .application-panel{padding:16px}.notebook-guide-content .segmented>button{flex:1 1 100%}.notebook-guide-content .research-search>input,.notebook-guide-content .material-form>input{flex:1 1 100%;width:100%}}

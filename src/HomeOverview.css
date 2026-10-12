@@ -28,6 +28,7 @@
 .home-person{background:transparent;padding:0 0 20px;border:0;border-bottom:1px solid #e4d7ca;border-radius:0}
 .home-person-heading h2{font-size:18px;margin:3px 0}.home-person-heading .home-kicker{font-size:10px}
 .home-person-heading p{font-size:14px}.home-person-focus{border:0;margin:4px 0 0 54px;padding:0;font-size:14px}
+.home-person-blurb{margin:8px 0 0 54px;font-size:13px;line-height:1.65;color:#625b55;white-space:pre-wrap;overflow-wrap:anywhere;max-width:70ch}
 .home-person-focus summary{cursor:pointer;min-height:44px;align-content:center;color:#625b55}
 .home-person-focus p{max-width:65ch;margin:0 0 8px}
 .home-conversation{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:36px;padding:32px;border:1px solid #dec9b8;background:#f4e8da;border-radius:20px}

@@ -1,0 +1,18 @@
+✔ privacy requests reject forged ownership, invalid categories, internal actions and malformed confirmation (1.5956ms)
+✔ exports, erasure and retention changes reject stale sign-in before accessing storage (4.3062ms)
+▶ PostgreSQL privacy controls, delayed writes, retention and stale-backup deletion replay
+  ✔ preview is scoped, includes derived notes, and stale confirmation erases nothing (38.3667ms)
+  ✔ journal is content-free, owner-only and immutable to runtime; notes cannot be resurrected (7.3001ms)
+  ✔ retention is opt-in, respects saved age, and keeps independent work and other accounts (33.4642ms)
+  ✔ explicit removal of independent copies cascades plan history and queues account identity closure (79.8279ms)
+  ✔ Auth0 closure verifies a receipt, retries failures and never deletes an active account (8.7898ms)
+  ✔ stale PostgreSQL recovery replays all deletions twice, preserves another user and blocks absent-record retries (113.5804ms)
+✔ PostgreSQL privacy controls, delayed writes, retention and stale-backup deletion replay (2103.892ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2280.043

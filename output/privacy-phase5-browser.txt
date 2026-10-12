@@ -1,0 +1,47 @@
+### Result
+{"passed":true,"checks":"English/Spanish, desktop/390px/320px, copy counts, scope, explicit confirmation, stale-preview rejection, fresh sign-in, retention choice, deletion resets other tabs"}
+### Ran Playwright code
+```js
+await (async page=>{
+ const origin='http://127.0.0.1:5176',errors=[],requests=[];let failErase='privacy_selection_changed',erased=false;
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.context().route('**/api/privacy',async route=>{
+  const body=route.request().postDataJSON();requests.push(body);
+  if(body.action==='status')return route.fulfill({json:{counts:{summaries:erased?0:2,notes:erased?1:3,plans:1,sheets:1},days:null,students:[{id:'synthetic-student',name:'Sofía'}]}});
+  if(body.action==='preview')return route.fulfill({json:{counts:{summaries:2,notes:2,plans:0,sheets:0},derivedNotes:2,revision:'a'.repeat(64)}});
+  if(body.action==='retention')return route.fulfill({json:{days:body.days}});
+  if(body.action==='erase'){if(failErase)return route.fulfill({status:failErase==='privacy_selection_changed'?409:403,json:{error:failErase}});erased=true;return route.fulfill({json:{deleted:true}});}
+  throw Error('Unexpected request');
+ });
+ await page.context().route('**/api/account-data',route=>route.fulfill({status:403,json:{error:'reauthentication_required'}}));
+ const source=await(await page.request.get(origin+'/src/AccountDataControls.tsx')).text();
+ const authModule=source.match(/\/node_modules\/\.vite\/deps\/@auth0_auth0-react\.js\?v=[a-z0-9]+/)[0];
+ await page.context().route('**/privacy-center-harness*',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#f4eee4;padding:20px;margin:0"><main class="account-settings" style="max-width:640px;margin:auto;padding:20px;box-sizing:border-box;background:#fffaf4;border-radius:16px"><div id="test-root"></div></main><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import {Auth0Context} from '${authModule}';import AccountDataControls from '/src/AccountDataControls.tsx';import {setAPITokenProvider} from '/src/api.ts';import {browserPrivacy} from '/src/browserPrivacy.mjs';import '/src/AccountSettings.css';import '/src/styles.css';import '/src/accessibility.css';import '/src/brand.css';
+ browserPrivacy.start('auth0|synthetic-privacy',{fresh:true});browserPrivacy.subscribe(event=>{if(event.type==='end')window.privacyEnded=true;});const token=async()=>'synthetic-token';setAPITokenProvider(token);const es=new URLSearchParams(location.search).has('es');ReactDOM.createRoot(document.getElementById('test-root')).render(React.createElement(Auth0Context.Provider,{value:{isAuthenticated:true,isLoading:false,user:{sub:'auth0|synthetic-privacy'},getAccessTokenSilently:token,loginWithRedirect:async args=>{window.lastStepUp=args;},logout:async()=>{}}},React.createElement(AccountDataControls,{t:(en,spanish)=>es?spanish:en})));
+ </script></body></html>`}));
+ await page.setViewportSize({width:1280,height:1000});await page.goto(origin+'/privacy-center-harness');await page.getByRole('heading',{name:'Privacy Center',exact:true}).waitFor();
+ await page.getByRole('checkbox',{name:'Conversations',exact:false}).check();await page.getByLabel('For whom?').selectOption('student:synthetic-student');
+ await page.getByRole('button',{name:'Review deletion',exact:true}).click();await page.getByRole('region',{name:'Deletion review'}).waitFor();
+ if(!await page.getByRole('button',{name:'Delete selected records',exact:true}).isDisabled())throw Error('Deletion allowed without confirmation');
+ await page.screenshot({path:'output/playwright/privacy-phase5-desktop.png',fullPage:true});
+ await page.getByLabel('Type DELETE to confirm',{exact:true}).fill('DELETE');await page.getByRole('button',{name:'Delete selected records',exact:true}).click();await page.getByText('Your saved records changed. Review the selection again before deleting.').waitFor();
+ if(await page.getByRole('region',{name:'Deletion review'}).count())throw Error('Stale preview remained');
+ failErase='reauthentication_required';await page.getByRole('button',{name:'Review deletion',exact:true}).click();await page.getByLabel('Type DELETE to confirm',{exact:true}).fill('DELETE');await page.getByRole('button',{name:'Delete selected records',exact:true}).click();await page.getByRole('button',{name:'Sign in again',exact:true}).click();
+ const args=await page.evaluate(()=>window.lastStepUp);if(args.authorizationParams.max_age!==0||args.authorizationParams.prompt!=='login')throw Error('Missing fresh sign-in');
+ await page.goto(origin+'/privacy-center-harness?es');await page.setViewportSize({width:390,height:844});await page.getByRole('heading',{name:'Centro de privacidad',exact:true}).waitFor();
+ await page.getByRole('checkbox',{name:'Conversaciones',exact:false}).check();await page.getByRole('button',{name:'Revisar eliminación',exact:true}).click();await page.getByRole('region',{name:'Revisión de eliminación'}).waitFor();
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow at 390');await page.screenshot({path:'output/playwright/privacy-phase5-mobile-spanish.png',fullPage:true});
+ await page.setViewportSize({width:320,height:740});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow at 320');
+ await page.getByLabel('Conservar conversaciones durante').selectOption('30');await page.getByRole('button',{name:'Guardar plazo de conservación',exact:true}).click();await page.getByText('Guardado. La limpieza automática se ejecuta al iniciar el servicio y aproximadamente cada hora.').waitFor();
+ const other=await page.context().newPage();await other.goto(origin+'/privacy-center-harness');await other.getByRole('heading',{name:'Privacy Center',exact:true}).waitFor();
+ await page.evaluate(()=>{const original=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='origen-login-fresh')throw new DOMException('Storage unavailable','SecurityError');return original.call(this,key,value);};});
+ failErase='';await page.getByLabel('Escribe DELETE para confirmar',{exact:true}).fill('DELETE');await page.getByRole('button',{name:'Eliminar registros seleccionados',exact:true}).click();await page.waitForLoadState();await other.waitForFunction(()=>window.privacyEnded===true);await other.close();
+ if(!requests.some(r=>r.action==='erase'&&r.studentId==='synthetic-student'&&r.categories.join()==='summaries'))throw Error('Student scope lost');
+ if(errors.length)throw Error(errors.join('\n'));
+ return {passed:true,checks:'English/Spanish, desktop/390px/320px, copy counts, scope, explicit confirmation, stale-preview rejection, fresh sign-in, retention choice, deletion resets other tabs'};
+}
+)(page);
+```
+### Events
+- New console entries: .playwright-cli\console-2026-10-10T19-12-06-813Z.log#L54-L79

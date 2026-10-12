@@ -1,0 +1,40 @@
+.personal-binder{position:relative;min-width:0;perspective:1600px}
+.binder-cover{position:relative;display:block;width:100%;min-height:330px;text-align:left;border:1px solid #8a402e;border-radius:10px 24px 24px 10px;background:linear-gradient(115deg,#984932,#ae5941 65%,#a4513c);color:#f9ecda;box-shadow:5px 5px 0 #e5d2bf,9px 9px 0 #f9f1e5,12px 12px 0 #d7bba7,0 16px 35px #813e2e18;transform-origin:left center;backface-visibility:hidden;overflow:visible;padding:38px 56px 38px 76px}
+.binder-cover:disabled{opacity:1;cursor:default}
+.binder-cover-spine{position:absolute;left:18px;top:0;bottom:0;width:18px;border-left:1px solid #ffffff20;border-right:1px solid #59251635;background:#79362422}
+.binder-cover-content{position:relative;display:flex;flex-direction:column;align-items:flex-start;max-width:560px}
+.binder-brand{font-size:24px;font-weight:650;letter-spacing:-1px;margin-bottom:28px}
+.binder-cover-kicker{font-size:10px;letter-spacing:.17em;font-weight:600;color:#f2d5bc}
+.binder-cover-content>strong{font-family:'Manrope',sans-serif;font-size:clamp(30px,4vw,46px);letter-spacing:-.045em;line-height:1.2;margin:10px 0}
+.binder-cover-owner{font-size:18px;line-height:1.5;overflow-wrap:anywhere}
+.binder-cover-description{font-size:14px;line-height:1.65;margin-top:14px;max-width:40ch;color:#f5dfca}
+.binder-open-label{display:flex;align-items:center;gap:12px;padding:13px 18px;background:#f7ecdc;color:#813e2e;border-radius:9px;font-size:14px;font-weight:650;margin-top:28px;box-shadow:0 2px 6px #49241812}
+.binder-open-label>svg:last-child{margin-left:12px}
+.binder-cover-tabs{position:absolute;right:-9px;top:70px;bottom:70px;display:flex;flex-direction:column;justify-content:space-around;z-index:-1}
+.binder-cover-tabs i{display:block;width:18px;height:48px;background:#d3a581;border:1px solid #bd8a68;border-radius:0 7px 7px 0}.binder-cover-tabs i:nth-child(2){background:#ead8bf}.binder-cover-tabs i:nth-child(3){background:#bd765a}
+.binder-cover:focus-visible{outline:3px solid #813e2e;outline-offset:17px}
+@media(hover:hover){.binder-cover:hover .binder-open-label{background:#fff8ec}}
+.binder-pages{position:relative;min-width:0;padding:18px 22px 28px 48px;border:1px solid #cfad94;border-radius:12px 20px 20px 12px;background:linear-gradient(90deg,#e6d4c0 0, #f6ebdd 38px,#fbf4e9 65px);box-shadow:0 8px 24px #813e2e0b}
+.binder-pages[hidden]{display:none}
+.binder-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;font-size:13px;color:#813e2e}.binder-topline>span,.binder-topline>button{display:flex;align-items:center;gap:8px}.binder-topline>button{min-height:44px;padding:8px 12px;border:1px solid #ddc6b0;background:#fffaf3;border-radius:8px}
+.binder-rings{position:absolute;top:140px;bottom:70px;left:13px;width:28px;display:flex;flex-direction:column;justify-content:space-around;pointer-events:none}
+.binder-rings i{height:17px;width:28px;border-radius:9px;border:3px solid #b99b80;background:linear-gradient(#fef8ee,#dac5b0);box-shadow:0 2px 3px #71523b22,inset 0 1px #fff}
+.binder-pages>.topic-notebook{min-width:0;background:transparent;border:0;padding:0;box-shadow:none}
+.binder-pages .notebook-panel{padding:30px 32px 28px 42px;border-top-width:2px;background:linear-gradient(90deg,transparent 25px,#b6755630 25px,#b6755630 26px,transparent 26px),#fffdfa;min-height:290px}
+.binder-pages .notebook-panel-heading,.binder-pages .history-heading{border-bottom:1px solid #eadbcd;padding-bottom:16px;margin-bottom:18px}
+.binder-pages .notebook-group>h4{font-size:13px;letter-spacing:.03em;color:#813e2e;margin-top:24px}
+.binder-pages .history-summary{max-width:76ch;margin-right:auto;font-size:15px}
+.binder-pages .notebook-note{border-left:3px solid #c88d6c;box-shadow:0 3px 10px #813e2e06}
+.binder-pages .notebook-topics{overflow-y:hidden;padding-bottom:0;align-items:stretch}
+.binder-pages .notebook-topic{transform:none;margin-top:6px}
+.binder-pages .notebook-topic[aria-selected=true]{margin-top:0;padding-top:23px}
+@media(hover:hover){.binder-pages .notebook-topic:not([aria-selected=true]):hover{transform:none}}
+@media(max-width:760px){.binder-cover{padding:28px 30px 30px 52px;min-height:340px}.binder-brand{margin-bottom:22px}.binder-cover-spine{left:12px;width:13px}.binder-cover-description{font-size:13px}.binder-pages{padding:12px 10px 22px 28px}.binder-rings{left:5px;width:18px}.binder-rings i{width:18px;height:14px;border-width:2px}.binder-pages .notebook-panel{padding:22px 16px 22px 24px;background:linear-gradient(90deg,transparent 13px,#b6755630 13px,#b6755630 14px,transparent 14px),#fffdfa}.binder-topline{font-size:12px;gap:6px}.binder-topline>button{padding-inline:8px}.binder-open-label{padding:12px 14px}}
+
+/* Both surfaces overlap during motion, avoiding an unmount/height jump midway. */
+.personal-binder.is-transitioning{overflow:hidden;overflow:clip;isolation:isolate;overflow-anchor:none;border-radius:12px 24px 24px 12px;background:#fbf4e9;box-shadow:0 8px 24px #813e2e0b}
+.personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{position:absolute;top:0;left:0;width:100%;will-change:transform,opacity}
+.personal-binder.is-transitioning>.binder-cover{z-index:2;pointer-events:none;transition:none;box-shadow:none}
+.personal-binder.is-transitioning>.binder-pages{z-index:1;pointer-events:none;box-shadow:none}
+.binder-cover[hidden]{display:none}
+@media(prefers-reduced-motion:reduce){.personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{will-change:auto}}

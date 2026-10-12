@@ -1,0 +1,23 @@
+✔ web-enabled payloads omit private profile fields and unexpected tool properties (9.3479ms)
+✔ English and Spanish research redaction preserves the public academic question (0.7576ms)
+✔ obvious prompt-control instructions fail before a web request (0.6226ms)
+✔ saved voice context rejects forged students and ignores caller-supplied private context (599.735ms)
+✔ research derives names only from the signed-in account and never reads requested private records (258.8972ms)
+✔ untrusted telemetry cannot smuggle content through technical-looking fields (0.7468ms)
+✔ production PostgreSQL always uses TLS and public endpoints verify certificates (1.6527ms)
+✔ every direct Responses request builder disables saved responses (80.1211ms)
+✔ workspace loads only saved entries for exact account/student/family and relevant topic (969.7416ms)
+✔ actions preserve self-reported status and dates, refresh edits, reject archived and deleted tasks (631.7733ms)
+✔ focused context remains bounded and retains older selected notes without inferring meaning (276.4639ms)
+✔ voice handler owns context, protects unresolved scopes, and updates focus without new realtime calls (400.993ms)
+✔ derived notes bring only their owned source summary and disappear with that source (442.5639ms)
+✔ selection validation strips client content and rejects incomplete or conflicting references (2.1858ms)
+✔ workspace queue waits for actual audio, coalesces rapid clicks, and stops after hangup (1.7079ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3080.4226

@@ -1,0 +1,64 @@
+### Result
+{"passed":true,"summaryAlwaysVisible":true,"compactNextStep":true,"optionalToolsOnDemand":true,"keyboard":true,"draftPreservation":true,"noteToAction":true,"voiceContinuity":true,"studentIsolation":true,"englishAndSpanish":true,"desktopAndMobile":true,"newUser":true,"loadFailure":true}
+### Ran Playwright code
+```js
+await (async page=>{
+ const assert=(ok,message)=>{if(!ok)throw Error(message);};
+ const diagnostics=()=>page.evaluate(()=>window.phase5Diagnostics());
+ await page.setViewportSize({width:1440,height:1000});
+ const before=(await diagnostics()).requests.length;await page.goto('http://127.0.0.1:5192/sheet-workspace-harness');
+ const width=async()=>assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow');
+ const notes=page.locator('.home-shelf').filter({has:page.locator('summary').filter({hasText:'My notes'})});
+ const tools=page.locator('.home-shelf').filter({has:page.locator('summary').filter({hasText:'Prepare for what’s next'})});
+ const action=page.locator('.action-plan');
+ await page.locator('.home-memory .history-summary').waitFor();
+ assert(!await page.locator('.home-memory .conversation-history').evaluate(el=>!!el.closest('details')),'Summary is collapsed');
+ assert(await action.locator('.home-step-preview h3').innerText()==='Meet with my counselor','Next step missing');
+ assert(!(await diagnostics()).requests.slice(before).some(r=>['/api/topic-notes','/api/workspace-sheets'].includes(r.path)),'Optional tools loaded before use');
+ await action.getByRole('button',{name:'Mark done',exact:true}).click();await action.getByText('You’ve marked all your steps done. Take a moment to enjoy that.',{exact:true}).waitFor();
+ await action.getByRole('button',{name:'See all my steps',exact:true}).click();await action.getByRole('button',{name:'Reopen',exact:true}).click();await action.getByRole('button',{name:'Show just my next step',exact:true}).click();await action.getByRole('heading',{name:'Meet with my counselor',exact:true}).waitFor();
+ await page.locator('.home-conversation').getByRole('button',{name:'Talk with Origen',exact:true}).click();
+ await page.waitForFunction(()=>window.voiceFixture.connections===1);
+ await page.locator('.home-conversation').getByRole('button',{name:'Return to conversation',exact:true}).click();
+ assert(await page.evaluate(()=>window.voiceFixture.connections)===1,'Returning restarted voice');
+ await page.getByRole('button',{name:'Close conversation details',exact:true}).click();
+ // Same shared session survives normal app navigation.
+ await page.locator('.home-next-card').first().click();await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Home',exact:true}).click();
+ assert(await page.evaluate(()=>window.voiceFixture.connections===1&&window.voiceFixture.closed===0),'Navigation interrupted the session');
+ await page.reload();await page.locator('.home-memory .history-summary').waitFor();
+ await notes.locator(':scope > summary').focus();await page.keyboard.press('Enter');await notes.locator('.notebook-topics').waitFor();
+ await notes.locator('.notebook-topic').filter({hasText:'Transfer'}).click();
+ await notes.getByRole('button',{name:'Make an action',exact:true}).click();await action.locator('.action-editor').waitFor();
+ assert(await action.locator('.action-editor').isVisible(),'Note action draft remained hidden');
+ await action.getByRole('button',{name:'Dismiss draft',exact:true}).click();
+ await notes.locator(':scope > summary').click();
+ await action.getByRole('button',{name:'See all my steps',exact:true}).click();await action.locator('.saved-plan').waitFor();
+ await action.getByRole('button',{name:'Show just my next step',exact:true}).click();
+ await tools.locator(':scope > summary').click();await tools.getByRole('button',{name:/^Counselor meeting preparation/}).click();
+ await tools.getByLabel('Title',{exact:true}).fill('Questions for my counselor');await tools.locator(':scope > summary').first().click();
+ await tools.locator(':scope > summary').first().click();assert(await tools.getByLabel('Title',{exact:true}).inputValue()==='Questions for my counselor','Closing tools lost the draft');
+ await tools.getByRole('button',{name:'Discard draft',exact:true}).click();await tools.locator(':scope > summary').first().click();
+ await page.locator('.home-memory').getByRole('button',{name:'Family conversations',exact:true}).click();await page.getByText(/^Saved summary for the family/).waitFor();
+ await page.locator('.home-student-selector').getByRole('button',{name:'Mateo',exact:true}).click();await page.getByText(/^Saved summary for Mateo/).waitFor();
+ assert(!await action.locator('.home-step-preview h3').count(),'Sibling sees another student’s step');
+ await page.locator('.home-student-selector').getByRole('button',{name:'Sofía',exact:true}).click();await page.getByText(/^Saved summary for Sofía/).waitFor();
+ await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'output/playwright/home-simplicity-desktop.png',fullPage:true,animations:'disabled'});
+ await page.setViewportSize({width:390,height:844});await width();await page.screenshot({path:'output/playwright/home-simplicity-mobile.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('button',{name:/^ES/}).click();await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.getByText(/^Resumen guardado para Sofía/).waitFor();await page.evaluate(()=>scrollTo(0,0));await width();await page.screenshot({path:'output/playwright/home-simplicity-spanish.png',fullPage:true,animations:'disabled'});
+ await page.setViewportSize({width:320,height:720});await width();
+ await page.goto('http://127.0.0.1:5192/sheet-workspace-harness?new');await page.getByText('No next step yet. You can talk it through with Origen or add one yourself.',{exact:true}).waitFor();
+ await page.locator('.home-memory').scrollIntoViewIfNeeded();await page.locator('.home-memory .history-empty').waitFor();assert(!await page.getByRole('button',{name:'Add a student',exact:true}).count(),'Student sees parent-only control');
+ await action.getByRole('button',{name:'Add a step',exact:true}).click();await action.getByLabel('Action title',{exact:true}).waitFor();await width();
+ await action.getByRole('button',{name:'Dismiss draft',exact:true}).click();await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'output/playwright/home-simplicity-new-user.png',fullPage:true,animations:'disabled'});
+ await page.goto('http://127.0.0.1:5192/sheet-workspace-harness?failHistory');await page.getByText('History could not be loaded.',{exact:false}).waitFor();
+ assert(!await page.locator('.home-memory .history-empty').count(),'Failed history presented as empty');
+ const results=await diagnostics();assert(!results.errors.length,results.errors.join('; '));
+ return {passed:true,summaryAlwaysVisible:true,compactNextStep:true,optionalToolsOnDemand:true,keyboard:true,draftPreservation:true,noteToAction:true,voiceContinuity:true,studentIsolation:true,englishAndSpanish:true,desktopAndMobile:true,newUser:true,loadFailure:true};
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:5192/sheet-workspace-harness?failHistory
+- Console: 5 errors, 0 warnings
+### Events
+- New console entries: .playwright-cli\console-2026-10-11T01-16-22-030Z.log#L11-L47
