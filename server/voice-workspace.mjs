@@ -2,6 +2,9 @@ import {guardAccountTransaction} from './account-guard.mjs';
 import {planTopic} from '../src/voiceWorkspace.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const topics=['options','transfer','costs','applications'];
+export function binderInstructions(){
+ return ` ORIGEN HOME AND BINDER: On Home the person opens My binder to see Summary and four topic dividers: College options (colleges, majors and interests), Transfer & courses (education paths, classes and counselor questions), Paying for college (costs, financial aid and loans), and Applications (applying, essays and deadlines). Each topic page has key points from saved conversations, personal notes, a Talk about this circle button, and expandable Guides & resources. Summary is one short overall recap across all topics for the same student or family scope, not a separate transcript or a recap for each tab. Explain this layout only when useful or asked, in everyday words. Do not send them to old sidebar guide links. If asked where to find a past explanation, name the matching binder divider. A Talk about this selection gives you the selected topic; start there but follow the person's actual spoken question if it changes. A call can cover several topics; its key points belong to the topics actually discussed, not just the starting divider or specialty. After a conversation ends and its summary saves, the app prepares topic key points automatically. They are AI recaps the person can correct, keep as their own note, or remove; they are not confirmed decisions. conversationPoints in the supplied workspace are unreviewed recaps from owned saved summaries. Use them as partial, dated context; never infer agreement, completion, understanding or current verified policy from them. User notes and explicit current corrections take priority. You cannot open a binder, change tabs, edit notes or confirm a storage result yourself. Never claim I saved this in your notes or that a point is already visible; the app confirms saving. If helpful, say a short variation of 'After we finish, you can find the key points under Paying for college in your binder.' Do not repeat this reassurance after every answer. Screen navigation alone never confirms which student's private information a call may use.`;
+}
 const id=value=>typeof value==='string'&&value.length>0&&value.length<=128;
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
 export function validateWorkspaceFocus(value){
@@ -50,9 +53,19 @@ export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus}
   const relevant=focus?[focus.topic]:mode==='finance'||mode==='loans'?['costs']:mode==='admissions'?['applications']:['options','transfer'];
   const chosenNotes=notes.filter(n=>relevant.includes(n.topic)).sort((a,b)=>Number(b.id===focus?.noteId)-Number(a.id===focus?.noteId)||(['decision','question'].includes(b.kind)?1:0)-(['decision','question'].includes(a.kind)?1:0)||byRecent(a,b)).slice(0,6);
   const chosenActions=actions.filter(a=>relevant.includes(planTopic(a.category))).sort((a,b)=>Number(b.id===focus?.stepId&&b.plan_id===focus?.planId)-Number(a.id===focus?.stepId&&a.plan_id===focus?.planId)||Number(a.status==='complete')-Number(b.status==='complete')||byRecent(a,b)).slice(0,5);
+  // Evidence-linked recaps are separate from user-owned notes and decisions.
+  // Require the extraction receipt and owned source; never load arbitrary suggestions.
+  const points=ready?(await c.query(`SELECT n.topic,n.kind,n.content,n.language,n.source_quote,s.summary,s.conversation_at FROM origen_topic_notes n JOIN origen_topic_note_batches b ON b.account_id=n.account_id AND b.summary_id=n.source_summary_id JOIN origen_conversation_summaries s ON s.account_id=n.account_id AND s.id=n.source_summary_id WHERE n.account_id=$1 AND ${studentId===null?'n.student_id IS NULL AND s.student_id IS NULL':'n.student_id=$2 AND s.student_id=$2'} AND n.status='suggested' AND n.origin='conversation' ORDER BY s.conversation_at DESC,n.id LIMIT 120`,args)).rows:[];
+  const seen=new Set();
+  const conversationPoints=points.filter(p=>{
+   const key=String(p.content).trim().toLocaleLowerCase();
+   if(!relevant.includes(p.topic)||!p.source_quote||!p.summary.includes(p.source_quote)||seen.has(key))return false;
+   seen.add(key);return true;
+  }).slice(0,6).map(p=>({topic:p.topic,kind:p.kind,content:excerpt(p.content,700),language:p.language,date:date(p.conversation_at),reviewedByUser:false}));
   const result={available:true,notesAvailable:ready,topic:focus?.topic||null,selection:focus?.kind||null,notes:chosenNotes.map(n=>({selected:n.id===focus?.noteId,kind:n.kind,content:excerpt(n.content,n.id===focus?.noteId?2000:700),language:n.language,origin:n.origin,updatedAt:date(n.updated_at)})),actions:chosenActions.map(a=>({selected:a.id===focus?.stepId&&a.plan_id===focus?.planId,plan:excerpt(a.plan_title,200),title:excerpt(a.title,200),action:excerpt(a.action,a.id===focus?.stepId?1200:400),notes:excerpt(a.notes,350),status:a.status,personalTargetDate:a.due_date||null,updatedAt:date(a.updated_at)})),...(linkedSummary?{sourceSummary:{date:date(linkedSummary.conversation_at),summary:excerpt(linkedSummary.summary,1200)}}:{})};
   // Bound input cost even for long saved text. Always keep the explicitly selected item.
-  while(JSON.stringify(result).length>10000){const list=result.actions.length>1?result.actions:result.notes;if(list.length<=1)break;list.pop();}
+  result.conversationPoints=conversationPoints;
+  while(JSON.stringify(result).length>10000){const list=result.conversationPoints.length?result.conversationPoints:result.actions.length>1?result.actions:result.notes;if(list.length<=1&&list===result.notes)break;list.pop();}
   await c.query('COMMIT');return result;
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 }

@@ -10,7 +10,7 @@ import {useFamily} from './FamilyStore';
 import {flushPendingHistory} from './pendingHistory.mjs';
 export type ConversationMemory={id:string;studentId:string|null;date:string;mode:string;summary:string;sources:{title:string;url:string;checkedAt:string}[]};
 type Overview={summary:string;sources:ConversationMemory['sources'];date:string|null};
-type Store={clear:(studentId:string|null,mode?:string)=>Promise<void>;overview:(studentId:string|null,mode:string|undefined,language:'en'|'es')=>Promise<Overview>;items:ConversationMemory[];cloud:boolean;loading:boolean;error:boolean;reload:()=>void;add:(item:ConversationMemory)=>Promise<void>;remove:(id:string)=>Promise<void>};
+type Store={clear:(studentId:string|null,mode?:string)=>Promise<void>;overview:(studentId:string|null,mode:string|undefined,language:'en'|'es',presentation?:'basic'|'complete')=>Promise<Overview>;items:ConversationMemory[];cloud:boolean;loading:boolean;error:boolean;reload:()=>void;add:(item:ConversationMemory)=>Promise<void>;remove:(id:string)=>Promise<void>};
 const Context=createContext<Store|null>(null);
 export function useConversationHistory(){const store=useContext(Context);if(!store)throw new Error('ConversationHistoryProvider is required');return store;}
 export function ConversationHistoryProvider({children}:{children:ReactNode}){
@@ -68,20 +68,28 @@ function AccountConversationHistory({children}:{children:ReactNode}){
   return()=>{active=false;};
  },[cloud,family.students.map(student=>student.id).join('|'),attempt]);
 
- const overview=useCallback(async(studentId:string|null,mode:string|undefined,language:'en'|'es')=>{
+ const overview=useCallback(async(studentId:string|null,mode:string|undefined,language:'en'|'es',presentation:'basic'|'complete'='complete')=>{
   const selected=items.filter(item=>item.studentId===studentId&&(!mode||item.mode===mode)).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date)||a.id.localeCompare(b.id)).slice(-100);
-  const cacheKey=JSON.stringify([studentId,mode,language,selected]);
+  const cacheKey=JSON.stringify([studentId,mode,language,presentation,selected]);
   const cached=overviewCache.current.get(cacheKey);if(cached)return cached;
   const job=(async()=>{
-   const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'overview',studentId,mode,language,...(cloud?{}:{items:selected})})});
-   const data=await response.json();if(!response.ok||typeof data.summary!=='string'||!Array.isArray(data.sources))throw new Error('summary_unavailable');return data as Overview;
+   const lease=browserPrivacy.capture({studentId,mode});
+   try{
+    privacyLease.assert();lease.assert();
+    const body={action:'overview',studentId,mode,language,presentation,...(cloud?{}:{items:selected})};
+    let data:Overview;
+    if(cloud)data=await request('/api/conversation-summary',body) as unknown as Overview;
+    else{const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:lease.signal});if(!response.ok)throw new Error('summary_unavailable');data=await response.json();}
+    privacyLease.assert();lease.assert();
+    if(typeof data.summary!=='string'||!Array.isArray(data.sources))throw new Error('summary_unavailable');return data;
+   }finally{lease.release();}
   })();
   overviewCache.current.set(cacheKey,job);if(overviewCache.current.size>40)overviewCache.current.delete(overviewCache.current.keys().next().value!);
   try{return await job;}catch(error){overviewCache.current.delete(cacheKey);throw error;}
  },[items,cloud]);
  return <Context.Provider value={{clear:async(studentId,mode)=>{privacyLease.assert();browserPrivacy.forget({studentId,mode});if(cloud){const data=await request('/api/conversation-history',{action:'clear',studentId,mode});setItems(previous=>[...previous.filter(item=>item.studentId!==studentId),...data.items]);}else write(read().filter(item=>item.studentId!==studentId||(mode&&item.mode!==mode)));},overview,items,cloud,loading,error,reload:()=>setAttempt(n=>n+1),add:async item=>{privacyLease.assert();if(cloud){pending.current.set(item.id,item);persistPending();if(item.studentId===null||family.students.some(student=>student.id===item.studentId)){try{const data=await request('/api/conversation-history',{action:'save',item});pending.current.delete(item.id);persistPending();setItems([...data.items,...[...pending.current.values()].filter(queued=>!data.items.some(saved=>saved.id===queued.id))]);}catch(cause){if((cause as {status?:number}).status===410){pending.current.delete(item.id);persistPending();return;}if(privacyLease.valid())setError(true);throw cause;}}else setAttempt(n=>n+1);}else write([...read().filter(x=>x.id!==item.id),item]);},remove:async id=>{privacyLease.assert();browserPrivacy.forget({id});if(cloud){const data=await request('/api/conversation-history',{action:'delete',id});setItems(data.items);}else write(read().filter(x=>x.id!==id));}}}>{children}</Context.Provider>;
 }
-export default function ConversationHistory({studentId,mode,t,title}:{studentId:string|null;mode?:string;title?:string;t:(a:string,b:string)=>string}){
+export default function ConversationHistory({studentId,mode,t,title,basic=false,flowing=false}:{studentId:string|null;mode?:string;title?:string;basic?:boolean;flowing?:boolean;t:(a:string,b:string)=>string}){
  const {clear:clearHistory,overview,cloud,loading,error:loadError,reload}=useConversationHistory();
  const section=useRef<HTMLElement>(null),headingId=useId();
  const [visible,setVisible]=useState(false),[result,setResult]=useState<Overview|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(false),[attempt,setAttempt]=useState(0),[deleting,setDeleting]=useState(false);
@@ -95,18 +103,18 @@ export default function ConversationHistory({studentId,mode,t,title}:{studentId:
  useEffect(()=>{
   if(!visible||loading||loadError||deleting)return;
   let active=true;setResult(null);setError(false);setBusy(true);
-  void overview(studentId,mode,language).then(value=>{if(active)setResult(value);}).catch(()=>{if(active)setError(true);}).finally(()=>{if(active)setBusy(false);});
+  void overview(studentId,mode,language,basic?'basic':'complete').then(value=>{if(active)setResult(value);}).catch(()=>{if(active)setError(true);}).finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;};
- },[visible,loading,loadError,deleting,overview,studentId,mode,language,attempt]);
+ },[visible,loading,loadError,deleting,overview,studentId,mode,language,basic,attempt]);
  const clear=async()=>{
   if(deleting||!window.confirm(t('Delete the saved discussions behind this summary? Notes created from these discussions will also be deleted. Notes you wrote separately actions you accepted into your plan, and separately saved sheets will remain. Origen will no longer use these discussions as context.','¿Eliminar las conversaciones guardadas de este resumen? También se eliminarán las notas creadas a partir de ellas. Las notas que escribiste por separado las acciones que aceptaste en tu plan y las hojas guardadas por separado se conservarán. Origen dejará de usar estas conversaciones como contexto.')))return;
   setDeleting(true);try{await clearHistory(studentId,mode);}catch{setError(true);}finally{setDeleting(false);}
  };
  return <section ref={section} className="conversation-history" aria-labelledby={headingId}><h3 id={headingId} className="history-heading"><span className="history-icon"><MessageCircle size={17} aria-hidden="true"/></span><span className="history-label">{title??(studentId===null?t('Family discussion summary','Resumen de conversaciones familiares'):mode==='planning'?t('Your planning summary','Tu resumen de planificación'):t('Conversation summary','Resumen de conversaciones'))}</span></h3><div className="history-content">
-  <p className="small-text muted">{cloud?t('One summary of your latest saved discussions. Origen remembers your conversations.','Un resumen de tus conversaciones guardadas más recientes. Origen recuerda lo conversado.'):t('One summary of the discussions saved in this browser preview.','Un resumen de las conversaciones guardadas en esta vista previa.')}</p>
+  <p className="small-text muted">{basic?t('One overview across your binder topics. Each topic has the detailed key points.','Un resumen de los temas de tu carpeta. Los puntos clave detallados están en cada tema.'):cloud?t('One summary of your latest saved discussions. Origen remembers your conversations.','Un resumen de tus conversaciones guardadas más recientes. Origen recuerda lo conversado.'):t('One summary of the discussions saved in this browser preview.','Un resumen de las conversaciones guardadas en esta vista previa.')}</p>
   {(loading||busy)&&<p className="small-text muted" role="status">{t('Updating your summary…','Actualizando tu resumen…')}</p>}
   {loadError&&<p role="alert">{t('History could not be loaded.','No se pudo cargar el historial.')} <button className="text-button" onClick={reload}>{t('Try again','Intentar de nuevo')}</button></p>}
   {error&&<p role="alert">{t('Could not update the summary. Your saved discussions are still available.','No se pudo actualizar el resumen. Tus conversaciones siguen guardadas.')} <button className="text-button" onClick={()=>setAttempt(value=>value+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
-  {!loading&&!busy&&!loadError&&!error&&result&&(result.summary?<article className="history-entry history-overview"><p className="history-summary" role="region" aria-label={t('Conversation summary. Scroll to read more.','Resumen de conversaciones. Desplázate para leer más.')} tabIndex={0}>{result.summary}</p>{result.date&&<small>{t('Latest discussion: ','Última conversación: ')}{new Date(result.date).toLocaleDateString()}</small>}{result.sources.length>0&&<details className="history-sources"><summary>{t('Sources discussed','Fuentes consultadas')}</summary>{result.sources.map(source=><p key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></p>)}</details>}<button disabled={deleting} className="text-button history-delete" onClick={()=>void clear()}><Trash2 size={13} aria-hidden="true"/>{deleting?t('Deleting…','Eliminando…'):t('Delete saved discussions','Eliminar conversaciones guardadas')}</button></article>:<div className="history-empty"><strong>{t('Your story, in one place','Tu historia, en un solo lugar')}</strong><p>{t('After you talk with Origen, one summary will bring your discussions together here.','Después de hablar con Origen, un resumen reunirá aquí tus conversaciones.')}</p></div>)}
+  {!loading&&!busy&&!loadError&&!error&&result&&(result.summary?<article className="history-entry history-overview"><p className={`history-summary${flowing?' history-summary-flowing':''}`} role={flowing?undefined:'region'} aria-label={flowing?undefined:t('Conversation summary. Scroll to read more.','Resumen de conversaciones. Desplázate para leer más.')} tabIndex={flowing?undefined:0}>{result.summary}</p>{result.date&&<small>{t('Latest discussion: ','Última conversación: ')}{new Date(result.date).toLocaleDateString()}</small>}{result.sources.length>0&&<details className="history-sources"><summary>{t('Sources discussed','Fuentes consultadas')}</summary>{result.sources.map(source=><p key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></p>)}</details>}<button disabled={deleting} className="text-button history-delete" onClick={()=>void clear()}><Trash2 size={13} aria-hidden="true"/>{deleting?t('Deleting…','Eliminando…'):t('Delete saved discussions','Eliminar conversaciones guardadas')}</button></article>:<div className="history-empty"><strong>{t('Your story, in one place','Tu historia, en un solo lugar')}</strong><p>{t('After you talk with Origen, one summary will bring your discussions together here.','Después de hablar con Origen, un resumen reunirá aquí tus conversaciones.')}</p></div>)}
  </div></section>;
 }

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {Readable} from 'node:stream';
 import {fixture} from './family-fixture.mjs';
-import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions} from './voice-workspace.mjs';
+import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions,binderInstructions} from './voice-workspace.mjs';
 import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';
 import {createTopicRepository,validateTopicRequest} from './topic-notes.mjs';
 import {createPlanRepository,validatePlan} from './plans.mjs';
@@ -38,6 +39,27 @@ test('workspace loads only saved entries for exact account/student/family and re
  await f.topics('owner',{action:'update',id,studentId:'s',version:1,note:{topic:'transfer',kind:'note',content:'I am only considering it now.',language:'en'}});
  await assert.rejects(f.load(focus),{status:409});assert.equal((await f.load({...focus,version:2})).notes[0].kind,'note');
  await f.topics('owner',{action:'delete',studentId:'s',id,version:2});await assert.rejects(f.load({...focus,version:2}),{status:404});assert.doesNotMatch(JSON.stringify(await f.load()),/I chose|considering/);
+});
+
+test('live topics use owned evidence-linked recaps without treating them as accepted notes or decisions',async t=>{
+ const f=await setup(t),history=createHistoryRepository(f.pool);
+ const summary='We discussed comparing art colleges. FAFSA was explained as an aid application.';
+ const item={id:'recap',studentId:'s',mode:'planning',date:'2026-10-08T12:00:00Z',summary,sources:[]};
+ for(const [subject,studentId] of [['owner','s'],['owner','sibling'],['owner',null],['other','s']]){
+  const summaryId=`recap-${studentId}`;
+  await history(subject,{action:'save',item:{...item,id:summaryId,studentId}});
+  await f.topics(subject,{action:'store-suggestions',studentId,summaryId,language:'en',fingerprint:createHash('sha256').update(JSON.stringify(summary)).digest('hex'),notes:[{topic:'costs',kind:'explanation',content:`${subject}/${studentId}: FAFSA was discussed.`,quote:'FAFSA was explained as an aid application.'}]});
+ }
+ const focus={kind:'topic',studentId:'s',topic:'costs'};
+ const context=await f.load(focus);assert.equal(context.notes.length,0);assert.equal(context.conversationPoints.length,1);
+ assert.equal(context.conversationPoints[0].reviewedByUser,false);assert.equal(context.conversationPoints[0].content,'owner/s: FAFSA was discussed.');
+ assert.doesNotMatch(JSON.stringify(context),/other\/|owner\/sibling|owner\/null/);
+ assert.equal((await f.load({kind:'topic',studentId:'s',topic:'applications'})).conversationPoints.length,0);
+ assert.equal((await f.load({kind:'topic',studentId:null,topic:'costs'},null)).conversationPoints[0].content,'owner/null: FAFSA was discussed.');
+ const policy=binderInstructions();assert.match(policy,/Summary and four topic dividers/);assert.match(policy,/topics actually discussed/);assert.match(policy,/unreviewed recaps/);assert.match(policy,/never confirms which student's private information/);
+ const session=voiceSession({mode:'finance',role:'student',language:'en',profile:{},workspace:context},{});
+ assert.match(session.instructions,/owner\/s: FAFSA/);assert.match(session.instructions,/one short overall recap/);assert.match(session.instructions,/Never claim I saved this/);
+ await history('owner',{action:'delete',id:'recap-s'});assert.equal((await f.load(focus)).conversationPoints.length,0);
 });
 test('actions preserve self-reported status and dates, refresh edits, reject archived and deleted tasks',async t=>{
  const f=await setup(t);const saved=(await f.plans({action:'create',plan})).plans[0];

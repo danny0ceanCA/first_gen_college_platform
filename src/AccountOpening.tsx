@@ -3,7 +3,7 @@ import {useLayoutEffect,useRef} from 'react';
 import {animate} from 'animejs';
 
 // Shared by each login gate so checking access and loading a profile look like
-// one continuous handoff. No artificial delay is added to account loading.
+// one continuous handoff. WorkspaceArrival controls the shared six-second intro.
 export default function AccountOpening(){
  const spanish=localStorage.getItem('origen.language')==='es';
  const hand=useRef<SVGGElement>(null);

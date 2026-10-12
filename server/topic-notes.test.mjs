@@ -144,3 +144,55 @@ test('transaction failure rolls back and releases the client',async()=>{
  const repo=createTopicRepository({connect:async()=>({query:async sql=>{queries.push(sql);if(sql!=='BEGIN'&&sql!=='ROLLBACK')throw new Error('database failure');return {rows:[]};},release(){released=true;}})});
  await assert.rejects(repo('owner',{action:'load',studentId:null}),/database failure/);assert.equal(queries.at(-1),'ROLLBACK');assert.equal(released,true);
 });
+
+test('binder sync catches up in bounded batches, routes mixed topics by content, and isolates scopes',async t=>{
+ const {pool,history,repo}=await setup(t);
+ const mixed='Sofia wants to compare art majors. FAFSA was explained as an aid application. She asked how to prepare transfer essays.';
+ for(let i=0;i<4;i++)await history('owner',{action:'save',item:{...item,id:`mixed-${i}`,summary:mixed,date:`2026-10-0${i+1}T12:00:00Z`}});
+ await history('owner',{action:'save',item:{...item,id:'family-only',studentId:null,summary:'FAMILY ONLY private discussion.'}});
+ await history('owner',{action:'save',item:{...item,id:'sibling-only',studentId:'mateo',summary:'SIBLING ONLY private discussion.'}});
+ await history('other',{action:'save',item:{...item,id:'other-only',summary:'OTHER ONLY private discussion.'}});
+ let calls=0;
+ const service=createTopicService(pool,{OPENAI_API_KEY:'fake'},async(_url,options)=>{
+  calls++;const body=JSON.parse(options.body);
+  assert.match(body.instructions,/topics actually discussed|what was actually discussed/);
+  assert.match(body.instructions,/guide mode is only a hint/);
+  assert.equal(JSON.parse(body.input).summary,mixed);
+  return response({notes:[
+   {topic:'options',kind:'note',content:'Comparing art majors.',quote:'Sofia wants to compare art majors.'},
+   {topic:'costs',kind:'explanation',content:'FAFSA was discussed as an aid application.',quote:'FAFSA was explained as an aid application.'},
+   {topic:'applications',kind:'question',content:'How can I prepare transfer essays?',quote:'She asked how to prepare transfer essays.'}
+  ]});
+ });
+ const input=validateTopicRequest({action:'sync',studentId:'sofia',language:'en',summaryId:'family-only',accountId:'other'});
+ assert.deepEqual(input,{action:'sync',studentId:'sofia',language:'en'});
+ let result=await service('owner',input);
+ assert.equal(calls,3);assert.equal(result.pendingCount,1);assert.equal(result.notes.length,9);
+ assert.ok(result.notes.every(n=>n.studentId==='sofia'&&n.status==='suggested'&&n.kind!=='decision'));
+ assert.deepEqual(new Set(result.notes.map(n=>n.topic)),new Set(['options','costs','applications']));
+ result=await service('owner',input);assert.equal(calls,4);assert.equal(result.pendingCount,0);assert.equal(result.notes.length,12);
+ await service('owner',input);assert.equal(calls,4,'reopening uses extraction receipts without another model request');
+ await repo('owner',{action:'delete',studentId:'sofia',id:result.notes[0].id,version:1});
+ result=await service('owner',input);assert.equal(result.notes.length,11);assert.equal(calls,4,'removed recaps are not regenerated');
+ await history('owner',{action:'clear',studentId:'sofia'});
+ result=await service('owner',input);assert.equal(result.notes.length,0);assert.equal(result.pendingCount,0);assert.equal(calls,4);
+ assert.equal((await history('owner',{action:'load',studentId:null})).items.length,1);
+ await rejects(service('owner',{...input,studentId:'missing'}),404);assert.equal(calls,4);
+});
+
+test('concurrent binder catch-ups share extraction and a failed batch resumes without repeating saved points',async t=>{
+ const {pool,history}=await setup(t);
+ for(let i=0;i<2;i++)await history('owner',{action:'save',item:{...item,id:`retry-${i}`}});
+ let calls=0,release,started;const waiting=new Promise(resolve=>release=resolve),ready=new Promise(resolve=>started=resolve);
+ const service=createTopicService(pool,{OPENAI_API_KEY:'fake'},async()=>{
+  calls++;if(calls===1){started();await waiting;}
+  if(calls===2)return new Response('{}',{status:500});
+  return response({notes:[suggestion]});
+ });
+ const input={action:'sync',studentId:'sofia',language:'en'};
+ const one=service('owner',input),two=service('owner',input);await ready;release();
+ const results=await Promise.allSettled([one,two]);assert.ok(results.every(result=>result.status==='rejected'));assert.equal(calls,2);
+ assert.equal((await service('owner',{action:'load',studentId:'sofia'})).notes.length,1);
+ const result=await service('owner',input);assert.equal(calls,3);assert.equal(result.notes.length,2);assert.equal(result.pendingCount,0);
+ await service('owner',input);assert.equal(calls,3);
+});

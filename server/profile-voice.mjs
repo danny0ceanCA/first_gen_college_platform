@@ -1,5 +1,5 @@
 import {bilingualTranscriptionPrompt,voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
-import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions} from './voice-workspace.mjs';
+import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions,binderInstructions} from './voice-workspace.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {createHistoryRepository} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
@@ -19,7 +19,9 @@ export function voiceSession(input, env) {
   const profile = Object.fromEntries(profileFields.map(k => [k, routing&&!input.targetConfirmed?'':typeof input.profile?.[k] === 'string' ? input.profile[k].slice(0,2000) : '']));
   const memory=routing&&!input.targetConfirmed?[]:selectConversationMemory(Array.isArray(input.memory)?input.memory:[],input.mode).map(m=>{
    const text=String(m.summary||'');
-   return {date:String(m.date||'').slice(0,40),mode:String(m.mode||'').slice(0,30),summary:text.length>1500?`${text.slice(0,950)}\n[Earlier summary excerpt; middle omitted.]\n${text.slice(-500)}`:text};
+   // Make room for binder orientation without growing the existing memory budget.
+   // Preserve the ending, where explicit corrections and unresolved next steps live.
+   return {date:String(m.date||'').slice(0,40),mode:String(m.mode||'').slice(0,30),summary:text.length>1000?`${text.slice(0,450)}\n[Earlier summary excerpt; middle omitted.]\n${text.slice(-500)}`:text};
   });
   const planning = input.mode === 'planning';
   const loans = input.mode === 'loans';
@@ -89,6 +91,7 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
     session.instructions+=' LIVE PROFILE SAVING: The Save profile button works during the conversation, and you can also save through save_onboarding_profile when the person asks, for example "save my profile", "save it", "guarda mi perfil" or "guárdalo". First use propose_account and propose_profile for any newly supplied details, then save. This overrides earlier instructions requiring the person to end the call, add suggestions to a form or use only a button to save. Do not ask for another confirmation or show a form. Account-holder name, explicitly stated student/parent role and student name are required; education stage and other fields may be unknown. If details are missing, ask only for those. Only say the profile is saved when the tool returns saved. If storage fails, say so and offer to retry while the call stays open. After a successful save, say one short confirmation in the current language and explain that the home page opens next. The app waits for your spoken confirmation to finish before completing onboarding. Do not ask another onboarding question.';
   }
   session.instructions+=' '+voiceStartingPoints({mode:input.mode,language:input.language,scopePending:Boolean(routing&&!input.targetConfirmed)});
+  if(input.onboarding!==true)session.instructions+=binderInstructions();
   if(!routing||input.targetConfirmed)session.instructions+=workspaceInstructions(input.workspace,{continuing:input.continuing===true,selectedNow:input.workspaceRefreshOnly!==true});
   session.instructions=voiceLanguageInstructions(session.instructions,input.language);
   return session;

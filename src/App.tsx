@@ -82,7 +82,6 @@ function FamilyApp() {
   const transfer = student.stage === 'Community college';
   const [modal, setModal] = useState<Modal>(null);
   const [mobile, setMobile] = useState(false);
-  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const [chat, setChat] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<{ who: string; text: string }[]>([]);
@@ -146,8 +145,7 @@ function FamilyApp() {
   if(family.error&&!welcomeChecked.current)return <main className="application-panel"><p role="alert">{t('Your family could not be loaded. Your saved information has not been replaced.','No se pudo cargar tu familia. No se ha reemplazado tu información guardada.')}</p><button className="button primary" onClick={family.reload}>{t('Try again','Intentar de nuevo')}</button><button className="button outline" onClick={logOut}>{t('Log out','Cerrar sesión')}</button></main>;
   const finishWelcome=()=>transitionFromOnboarding(()=>{homePending.current=true;go('home');setModal(null);setWelcoming(false);window.location.hash='app';},onboardingTracker.event);
   if(welcoming)return <Welcome tracker={onboardingTracker} onComplete={finishWelcome} onRole={next=>{setRole(next);setLanguages(previous=>({...previous,[next]:lang}));saveLocal(`${storageScope}.role.v1`,next);}} initialName={family.account.firstName} initialRole={family.account.role} hasStudents={family.students.length>0} cloud={family.cloud} language={lang} setLanguage={setLang} complete={async(firstName,accountRole,added,options)=>{setLanguages(previous=>({...previous,[accountRole]:liveLanguage.current}));if(!await family.completeOnboarding(firstName,accountRole,added,options?.attemptId))return false;if(added)setSelected(added.id);if(!options?.keepOpen)finishWelcome();return true;}}/>;
-  return <div className={`app-shell${sidebarCollapsed?' sidebar-collapsed':''}`}>
-    <button type="button" className="sidebar-pull-tab" aria-controls="app-sidebar" aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed?t('Show navigation','Mostrar navegación'):t('Hide navigation','Ocultar navegación')} onClick={()=>setSidebarCollapsed(value=>!value)}><ChevronRight size={18} aria-hidden="true"/></button>
+  return <div className="app-shell">
     {mobile && <button className="sidebar-shade" onClick={() => setMobile(false)} aria-label="Close navigation" />}
     <aside id="app-sidebar" className={`sidebar ${mobile ? 'open' : ''}`}>
       <button className="brand" onClick={() => go('home')} aria-label="Origen home"><span className="brand-symbol"><span/><span/></span>origen<span className="brand-dot">.</span></button>

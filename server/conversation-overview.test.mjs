@@ -71,3 +71,19 @@ test('single saved summaries translate with the selected language, cache each ve
  assert.equal((await overview({},input)).summary,spanish);assert.equal(calls,2);
  assert.equal(item.summary,english);
 });
+
+test('binder basic overview combines topics concisely and keeps its cache separate from complete summaries',async()=>{
+ let calls=0;
+ const overview=createConversationOverview({OPENAI_API_KEY:'test'},async(_url,options)=>{
+  calls++;const body=JSON.parse(options.body),basic=body.max_output_tokens===650;
+  if(basic){assert.match(body.instructions,/ONE short, cohesive overall summary/);assert.match(body.instructions,/80–140 words/);assert.match(body.instructions,/detailed key points/);assert.match(body.instructions,/not invent understanding, agreement, completion/);}
+  const spanish=body.instructions.includes(' in Spanish');
+  return {ok:true,status:200,json:async()=>({output:[{content:[{type:'output_text',text:basic?(spanish?'Resumen general breve.':'A brief overall picture.'):'A complete narrative.'}]}]})};
+ },null);
+ const input={studentId:null,language:'en',presentation:'basic',items:[memory('first','Comparing colleges and financial aid.')]};
+ assert.equal((await overview({},input)).summary,'A brief overall picture.');
+ await overview({},input);assert.equal(calls,1);
+ assert.equal((await overview({},{...input,presentation:'complete'})).summary,'A complete narrative.');assert.equal(calls,2);
+ assert.equal((await overview({},{...input,language:'es'})).summary,'Resumen general breve.');assert.equal(calls,3);
+ await assert.rejects(overview({},{...input,presentation:'forged'}),{status:400});
+});
