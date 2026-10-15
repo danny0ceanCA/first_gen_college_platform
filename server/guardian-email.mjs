@@ -1,5 +1,8 @@
-// No SMTP password or alias authentication. Real transport is an explicit,
-// future opt-in; tests inject a capture-only transport and never send email.
+import {readFileSync} from 'node:fs';
+import {renderGuardianEmail} from './guardian-email-template.mjs';
+// No SMTP password or alias authentication. Sending requires explicit transport
+// configuration; tests inject a capture-only transport and never send email.
+const logoContent=readFileSync(new URL('./assets/origen-mark.png',import.meta.url)).toString('base64');
 export const GUARDIAN_NOTICE_VERSION='guardian-2026-10-15-v1';
 export const GUARDIAN_NOTICE={
  en:'Origen Edu, operated by Blueprint Holdings LLC, offers college planning for ninth graders and above. You are being asked to permit a teenager aged 13–17 to use an account. The student may provide profile information and college questions. Voice sends audio and relevant context to OpenAI; Origen does not keep microphone recordings. OpenAI processes data under its own applicable API retention settings. Origen saves conversation summaries, which may include personal context, and user-saved profiles, plans, notes and worksheets. Summary retention and deletion controls do not automatically delete those separate records. Permission does not link family accounts or let you, a referring organization, or a coordinator read private conversations. No sale of personal information is authorized by this permission. You can decline, withdraw using the separate link in this email, or contact daniel@origenedu.ai to request help or deletion. Withdrawing stops further permitted use; it does not by itself erase existing records. Email possession and your declaration do not conclusively verify guardianship. Approval lasts 180 days from the request and must then be renewed.',
@@ -20,9 +23,9 @@ export function createGuardianMailer(env={},request=fetch){
  const config=guardianMailConfig(env);
  return {mode:config.mode,async send({to,requestId,approvalToken,withdrawalToken}){
   if(config.mode==='disabled')return 'disabled';
-  const text=`Origen Edu — Parent or guardian permission / Permiso de madre, padre o tutor\nReference / Referencia: ${requestId}\n\n${GUARDIAN_NOTICE.en}\n\n${GUARDIAN_NOTICE.es}\n\nReview and decide within 48 hours / Revisa y decide en 48 horas:\n${config.publicURL}#guardian/${approvalToken}\n\nKeep this private withdrawal link (180 days) / Conserva este enlace privado para retirar el permiso (180 días):\n${config.publicURL}#guardian/${withdrawalToken}\n\nIf this request is unfamiliar, decline it. Do not forward either link. / Si no reconoces la solicitud, recházala. No reenvíes los enlaces.\nPrivacy / Privacidad: ${config.publicURL}#privacy\nNotice / Aviso: ${GUARDIAN_NOTICE_VERSION}`;
+  const message=renderGuardianEmail({publicURL:config.publicURL,requestId,approvalToken,withdrawalToken,notice:GUARDIAN_NOTICE,noticeVersion:GUARDIAN_NOTICE_VERSION});
   try{
-   const response=await request('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json','Idempotency-Key':`guardian-${requestId}`},body:JSON.stringify({from:config.from,to:[to],reply_to:config.replyTo,subject:'Origen Edu: guardian permission / permiso de tutor',text}),signal:AbortSignal.timeout(10000)});
+   const response=await request('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json','Idempotency-Key':`guardian-${requestId}`},body:JSON.stringify({from:`Daniel at Origen Edu <${config.from}>`,to:[to],reply_to:config.replyTo,...message,attachments:[{filename:'origen-mark.png',content:logoContent,content_id:'origen-mark',content_type:'image/png'}]}),signal:AbortSignal.timeout(10000)});
    // Accepted means the provider accepted a send request, not delivered/read.
    return response.ok?'accepted':'failed';
   }catch{return 'failed';}

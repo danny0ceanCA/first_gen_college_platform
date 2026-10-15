@@ -1,0 +1,66 @@
+Daniel · Origen Edu
+
+--------------------
+
+English
+
+A little help with college.
+
+Hello,
+
+I’m Daniel from Origen Edu. We help students and families explore college options, applications and financial aid.
+
+A student has asked us to contact you as their parent or legal guardian. If this is your child’s request, please review how Origen uses their information and choose whether to allow access.
+
+Review within 48 hours. You can accept or decline on the next page; opening this email does not grant permission.
+
+Review and accept: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-APPROVAL
+
+Reference: PREVIEW-ONLY
+
+Don’t recognize the request? Don’t approve it. Reply to me for help, and keep these links private.
+
+Withdraw permission: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-WITHDRAWAL
+
+Read the privacy notice: https://example.invalid/#privacy
+
+Thank you,
+
+Daniel
+Origen Edu
+daniel@origenedu.ai
+
+--------------------
+
+Español
+
+Un poco de ayuda para llegar a la universidad.
+
+Hola,
+
+Soy Daniel, de Origen Edu. Ayudamos a estudiantes y familias a explorar opciones universitarias, solicitudes y ayuda financiera.
+
+Un estudiante nos pidió contactarte como su madre, padre o tutor legal. Si la solicitud es de tu hijo o hija, revisa cómo Origen usa su información y decide si autorizas el acceso.
+
+Revisa la solicitud en 48 horas. Puedes aceptar o rechazar en la siguiente página; abrir este correo no otorga permiso.
+
+Revisar y aceptar: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-APPROVAL
+
+Referencia: PREVIEW-ONLY
+
+¿No reconoces la solicitud? No la apruebes. Respóndeme para pedir ayuda y mantén privados estos enlaces.
+
+Retirar el permiso: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-WITHDRAWAL
+
+Leer el aviso de privacidad: https://example.invalid/#privacy
+
+Gracias,
+
+Daniel
+Origen Edu
+daniel@origenedu.ai
+
+--------------------
+
+Blueprint Holdings LLC
+Notice / Aviso: guardian-2026-10-15-v1

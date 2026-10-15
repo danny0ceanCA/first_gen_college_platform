@@ -13,6 +13,7 @@ allowed = {
  'https://www.okta.com/privacy-policy/',
  'https://render.com/privacy',
  'https://policies.google.com/privacy',
+ 'https://resend.com/legal/privacy-policy',
 }
 annotations = []
 for n, page in enumerate(reader.pages, 1):
@@ -30,7 +31,7 @@ catalog = reader.trailer['/Root']
 assert not any(key in catalog for key in ['/Metadata', '/OpenAction', '/AA', '/AcroForm', '/AF'])
 if '/Names' in catalog:
     assert not any(key in catalog['/Names'] for key in ['/EmbeddedFiles', '/JavaScript'])
-blocked = [r'C:[\\/]', r'file://', r'localhost', r'127\.0\.0\.1', r'\.mjs\b', r'\.tsx\b', r'SKILL\.md', r'AGENTS\.md', r'github\.com', r'onrender\.com', r'\benv\s+vars\b', r'\bResend\b', r'guardian[- ]permission', r'publication checklist', r'implementation appendix']
+blocked = [r'C:[\\/]', r'file://', r'localhost', r'127\.0\.0\.1', r'\.mjs\b', r'\.tsx\b', r'SKILL\.md', r'AGENTS\.md', r'github\.com', r'onrender\.com', r'\benv\s+vars\b', r'publication checklist', r'implementation appendix']
 metadata = {str(k): str(v) for k,v in (reader.metadata or {}).items()}
 leaks = [pattern for pattern in blocked if re.search(pattern, extracted+'\n'+json.dumps(metadata), re.I)]
 assert not leaks, leaks

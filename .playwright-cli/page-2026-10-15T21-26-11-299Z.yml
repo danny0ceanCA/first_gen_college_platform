@@ -1,0 +1,49 @@
+- generic [active] [ref=f1e1]:
+  - img "Origen circle mark" [ref=f1e2]
+  - text: origen.
+  - paragraph [ref=f1e3]: A note from Daniel · Una nota de DanielEnglish first · Español a continuación
+  - paragraph [ref=f1e4]: English
+  - heading "A little help with college." [level=1] [ref=f1e5]
+  - paragraph [ref=f1e6]: Hello,
+  - paragraph [ref=f1e7]: I’m Daniel from Origen Edu. We help students and families explore college options, applications and financial aid.
+  - paragraph [ref=f1e8]: A student has asked us to contact you as their parent or legal guardian. If this is your child’s request, please review how Origen uses their information and choose whether to allow access.
+  - text: Review within 48 hours. You can accept or decline on the next page; opening this email does not grant permission.
+  - link "Review and accept" [ref=f1e9] [cursor=pointer]:
+    - /url: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-APPROVAL
+  - paragraph [ref=f1e10]: "Reference: PREVIEW-ONLY"
+  - paragraph [ref=f1e11]: Don’t recognize the request? Don’t approve it. Reply to me for help, and keep these links private.
+  - paragraph [ref=f1e12]:
+    - link "Withdraw permission" [ref=f1e13] [cursor=pointer]:
+      - /url: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-WITHDRAWAL
+    - text: ·
+    - link "Read the privacy notice" [ref=f1e14] [cursor=pointer]:
+      - /url: https://example.invalid/#privacy
+  - paragraph [ref=f1e15]:
+    - text: Thank you,
+    - strong [ref=f1e16]: Daniel
+    - text: Origen Edu
+    - link "daniel@origenedu.ai" [ref=f1e17] [cursor=pointer]:
+      - /url: mailto:daniel@origenedu.ai
+  - paragraph [ref=f1e18]: Español
+  - heading "Un poco de ayuda para llegar a la universidad." [level=1] [ref=f1e19]
+  - paragraph [ref=f1e20]: Hola,
+  - paragraph [ref=f1e21]: Soy Daniel, de Origen Edu. Ayudamos a estudiantes y familias a explorar opciones universitarias, solicitudes y ayuda financiera.
+  - paragraph [ref=f1e22]: Un estudiante nos pidió contactarte como su madre, padre o tutor legal. Si la solicitud es de tu hijo o hija, revisa cómo Origen usa su información y decide si autorizas el acceso.
+  - text: Revisa la solicitud en 48 horas. Puedes aceptar o rechazar en la siguiente página; abrir este correo no otorga permiso.
+  - link "Revisar y aceptar" [ref=f1e23] [cursor=pointer]:
+    - /url: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-APPROVAL
+  - paragraph [ref=f1e24]: "Referencia: PREVIEW-ONLY"
+  - paragraph [ref=f1e25]: ¿No reconoces la solicitud? No la apruebes. Respóndeme para pedir ayuda y mantén privados estos enlaces.
+  - paragraph [ref=f1e26]:
+    - link "Retirar el permiso" [ref=f1e27] [cursor=pointer]:
+      - /url: https://example.invalid/#guardian/PREVIEW-NOT-A-REAL-WITHDRAWAL
+    - text: ·
+    - link "Leer el aviso de privacidad" [ref=f1e28] [cursor=pointer]:
+      - /url: https://example.invalid/#privacy
+  - paragraph [ref=f1e29]:
+    - text: Gracias,
+    - strong [ref=f1e30]: Daniel
+    - text: Origen Edu
+    - link "daniel@origenedu.ai" [ref=f1e31] [cursor=pointer]:
+      - /url: mailto:daniel@origenedu.ai
+  - text: "Origen Edu · Blueprint Holdings LLCNotice / Aviso: guardian-2026-10-15-v1daniel@origenedu.ai"

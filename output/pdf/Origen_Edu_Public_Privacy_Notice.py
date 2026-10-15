@@ -32,6 +32,7 @@ PAGES = [
 ('h','The main points'),
 ('p','We use information to provide college guidance, maintain your account and planning history, carry out sharing you request, and operate and protect the service. We do not sell personal information or provide private student profiles or conversations to advertisers for targeting across unrelated services.'),
 ('p','A name is not the only personal information involved. Your account identifiers, email address, educational details, questions and saved summaries can also identify you or describe your circumstances. Optional details can make guidance more relevant; you can limit the details you choose to provide.'),
+('p','Account access includes age-group and eligibility screening. Students aged 13–17 must have parent or legal guardian approval before using profiles or AI. The eligibility section explains the information collected, permission limits and delivery availability.'),
 ('p','Origen does not keep an archive of microphone recordings. Live audio is sent to OpenAI for processing. Written conversation summaries normally save automatically after a conversation with captured speech and a confirmed student or family context ends, and may include personal context. OpenAI’s processing and retention are separate from Origen’s saved records.'),
 ('p','Linking family accounts shares designated academic profile information. It does not automatically share private conversations. A community organization’s referral does not give its staff access to your private history. University page analytics contain aggregate counts, not private student profiles.'),
 ('h','Privacy questions and requests'),
@@ -95,9 +96,10 @@ PAGES = [
  ['OpenAI','AI responses, live audio processing, summaries and quality checks; relevant questions, audio, profile details and conversation context.'],
  ['Auth0 (Okta)','Sign-in and identity management; identity and authentication information needed to authenticate an account.'],
  ['Render','Application and database hosting; saved application records and infrastructure information, including relevant logs and backup copies.'],
- ['Google Fonts','Website fonts; font requests can disclose ordinary network and browser information, including an IP address. Student profiles and conversations are not sent as font content.']
+ ['Google Fonts','Website fonts; font requests can disclose ordinary network and browser information, including an IP address. Student profiles and conversations are not sent as font content.'],
+ ['Resend (when enabled)','Guardian-permission email delivery; guardian email address, request reference, privacy notice and private approval/withdrawal links. The permission email does not include saved student profiles or conversation summaries.']
 ]),
-('links',[('Auth0 / Okta privacy','https://www.okta.com/privacy-policy/'),('Render privacy','https://render.com/privacy'),('Google privacy','https://policies.google.com/privacy')]),
+('links',[('Auth0 / Okta privacy','https://www.okta.com/privacy-policy/'),('Render privacy','https://render.com/privacy'),('Google privacy','https://policies.google.com/privacy'),('Resend privacy','https://resend.com/legal/privacy-policy')]),
 ('h','What Origen staff can see'),
 ('p','Application permissions limit staff reports by role. Activity reports contain operational trends. Directory access can include account names, identifiers, status and activity or conversation metadata. Quality-review access can include diagnostic findings and associated account identifiers. These reporting permissions do not expose private summary text, transcripts, notes, plans or worksheets.'),
 ('p','Authorized technical operators may be able to access underlying systems for support, maintenance, recovery, security or a legal obligation. Restrictions in a dashboard do not mean the underlying stored content is inaccessible to every human.'),
@@ -125,13 +127,31 @@ PAGES = [
 ('h','Backups, support and provider records'),
 ('p','Backups, infrastructure and security logs, support correspondence and records needed for legal obligations follow separate retention rules. They are not removed simply by changing summary retention. We do not promise immediate erasure from every backup or provider system. Contact daniel@origenedu.ai about the records involved in your request.')
 ]),
-('6. Deletion, students and privacy requests', [
+('6. Eligibility and guardian permission', [
+('h','Who can use an account'),
+('p','Origen supports students in ninth grade and above, including college students and people returning to education, and adults supporting a student. Users under 13 are blocked from student-profile and AI access, even if they are in ninth grade. Eligible users aged 13–17 remain pending until a parent or legal guardian approves. Eligible users aged 18 or older have an adult path. Existing users whose eligibility is unknown must also complete screening.'),
+('p','We ask for an age group and audience category, not a full birth date. Answers are self-reported; the screen does not verify age or identity. A sign-in provider may create a preliminary identity before Origen completes screening. That identity does not itself permit profile or AI use. Contact us to request correction of a screening answer; changing it is not available through self-service.'),
+('h','Information used to manage permission'),
+('p','We record the age group, audience category, permission status, a hashed identifier linking the record to the account, notice version, request reference, guardian email, request and decision dates, expiry dates and delivery status. Private permission links are stored as hashes. Temporary call identifiers and permission revisions help stop AI sessions when permission is no longer valid. These records are separate from saved college conversations.'),
+('h','How approval works'),
+('p','When email delivery is enabled, the guardian receives a notice and private links to approve, decline or withdraw permission. Opening an email is not approval: an affirmative decision and confirmation are required. Approval links expire 48 hours after the request. Permission expires 180 days after the request, rather than 180 days after approval, and must then be renewed. Email possession and a declaration do not conclusively establish legal guardianship.'),
+('p','If delivery is disabled or fails, permission stays pending and profiles, microphone use and AI remain unavailable. A provider accepting an email request does not establish delivery, reading or approval. Contact daniel@origenedu.ai for help. Email-provider storage is separate from Origen’s records.'),
+('h','Permission records and retention'),
+('table',[
+ ['Record','Retention and cleanup'],
+ ['Guardian contact and link hashes','Pending requests: cleared by periodic cleanup after 30 days from the request. Denial or withdrawal removes the email immediately; remaining link hashes are cleared after 30 days from that decision. For approved permission, periodic cleanup clears contact and link hashes after permission expires.'],
+ ['Decision events and eligibility','Decision events are removed after 365 days or earlier account closure. The eligibility record, including status and associated request/decision metadata, remains until account closure; it is not covered by the summary-deletion setting.'],
+ ['Call-control records','Used while calls are active or awaiting termination/retry. Removed after applicable cleanup succeeds; closing an account does not itself guarantee immediate removal of a queued call-control record.']
+])
+]),
+('7. Deletion and privacy requests', [
 ('h','Deleting information or closing an account'),
 ('p','You can review and edit supported profiles, remove supported saved records, manage family links, stop microphone access, and use available export and account-closure controls. Some actions require a recent sign-in. Family links may need to be resolved before closure, and institutional responsibilities can require additional review.'),
 ('p','Deleting a summary can also delete notes generated from that summary. It does not automatically erase independent notes, plans, worksheets, exports or another account holder’s independent copy of previously shared information. Where a control is unavailable in your version, contact us for help.'),
 ('p','Closing an Origen account removes supported records from active application storage and creates a separate request to remove the Auth0 sign-in identity. That identity request needs separate completion and verification; a queued request is not completed deletion. Closing Origen does not delete an underlying Google account or every provider security log. The deletion receipts and other exceptions described in the retention section may remain.'),
-('h','Students, families and community partners'),
-('p','Origen is designed to support students in ninth grade and above and their families. A school grade does not establish a person’s age or prove authority over their information. A family link, an organization’s referral and a school’s authorization are different. None should be treated as unrestricted permission to access a student’s private conversations.'),
+('h','Withdrawing permission and access'),
+('p','A guardian can use the private withdrawal link during its validity period; an account user can also withdraw account permission. Withdrawal blocks further permitted profile and AI use and initiates termination of affected voice sessions. It does not erase saved records or recall information already sent to providers. Permission does not create a family link or grant a guardian, coordinator or referring organization access to private conversations. Use the deletion-request process when you also want information removed.'),
+('h','Requests by parents and families'),
 ('p','Parents and legal guardians can request review or deletion of a child’s information by emailing daniel@origenedu.ai. You do not need to link accounts to make a request. Identify the account, your relationship and the requested action without sending unnecessary sensitive documents. We may need additional information to establish your authority. A request concerning an adult student requires that student’s authorization or another valid basis.'),
 ('h','How to make a privacy request'),
 ('p','Email daniel@origenedu.ai to request access, correction, a copy of information, deletion or help with available controls. We may ask for information reasonably needed to confirm identity and authority and to find the relevant records. Do not send passwords or detailed financial identifiers. We will explain any additional steps or limits that apply to the request.'),

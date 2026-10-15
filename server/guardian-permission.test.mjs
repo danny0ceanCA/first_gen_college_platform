@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {fixture} from './family-fixture.mjs';
 import {createPermissionRepository,tokenHash} from './guardian-permission.mjs';
-import {GUARDIAN_NOTICE_VERSION,createGuardianMailer,guardianMailConfig} from './guardian-email.mjs';
+import {GUARDIAN_NOTICE,GUARDIAN_NOTICE_VERSION,createGuardianMailer,guardianMailConfig} from './guardian-email.mjs';
 import {createApp} from './index.mjs';
 import {permissionContext,assertPermission} from './permission-context.mjs';
 import {permissionFetch,sweepPermissionCalls} from './permission-execution.mjs';
@@ -29,7 +29,8 @@ test('guardian action is explicit, tokens are hashed, scoped, expiring and singl
   await f.repo.account('teen',screen());const result=await f.repo.account('teen',{action:'request',guardianEmail:'parent@example.invalid'});const mail=f.mails[0];
   assert.equal(result.delivery,'mock');assert.ok(!JSON.stringify(result).includes(mail.approvalToken));
   const row=await f.repo.read('teen');assert.equal(row.approval_hash,tokenHash(mail.approvalToken));assert.ok(!JSON.stringify(row).includes(mail.approvalToken));
-  assert.equal((await f.repo.guardian({action:'view',token:mail.approvalToken})).kind,'approval');
+  const displayedNotice=await f.repo.guardian({action:'view',token:mail.approvalToken});
+  assert.equal(displayedNotice.kind,'approval');assert.deepEqual(displayedNotice.notice,GUARDIAN_NOTICE);
   assert.equal((await f.repo.account('teen',{action:'status'})).allowed,false);
   await assert.rejects(f.repo.guardian({action:'approve',token:mail.approvalToken}),{status:400});
   await assert.rejects(approve(f.repo,mail.withdrawalToken),{status:403});
@@ -62,7 +63,7 @@ test('default transport never calls network; Resend contract uses configured sen
  assert.equal(guardianMailConfig().from,'daniel@origenedu.ai');
  assert.throws(()=>guardianMailConfig({GUARDIAN_EMAIL_TRANSPORT:'resend'}),/configuration/);
  const env={GUARDIAN_EMAIL_TRANSPORT:'resend',RESEND_API_KEY:'SYNTHETIC',GUARDIAN_PUBLIC_URL:'https://example.invalid/'};
- const mailer=createGuardianMailer(env,async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');const body=JSON.parse(options.body);assert.equal(body.from,'daniel@origenedu.ai');assert.equal(body.reply_to,'daniel@origenedu.ai');assert.equal(options.headers.Authorization,'Bearer SYNTHETIC');assert.match(body.text,/#guardian\/SYNTHETIC_APPROVAL/);assert.match(body.text,/guardian-2026-10-15-v1/);return {ok:true};});
+ const mailer=createGuardianMailer(env,async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');const body=JSON.parse(options.body);assert.equal(body.from,'Daniel at Origen Edu <daniel@origenedu.ai>');assert.equal(body.reply_to,'daniel@origenedu.ai');assert.equal(options.headers.Authorization,'Bearer SYNTHETIC');assert.match(body.text,/#guardian\/SYNTHETIC_APPROVAL/);assert.match(body.text,/guardian-2026-10-15-v1/);assert.match(body.html,/cid:origen-mark/);assert.equal(body.attachments[0].content_id,'origen-mark');assert.equal(Buffer.from(body.attachments[0].content,'base64').subarray(1,4).toString(),'PNG');return {ok:true};});
  assert.equal(await mailer.send({to:'parent@example.invalid',requestId:'synthetic',approvalToken:'SYNTHETIC_APPROVAL',withdrawalToken:'SYNTHETIC_WITHDRAWAL'}),'accepted');
 });
 test('all private HTTP paths reject unknown/pending/blocked accounts before profile or AI input is processed',async()=>{

@@ -1,6 +1,6 @@
 {
-  "pages": 7,
-  "sha256": "766de5e5b169740ae55d0acc96a7ad7c545bf021fdf4c05c7fc73d3ce5d8789c",
+  "pages": 8,
+  "sha256": "0dd0627409b931ae57db5b8db376b21eef3561ad79634e7f108648536ed5dcb5",
   "metadata": {
     "/Title": "Origen Edu Privacy Notice \u2014 Review Draft",
     "/Author": "Blueprint Holdings LLC",
@@ -38,6 +38,12 @@
       "subtype": "/Link",
       "action": "/URI",
       "url": "https://policies.google.com/privacy"
+    },
+    {
+      "page": 5,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://resend.com/legal/privacy-policy"
     }
   ],
   "attachments": [],
