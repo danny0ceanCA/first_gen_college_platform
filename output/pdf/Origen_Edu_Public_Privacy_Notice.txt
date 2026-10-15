@@ -2,8 +2,6 @@ PRIVACY NOTICE
 
 For students, families and community organizations
 
-Review draft • October 15, 2026
-
 Origen Edu helps students and families explore college options and organize their next steps. This notice explains what information we process, how voice and AI features work, what we save, who can access information, and how to request help or deletion.
 
 Who we are
@@ -266,6 +264,6 @@ Security and changes to this notice
 
 We use authentication, access restrictions and separation of private account records from institutional reporting to help protect information. No system can guarantee absolute security. Protect your sign-in credentials, avoid sharing accounts and report suspected unauthorized access to daniel@origenedu.ai.
 
-When our practices change, we may update this notice and its date. We will provide additional notice or obtain additional authorization when required. School-directed use and school-supplied records may require separate agreements; an institution’s public page does not by itself create such an agreement.
+When our practices change, we may update this notice. We will provide additional notice or obtain additional authorization when required. School-directed use and school-supplied records may require separate agreements; an institution’s public page does not by itself create such an agreement.
 
 

@@ -1,9 +1,8 @@
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 1
 Privacy Notice
 For students, families and community organizations
-Review draft • October 15, 2026
 Origen Edu helps students and families explore college options and organize their next steps. This notice explains
 what information we process, how voice and AI features work, what we save, who can access information, and how
 to request help or deletion.
@@ -37,7 +36,7 @@ and other authorized people.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 2
 1. Information we collect and use
 Account and authentication information
@@ -78,7 +77,7 @@ personal context you want processed and potentially included in a summary.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 3
 2. AI, voice and conversation summaries
 College-focused guidance
@@ -120,7 +119,7 @@ OpenAI API data controls   |   OpenAI business privacy
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 4
 3. Sharing and access
 No sale of personal information
@@ -163,7 +162,7 @@ privacy protections and notice obligations.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 5
 4. Providers, staff and browser storage
 Service providers
@@ -211,7 +210,7 @@ process information outside the place where you live.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 6
 5. How long information remains
 Default retention and your choices
@@ -259,7 +258,7 @@ in your request.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 7
 6. Eligibility and guardian permission
 Who can use an account
@@ -306,7 +305,7 @@ queued call-control record.
 
 
 origen. PRIVACY NOTICE
-Review draft • October 15, 2026
+Origen Edu · Blueprint Holdings LLC
 8
 7. Deletion and privacy requests
 Deleting information or closing an account
@@ -343,6 +342,6 @@ Security and changes to this notice
 We use authentication, access restrictions and separation of private account records from institutional reporting to
 help protect information. No system can guarantee absolute security. Protect your sign-in credentials, avoid sharing
 accounts and report suspected unauthorized access to daniel@origenedu.ai.
-When our practices change, we may update this notice and its date. We will provide additional notice or obtain
-additional authorization when required. School-directed use and school-supplied records may require separate
-agreements; an institution’s public page does not by itself create such an agreement.
+When our practices change, we may update this notice. We will provide additional notice or obtain additional
+authorization when required. School-directed use and school-supplied records may require separate agreements; an
+institution’s public page does not by itself create such an agreement.

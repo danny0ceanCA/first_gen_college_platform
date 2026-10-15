@@ -24,7 +24,6 @@ MARK=ET.parse(OUT/'public-privacy-assets'/'origen-mark.svg').getroot()
 PAGES = [
 ('Privacy Notice', [
 ('sub','For students, families and community organizations'),
-('meta','Review draft • October 15, 2026'),
 ('p','Origen Edu helps students and families explore college options and organize their next steps. This notice explains what information we process, how voice and AI features work, what we save, who can access information, and how to request help or deletion.'),
 ('h','Who we are'),
 ('p','Origen Edu is operated by Blueprint Holdings LLC. In this notice, “Origen,” “we,” “us” and “our” refer to Blueprint Holdings LLC. Our privacy contact is daniel@origenedu.ai.'),
@@ -158,7 +157,7 @@ PAGES = [
 ('p','Privacy rights and response requirements depend on the law that applies to you and the information involved. An authorized representative may make a request with appropriate proof of authority. This notice does not waive your applicable rights. If you disagree with a response, contact the same address and ask for a review.'),
 ('h','Security and changes to this notice'),
 ('p','We use authentication, access restrictions and separation of private account records from institutional reporting to help protect information. No system can guarantee absolute security. Protect your sign-in credentials, avoid sharing accounts and report suspected unauthorized access to daniel@origenedu.ai.'),
-('p','When our practices change, we may update this notice and its date. We will provide additional notice or obtain additional authorization when required. School-directed use and school-supplied records may require separate agreements; an institution’s public page does not by itself create such an agreement.')
+('p','When our practices change, we may update this notice. We will provide additional notice or obtain additional authorization when required. School-directed use and school-supplied records may require separate agreements; an institution’s public page does not by itself create such an agreement.')
 ])]
 
 INK=HexColor('#2f343b'); ACCENT=HexColor('#a4513c'); MUTED=HexColor('#756b63'); IVORY=HexColor('#f4eee4'); BORDER=HexColor('#e4d7ca')
@@ -195,7 +194,7 @@ def page_frame(c,doc):
     draw_brand(c,44,h-39,28)
     c.setFillColor(MUTED);c.setFont('Body',9);c.drawRightString(w-47,h-29,'PRIVACY NOTICE')
     c.setStrokeColor(BORDER);c.line(47,43,w-47,43)
-    c.setFont('Body',8.5);c.drawString(47,29,'Review draft • October 15, 2026')
+    c.setFont('Body',8.5);c.drawString(47,29,'Origen Edu · Blueprint Holdings LLC')
     c.drawRightString(w-47,29,f'{doc.page}');c.restoreState()
 
 story=[];text=[]
@@ -215,12 +214,12 @@ for n,(title,blocks) in enumerate(PAGES):
             story.append(Paragraph(escape(value),styles[kind]));text.append(value+'\n')
     text.append('\n')
 pdf=OUT/'Origen_Edu_Public_Privacy_Notice.pdf'
-doc=SimpleDocTemplate(str(pdf),pagesize=letter,leftMargin=47,rightMargin=47,topMargin=52,bottomMargin=52,title='Origen Edu Privacy Notice — Review Draft',author='Blueprint Holdings LLC',subject='Privacy information for students, families and community organizations')
+doc=SimpleDocTemplate(str(pdf),pagesize=letter,leftMargin=47,rightMargin=47,topMargin=52,bottomMargin=52,title='Origen Edu Privacy Notice',author='Blueprint Holdings LLC',subject='Privacy information for students, families and community organizations')
 doc.build(story,onFirstPage=page_frame,onLaterPages=page_frame)
 # Publishable metadata only; no authoring-tool, source, or filesystem provenance.
 writer=PdfWriter(clone_from=PdfReader(BytesIO(pdf.read_bytes())))
 writer.metadata=None
-writer.add_metadata({'/Title':'Origen Edu Privacy Notice — Review Draft','/Author':'Blueprint Holdings LLC','/Subject':'Privacy information for students, families and community organizations','/Creator':'Origen Edu','/Producer':'Origen Edu'})
+writer.add_metadata({'/Title':'Origen Edu Privacy Notice','/Author':'Blueprint Holdings LLC','/Subject':'Privacy information for students, families and community organizations','/Creator':'Origen Edu','/Producer':'Origen Edu'})
 if '/Metadata' in writer.root_object:del writer.root_object['/Metadata']
 with pdf.open('wb') as stream:writer.write(stream)
 (OUT/'Origen_Edu_Public_Privacy_Notice.txt').write_text('\n'.join(text),encoding='utf-8')

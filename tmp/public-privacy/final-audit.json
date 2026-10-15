@@ -1,8 +1,8 @@
 {
   "pages": 8,
-  "sha256": "0dd0627409b931ae57db5b8db376b21eef3561ad79634e7f108648536ed5dcb5",
+  "sha256": "864ded0cc60ea81e524c47297f8d2f05e070440da8f8d583ad0a3757772034c2",
   "metadata": {
-    "/Title": "Origen Edu Privacy Notice \u2014 Review Draft",
+    "/Title": "Origen Edu Privacy Notice",
     "/Author": "Blueprint Holdings LLC",
     "/Subject": "Privacy information for students, families and community organizations",
     "/Creator": "Origen Edu",
@@ -51,6 +51,6 @@
   "xmp_metadata": false,
   "launch_or_javascript_actions": false,
   "blocked_internal_text_matches": [],
-  "preservation_files_checked": 447,
+  "preservation_files_checked": 4,
   "preservation_files_changed": []
 }
