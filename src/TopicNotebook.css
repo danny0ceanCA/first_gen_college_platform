@@ -82,6 +82,36 @@
 @media(max-width:760px){.notebook-guide-content .research-panel,.notebook-guide-content .application-panel{padding:16px}.notebook-guide-content .segmented>button{flex:1 1 100%}.notebook-guide-content .research-search>input,.notebook-guide-content .material-form>input{flex:1 1 100%;width:100%}}
 
 .notebook-page-view{min-width:0}
+
+/* A notebook page, with quiet bullets and tools tucked out of the reading path. */
+.binder-pages .notebook-note{position:relative;margin:0;padding:18px 0 16px 22px;border:0;border-bottom:1px solid #e7ded3;border-radius:0;background:transparent;box-shadow:none}
+.binder-pages .notebook-note::before{content:'';position:absolute;left:3px;top:29px;width:5px;height:5px;border-radius:50%;background:#a4513c}
+.binder-pages .notebook-note-content{margin:0;line-height:1.8;font-size:15px;color:#343a40}
+.binder-pages .notebook-key-points{background:transparent;border:0;border-radius:0;padding:0;margin:30px 0}
+.binder-pages .notebook-key-points>h4,.binder-pages .notebook-group>h4{font-size:16px;letter-spacing:0;font-weight:650;color:#4d4137;border-bottom:1px solid #dbc8b6;padding-bottom:12px;margin-bottom:4px}
+.binder-pages .notebook-key-points>p{font-size:12px;margin:12px 0;color:#7e7268}
+.binder-pages .notebook-points-list{max-height:none;overflow:visible;padding:0;scrollbar-gutter:auto;overscroll-behavior:auto}
+.binder-pages .notebook-points-list .notebook-note{margin:0;background:transparent;border-left:0}
+.notebook-note-menu{margin-top:8px;font-size:12px;color:#7e7268}
+.notebook-note-menu>summary{cursor:pointer;list-style:none;min-height:36px;display:flex;align-items:center;gap:6px;width:max-content;font-size:11px}
+.notebook-note-menu>summary::-webkit-details-marker{display:none}
+.notebook-note-menu>summary::before{content:'···';font-size:19px;letter-spacing:2px;color:#a4513c}
+.notebook-note-menu>summary:focus-visible{outline:2px solid #a4513c;outline-offset:3px;border-radius:4px}
+.notebook-note-menu[open]{border-radius:8px;padding:0 12px 10px;background:#f8f1e8;margin-left:-12px}
+.notebook-note-menu .notebook-note-meta{font-size:11px;margin:8px 0 12px}
+.notebook-note-menu .notebook-note-actions{gap:6px 16px;margin-top:10px}
+.notebook-pdf-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border:1px solid #ddc6b0;border-radius:8px;padding:10px 12px;font-size:12px;color:#813e2e;background:#fffaf3}
+.notebook-export-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin:0 2px 20px}
+.notebook-export-toolbar>span{font-size:12px;line-height:1.6;color:#7e7268}
+.notebook-summary-page>.notebook-export-toolbar{margin:24px 0 0}
+.notebook-export-error{font-size:13px;color:#813e2e}
+@media(max-width:760px){
+ .binder-pages .notebook-mobile .notebook-note{padding:16px 0 10px 17px}
+ .binder-pages .notebook-mobile .notebook-note::before{left:2px;top:27px;width:4px;height:4px}
+ .notebook-mobile .notebook-toolbar>.notebook-pdf-button{flex-basis:100%;justify-content:flex-start;margin-top:2px}
+ .notebook-mobile .notebook-export-toolbar{margin-bottom:22px}
+ .binder-pages .notebook-mobile .notebook-key-points{padding:0;border:0}
+}
 @media(max-width:760px){
  :root:has(.notebook-mobile){scroll-padding-top:20px;scroll-padding-bottom:calc(150px + env(safe-area-inset-bottom))}
  body:has(.notebook-mobile):has(.shared-voice) .app-shell{padding-bottom:calc(190px + env(safe-area-inset-bottom))}

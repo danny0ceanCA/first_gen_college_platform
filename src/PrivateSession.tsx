@@ -7,7 +7,7 @@ import AccountOpening from './AccountOpening';
 export default function PrivateSession({children}:{children:ReactNode}){
  const auth=useAuth0(),subject=auth.isAuthenticated?auth.user?.sub:undefined;
  const [ready,setReady]=useState<string>(),[ended,setEnded]=useState(false);
- useLayoutEffect(()=>browserPrivacy.subscribe(event=>{if(event.type==='end'){setReady(undefined);setEnded(true);}}),[]);
+ useLayoutEffect(()=>browserPrivacy.subscribe(event=>{if(event.type==='end'&&event.reason!=='eligibility_changed'){setReady(undefined);setEnded(true);}}),[]);
  useLayoutEffect(()=>{
   if(auth.isLoading)return;
   if(!subject){browserPrivacy.stop('signed_out');setReady(undefined);setEnded(false);return;}

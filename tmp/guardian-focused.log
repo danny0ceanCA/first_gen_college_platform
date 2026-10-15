@@ -1,0 +1,29 @@
+✔ all API outcomes have unique request IDs, safe logs and CORS-visible correlation headers (73.9269ms)
+✔ database failure records SQLSTATE without SQL, user values, stack or secrets (26.6914ms)
+✔ successful probes are quiet and failed readiness is logged (13.0072ms)
+✔ anonymous AI and family access is rejected even with the retired preview flag (85.1228ms)
+✔ neutral screening separates grade from age, blocks under 13 and prevents self-reclassification (429.5503ms)
+✔ guardian action is explicit, tokens are hashed, scoped, expiring and single-use; approval grants no family link (128.3802ms)
+✔ resend invalidates prior tokens, cooldown/daily budgets apply, pending and granted permission expire (102.5274ms)
+✔ default transport never calls network; Resend contract uses configured sender and API key without exposing tokens in results (0.934ms)
+✔ all private HTTP paths reject unknown/pending/blocked accounts before profile or AI input is processed (204.6269ms)
+✔ revocation rejects delayed provider bodies, profile writes and summaries under an earlier revision (79.82ms)
+✔ Realtime calls are durably tracked and hangup retried on revocation; account deletion erases guardian email (91.2887ms)
+{"time":"2026-10-15T19:12:40.800Z","requestId":"7b521924-0508-4bcf-8854-81f63cd8cd38","event":"api_request","code":"authentication_required","endpoint":"api.chat","method":"POST","level":"warn","durationMs":1,"httpStatus":401}
+{"time":"2026-10-15T19:12:40.806Z","requestId":"783e8507-4d73-4e43-bf74-68d5a4e99c64","event":"api_request","code":"invalid_token","endpoint":"api.chat","method":"POST","level":"warn","durationMs":1,"httpStatus":401}
+{"time":"2026-10-15T19:12:40.809Z","requestId":"e37d6f52-cb1f-402c-8c3e-e7b8934cd81c","event":"api_request","code":"origin_not_allowed","endpoint":"api.chat","method":"POST","level":"warn","durationMs":1,"httpStatus":403}
+{"time":"2026-10-15T19:12:40.812Z","requestId":"6ce2dc66-7c30-4bd8-a6b1-05b6f0b1781d","event":"api_request","endpoint":"api.chat","method":"OPTIONS","level":"info","durationMs":1,"httpStatus":204}
+{"time":"2026-10-15T19:12:40.818Z","requestId":"e7009aa8-4576-45d5-bc7a-6fecac35923b","event":"database_error","code":"operation_failed","endpoint":"unknown_route","method":"POST"}
+{"time":"2026-10-15T19:12:40.819Z","requestId":"e7009aa8-4576-45d5-bc7a-6fecac35923b","event":"api_request","code":"permission_unavailable","endpoint":"unknown_route","method":"POST","level":"error","durationMs":2,"httpStatus":503}
+✔ production gateway checks tokens, origins and preflights (70.4206ms)
+✔ gateway rejects malformed identity subjects before touching storage (25.2062ms)
+✔ excess authenticated requests are rejected before closure database checks (199.5206ms)
+✔ onboarding release journey preserves authoritative saves, replay, return visits, admin isolation and closure through HTTP (857.0296ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1583.3781

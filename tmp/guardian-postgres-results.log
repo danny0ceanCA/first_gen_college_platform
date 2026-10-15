@@ -1,0 +1,22 @@
+✔ account context rejects invalid identities and cannot become a retention job (3.176ms)
+▶ PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and pooled sessions
+  ✔ omitted SQL ownership filters still expose only the active account (19.0829ms)
+  ✔ summary, profile, notes, plans, sheets, and voice selection reject guessed foreign IDs (60.9515ms)
+  ✔ linked families retain academic sharing without receiving private content (200.456ms)
+  ✔ commit, rollback, errors, concurrent requests and pool reuse cannot inherit access (81.185ms)
+  ✔ context setup does not freeze a repeatable-read snapshot before serialization (5.7779ms)
+  ✔ reporting counts records through views that exclude conversation and profile prose (15.6901ms)
+  ✔ HTTP authentication is the only source of account and reporting authority (441.7287ms)
+  ✔ privileged audit is append-only, actor-bound, and cannot be read by runtime or administrators (20.2344ms)
+  ✔ guidance tools remain owner scoped and retention operates only in its explicit job context (70.1359ms)
+  ✔ account closure cascades under the restricted role and cannot erase someone else (59.6066ms)
+✔ PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and pooled sessions (2766.3498ms)
+✔ PostgreSQL migration/RLS, single-use concurrency and revocation serialize under restricted runtime (1974.9732ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3164.2786

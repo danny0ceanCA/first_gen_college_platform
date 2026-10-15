@@ -1,0 +1,76 @@
+ORIGEN EDU - INTERNAL PUBLICATION REVIEW
+October 15, 2026
+Separate from the public-facing Privacy Notice. Do not attach this report to the public notice or publish it as policy.
+
+DELIVERABLE AND STATUS
+
+The seven-page Origen Edu Public Privacy Notice is a review draft for Daniel. It uses Blueprint Holdings LLC as the operator and daniel@origenedu.ai for privacy and parent deletion requests, as directed. It describes an intended audience of students in ninth grade and above and their families. It does not represent undeployed registration or guardian controls as active.
+
+The draft is a basis for review, not a determination that all publication prerequisites have been satisfied. Existing source behavior was used for technical descriptions; provider public policies were used for attributed provider statements. Production settings, contracts, processing locations and operational procedures have not all been independently verified.
+
+Public deliverables:
+- Origen_Edu_Public_Privacy_Notice.pdf: seven-page review PDF.
+- Origen_Edu_Public_Privacy_Notice.txt: complete editable prose and public provider references.
+- Origen_Edu_Public_Privacy_Notice.py: editable content and layout generator. The adjacent public-privacy-assets folder supplies the mark and wordmark font; the generator uses Windows Calibri and ReportLab/pypdf.
+
+PUBLICATION QUESTIONS THAT REMAIN
+
+1. Student registration and permission. Ninth grade is an audience description, not a verified minimum age. Resolve the actual age eligibility rule, handling of unusually young ninth graders, when guardian permission is needed, and how permission and authority will be verified. The earlier local registration/guardian implementation has not been deployed. The public draft therefore does not claim it protects current registration. The draft explains parent deletion requests without requiring a family link. Final public language must state the adopted eligibility and permission rules once they are operationally supported.
+
+2. OpenAI account settings and agreements. Confirm the production project's actual data-sharing/training opt-ins, endpoint choices and application-state settings, any approved retention controls, and applicable agreements. The draft attributes no-training-by-default and abuse-log retention statements to published API policies; it does not certify this account's configuration or promise zero provider retention. Provider employee/contractor review is described separately from Origen storage. Confirm that these disclosures match every AI feature before publication.
+
+3. Retention beyond summaries. Source defaults retain summaries until deletion; optional 30-, 90- or 365-day deletion applies to summaries and dependent generated notes, not independently saved profiles, notes, plans or worksheets. Confirm production cleanup execution and actual backup, infrastructure log, support correspondence and security-record schedules. These durations have not all been established. The draft does not invent deadlines. Complete the operational retention schedule and then add concrete public durations or defensible retention criteria where needed.
+
+4. Deletion receipts and identity closure. Current deletion safeguards have no automatic expiry; some contain account/record identifiers in addition to hashes and are not anonymous. The draft discloses that they may remain indefinitely. Decide whether to implement a bounded schedule aligned with backup recovery and other justified needs. Auth0 identity deletion is separately queued and requires completion and verification; no completion deadline has been verified. Establish ownership, escalation and a realistic completion timeline before making a stronger public promise. Do not describe the queued request as completed deletion.
+
+5. Staff access and operations. Source permissions constrain reports; technical operators can potentially access underlying systems. Confirm privileged-access practice, support access, provider agreements and incident/request handling. Do not promise that no human can see private content. No-sale and no unrelated advertising statements reflect Daniel's stated business commitments and the inspected design; actual commercial and operational practices must continue to support them.
+
+6. Publication identity and legal coverage. Confirm business mailing address, intended service jurisdictions, school-directed arrangements and any jurisdiction-specific notices or rights processes needed for the actual service. Set the effective date when approved for publication; the PDF currently has a review date only. This source review does not establish that the service satisfies every children's privacy, education-record or consumer privacy requirement.
+
+7. Runtime verification. Earlier read-only Render metadata showed API/static deployments at commit 14398304da90eab775d470f552bdf3ac3af3a186. A matching deployment commit does not prove the live database schema, runtime configuration or operation of scheduled jobs. This PDF-only pass did not run production tests or change production. Resolve any difference between the source baseline and actual behavior before publishing.
+
+IMPORTANT CONTENT DECISIONS
+
+- The notice does not say a name is the only personal information. Email/identity information, educational context, questions, summaries and free-text records can also be personal information.
+- Origen's lack of a raw microphone-recording archive is distinguished from audio transmitted to OpenAI and OpenAI's own retention. Written summaries normally save automatically after a qualifying conversation; users are not asked to approve every summary first. Saving a profile is a separate action.
+- Family linking shares designated academic profile fields. It does not automatically share private summaries, private needs or private notes. Ending a link does not erase an independent copy already retained elsewhere.
+- Referring a family does not grant a community coordinator access to private conversations. Planned coordinator summary sharing is omitted, rather than presented as available.
+- University analytics are described as aggregate reporting. Deliberately submitted institutional inquiries are separately explained; they are not automatic disclosure of private history.
+- Providers are named: OpenAI, Auth0/Okta, Render and Google Fonts. Resend and the undeployed guardian email workflow are omitted.
+- AI is described as designed and instructed for college guidance, without a guarantee that every output will stay in scope or be correct.
+
+SOURCE AND BRAND PROVENANCE
+
+Technical review used the existing baseline, including server/privacy-controls.mjs, server/migrations/037_privacy_controls.sql, server/account-lifecycle.mjs, server/institution-metrics.mjs, the application privacy/settings and voice/session flows, and relevant access controls. Undeployed local guardian additions were excluded from public claims.
+
+The mark is copied from public/favicon.svg. The literal lowercase 'origen.' wordmark follows the existing landing-page brand; its DM Sans styling follows the project's available font and wordmark treatment. Theme colors come from src/brand.css: ivory #f4eee4, ink #2f343b, clay #a4513c, muted #756b63 and border #e4d7ca. The PDF combines these existing assets with a readable document layout; no substitute brand or logo was invented. The font license accompanies the asset copy.
+
+Provider sources reviewed October 15, 2026:
+https://developers.openai.com/api/docs/guides/your-data
+https://openai.com/enterprise-privacy/
+Other public provider links in the PDF:
+https://www.okta.com/privacy-policy/
+https://render.com/privacy
+https://policies.google.com/privacy
+
+LOCAL IMPLEMENTATION STATUS - PRESERVED, NOT PUBLISHED
+
+Before the PDF-only stop instruction, local work included web age/eligibility and guardian screens, related registration entry wiring, backend permission and guardian-email modules, migration 039, native permission screens, onboarding voice disclosures, tests and internal documentation. Relevant web files include EligibilityGate.tsx/css, GuardianPermission.tsx, Entry.tsx, Landing.tsx, main.tsx, NativeWelcome.tsx, PrivateSession.tsx, OnboardingVoiceDisclosure.tsx, ProfileVoice.tsx/css and Welcome.tsx/css. Backend work includes guardian-permission.mjs, guardian-email.mjs, permission-context.mjs, permission-execution.mjs and related account/API/database wiring. Native work includes MobilePermission.tsx, App.tsx and welcome screens. This is a scope summary, not a claim that every pre-existing working-tree change belongs to this task.
+
+The full policy was not inserted into the landing page. No commit, push, deployment, production configuration/DNS change, or actual guardian/test email was performed. Those earlier local changes remain for later review. Their tests do not establish live behavior. This PDF pass changed only new output and temporary artifact files; it did not resume application implementation.
+
+The 13-page Origen_Edu_Privacy_Proposal.pdf and its editable sources remain unchanged. That proposal is an internal planning record containing implementation material and proposed controls; it should not be substituted for the new public draft.
+
+FINAL ARTIFACT CHECKS
+
+- Seven final pages rendered and individually visually inspected after fixing character-spacing leakage from the wordmark. Header/footer, tables, pagination and body text are readable without clipping or overlaps.
+- Extracted text reviewed for substantive disclosures and internal-material leakage. No internal source paths, service IDs, commands, environment variables, tests or implementation appendix occur in the public document.
+- Five PDF link annotations, all public provider URLs listed above. No local-file or operational links.
+- No embedded attachments, form fields, XMP metadata, document launch action or JavaScript name tree.
+- Metadata contains only public title, operator, subject and Origen Edu creator/producer values.
+- SHA-256 preservation check covered 447 baseline files, including application source and the original proposal artifacts: zero changes since the PDF-only stop baseline.
+- Final PDF SHA-256: 766de5e5b169740ae55d0acc96a7ad7c545bf021fdf4c05c7fc73d3ce5d8789c
+
+NEXT STEP
+
+Daniel reviews the public PDF and resolves the publication questions above. Keep website policy implementation and deployment paused until approval. This task has not uploaded a Library copy; the main reviewer can inspect this final version and perform the single intended upload.

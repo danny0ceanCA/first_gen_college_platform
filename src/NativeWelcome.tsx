@@ -1,3 +1,4 @@
+import EligibilityGate from './EligibilityGate';
 import {Auth0Context,useAuth0,type Auth0ContextInterface} from '@auth0/auth0-react';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {apiFetch,setAPITokenProvider,onboardingTransport} from './api';
@@ -11,7 +12,7 @@ import {ConversationHistoryProvider} from './ConversationHistory';
 import Welcome from './Welcome';
 import {type StudentProfile} from './planning';
 
-type Init={subject:string;firstName:string;role?:'parent'|'student';language:'en'|'es'};
+type Init={permissionOnly?:boolean;subject:string;firstName:string;role?:'parent'|'student';language:'en'|'es'};
 type NativeWindow=Window&{ReactNativeWebView?:{postMessage:(message:string)=>void};origenNativeReply?:(message:{id:string;value?:unknown;error?:boolean})=>void};
 const pending=new Map<string,{resolve:(value:unknown)=>void;reject:()=>void}>();
 function send(message:unknown){
@@ -40,7 +41,7 @@ export default function NativeWelcome(){
  },[]);
  const auth=useMemo(()=>({...base,isLoading:false,isAuthenticated:!!init?.subject,user:init?.subject?{sub:init.subject}:undefined,getAccessTokenSilently:token as Auth0ContextInterface['getAccessTokenSilently']}),[base,init]);
  if(!init)return <main className="welcome-conversation"><p role={error?'alert':'status'}>{error?'Could not connect. Close and reopen onboarding. / No se pudo conectar. Cierra y vuelve a abrir.':'Opening Origen… / Abriendo Origen…'}</p></main>;
- return <Auth0Context.Provider value={auth}><PrivateSession><FamilyProvider previewStudents={[]}><ConversationHistoryProvider><NativeStory init={init}/></ConversationHistoryProvider></FamilyProvider></PrivateSession></Auth0Context.Provider>;
+ return <Auth0Context.Provider value={auth}><PrivateSession><EligibilityGate hideSignOut key={init.subject} onAllowed={init.permissionOnly?()=>{void request('closed').catch(()=>{});}:undefined}>{!init.permissionOnly&&<FamilyProvider previewStudents={[]}><ConversationHistoryProvider><NativeStory init={init}/></ConversationHistoryProvider></FamilyProvider>}</EligibilityGate></PrivateSession></Auth0Context.Provider>;
 }
 function NativeStory({init}:{init:Init}){
  const family=useFamily();const [language,setLanguage]=useState(init.language);const loaded=useRef(false);

@@ -1,3 +1,4 @@
+import {createPermissionRepository} from './guardian-permission.mjs';
 import {staffTestIdentity} from './staff-test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import {createApp} from './index.mjs';
 
 test('onboarding release journey preserves authoritative saves, replay, return visits, admin isolation and closure through HTTP',async()=>{
  const {pool}=await fixture(),logs=[];
+ for(const sub of ['auth0|release-one','auth0|release-two'])await createPermissionRepository(pool).account(sub,{action:'screen',ageBand:'18plus',audience:'grade9plus'});
  await pool.query('CREATE TABLE origen_schema_migrations(name text,applied_at timestamptz)');
  await pool.query('INSERT INTO origen_schema_migrations VALUES($1,now())',['027_onboarding_events.sql']);
  const identities={one:{sub:'auth0|release-one'},two:{sub:'auth0|release-two'},admin:staffTestIdentity('auth0|release-admin')};

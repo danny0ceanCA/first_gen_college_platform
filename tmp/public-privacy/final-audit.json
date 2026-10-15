@@ -1,0 +1,50 @@
+{
+  "pages": 7,
+  "sha256": "766de5e5b169740ae55d0acc96a7ad7c545bf021fdf4c05c7fc73d3ce5d8789c",
+  "metadata": {
+    "/Title": "Origen Edu Privacy Notice \u2014 Review Draft",
+    "/Author": "Blueprint Holdings LLC",
+    "/Subject": "Privacy information for students, families and community organizations",
+    "/Creator": "Origen Edu",
+    "/Producer": "Origen Edu"
+  },
+  "links": [
+    {
+      "page": 3,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://developers.openai.com/api/docs/guides/your-data"
+    },
+    {
+      "page": 3,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://openai.com/enterprise-privacy/"
+    },
+    {
+      "page": 5,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://www.okta.com/privacy-policy/"
+    },
+    {
+      "page": 5,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://render.com/privacy"
+    },
+    {
+      "page": 5,
+      "subtype": "/Link",
+      "action": "/URI",
+      "url": "https://policies.google.com/privacy"
+    }
+  ],
+  "attachments": [],
+  "form_fields": [],
+  "xmp_metadata": false,
+  "launch_or_javascript_actions": false,
+  "blocked_internal_text_matches": [],
+  "preservation_files_checked": 447,
+  "preservation_files_changed": []
+}

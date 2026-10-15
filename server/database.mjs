@@ -53,7 +53,7 @@ export async function migrateDatabase(pool,directory=migrationDirectory){
 export async function databaseReady(pool){
  if(!pool)return false;
  try{
-  const {rows}=await pool.query("SELECT EXISTS (SELECT 1 FROM origen_schema_migrations WHERE name = '038_privacy_verification.sql') AS ready");
+  const {rows}=await pool.query("SELECT EXISTS (SELECT 1 FROM origen_schema_migrations WHERE name = '039_guardian_permission.sql') AS ready");
   return rows[0]?.ready===true;
  }catch{return false;}
 }

@@ -14,7 +14,7 @@ test('production gateway checks tokens, origins and preflights',async()=>{
   const preflight=await fetch(base+'/api/chat',{method:'OPTIONS',headers:{Origin:'https://origen.example'}});
   assert.equal(preflight.status,204);
   assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),'https://origen.example');
-  assert.equal((await fetch(base+'/api/unknown',{method:'POST',headers:{Authorization:'Bearer valid'}})).status,404);
+  assert.equal((await fetch(base+'/api/unknown',{method:'POST',headers:{Authorization:'Bearer valid'}})).status,503);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 
@@ -31,7 +31,7 @@ test('excess authenticated requests are rejected before closure database checks'
  const server=createServer(createApp({},async()=>({sub:'same-account'}),database,()=>{}));await new Promise(r=>server.listen(0,'127.0.0.1',r));
  try{
   const url=`http://127.0.0.1:${server.address().port}/api/unknown`;
-  for(let i=0;i<120;i++)assert.equal((await fetch(url,{method:'POST',headers:{Authorization:'Bearer valid'}})).status,404);
-  const rejected=await fetch(url,{method:'POST',headers:{Authorization:'Bearer valid'}});assert.equal(rejected.status,429);assert.equal(rejected.headers.get('Retry-After'),'60');assert.equal(queries,120);
+  for(let i=0;i<120;i++)assert.equal((await fetch(url,{method:'POST',headers:{Authorization:'Bearer valid'}})).status,403);
+  const rejected=await fetch(url,{method:'POST',headers:{Authorization:'Bearer valid'}});assert.equal(rejected.status,429);assert.equal(rejected.headers.get('Retry-After'),'60');assert.equal(queries,240);
  }finally{await new Promise(r=>server.close(r));}
 });

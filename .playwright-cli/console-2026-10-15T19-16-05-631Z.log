@@ -1,0 +1,17 @@
+[    3812ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=b535da63:22164
+[  268341ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:5183/@vite/client:963
+[  268344ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  268879ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/api/eligibility:0
+[  269350ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  271674ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  306830ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  331991ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:5183/@vite/client:963
+[  332024ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_NETWORK_IO_SUSPENDED @ http://127.0.0.1:5183/@vite/client:1034
+[  412254ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  470993ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:5183/@vite/client:963
+[  471130ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  471151ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/api/eligibility:0
+[  472143ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  473158ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  481574ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  491580ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164

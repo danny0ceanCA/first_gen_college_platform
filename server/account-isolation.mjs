@@ -13,6 +13,11 @@ export function runAsAccount(identity,work){
  if(!validSubject(identity?.sub))throw fail();
  return context.run(Object.freeze({subject:identity.sub,purpose:'account'}),work);
 }
+// Public guardian capabilities scope only the matching hashed token's rows.
+export function runAsGuardian(hash,work){
+ if(context.getStore()||!/^[a-f0-9]{64}$/.test(hash))throw fail();
+ return context.run({subject:'',purpose:'guardian',guardianHash:hash},work);
+}
 // Call only after the server's administrator gate, never from request input.
 export function runAsAnalytics(work){
  const current=context.getStore();
@@ -40,7 +45,7 @@ export function isolateDatabase(pool,{schema='public'}={}){
   // node-postgres escapes literals (including quotes/backslashes); none is SQL.
   const configure=()=>raw.query(Object.entries({
    'origen.subject':scope.subject,'origen.subject_hash':scope.subject?createHash('sha256').update(scope.subject).digest('hex'):'',
-   'origen.purpose':scope.purpose,
+   'origen.purpose':scope.purpose,'origen.guardian_hash':scope.guardianHash||'',
   }).map(([key,value])=>`SET LOCAL ${key}=${pg.escapeLiteral(value)}`).concat(`SET LOCAL search_path TO ${scope.purpose==='analytics'?`${reporting},${base}`:base}`).join(';'));
   const client={
    isolated:true,
@@ -78,7 +83,7 @@ export async function assertRuntimeIsolation(pool,{schema='public'}={}){
   has_schema_privilege(current_user,$1,'CREATE') AS can_create,
   EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ($1,$1||'_reporting') AND c.relname LIKE 'origen_%' AND pg_has_role(current_user,c.relowner,'MEMBER')) AS owns_tables,
   EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=$1 AND p.proname LIKE 'origen_%' AND pg_has_role(current_user,p.proowner,'MEMBER')) AS owns_functions,
-  (SELECT count(*)=12 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND c.relname IN ('origen_accounts','origen_conversation_summaries','origen_student_links','origen_family_invites','origen_closed_accounts','origen_subject_locks','origen_privileged_access_audit','origen_staff_access_controls','origen_privacy_preferences','origen_deletion_journal','origen_identity_closures','origen_privacy_events') AND c.relrowsecurity) AS protected,
+  (SELECT count(*)=15 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND c.relname IN ('origen_accounts','origen_conversation_summaries','origen_student_links','origen_family_invites','origen_closed_accounts','origen_subject_locks','origen_privileged_access_audit','origen_staff_access_controls','origen_privacy_preferences','origen_deletion_journal','origen_identity_closures','origen_privacy_events','origen_eligibility','origen_permission_events','origen_permission_calls') AND c.relrowsecurity) AS protected,
   EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid AND a.attname='account_id' WHERE n.nspname=$1 AND c.relkind='r' AND NOT c.relrowsecurity) AS unprotected,
   EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND c.relkind='r' AND c.relname LIKE 'origen_%' AND has_table_privilege(current_user,c.oid,'TRUNCATE')) AS can_truncate,
   has_table_privilege(current_user,format('%I.origen_schema_migrations',$1),'INSERT,UPDATE,DELETE') AS can_migrate,

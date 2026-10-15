@@ -1,0 +1,395 @@
+ORIGEN EDU PRIVACY NOTICE PROPOSAL
+
+For students families and community organizations
+
+Prepared October 15 2026 | Proposed notice for review
+
+Origen Edu helps students and families explore college options and organize their next steps. This proposed notice explains the information used to provide that support, what is saved after a conversation, who may receive information, and the choices available to users.
+
+This is a proposal for a public notice, not confirmation that every described control is available in the live service. The notice language requires verification against the deployed product before publication. A separate proposed coordinator-sharing clause describes a planned feature. The final appendix identifies the remaining publication decisions.
+
+The proposed privacy commitment
+
+We use information to provide college guidance, maintain your account and planning history, support sharing that you authorize, and operate and protect Origen Edu. We do not sell personal information or use student profiles or private conversations for advertising targeted across unrelated websites or services.
+
+Browsing a university page does not give that university access to your identity, private profile, or conversations. Family links share designated academic profile information after an invitation is accepted. Private conversations are not automatically shared through a family link. Any future sharing of a summary with a community coordinator requires a separate, specific authorization.
+
+Origen Edu does not save microphone recordings as part of your account history. Live audio is processed by our AI provider to make voice conversations work. We save written summaries of topics discussed and relevant planning context. A summary can contain personal information you provide; it is not necessarily anonymous or limited to a list of topic names.
+
+A name is not the only personal information
+
+A name may help us address you naturally, but account identifiers, email addresses, educational information, questions, and saved summaries can also be personal information. Providing less optional detail reduces the information processed, though it can make guidance less personalized. Voice summaries normally save automatically after a scoped conversation with user speech ends; individual summary approval is not required.
+
+Who this notice covers
+
+The notice covers Origen Edu websites, applications, college-guidance features, and related support. It applies to students, family members, institutional representatives, and other visitors using those services. A community organization does not receive access to student information merely because it recommends or sponsors Origen Edu.
+
+Operator: Blueprint Holdings LLC. Effective date: [publication date]. Privacy contact: daniel@origenedu.ai. Mailing address: [business mailing address]. References to "we," "us," and "our" mean that operator. Feature availability and privacy controls may differ between web and mobile releases.
+
+
+
+INFORMATION WE COLLECT AND WHY
+
+Account and sign in information
+
+When you create or use an account, we process information such as your name, email address, account role, and an identifier provided by our sign-in service. We use this information to authenticate you, keep records associated with the correct account, provide support, and protect access. Your sign-in provider processes authentication information under its own terms and settings.
+
+Student and family planning information
+
+Depending on what you enter and the features you use, a student profile may include a name, school or educational stage, GPA, interests, activities, goals, colleges of interest, intended entry term, practical needs, and notes. This information helps tailor guidance and organize plans. Free-text fields can contain additional personal information even when the field does not specifically request it.
+
+Family links create records of the invitation, acceptance, participants, and linked student profiles. We use those records to manage the academic information shared through the link. Do not enter information about another person unless you have appropriate authority and any permission required for that use.
+
+Conversations and saved work
+
+We process your typed questions or spoken statements, the AI responses, selected profile details, and relevant previous summaries to provide guidance. Saved work may include summaries, topic notes, college plans, action items, worksheets, source links, and dates. Where enabled, progress features also record changes to academic information, plan revisions, and self-reported milestones. These records are associated with your account; they are not independently verified school records.
+
+Information you deliberately send to others
+
+If you use an available institution inquiry or event-request form, we process the name, question, topic, contact details if supplied, event information, and permissions you submit. Institutional representatives provide information such as their work email, role, affiliation, and page content. Approved information intended for a public institutional page becomes public.
+
+Technical information and support
+
+We process operational information such as visit and feature-use indicators, language preferences, session identifiers, request timing, error categories, and quality signals to maintain the service and diagnose problems. Our infrastructure providers may receive IP addresses, device and browser information, and other request metadata. These operational records are separate from the aggregate page counts supplied to universities.
+
+If you contact support or make a privacy request, we process the information you send and the records needed to respond. Optional feedback may include your response and associated account or feature context. We do not treat a support request as permission to publish your story or testimonial.
+
+Information you should avoid providing
+
+College guidance does not require Social Security numbers, passwords, bank-account numbers, payment-card information, tax documents, or confidential medical records. Avoid entering or speaking these details. You can discuss financial-aid processes without sharing exact financial identifiers. An educational conversation can still reveal sensitive circumstances, so include only the context you want processed and potentially summarized.
+
+
+
+AI GUIDANCE VOICE AND SAVED SUMMARIES
+
+The purpose of the AI
+
+Origen Edu is designed for college-related guidance, including college exploration, academic preparation, admissions, applications, financial-aid information, scholarships, education financing, and planning. Its AI instructions direct conversations toward those topics. This describes the intended scope; it does not guarantee that every generated response stays within it or is accurate.
+
+AI guidance supports your decisions. It does not make admissions or financial-aid decisions for a university, submit an application merely because you discuss one, or establish that you qualify for a program. Verify deadlines, requirements, costs, and eligibility with the relevant institution or official source. A generated statement that you agreed to something is not evidence of your authorization.
+
+What is sent for AI processing
+
+We use OpenAI to generate responses and summaries and support live voice. Relevant questions, conversation text, selected profile information, and past summaries may be sent to OpenAI for those purposes. The service may also compare a summary with the conversation to identify possible quality problems. These operations involve processing personal information even when no audio recording is saved by Origen Edu.
+
+When a feature searches for public college information, it processes the query and relevant search criteria. The application includes measures to limit private details in search inputs, but automated filtering cannot guarantee that all personal information is removed. Avoid adding sensitive details to a search request.
+
+How voice works
+
+Voice is optional and requires microphone permission. While a voice session is active, microphone audio is transmitted to OpenAI for live processing. Speech recognition produces text used to respond and prepare summaries. Stop the session or revoke microphone permission to stop further capture. Stopping does not recall information already transmitted.
+
+Origen Edu does not retain raw microphone recordings in its account database or provide a recording archive for replay. It does retain written summaries and other saved planning records. The application also temporarily processes conversation text and pending summaries so a discussion can continue and an interrupted save can be retried. Temporary session handling is distinct from your saved account history.
+
+What a summary may contain
+
+A saved summary may describe the college topics explored, your goals, relevant academic context, questions that remain open, suggested next steps, and sources discussed. For example, a scholarship discussion could produce a summary of the scholarship types explored and your intended next action. It may also mention a name or personal circumstance supplied during the discussion. Review summaries for accuracy and remove details you do not want retained using available controls or a privacy request.
+
+Provider retention and model training
+
+Not storing recordings in Origen Edu does not mean zero retention by every provider. OpenAI documents that API data is not used to train its models by default unless a customer opts in. It also documents default abuse-monitoring retention of up to 30 days, with exceptions and different rules for some features. Those provider defaults are not proof of the settings on Origen Edu's project. The applicable configuration must be verified before a stronger no-training or zero-retention promise is published.
+
+OpenAI data controls: https://developers.openai.com/api/docs/guides/your-data
+
+
+
+WHEN CONVERSATION SUMMARIES ARE SAVED
+
+Automatic saving after a voice conversation
+
+When you speak in a voice conversation about a confirmed student or family context, Origen normally generates and saves a written summary automatically when the call ends. You are not asked to approve each summary before it is generated or saved. Ending the call is not a discard action, and reviewing a summary afterward is different from approving it in advance.
+
+The summary may include personal context you supplied, the topics explored, unresolved questions, and proposed next steps. Generated notes may be prepared from a saved summary. Use the available review and deletion controls if you want to remove saved information. The retention choices described in this notice apply to saved summaries and their dependent generated notes.
+
+Profile saving is a separate action
+
+During profile setup, details can appear as a draft while you speak. You can request a profile save with Save profile or by asking Origen to save it. That action concerns the profile; it is not separate approval of each conversation summary. You should not interpret a profile-review instruction as a promise that no other record will be generated or saved automatically.
+
+Deferred saving during onboarding
+
+If the conversation concerns a new student whose profile has not yet been saved, summary generation can still send conversation text to OpenAI before the profile is saved. Saving the written summary to the account may be deferred until that student profile exists. Pending summary work can then be retried automatically while the private session remains valid. This does not add an individual summary-approval step.
+
+The server may retain limited lifecycle, attribution, or quality records associated with a deferred summary even before the summary text is attached to a saved student. Temporary text and pending summaries are distinct from saved account history. Logging out or changing accounts clears private session buffers; closing or reloading the page can lose unsaved conversation text. These actions do not recall information already sent to OpenAI or remove an already saved summary.
+
+Limits and save failures
+
+Automatic saving depends on captured user speech, a confirmed conversation scope, a valid private session, and successful processing and storage. A call without captured user speech or without a confirmed target does not follow the ordinary automatic-summary path. Network failures, interruptions, or a missing profile can delay or prevent a save; the interface can offer a retry. Do not rely on every call producing a complete summary.
+
+For signed-in use, completed summaries belong to account history. In a preview, saved summaries may remain in the browser instead. Neither flow creates an Origen microphone-recording archive. Provider processing and retention remain separate, as explained in the AI and voice section.
+
+Notice before microphone use
+
+The onboarding start control should disclose that microphone audio and the supplied profile details go to OpenAI, and that summaries normally generate automatically when a call ends. This notice should be visible before microphone capture begins, in the selected interface language. The AI's spoken welcome and the browser microphone prompt are not substitutes for that disclosure.
+
+
+
+LIMITED SHARING AND ACCESS
+
+No sale and no advertising use of private student records
+
+We do not sell personal information or give advertisers student profiles or private conversation content for advertising across unrelated services. Operating the service still requires limited processing by providers and may involve disclosures you request or that the law requires. The following categories explain those circumstances.
+
+Linked family accounts
+
+A family link is established through an invitation and acceptance. It shares designated academic profile fields, including the student name, stage, school, GPA, interests, activities, goals, selected institutions, and entry term. Linked participants may be able to update shared academic fields. Review the sharing explanation before accepting a link.
+
+A family link does not automatically share private conversation summaries, private needs, or private notes. Linking an account is not proof of legal guardianship or unrestricted authority over another person's records. An adult student's parent or family member does not automatically receive access without authorization.
+
+You can end a family link through available controls. Unlinking stops future synchronization through that link. It does not erase an independent copy of previously shared academic information retained in another account or downloaded by another person.
+
+Community coordinators
+
+Coordinator access to selected summaries is a planned feature. A community organization's referral, sponsorship, or staff role does not currently grant access to a student's private conversation history. The proposed consent-based feature and its proposed public wording appear in the separate proposed coordinator-sharing section. It must be implemented before that wording is presented as an available service.
+
+Institutions you choose to contact
+
+Simply visiting an institution's page does not disclose your private account records to that institution. If you deliberately submit an available question or event request, the designated institution or department receives the submitted information and relevant replies. This is separate from aggregate analytics and does not include your private conversation history.
+
+Where offered, permission to answer a request and permission for future outreach are separate choices. You can withdraw a request or unsubscribe using its available controls. A proposed transfer to another institution or department requires the approval described in the request flow. A recipient may retain information it has already received under its own responsibilities; withdrawal cannot erase independent copies.
+
+Legal obligations and organizational changes
+
+We may disclose information when necessary to comply with a valid legal obligation, investigate misuse, address a security threat, or protect lawful rights. If ownership of the service changes, information may transfer with the service subject to applicable protections and notice obligations. Such a transfer is not blanket permission to use student information for unrelated purposes.
+
+
+
+SERVICE PROVIDERS AND STAFF ACCESS
+
+Named service providers
+
+OpenAI provides AI text responses, live voice, summary generation, and summary-quality checks. It processes audio, questions, selected profile details, and relevant conversation context. Its processing and retention are separate from the saved records managed in Origen Edu. See the AI and voice section for provider defaults and configuration limits.
+
+Auth0, an Okta service, handles sign-in and identity management. It processes identity and authentication information needed to authenticate an account. Deleting an application account and deleting the Auth0 identity are separate operations. Provider notice: https://www.okta.com/privacy-policy/
+
+Render hosts the application and PostgreSQL database infrastructure. Stored profiles, summaries, plans, and other application records are processed on that infrastructure. Render may also process infrastructure metadata, logs, and backup copies. Actual retention, access, and recovery settings require verification. Provider notice: https://render.com/privacy
+
+Google Fonts supplies fonts requested by the website. Those browser requests can disclose ordinary network and browser metadata, including an IP address, to Google. This is distinct from sending a student profile or conversation to Google Fonts. Provider notice: https://policies.google.com/privacy
+
+Who can see operational information
+
+Origen staff permissions define the reports available to a staff member. Activity-report access permits aggregate operational trends. Directory access permits account names, identifiers, status, and activity or conversation metadata. Quality-review access permits diagnostic findings and related operational evidence, which may include affected account identifiers. Those reporting permissions do not expose private summary text, transcripts, notes, plans, or worksheets.
+
+Institution reviewers can review institutional representatives and submitted page content. Institution owners and authorized outreach staff may see questions and replies deliberately submitted to their own workspace. Institutional analysts receive the permitted aggregate reports. These roles do not grant access to private family conversations or unrelated departments' request inboxes.
+
+Operational access beyond reporting
+
+The application stores private content to provide the service. Appropriately authorized technical operators may be able to access underlying systems for support, maintenance, recovery, security, or a legal obligation. Dashboard restrictions are not a claim that the database is inaccessible to every human. Limit such access to a necessary purpose and authorized personnel, with operational safeguards and review.
+
+Possible review by the AI provider
+
+OpenAI states that access to stored API business data is limited to authorized employees for engineering support, abuse investigation, and legal compliance, and specialized contractors under confidentiality and security obligations for abuse review. A promise that nobody can ever review AI inputs would therefore be inaccurate. Provider policy: https://openai.com/enterprise-privacy/
+
+A provider's public policy does not establish the permissions, contractual terms, or optional settings in Origen Edu's specific account. Those must be verified before this proposal becomes an operating notice.
+
+
+
+ANALYTICS STORAGE AND SERVICE IMPROVEMENT
+
+What universities see in page analytics
+
+Institution page analytics report aggregate activity, such as page-view and link-click totals. These counters are not a list of student names, email addresses, private profiles, or conversations. They do not identify which individual viewed a page. Visiting a page does not authorize a university to contact you.
+
+The basic page-counter design stores an institution identifier, a calendar month, a metric type, and a count, rather than a visitor identifier. Reports cover completed months and suppress small positive counts below 10. These counts may include repeated visits or clicks and do not establish unique students, applications, admissions, or enrollment. Small-count suppression reduces disclosure risk; it does not prove that every report is anonymous in every context.
+
+If separate inquiry, event, or campaign reporting is available, its aggregate activity measures are distinct from a recipient's authorized access to a request you submitted. For an aggregate-only community or university pilot, individual contact and outreach features should remain outside that pilot's scope.
+
+Operational and quality information
+
+We use operational signals to understand whether sign-in, onboarding, voice connections, language selection, summary saving, and other features work. Quality checks can identify a repeated question, an interrupted response, or a possible discrepancy in a summary. These checks support troubleshooting and review; they are not grades, psychological assessments, or verified measures of student understanding.
+
+The conversation-quality reporting design saves categories, counts, references to turns, and standardized explanations rather than a second transcript or quoted excerpts. A quality check can nevertheless process conversation text before producing those findings. Operational records may remain associated with an account even when a report does not display conversation content.
+
+Optional feedback and progress features, when enabled, can support service evaluation and continuity. Keeping previous summaries for guidance, checking summary quality, conducting research, and training an AI model are different activities. This notice does not treat ordinary use as blanket permission for an unrelated research study or release of student-level datasets. A separate activity requiring consent must have its own explanation and permission.
+
+Browser and device storage
+
+Cookies and browser or device storage support authentication, preferences, preview records, and application operation. Some preview data and preferences may remain after a tab closes. Temporary signed-in conversation buffers and saved cloud records have different lifetimes. Closing a tab is not the same as deleting an account.
+
+On a shared device, sign out when finished and remove downloaded files or preview information you do not want another person to see. Clearing browser storage can remove local information but does not by itself delete cloud records. Similarly, deleting cloud information cannot remove a file someone has already downloaded.
+
+External sites and public content
+
+College links and other external resources lead to services with their own privacy practices. Those sites receive information when you visit or submit information to them. Approved institutional page content is public and may be copied or indexed. Private student planning information is not made public merely because an institution has a page in Origen Edu.
+
+
+
+RETENTION DELETION AND YOUR CHOICES
+
+Saved account information
+
+Account profiles, plans, notes, worksheets, and saved summaries generally remain until you delete the relevant records or close the account, subject to the exceptions below. The default summary policy is to keep summaries until deleted. There is no inactivity-based deletion schedule.
+
+Where the Privacy Center is available, you can choose automatic deletion of summaries 30, 90, or 365 days after saving. A shorter selection also applies to older summaries. This setting removes expired summaries and dependent generated notes; it does not automatically delete independent notes, plans, worksheets, or profile information. Scheduled cleanup is not necessarily immediate at the exact expiration time.
+
+Different records have different lifetimes
+
+The basic institution page counters retain the current UTC calendar month and the preceding eleven months. Conversation-quality findings have a 90-day cleanup schedule; findings awaiting a saved summary have a shorter cleanup period. Other technical events, inquiry records, support records, and provider records follow their applicable operational schedules. Optional institution inquiry records expire 90 days after submission and are removed by scheduled cleanup. Withdrawal clears submitted content and related messages earlier, while limited operational records may remain. The other schedules must be confirmed for the published service.
+
+Limited deletion receipts and account-closure safeguards may remain after private content is deleted. They record identifiers or hashed identifiers and deletion information to prevent deleted records from reappearing, including after recovery from a backup. They do not contain the deleted conversation prose, but they are not necessarily anonymous. They currently remain indefinitely unless an operator removes them; no automatic expiry is implemented. The business must approve a bounded schedule tied to the recoverable backup period and necessary safeguards before promising a shorter duration.
+
+What deletion does and does not remove
+
+Deleting a summary can also delete notes generated from that summary. Separately saved notes, plans, exports, other account holders' independent copies, and records held by recipients may require separate action. Closing an Origen account removes supported records from active application storage. It also queues a separate Auth0 identity-deletion request. An authorized operator must complete and verify that request; a pending request is not completed deletion. This does not delete an underlying Google account or every provider security log. The operator must publish an actual processing deadline before promising one.
+
+Backups, infrastructure logs, security records, and records needed to meet a legal obligation may persist for a limited or legally required period. We do not promise immediate erasure from every backup or provider system. Confirmed backup and provider schedules must be included in the operational policy before publication of precise deletion deadlines.
+
+How to use your controls
+
+You can review and edit supported profile information, remove supported saved records, manage family links, stop microphone access, and use available export or account-closure tools. Sensitive operations may require recent sign-in, resolving family links, or review of institutional responsibilities. Contact us if a control is unavailable.
+
+Send privacy requests to daniel@origenedu.ai. Explain the request and the account concerned without sending passwords or sensitive identity documents in an initial message. We may verify identity or authority proportionately. Depending on applicable law, rights may include access, correction, deletion, a copy of information, and other choices. We will explain applicable limitations and any required appeal process and will not penalize you for exercising applicable rights.
+
+
+
+STUDENT PROTECTIONS SECURITY AND CONTACT
+
+Children and younger students
+
+The selected audience is students in ninth grade and above and their families. The local registration flow separately asks actual age band: under 13 cannot proceed to profiles or AI, ages 13-17 require a parent or legal guardian's email approval, and adults age 18 or older may proceed on the adult path. A younger ninth grader is still under the age restriction. These controls are implemented locally for review and are not confirmed deployed.
+
+A parent's relationship to a student, a community organization's referral, and a school's authorization are different. A family-link acceptance does not establish all of them. A parent or legal guardian can email daniel@origenedu.ai to request review or deletion of a child's information. Identify the account, your relationship, and the request without sending unnecessary sensitive documents. We verify authority proportionately, explain any required additional steps, and address deletion or restriction under applicable law. A linked account is not required to submit a request. If collection occurred contrary to age requirements, we investigate and restrict the affected use as appropriate.
+
+Schools and community organizations
+
+Community partners can help families discover and use Origen Edu without receiving their private profiles or conversations. Any sharing for individual support must have a defined recipient, purpose, and authorization. Participation in a partner program is not, by itself, permission for unrestricted monitoring of a student's activity.
+
+If a school directs use of Origen Edu or supplies education records, the applicable responsibilities and agreements require separate review. This notice is not a school data-processing agreement, a security certification, or a statement that every use meets FERPA, COPPA, or another legal standard. An institution's published page does not establish those agreements.
+
+Security and access
+
+We use safeguards intended to protect account information and limit access, including authentication, authorization checks, input validation, and separation of private account records from institutional reporting. The safeguards and their effectiveness depend on correct deployment and operation. No system can guarantee absolute security.
+
+We limit operational access according to assigned responsibilities and investigate suspected unauthorized access. Users should protect their sign-in credentials and avoid sharing accounts. If an incident requires notification, we will provide the notification required by applicable law. This proposal does not claim an independent security audit, certification, or guaranteed incident-free operation.
+
+Processing locations
+
+Providers may process information outside your location. Confirm production regions, intended markets, and any required transfer protections before making geographic commitments. This proposal does not promise that every copy remains in one country.
+
+Changes to this notice
+
+We will date the final notice and communicate material changes as required. A new use that requires consent will have a separate permission process. Continued use or an AI-generated summary is not a substitute for that permission.
+
+How to contact us
+
+Responsible operator: Blueprint Holdings LLC. Privacy requests and questions: daniel@origenedu.ai. Mailing address: [business mailing address]. Please identify the service or account involved and the kind of assistance requested. Community organizations may use the same channel to ask about the pilot scope, approved sharing arrangements, and available privacy documentation.
+
+
+
+PROPOSED COORDINATOR SHARING CLAUSE
+
+Future feature language for use only after implementation
+
+The wording below expresses the intended feature in the present tense so it can be reviewed as proposed public language. It must not be published as a description of an available capability until the consent, access, revocation, and recipient controls exist and have been verified. Family linking remains separate from coordinator permission.
+
+Selected summaries for additional support
+
+You may choose to share a selected college-guidance summary with a named coordinator at a community organization for follow-up support. Sharing is optional. Before anything is sent, we show you the recipient, organization, summary content, purpose, and whether access is a one-time disclosure or continues for a stated period. You can review the summary, correct inaccuracies, remove information, or cancel.
+
+Only the summary and identifying or contact information shown in the sharing preview are disclosed. Your permission does not give the coordinator access to your full profile, other conversations, raw audio, transcripts, or future summaries. We do not automatically add new summaries to an earlier permission. New content or a new recipient requires a new authorization.
+
+Shared summaries focus on the college topics explored, unresolved questions, and next steps for which you want support. They are AI-assisted notes that you have reviewed, not verified statements of academic performance, financial-aid eligibility, or consent to another action. You can receive ordinary guidance without sharing a summary with a coordinator.
+
+Permission and recipient responsibilities
+
+We record the approved recipient, the version of the summary shared, the purpose, the authorization date, any expiration, and any required parent or guardian permission. We do not infer this permission from a referral, participation in a program, a family link, silence, or an AI-generated statement.
+
+Coordinators must use the information only for the support purpose explained at authorization. Our agreement with the receiving organization prohibits selling it, using it for unrelated advertising or AI training, and redisclosing it for unrelated purposes. The agreement specifies authorized staff, safeguards, retention, deletion, and how the organization handles privacy requests.
+
+Ending access
+
+You can review and revoke active coordinator access. Revocation stops future access through Origen Edu and any further sharing under that authorization. It cannot make a recipient forget information already seen or automatically erase an authorized download. We explain any download capability before you authorize sharing and provide a way to request deletion of recipient-held copies, subject to applicable legal duties.
+
+Suggested confirmation text
+
+"I authorize Origen Edu to share the summary displayed above and the listed identifying information with [coordinator name] at [organization] for [support purpose]. This permission covers [this one summary and access period]. It does not include my other conversations or future summaries. I can cancel before sending and revoke future access afterward. I understand that revocation does not automatically erase information already received."
+
+The confirmation must be a separate affirmative action, with an unchecked choice by default. Show the actual content and recipient rather than relying on the general privacy notice. Where legally required, obtain and document valid parent or guardian authorization in addition to the student-facing explanation.
+
+
+
+PUBLICATION DECISIONS AND VERIFICATION
+
+Owner review appendix
+
+This appendix supports review of the proposal. It is not a representation that the listed work is complete. Complete the decisions below, then remove review-only language and issue a final notice with an effective date.
+
+Decisions needed from the business
+
+The owner confirmed Blueprint Holdings LLC, daniel@origenedu.ai, and the ninth-grade-and-above audience. He subsequently authorized a local guardian-email flow for ages 13-17, an under-13 block and an adult path. Confirm the mailing address, publication date, markets, legal verification method and deployment before publication. Preserve the aggregate-only university pilot boundary.
+
+Choose whether coordinator sharing launches with the pilot or remains planned. For the proposed feature, approve the consent design, permitted summary fields, expiration, download policy, recipient agreement, revocation behavior, and process for minors. A privacy notice cannot substitute for implementing those controls.
+
+Verify behavior in the deployed service
+
+Read-only Render deployment metadata checked October 15, 2026 identifies commit 14398304da90eab775d470f552bdf3ac3af3a186 as live for both the Origen API and static web service. The API service is in Oregon. This verifies reported deployment metadata, not database migrations, runtime permissions, backup settings, OpenAI settings, or end-to-end privacy behavior. The disclosure revisions in this follow-up remain local and undeployed.
+
+Test with synthetic accounts that family links share only the intended fields, institutional staff cannot read private histories, microphone capture stops, exports exclude other accounts, and deletion covers the promised records. Confirm summary-retention choices on both web and supported mobile versions. Check that restore procedures honor deletion records.
+
+Verify providers and retention
+
+Check the actual OpenAI project for training/data-sharing opt-ins, the endpoints used, abuse-monitoring retention, and any approved retention controls. Inspect hosting, authentication, font loading, and other production integrations. Confirm provider agreements, locations, access permissions, backup expiry, security-log schedules, and identity-deletion operations. The absence of an application audio archive is not proof of zero provider retention.
+
+Publish meaningful schedules or criteria for all retained categories, including optional inquiries, technical events, support requests, acceptance or sharing records, backups, and deletion receipts. Do not promise a deadline that operations cannot meet. Obtain a privacy-law review focused on the users' ages, actual markets, school relationships, and the final deployment.
+
+Evidence used for this proposal
+
+Repository sources reviewed on October 15, 2026 include docs/legal/PRIVACY_NOTICE.md; docs/PRIVACY_SECURITY_PHASE_3.md and PHASE_5.md; docs/vendor-readiness/DATA_INVENTORY.md; server/family.mjs; server/provider-privacy.mjs; server/conversation-quality-store.mjs; server/summary-quality.mjs; server/institution-inquiries.mjs; server/institution-campaigns.mjs; and src/ProfileVoice.tsx. These establish source behavior and documented limitations, not production verification.
+
+OpenAI API data controls, checked October 15, 2026: https://developers.openai.com/api/docs/guides/your-data. API defaults do not establish Origen Edu's configuration.
+
+FTC COPPA guidance, checked October 15, 2026: https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions. Children's voice recordings can be personal information; a narrow voice exception should not be assumed for personalized guidance or saved student context.
+
+
+
+GUARDIAN PERMISSION: LOCAL REVIEW
+
+Implementation appendix | Not deployed | Email disabled
+
+How registration works
+
+The neutral English/Spanish screen has no selected answer. It asks the account user for an age band and educational situation before ordinary sign-in, then records those answers against the signed-in identity before profiles, voice or AI. It collects no full birth date. Under-13 users cannot proceed; students aged 13-17 remain pending; adults can use the adult path. Existing accounts without a recorded decision must also complete the gate.
+
+An adult makes a separate decision
+
+A parent or legal guardian reviews a bilingual notice and a request reference, makes an unchecked declaration, and clicks an explicit approval button. Opening an email link does not approve anything. The notice describes voice processing, automatic summaries, separately saved records, withdrawal and deletion. Permission never creates a family link or gives the guardian, a referring organization or a coordinator access to private conversations.
+
+The application keeps the hashed account linkage, age band, request identifier, notice version, decision, revision and server timestamps. It keeps the guardian email for the permission request. Random approval and withdrawal tokens are stored only as hashes in PostgreSQL, not plaintext. The email provider and recipient mailbox necessarily receive the original links. Approval expires in 48 hours; a resend invalidates earlier links. Permission and the separate withdrawal link expire 180 days after the request.
+
+Withdrawal and storage
+
+Withdrawal blocks new permitted use and invalidates older work. It does not itself erase records already saved or recall information sent to a provider. The guardian email is erased on denial, withdrawal or account closure. Hourly cleanup removes pending email and token hashes after 30 days and expired approval details after the 180-day term. Decision events expire after 365 days or earlier account closure. Minimal eligibility status stays until account closure to enforce the restriction.
+
+What the tests establish and what remains
+
+Synthetic tests cover permission decisions, replay, expiry, direct API blocking, delayed writes and provider responses, and PostgreSQL row isolation and concurrent decisions. Web and native source changes are local. Realtime calls have a durable termination queue and periodic provider hangup checks; outages can delay remote termination. Nothing promises immediate recall or zero provider retention.
+
+Email possession and a declaration do not conclusively verify guardianship or establish legal sufficiency. Self-reported age can be false, and direct Auth0 signup may create a preliminary identity before Origen screening. Review identity-provider signup, published wording and any required stronger verification before launch. A separate controlled provider and native-device test is still required.
+
+
+
+GUARDIAN EMAIL: SETUP STILL REQUIRED
+
+Implementation-backed handoff | No credentials or production settings changed
+
+Sender and chosen transport
+
+The chosen future sender is daniel@origenedu.ai, using the Resend HTTPS email API. The reply-to default is the same monitored address. An email alias alone does not authenticate outgoing application mail; Resend needs an authorized sending domain and a server-side API key. No separate permissions@ alias is required. Resend is a proposed additional provider for this flow, not a verified live integration.
+
+Exact backend configuration
+
+Configure the Render API web service srv-db02or0u01pc738ktekg at https://origen-edu.onrender.com. Never put the sending credential in the static website or mobile bundle. GUARDIAN_EMAIL_TRANSPORT defaults to disabled; only a separately authorized release should set resend.
+
+GUARDIAN_EMAIL_FROM and GUARDIAN_EMAIL_REPLY_TO both default to daniel@origenedu.ai. GUARDIAN_PUBLIC_URL must be the final HTTPS web origin with a trailing slash, such as https://origenedu.ai/, without a query or fragment. RESEND_API_KEY is a Resend sending API credential, not an inbox password. It is unnecessary while delivery is disabled.
+
+Environment variables are only one part
+
+Verify origenedu.ai with Resend using its required DNS records and sender authorization, check external-recipient permission and tracking settings, confirm the reply inbox, and review provider terms and retention. Deploy the new backend and frontend, apply database migration 039 with the migration credential, install and verify restricted runtime grants, and confirm the guardian page, CORS, status checks, supervisor and cleanup jobs. Review Auth0 signup behavior and native releases. None of those production actions occurred in this task.
+
+After separately approving real delivery, send a controlled email to a consenting adult test recipient and verify receipt, approval, expiry, replay and withdrawal. An accepted API response is not proof the message arrived. Verify actual Realtime termination with controlled data before enabling teen voice. Final legal review must address the chosen audience and verification method.
+
+Review safely now
+
+Run node scripts/review-guardian-permission.mjs and open http://127.0.0.1:5183/guardian-review. The local review uses fictional accounts, an in-memory database and a mock mailbox. No email or OpenAI call is sent. Use only fictional addresses. View the mock mailbox, open approval in another tab, then test the separate withdrawal link. Stop with Ctrl+C; restarting clears the synthetic data.
+
+The detailed file docs/GUARDIAN_PERMISSION_IMPLEMENTATION.md contains the exact settings, retention behavior, test commands, known limits and release checklist. Official technical references: https://resend.com/docs/api-reference/emails/send-email and https://developers.openai.com/api/reference/resources/realtime/subresources/calls/methods/hangup.
+
+

@@ -22,6 +22,7 @@ export async function apiFetch(path:string,options:RequestInit={}){
  else throw new Error('Sign in to use Origen AI.');
  lease.assert();
  const response=await fetch(`${base}${path}`,{...options,headers,signal:options.signal?AbortSignal.any([options.signal,lease.signal]):lease.signal});
+ if(response.status===403){const data=await response.clone().json().catch(()=>null);if(data?.error==='permission_required')browserPrivacy.stop('eligibility_changed');}
  lease.assert();return response;
  }finally{lease.release();}
 }

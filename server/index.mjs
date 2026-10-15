@@ -1,3 +1,6 @@
+import {createPermissionHandler,purgePermissionData} from './guardian-permission.mjs';
+import {eligibilityAllowed} from './permission-context.mjs';
+import {permissionFetch,runPermittedRequest,startPermissionSupervisor} from './permission-execution.mjs';
 import {createPrivacyMonitor,privacyAlertReport,createPrivacyAlertEmitter,purgePrivacyEvents} from './privacy-monitor.mjs';
 import {createPrivacyHandler,purgePrivateSummaries} from './privacy-controls.mjs';
 import {createCampaignHandler} from './institution-campaigns.mjs';
@@ -36,8 +39,9 @@ import {createGuidanceHandler,guidanceEnabled,purgeGuidanceHistory,bindGuidanceI
 import {purgeAdminReviews} from './admin-review-queue.mjs';
 import {purgeAdminReportSnapshots} from './admin-report-snapshots.mjs';
 
-export function createApp(env=process.env,verify,database=null,writeLog=record=>console.log(JSON.stringify(record))){
+export function createApp(env=process.env,verify,database=null,writeLog=record=>console.log(JSON.stringify(record)),reviewOptions={}){
  assertProductionConfig(env);
+ if(env.NODE_ENV==='production'&&Object.keys(reviewOptions).length)throw new Error('review_overrides_not_allowed');
  if(env.NODE_ENV==='production'&&database&&!database.isolated)throw new Error('isolated_database_required');
  assertProgressConfiguration(env);
  onboardingSettings(env);
@@ -50,7 +54,9 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
  const inquiries=createInquiryHandler(database);
  const metrics=createMetricsHandler(database);
  const lifecycle=createLifecycleHandler(database);
- const handlers=[createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,fetch,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,fetch,log,database),createAdmissionsResearchHandler(env,fetch,log,database),createProfileVoiceHandler(env,fetch,log,database),createAIHandler(env,fetch,database)];
+ const permission=createPermissionHandler(database,env,reviewOptions.permission);
+ const providerRequest=permissionFetch(database,env);
+ const handlers=[createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
  const buckets=new Map();
  const privacyMonitor=createPrivacyMonitor(database,writeLog);
  const app=async(req,res)=>{
@@ -74,6 +80,13 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   }
   if(req.method==='GET'&&/^\/api\/institutions\/(?:directory|(?:published|pages|qr)\/[a-z0-9-]{1,100})$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
   if(req.method!=='POST')return send(405,'method_not_allowed');
+  if(req.url==='/api/guardian-permission'){
+   const key=`guardian:${req.socket.remoteAddress||'unknown'}`,now=Date.now();
+   for(const [k,v] of buckets)if(v.reset<now)buckets.delete(k);
+   const budget=buckets.get(key)||{count:0,reset:now+60000};buckets.set(key,budget);
+   if(++budget.count>30)return send(429,'rate_limited');
+   return permission.handle(req,res,true);
+  }
   if(req.url==='/api/institution-inquiries/public')return inquiries(req,res,()=>send(404,'not_found'));
   if(req.url==='/api/institution-metrics/event')return metrics(req,res,()=>send(404,'not_found'));
   const token=/^Bearer (.+)$/.exec(req.headers.authorization||'')?.[1];
@@ -92,6 +105,15 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   req.origenAuthorized=true;
   req.origenPreview=false;
   req.origenIdentity=identity;
+  if(req.url==='/api/eligibility')return permission.handle(req,res);
+  const exempt=new Set(['/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
+  const protectedRequest=!exempt.has(req.url?.split('?')[0]);
+  let eligibility;
+  if(protectedRequest){
+   try{eligibility=await permission.repository.read(identity.sub);}catch(error){req.log({event:'database_error',code:safeErrorCode(error)});return send(503,'permission_unavailable');}
+   if(!eligibilityAllowed(eligibility))return send(403,'permission_required');
+  }
+  const dispatch=async()=>{
   if(identity&&database&&guidanceEnabled(env)){
    try{await bindGuidanceIdentity(database,identity.sub,`https://${domain}/`);}catch(error){if(error.status!==404)return send(error.status===403?403:503,'identity_mapping_unavailable');}
   }
@@ -99,6 +121,9 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   try{
    await next();
   }catch(error){req.log({event:'api_error',level:'error',code:safeErrorCode(error)});if(!res.headersSent)send(500,'server_error');else res.end();}
+  };
+  if(protectedRequest)return runPermittedRequest(database,identity.sub,eligibility.revision,req,res,dispatch);
+  return dispatch();
   });
  };
  app.privacyMonitor=privacyMonitor;return app;
@@ -112,6 +137,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(database){await assertRuntimeIsolation(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');console.log('Origen restricted database runtime verified.');}
   else console.warn('DATABASE_URL is not set; persistent storage is unavailable.');
   await runRetentionJob(async()=>{
+  await purgePermissionData(database);
   await purgeMetrics(database);
   await purgeExpiredInvites(database);
   await purgePrivateSummaries(database);
@@ -124,8 +150,9 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   await purgeConversationQuality(database);
   await purgeOnboardingEvents(database,new Date(),process.env);
   });
-  const metricsCleanup=setInterval(()=>{void runRetentionJob(()=>Promise.all([purgePrivacyEvents(database),purgePrivateSummaries(database),purgeAdminReportSnapshots(database),purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database),purgeConversationQuality(database),purgeOnboardingEvents(database,new Date(),process.env)]).then(()=>purgeAdminReviews(database,new Date(),process.env))).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
+  const metricsCleanup=setInterval(()=>{void runRetentionJob(()=>Promise.all([purgePermissionData(database),purgePrivacyEvents(database),purgePrivateSummaries(database),purgeAdminReportSnapshots(database),purgeMetrics(database),purgeInstitutionInquiries(database),purgeInstitutionOutreach(database),purgeExpiredInvites(database),purgeGuidanceHistory(database),purgeProgressHistory(database),purgeConversationQuality(database),purgeOnboardingEvents(database,new Date(),process.env)]).then(()=>purgeAdminReviews(database,new Date(),process.env))).catch(()=>console.error('Origen retention cleanup failed.'));},60*60*1000);metricsCleanup.unref();
   const application=createApp(process.env,undefined,database),server=createServer(application);
+  const stopPermissionSupervisor=startPermissionSupervisor(database,process.env);
   const emitPrivacyAlert=createPrivacyAlertEmitter(record=>console.log(JSON.stringify(record)));
   let privacySweepBusy=false;
   const privacyAlerts=setInterval(()=>{if(!database||privacySweepBusy)return;privacySweepBusy=true;void runRetentionJob(()=>privacyAlertReport(database).then(emitPrivacyAlert)).catch(()=>console.error(JSON.stringify({event:'privacy_monitor_gap',code:'alert_query_failed',level:'error'}))).finally(()=>{privacySweepBusy=false;});},60000);privacyAlerts.unref();
@@ -133,7 +160,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   let stopping=false;
   const shutdown=()=>{
    if(stopping)return;stopping=true;
-   clearInterval(metricsCleanup);clearInterval(privacyAlerts);
+   clearInterval(metricsCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
    server.close(async()=>{try{await application.privacyMonitor.flush();await database?.end();}finally{clearTimeout(deadline);}});
   };

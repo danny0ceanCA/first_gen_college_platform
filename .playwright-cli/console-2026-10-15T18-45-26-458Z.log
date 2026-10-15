@@ -1,0 +1,75 @@
+[   79306ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:5183/@react-refresh:0
+[  178440ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  178502ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  178544ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  178672ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  178673ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  179038ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  179063ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  179071ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  179083ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  179083ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  179541ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  179565ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  179566ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  179608ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  179609ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  179907ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  179925ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  179930ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  179959ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  179959ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  180243ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  180268ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  180271ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  180306ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  180306ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  180561ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  180586ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  180640ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  180703ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  180703ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829
+[  180961ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  180985ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  181114ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  181406ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  181440ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  181901ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  181921ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  182305ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  182325ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  182712ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  182743ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  183200ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js:22429
+[  183221ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap:0
+[  185199ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:801
+[  187449ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/?token=4PvQ7DhJNoly' failed: Error in connection establishment: net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS @ http://127.0.0.1:5183/@vite/client:814
+[  187450ms] [ERROR] [vite] failed to connect to websocket.
+your current setup:
+  (browser) 127.0.0.1:5183/ <--[HTTP]--> 127.0.0.1:5183/ (server)
+  (browser) 127.0.0.1:5183/ <--[WebSocket (failing)]--> 127.0.0.1:5183/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr . @ http://127.0.0.1:5183/@vite/client:829

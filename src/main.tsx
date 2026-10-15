@@ -1,3 +1,4 @@
+import GuardianPermission from './GuardianPermission';
 import NativeWelcome from './NativeWelcome';
 import PrivateSession from './PrivateSession';
 import LoginArrival from './WorkspaceArrival';
@@ -13,4 +14,6 @@ import './accessibility.css';
 import './brand.css';
 function SkipContent(){return <a className="skip-content" href="#origen-main-content" onClick={event=>{const main=document.querySelector('main');if(main){event.preventDefault();main.id='origen-main-content';main.tabIndex=-1;main.focus();main.scrollIntoView();}}}>Skip to content / Saltar al contenido</a>;}
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><Auth0Provider domain={authConfig.domain} clientId={authConfig.clientId} authorizationParams={{redirect_uri:window.location.origin,audience:authConfig.audience,scope:'openid profile email'}} onRedirectCallback={state=>{sessionStorage.setItem('origen-login-event',crypto.randomUUID());sessionStorage.setItem('origen-login-fresh','1');const target=typeof state?.returnTo==='string'&&(/^#(?:invite|institution-invite)\/[A-Za-z0-9_-]{43}$/.test(state.returnTo)||state.returnTo==='#institutions')?'/'+state.returnTo:'/#app';window.history.replaceState({},document.title,target);window.dispatchEvent(new HashChangeEvent('hashchange'));}}><SkipContent/>{window.location.hash==='#native-welcome'?<NativeWelcome/>:<LoginArrival><PrivateSession><Entry /></PrivateSession></LoginArrival>}</Auth0Provider></React.StrictMode>);
+const guardianToken=/^#guardian\/([A-Za-z0-9_-]{43})$/.exec(window.location.hash)?.[1];
+if(guardianToken)window.history.replaceState({},document.title,'/#guardian');
+createRoot(document.getElementById('root')!).render(guardianToken?<GuardianPermission token={guardianToken}/>:<React.StrictMode><Auth0Provider domain={authConfig.domain} clientId={authConfig.clientId} authorizationParams={{redirect_uri:window.location.origin,audience:authConfig.audience,scope:'openid profile email'}} onRedirectCallback={state=>{sessionStorage.setItem('origen-login-event',crypto.randomUUID());sessionStorage.setItem('origen-login-fresh','1');const target=typeof state?.returnTo==='string'&&(/^#(?:invite|institution-invite)\/[A-Za-z0-9_-]{43}$/.test(state.returnTo)||state.returnTo==='#institutions')?'/'+state.returnTo:'/#app';window.history.replaceState({},document.title,target);window.dispatchEvent(new HashChangeEvent('hashchange'));}}><SkipContent/>{window.location.hash==='#native-welcome'?<NativeWelcome/>:<LoginArrival><PrivateSession><Entry /></PrivateSession></LoginArrival>}</Auth0Provider></React.StrictMode>);

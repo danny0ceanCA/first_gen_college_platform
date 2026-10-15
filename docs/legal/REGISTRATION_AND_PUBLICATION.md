@@ -1,6 +1,6 @@
 # Origen legal notices and registration plan
 
-Prepared October 4, 2026. These are reviewable drafts, not published policies or implemented consent controls.
+Prepared October 4, 2026; privacy follow-up updated October 15, 2026. These are unpublished reviewable drafts. Guardian permission controls are now implemented locally; production deployment and real email are not authorized or confirmed.
 
 ## Recommended placement
 
@@ -22,7 +22,7 @@ This is a one-time registration step, not a confirmation form during conversatio
 
 Show a concise notice beside the Start voice button before microphone capture, including signed-out preview:
 
-> Origen uses an AI-generated voice. Starting sends your microphone audio and relevant conversation context to OpenAI to provide guidance and summaries. Avoid sensitive details. You can stop anytime. [Privacy Notice]
+> Starting sends microphone audio and the profile details you provide to OpenAI. Origen does not save microphone recordings; OpenAI's retention is separate. After you speak in a confirmed student or family context, a summary normally generates and saves automatically when the call ends, without separate approval. During setup, saving it to your account may wait until you save the profile. Profile saving is a separate action. [Privacy Notice]
 
 Button: **Start voice conversation**. The button can express the disclosed action without adding repetitive confirmation dialogs. Have counsel assess whether separate express consent is required for the jurisdictions, recording practices, or sensitive data involved. Browser microphone permission alone does not settle those requirements.
 
@@ -36,12 +36,30 @@ Keep legal acceptance separate from `welcome_heard_at` and `voice_used_at`. Thos
 
 ## Decisions required before publication
 
-1. Confirm the legal operator, mailing address, monitored privacy/support email, launch date, governing law, and intended countries/states. The current public contact fallback is `daniel@origenedu.ai`; this is not confirmation that it is the privacy-request channel.
-2. Approve and implement minimum-age and guardian rules. The drafts propose 13+ independent use, but no enforceable age gate was established by this review. Under-13 service use may trigger COPPA; an ordinary checkbox does not satisfy verifiable parental consent requirements. Assess treatment of younger student profiles too.
+1. The owner explicitly confirmed Blueprint Holdings LLC and `daniel@origenedu.ai` as operator and privacy-request contact in this chat on October 15. Mailing address, launch date, governing law, and intended countries/states remain unresolved.
+2. The owner selected ninth grade and above, then authorized a local age-band flow: under 13 blocked; 13–17 pending guardian email approval; 18+ adult path. That flow is now implemented locally, including server gates and an explicit guardian decision. Email remains disabled. See [the implementation and exact Render/email checklist](../GUARDIAN_PERMISSION_IMPLEMENTATION.md). Review legal sufficiency, age self-reporting and direct Auth0 signup before release; a guardian email response is not conclusive verification.
 3. Verify production providers, subprocessors, agreements, OpenAI processing/training settings, Render regions/backups/log expiry, Auth0 identity deletion, security access, and incident handling. Replace draft verification notes with accurate public statements; do not assert zero retention or certification without evidence.
 4. Establish defensible retention for support records, logs, backups, closure hashes, lock records, legal acceptance receipts, and inactive accounts. Confirm that deletion/export procedures match the Notice, including linked families, institutional records and native mobile.
 5. Determine applicable privacy laws based on the actual operator, revenue/data practices, users, and school relationships. Add required regional supplements and request/appeal channels; confirm sale/advertising-sharing statements and GPC obligations. Do not claim CCPA, GDPR, FERPA, or COPPA compliance by publishing a generic agreement.
 6. Seek review from a qualified legal friend, legal-aid reviewer, or other appropriate reviewer when available; paid counsel is not a prerequisite to preparing or reviewing these documents. Finalize English and matching Spanish text, then publish stable URLs and implement consent receipts after resolving the factual and operational gaps above. The protective version omits mandatory arbitration and class waivers. It proposes a limited monetary cap with substantial exceptions and a narrow institutional third-party-claim provision; review both explicitly.
+
+## Age and guardian work prepared for the next decision
+
+No registration or AI gate is added by this follow-up. `server/family.mjs` still validates account/profile fields without establishing age or guardianship. The adult attestation on institution inquiries is separate and must not be reused as authorization for student onboarding.
+
+Before implementation, specify eligible student stages, how age is established with minimal data, which guardian actions are required, when permission must precede registration or AI processing, and how permission changes when a user reaches adulthood. Distinguish a parent using their own account to discuss a student from a student operating an account. Decide how existing teen accounts, linked families, native onboarding, and preview use will transition without silently removing intended access.
+
+The later implementation should enforce approved eligibility and authorization on the server before restricted processing; a UI checkbox or selected school stage alone must not grant access. Keep any required guardian receipt separate from a family link, microphone permission, profile-save request, summary generation, and coordinator sharing. Give a verified guardian a request path that does not require a linked account. Specify receipt retention and revocation before collecting additional evidence.
+
+Synthetic acceptance cases to prepare after the policy decision: eligible ninth-grader, younger ninth-grader, below-grade applicant, adult returning student, parent account, missing/invalid/revoked permission, forged client flags, changed policy version, and existing accounts. Check web, native, direct API, preview, profile import, AI text, and voice paths against the same approved rule. These are proposed checks, not implemented controls or passed tests.
+
+## Follow-up verification boundaries
+
+On October 15, read-only metadata in the previously authorized Render workspace reported commit `14398304da90eab775d470f552bdf3ac3af3a186` live for the API and web services, matching local HEAD. The API service reports Oregon. The current disclosure edits are uncommitted and undeployed. No live personal records, request logs, credentials, database rows, or provider admin consoles were inspected; no settings changed.
+
+This metadata does not verify deployed database migrations, runtime grants, actual request behavior, OpenAI training opt-ins or retention settings, Auth0 deletion processing, provider human access, or Render backup expiry. Those remain evidence gaps, not inferred passes. Preserve the distinction between full-account exports and local binder PDF downloads; no blanket recent-login requirement applies to all exports.
+
+Local validation on October 15: 44 focused Node tests passed across onboarding disclosure, voice welcome/flow/profile save, summary retries, summary handler, scope, memory/deferred saving, and browser privacy. The new renderer test compiles in memory and exercises the real shared onboarding launcher in English and Spanish. Twelve synthetic browser cases cover shared and local onboarding in both languages at 1280, 390, and 320 pixels, including visible notice text, accessible description, no capture before the start action, and no horizontal overflow. Microphone access was replaced with a denied mock; backend/provider traffic was blocked. Production build passed with existing Auth0 directive and bundle-size warnings. No PostgreSQL-backed test or live-provider test was run. The 11-page revised PDF was rendered and every page visually checked.
 
 ## Sources supporting the placement recommendation
 

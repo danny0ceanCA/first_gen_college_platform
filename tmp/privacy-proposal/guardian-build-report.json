@@ -1,0 +1,71 @@
+{
+  "pages": 13,
+  "words": 6081,
+  "page_starts": [
+    [
+      "1",
+      "Origen Edu Privacy Notice Proposal",
+      "For students families and community organizations"
+    ],
+    [
+      "2",
+      "Information we collect and why",
+      "Account and sign in information"
+    ],
+    [
+      "3",
+      "AI guidance voice and saved summaries",
+      "The purpose of the AI"
+    ],
+    [
+      "4",
+      "When conversation summaries are saved",
+      "Automatic saving after a voice conversation"
+    ],
+    [
+      "5",
+      "Limited sharing and access",
+      "No sale and no advertising use of private student records"
+    ],
+    [
+      "6",
+      "Service providers and staff access",
+      "Named service providers"
+    ],
+    [
+      "7",
+      "Analytics storage and service improvement",
+      "What universities see in page analytics"
+    ],
+    [
+      "8",
+      "Retention deletion and your choices",
+      "Saved account information"
+    ],
+    [
+      "9",
+      "Student protections security and contact",
+      "Children and younger students"
+    ],
+    [
+      "10",
+      "Proposed coordinator sharing clause",
+      "Future feature language for use only after implementation"
+    ],
+    [
+      "11",
+      "Publication decisions and verification",
+      "Owner review appendix"
+    ],
+    [
+      "12",
+      "Guardian permission: local review",
+      "Implementation appendix | Not deployed | Email disabled"
+    ],
+    [
+      "13",
+      "Guardian email: setup still required",
+      "Implementation-backed handoff | No credentials or production settings changed"
+    ]
+  ]
+}

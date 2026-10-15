@@ -1,3 +1,4 @@
+import EligibilityGate from './EligibilityGate';
 import AccountOpening from './AccountOpening';
 import {InquiryReceipt} from './InstitutionInquiry';
 import InstitutionInvite from './InstitutionInvite';
@@ -23,7 +24,6 @@ export default function Entry(){
  useEffect(()=>{const stop=()=>setClosed(true);window.addEventListener('origen-account-closed',stop);return()=>window.removeEventListener('origen-account-closed',stop);},[]);
  const {isLoading,isAuthenticated,error,user,getAccessTokenSilently,logout}=useAuth0();
  useEffect(()=>{setAPITokenProvider(isAuthenticated?()=>getAccessTokenSilently():undefined);return()=>setAPITokenProvider(undefined);},[isAuthenticated,getAccessTokenSilently]);
- useEffect(()=>{if(!isAuthenticated)return;const id=sessionStorage.getItem('origen-login-event');if(!id)return;void apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',id})}).then(r=>{if(r.ok&&sessionStorage.getItem('origen-login-event')===id)sessionStorage.removeItem('origen-login-event');}).catch(()=>{});},[isAuthenticated,getAccessTokenSilently]);
  useEffect(()=>{
   if(!isAuthenticated||!user?.sub){setAdminAccess(null);return;}
   const controller=new AbortController(),subject=user.sub;
@@ -59,6 +59,6 @@ export default function Entry(){
  if(route==='#institutions')return <InstitutionPortal key={isAuthenticated?user?.sub:'anonymous'}/>;
  if(route==='#about'||route==='#privacy')return <LandingInformation page={route==='#about'?'about':'privacy'}/>;
  if(/^#institution\/[a-z0-9-]{1,100}$/.test(route))return <InstitutionPublic key={route} slug={route.slice(13)}/>;
- if(/^#invite\/[A-Za-z0-9_-]{43}$/.test(route))return <InviteAccept token={route.slice(8)}/>;
- return inside&&isAuthenticated?<App key={user?.sub}/>:<Landing/>;
+ if(/^#invite\/[A-Za-z0-9_-]{43}$/.test(route))return <EligibilityGate key={user?.sub}><InviteAccept token={route.slice(8)}/></EligibilityGate>;
+ return inside&&isAuthenticated?<EligibilityGate key={user?.sub}><App/></EligibilityGate>:<Landing/>;
 }

@@ -9,7 +9,7 @@ const webOrigin=new URL(process.env.EXPO_PUBLIC_WEB_URL||'https://origenedu.ai')
 const uri=`${webOrigin}/#native-welcome`;
 function trusted(url:string){try{const target=new URL(url);return target.protocol==='https:'&&target.origin===webOrigin&&target.pathname==='/'&&target.hash==='#native-welcome';}catch{return false;}}
 
-export default function Welcome({account,es,save,logout,onFinished}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void}){
+export default function Welcome({account,es,save,logout,onFinished,permissionOnly=false}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void;permissionOnly?:boolean}){
  const session=useSession();const view=useRef<WebView>(null);const location=useRef(uri);const [error,setError]=useState(false);const saving=useRef(false);
  const reply=(id:string,value:unknown,error=false)=>{if(trusted(location.current))view.current?.injectJavaScript(`window.origenNativeReply?.(${JSON.stringify({id,value,error})});true;`);};
  async function message(event:WebViewMessageEvent){
@@ -18,7 +18,7 @@ export default function Welcome({account,es,save,logout,onFinished}:{account:Acc
   if(typeof data.id!=='string'||data.id.length>100)return;
   try{
    if(data.type==='closed'){onFinished?.();return;}
-   if(data.type==='ready'){reply(data.id,{subject:session.subject,firstName:account.firstName,role:account.role,language:es?'es':'en'});return;}
+   if(data.type==='ready'){reply(data.id,{permissionOnly,subject:session.subject,firstName:account.firstName,role:account.role,language:es?'es':'en'});return;}
    if(data.type==='token'){reply(data.id,await session.getToken());return;}
    if(data.type==='complete'){
     if(saving.current)throw new Error();

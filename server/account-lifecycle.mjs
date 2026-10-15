@@ -41,6 +41,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_workspace_sheets'")).rows.length){data.workspaceSheets=await rows('origen_workspace_sheets');data.workspaceSheetReceipts=await rows('origen_workspace_sheet_receipts');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length)data.institutionAffiliationRequests=(await c.query('SELECT parent_name,parent_website,unit_name,unit_type,status,review_note,created_at,updated_at FROM origen_institution_affiliation_requests WHERE auth0_subject=$1',[subject])).rows;
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_privacy_preferences'")).rows.length){data.formatVersion=4;data.privacyPreferences=await rows('origen_privacy_preferences');}
+   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_eligibility'")).rows.length){data.eligibility=(await c.query('SELECT age_band,audience,status,notice_version,request_id,guardian_email,permission_expires_at,decided_at FROM origen_eligibility WHERE subject_hash=$1',[subjectHash(subject)])).rows;data.permissionEvents=(await c.query('SELECT request_id,notice_version,decision,occurred_at FROM origen_permission_events WHERE subject_hash=$1',[subjectHash(subject)])).rows;}
    // No invite tokens/hashes, other participants' private data or identity credentials.
    await c.query('COMMIT');return data;
   }
@@ -50,6 +51,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
   if((await c.query('SELECT id FROM origen_institution_reviews WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length&&(await c.query('SELECT id FROM origen_institution_affiliation_requests WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
   await c.query('INSERT INTO origen_closed_accounts(subject_hash) VALUES($1) ON CONFLICT(subject_hash) DO NOTHING',[subjectHash(subject)]);
+  if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_eligibility'")).rows.length)await c.query('DELETE FROM origen_eligibility WHERE subject_hash=$1',[subjectHash(subject)]);
   if(account)await c.query('DELETE FROM origen_accounts WHERE id=$1',[account.id]);
   await c.query('DELETE FROM origen_institution_representatives WHERE auth0_subject=$1',[subject]);
   await c.query('COMMIT');return {deleted:true,identityProviderDeletion:'pending',backupDeletion:'provider_retention',closureReceipt:'subject_sha256'};

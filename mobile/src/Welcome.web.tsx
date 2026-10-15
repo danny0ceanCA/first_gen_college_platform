@@ -3,7 +3,7 @@ import {useSession} from './Session';
 import type {Account,Student} from './family';
 
 const origin=new URL(process.env.EXPO_PUBLIC_WEB_URL||'https://origenedu.ai').origin;
-export default function Welcome({account,es,save,logout,onFinished}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void}){
+export default function Welcome({account,es,save,logout,onFinished,permissionOnly=false}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void;permissionOnly?:boolean}){
  const session=useSession();const frame=useRef<HTMLIFrameElement>(null);const saving=useRef(false);
  useEffect(()=>{
   const reply=(id:string,value:unknown,error=false)=>frame.current?.contentWindow?.postMessage({id,value,error},origin);
@@ -11,7 +11,7 @@ export default function Welcome({account,es,save,logout,onFinished}:{account:Acc
    if(event.origin!==origin||event.source!==frame.current?.contentWindow)return;
    const data=event.data;if(!data||typeof data.id!=='string'||data.id.length>100)return;
    try{
-    if(data.type==='ready')reply(data.id,{subject:session.subject,firstName:account.firstName,role:account.role,language:es?'es':'en'});
+    if(data.type==='ready')reply(data.id,{permissionOnly,subject:session.subject,firstName:account.firstName,role:account.role,language:es?'es':'en'});
     else if(data.type==='token')reply(data.id,await session.getToken());
     else if(data.type==='closed')onFinished?.();
     else if(data.type==='complete'){
@@ -24,6 +24,6 @@ export default function Welcome({account,es,save,logout,onFinished}:{account:Acc
    }catch{reply(data.id,null,true);}
   };
   window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);
- },[account,es,onFinished,save,session]);
+ },[account,es,onFinished,save,session,permissionOnly]);
  return <div style={{height:'100dvh',display:'flex',flexDirection:'column',background:'#a4513c'}}><button onClick={logout} style={{alignSelf:'flex-end',background:'transparent',border:0,padding:12,color:'#f4eee4'}}>{es?'Salir':'Exit'}</button><iframe ref={frame} title="Origen live onboarding" src={`${origin}/#native-welcome`} allow={`microphone ${origin}; autoplay ${origin}`} referrerPolicy="origin" style={{flex:1,width:'100%',border:0}}/></div>;
 }

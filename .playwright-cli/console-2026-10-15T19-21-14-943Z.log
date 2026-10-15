@@ -1,0 +1,21 @@
+[     233ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[    3203ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[    3248ms] [ERROR] Failed to load resource: the server responded with a status of 410 (Gone) @ http://127.0.0.1:5183/api/guardian-permission:0
+[    3464ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[   22411ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:5183/@vite/client:963
+[   22417ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_NETWORK_IO_SUSPENDED @ http://127.0.0.1:5183/@vite/client:1034
+[   99815ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_NETWORK_IO_SUSPENDED @ http://127.0.0.1:5183/@vite/client:1034
+[  101547ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  101623ms] [ERROR] Failed to load resource: the server responded with a status of 410 (Gone) @ http://127.0.0.1:5183/api/guardian-permission:0
+[  155511ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:5183/@vite/client:963
+[  155513ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  156528ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  157578ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  158603ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  159630ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  160650ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  161728ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  162761ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  163767ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:5183/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:5183/@vite/client:1034
+[  172158ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5183/node_modules/.vite/deps/react-dom_client.js?v=109c7256:22164
+[  172320ms] [ERROR] Failed to load resource: the server responded with a status of 410 (Gone) @ http://127.0.0.1:5183/api/guardian-permission:0

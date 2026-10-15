@@ -1,0 +1,34 @@
+async page=>{
+ const origin='http://127.0.0.1:5183',errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.context().route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await page.setViewportSize({width:390,height:844});await page.goto(origin+'/guardian-review');
+ const selects=page.locator('.eligibility-panel select');await selects.first().waitFor();
+ if(await selects.nth(0).inputValue()||await selects.nth(1).inputValue())throw Error('Preselected eligibility');
+ if(await page.getByRole('heading',{name:'Protected account is available'}).count())throw Error('Early profile mount');
+ await page.screenshot({path:'output/playwright/guardian-screen-mobile.png',fullPage:true});
+ await selects.nth(0).selectOption('13to17');await selects.nth(1).selectOption('grade9plus');await page.getByRole('button',{name:'Continue',exact:true}).click();
+ await page.getByLabel('Parent or guardian email',{exact:true}).fill('guardian@example.invalid');await page.getByRole('button',{name:'Request permission',exact:true}).click();
+ await page.getByText('Synthetic review: a mock message was captured. No email was sent.',{exact:true}).waitFor();
+ if(await page.getByRole('heading',{name:'Protected account is available'}).count())throw Error('Pending account unlocked');
+ const messages=await(await page.request.get(origin+'/__review/mailbox')).json(),mail=messages.at(-1);
+ const guardian=await page.context().newPage();await guardian.goto(origin+'/guardian-review#guardian/'+mail.approvalToken);await guardian.getByRole('checkbox').waitFor();
+ if(await guardian.getByRole('checkbox').isChecked()||await guardian.getByRole('button',{name:'Approve account use',exact:true}).isEnabled())throw Error('Implicit consent');
+ await guardian.setViewportSize({width:390,height:844});await guardian.screenshot({path:'output/playwright/guardian-notice-mobile-en.png',fullPage:true});
+ await guardian.getByRole('button',{name:'Español',exact:true}).click();await guardian.getByRole('button',{name:'Autorizar el uso de la cuenta',exact:true}).waitFor();
+ await guardian.screenshot({path:'output/playwright/guardian-notice-mobile-es.png',fullPage:true});
+ await guardian.getByRole('checkbox').check();await guardian.getByRole('button',{name:'Autorizar el uso de la cuenta',exact:true}).click();
+ await page.getByRole('heading',{name:'Protected account is available'}).waitFor({timeout:10000});
+ await guardian.goto(origin+'/guardian-review#guardian/'+mail.approvalToken);await guardian.reload();await guardian.getByText('This link is unavailable, expired, or already used. Contact us for help.',{exact:true}).waitFor();
+ await guardian.goto(origin+'/guardian-review#guardian/'+mail.withdrawalToken);await guardian.reload();await guardian.getByRole('checkbox').check();await guardian.getByRole('button',{name:'Withdraw permission',exact:true}).click();
+ await page.getByText('This account cannot continue into profiles or AI. Contact daniel@origenedu.ai for help or a deletion request. Changing the answers is not available here.',{exact:true}).waitFor({timeout:10000});
+ if(await page.getByRole('heading',{name:'Protected account is available'}).count())throw Error('Revoked account stayed mounted');
+ await page.getByLabel('Review account',{exact:true}).selectOption('synthetic-adult');await selects.first().waitFor();
+ if(await selects.first().inputValue())throw Error('Previous account age leaked');
+ await selects.nth(0).selectOption('18plus');await selects.nth(1).selectOption('adult_supporter');await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('heading',{name:'Protected account is available'}).waitFor();
+ await page.getByLabel('Review account',{exact:true}).selectOption('synthetic-other');await selects.first().waitFor();await selects.nth(0).selectOption('under13');await selects.nth(1).selectOption('grade9plus');await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByText('This account cannot continue into profiles or AI. Contact daniel@origenedu.ai for help or a deletion request. Changing the answers is not available here.',{exact:true}).waitFor();
+ if(await page.locator('input[type=email]').count())throw Error('Guardian email collected from under-13 account');
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile horizontal overflow');
+ if(errors.length)throw Error(errors.join('; '));await guardian.close();
+ await page.evaluate(()=>{document.body.dataset.guardianChecks='passed';});
+ return {passed:true,checks:['neutral selection','pending profile block','mock email','explicit bilingual guardian action','approval','single-use replay','withdrawal','account switching','adult path','under-13 block','mobile layout'],externalRequests:'blocked'};
+}

@@ -3,7 +3,7 @@ import {Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native'
 import {SafeAreaView} from 'react-native-safe-area-context';
 import type {Account,Student} from './family';
 
-export default function Welcome({account,es,save,logout,onFinished}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void}){
+export default function Welcome({account,es,save,logout,onFinished,permissionOnly=false}:{account:Account;es:boolean;save:(account:Account,student?:Student)=>Promise<boolean>;logout:()=>void;onFinished?:()=>void;permissionOnly?:boolean}){
  const t=(en:string,spanish:string)=>es?spanish:en;
  const [name,setName]=useState(account.firstName);
  const [role,setRole]=useState<Account['role']>(account.role);
@@ -15,6 +15,7 @@ export default function Welcome({account,es,save,logout,onFinished}:{account:Acc
   try{if(!await save({...account,firstName:name.trim(),role}))setError(true);else onFinished?.();}
   catch{setError(true);}finally{setSaving(false);}
  };
+ if(permissionOnly)return <SafeAreaView style={styles.page}><Text>Open the supported Origen web or native app to review permission. / Abre la aplicación web o nativa de Origen para revisar el permiso.</Text><Pressable accessibilityRole="button" onPress={logout}><Text>Sign out / Cerrar sesión</Text></Pressable></SafeAreaView>;
  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
   <Text style={styles.logo}>○ origen.</Text>
   <Text accessibilityRole="header" style={styles.title}>{t('Welcome to Origen','Bienvenido a Origen')}</Text>

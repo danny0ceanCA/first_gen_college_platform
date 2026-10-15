@@ -1,3 +1,4 @@
+import {createPermissionRepository} from './guardian-permission.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -150,6 +151,7 @@ test('PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and
    await as('alice',async()=>assert.deepEqual((await db.query(`SELECT * FROM ${schema}_reporting.origen_conversation_summaries`)).rows,[]));
   });
   await t.test('HTTP authentication is the only source of account and reporting authority',async()=>{
+   for(const sub of ['alice','admin'])await as(sub,()=>createPermissionRepository(db).account(sub,{action:'screen',ageBand:'18plus',audience:'grade9plus'}));
    const seconds=Math.floor(Date.now()/1000);
    server=createServer(createApp({ADMIN_SUBJECTS:'admin',OPENAI_API_KEY:'synthetic'},async token=>({sub:token,iat:seconds,[MFA_TIME_CLAIM]:seconds,[AUTH_TIME_CLAIM]:seconds,permissions:token==='admin'?[...new Set(Object.values(ADMIN_ACTIONS))]:token==='analyst'?['read:activity']:[]}),db,()=>{}));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
    const call=async(sub,path,body)=>{const response=await fetch(`http://127.0.0.1:${server.address().port}${path}`,{method:'POST',headers:{Authorization:`Bearer ${sub}`,'Content-Type':'application/json'},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
