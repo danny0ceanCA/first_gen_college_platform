@@ -20,13 +20,12 @@ test('export is account-scoped and confirmed closure cascades private records wi
   const receipt=(await pool.query('SELECT * FROM origen_closed_accounts')).rows[0];assert.equal(receipt.subject_hash.length,64);assert.doesNotMatch(JSON.stringify(receipt),/owner/);
  }finally{await pool.end();}
 });
-test('linked accounts must unlink explicitly and expired invitations are removed',async()=>{
+test('closure detaches family links while preserving the other account and removes expired invitations',async()=>{
  const {pool,run}=await fixture();const links=createLinksRepository(pool),life=createLifecycleRepository(pool);
  try{
   await run('owner',{action:'save-student',student});const invite=await links('owner',{action:'create',studentId:'s',role:'student'});const joined=await links('member',{action:'accept',token:invite.token});
-  await assert.rejects(life('owner',{action:'delete',confirmation:'DELETE'}),{status:409,message:'unlink_family_first'});
-  await assert.rejects(life('member',{action:'delete',confirmation:'DELETE'}),{status:409});
-  await links('owner',{action:'unlink',id:joined.links[0].id});await life('owner',{action:'delete',confirmation:'DELETE'});assert.equal((await run('member',{action:'load'})).students[0].name,'Student');
+  await life('owner',{action:'delete',confirmation:'DELETE'});assert.equal((await run('member',{action:'load'})).students[0].name,'Student');
+  assert.equal((await pool.query('SELECT * FROM origen_student_links')).rows.length,0);
   await pool.query("INSERT INTO origen_family_invites(owner_account_id,student_id,target_role,token_hash,expires_at) SELECT account_id,id,'parent',$1,$2::timestamptz FROM origen_students",['a'.repeat(64),new Date('2020-01-01')]);
   await purgeExpiredInvites(pool);assert.equal((await pool.query('SELECT * FROM origen_family_invites')).rows.length,0);
  }finally{await pool.end();}

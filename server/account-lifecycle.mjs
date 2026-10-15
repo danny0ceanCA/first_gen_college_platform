@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {recentlyAuthenticated} from './recent-auth.mjs';
+import {unlinkFamily} from './family-unlink.mjs';
 export const subjectHash=subject=>createHash('sha256').update(subject).digest('hex');
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export async function accountClosed(database,subject){
@@ -46,10 +47,15 @@ export function createLifecycleRepository(database){return async(subject,input)=
    await c.query('COMMIT');return data;
   }
   if(input.action!=='delete'||input.confirmation!=='DELETE')throw fail(400,'confirmation_required');
-  if(account&&(await c.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 OR member_account_id=$1',[account.id])).rows.length)throw fail(409,'unlink_family_first');
   if((await c.query('SELECT institution_id FROM origen_institution_members WHERE auth0_subject=$1',[subject])).rows.length)throw fail(409,'institution_membership_requires_review');
   if((await c.query('SELECT id FROM origen_institution_reviews WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length&&(await c.query('SELECT id FROM origen_institution_affiliation_requests WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
+  if(account){
+   // Restricted runtime can read links; the scoped unlink function takes the
+   // row lock with its existing authority, without granting table UPDATE.
+   const links=(await c.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 OR member_account_id=$1 ORDER BY id',[account.id])).rows;
+   for(const link of links)await unlinkFamily(c,account.id,link.id);
+  }
   await c.query('INSERT INTO origen_closed_accounts(subject_hash) VALUES($1) ON CONFLICT(subject_hash) DO NOTHING',[subjectHash(subject)]);
   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_eligibility'")).rows.length)await c.query('DELETE FROM origen_eligibility WHERE subject_hash=$1',[subjectHash(subject)]);
   if(account)await c.query('DELETE FROM origen_accounts WHERE id=$1',[account.id]);

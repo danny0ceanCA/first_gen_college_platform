@@ -1,0 +1,68 @@
+{
+  "path": "C:\\Users\\danie\\Documents\\ChatGPT\\Project Elo-Em\\output\\pdf\\Origen_Edu_Public_Privacy_Notice.pdf",
+  "pages": 9,
+  "sha256": "9fcb06a924de485c2bf229e194c705e10d2acc83125cbd32d83b9054bb63942c",
+  "websitePolicyMatchesExactly": true,
+  "sourcePolicySections": 8,
+  "extractedTextItemsVerified": 139,
+  "renderDpi": 90,
+  "visuallyInspectedPages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "metadata": {
+    "/Title": "Origen Edu Privacy Notice",
+    "/Author": "Blueprint Holdings LLC",
+    "/Subject": "Privacy information for students, families and community organizations",
+    "/Creator": "Origen Edu",
+    "/Producer": "Origen Edu"
+  },
+  "annotations": [
+    {
+      "page": 3,
+      "url": "https://developers.openai.com/api/docs/guides/your-data"
+    },
+    {
+      "page": 3,
+      "url": "https://openai.com/enterprise-privacy/"
+    },
+    {
+      "page": 5,
+      "url": "https://www.okta.com/privacy-policy/"
+    },
+    {
+      "page": 5,
+      "url": "https://render.com/privacy"
+    },
+    {
+      "page": 5,
+      "url": "https://policies.google.com/privacy"
+    },
+    {
+      "page": 5,
+      "url": "https://resend.com/legal/privacy-policy"
+    }
+  ],
+  "attachments": [],
+  "forms": [],
+  "internalTextLeaks": [],
+  "draftOrDateLabels": false,
+  "protectedFilesChecked": 524,
+  "protectedFilesChanged": [],
+  "trackedFilesModified": [
+    "output/pdf/Origen_Edu_Public_Privacy_Notice.pdf",
+    "output/pdf/Origen_Edu_Public_Privacy_Notice.py",
+    "output/pdf/Origen_Edu_Public_Privacy_Notice.txt"
+  ],
+  "limitations": [
+    "Compared to the checked-in English website policy at c422eb6; no live-site or provider behavior revalidation.",
+    "Library item was not uploaded or replaced."
+  ]
+}

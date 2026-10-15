@@ -4,6 +4,7 @@ import {guardAccountTransaction} from './account-guard.mjs';
 import {runAsGuardian} from './account-isolation.mjs';
 import {eligibilityAllowed} from './permission-context.mjs';
 import {createGuardianMailer,GUARDIAN_NOTICE_VERSION,GUARDIAN_NOTICE} from './guardian-email.mjs';
+import {createGuardianRateLimit} from './guardian-rate-limit.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 const validToken=token=>typeof token==='string'&&/^[A-Za-z0-9_-]{43}$/.test(token);
@@ -53,7 +54,7 @@ export function createPermissionRepository(database,{mailer=createGuardianMailer
   }
   return eligibilityView(row,clock());
  }
- async function guardian(input){
+ async function guardian(input,{onMatched=()=>{}}={}){
   available();if(!validToken(input.token)||!['view','approve','decline','withdraw'].includes(input.action))throw fail(400,'invalid_request');
   const hash=tokenHash(input.token);
   return runAsGuardian(hash,async()=>{
@@ -62,13 +63,16 @@ export function createPermissionRepository(database,{mailer=createGuardianMailer
     await c.query('BEGIN');
     let row=(await c.query('SELECT * FROM origen_eligibility WHERE approval_hash=$1 OR withdrawal_hash=$1',[hash])).rows[0];
     if(!row)throw fail(410,'permission_link_unavailable');
+    onMatched(hash); // Limit a real capability before acquiring subject locks.
     await c.query('SELECT subject_hash FROM origen_subject_locks WHERE subject_hash=$1 FOR UPDATE',[row.subject_hash]);
     row=(await c.query('SELECT * FROM origen_eligibility WHERE approval_hash=$1 OR withdrawal_hash=$1 FOR UPDATE',[hash])).rows[0];
     if(!row)throw fail(410,'permission_link_unavailable');
     const withdrawal=row.withdrawal_hash===hash,now=clock();
     if(withdrawal?(!['pending','approved'].includes(row.status)||Date.parse(row.permission_expires_at)<=now):(row.status!=='pending'||Date.parse(row.approval_expires_at)<=now))throw fail(410,'permission_link_unavailable');
     if(input.action==='view'){await c.query('COMMIT');return {kind:withdrawal?'withdrawal':'approval',requestId:row.request_id,noticeVersion:row.notice_version,notice:GUARDIAN_NOTICE,permissionExpiresAt:row.permission_expires_at};}
-    if(row.notice_version!==GUARDIAN_NOTICE_VERSION||input.noticeVersion!==GUARDIAN_NOTICE_VERSION||input.confirmed!==true)throw fail(400,'guardian_confirmation_required');
+    // Withdrawal stops an existing grant; a newer approval notice must never
+    // invalidate the guardian's still-active withdrawal capability.
+    if(input.confirmed!==true||!withdrawal&&(row.notice_version!==GUARDIAN_NOTICE_VERSION||input.noticeVersion!==GUARDIAN_NOTICE_VERSION))throw fail(400,'guardian_confirmation_required');
     if(withdrawal?input.action!=='withdraw':!['approve','decline'].includes(input.action))throw fail(403,'permission_link_wrong_action');
     const status=input.action==='approve'?'approved':input.action==='decline'?'denied':'revoked';
     // Consumed links remain hashed for replay detection. State prevents reuse;
@@ -87,7 +91,9 @@ export async function purgePermissionData(database,now=new Date()){
 }
 export function createPermissionHandler(database,env={},options={}){
  const repository=createPermissionRepository(database,{mailer:createGuardianMailer(env),...options});
+ const rateLimit=createGuardianRateLimit();
  return {repository,async handle(req,res,publicGuardian=false){
+  let matched=false;
   const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
   try{
    if(!req.headers['content-type']?.startsWith('application/json'))throw fail(415,'json_required');
@@ -95,7 +101,12 @@ export function createPermissionHandler(database,env={},options={}){
    let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
    const keys=publicGuardian?['action','token','noticeVersion','confirmed']:['action','ageBand','audience','guardianEmail'];
    if(!input||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))throw fail(400,'invalid_request');
-   return send(200,publicGuardian?await repository.guardian(input):{...await repository.account(req.origenIdentity.sub,input),subject:req.origenIdentity.sub});
-  }catch(error){const status=[400,403,409,410,413,415,429].includes(error.status)?error.status:503;return send(status,{error:status===503?'permission_unavailable':error.message});}
+   return send(200,publicGuardian?await rateLimit.lookup(()=>repository.guardian(input,{onMatched:hash=>{matched=true;rateLimit.capability(hash);}})):{...await repository.account(req.origenIdentity.sub,input),subject:req.origenIdentity.sub});
+  }catch(error){
+   // An indexed lookup is necessary to distinguish a fresh valid capability
+   // from guesses, even if invalid traffic has exhausted this proxy's budget.
+   if(publicGuardian&&!matched){try{rateLimit.invalid(req.socket?.remoteAddress||'unknown');}catch(limited){error=limited;}}
+   const status=[400,403,409,410,413,415,429].includes(error.status)?error.status:503;return send(status,{error:status===503?'permission_unavailable':error.message});
+  }
  }};
 }

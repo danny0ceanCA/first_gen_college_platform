@@ -80,13 +80,7 @@ export function createApp(env=process.env,verify,database=null,writeLog=record=>
   }
   if(req.method==='GET'&&/^\/api\/institutions\/(?:directory|(?:published|pages|qr)\/[a-z0-9-]{1,100})$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
   if(req.method!=='POST')return send(405,'method_not_allowed');
-  if(req.url==='/api/guardian-permission'){
-   const key=`guardian:${req.socket.remoteAddress||'unknown'}`,now=Date.now();
-   for(const [k,v] of buckets)if(v.reset<now)buckets.delete(k);
-   const budget=buckets.get(key)||{count:0,reset:now+60000};buckets.set(key,budget);
-   if(++budget.count>30)return send(429,'rate_limited');
-   return permission.handle(req,res,true);
-  }
+  if(req.url==='/api/guardian-permission')return permission.handle(req,res,true);
   if(req.url==='/api/institution-inquiries/public')return inquiries(req,res,()=>send(404,'not_found'));
   if(req.url==='/api/institution-metrics/event')return metrics(req,res,()=>send(404,'not_found'));
   const token=/^Bearer (.+)$/.exec(req.headers.authorization||'')?.[1];

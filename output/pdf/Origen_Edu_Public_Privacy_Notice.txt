@@ -204,6 +204,10 @@ Backups, support and provider records
 
 Backups, infrastructure and security logs, support correspondence and records needed for legal obligations follow separate retention rules. They are not removed simply by changing summary retention. We do not promise immediate erasure from every backup or provider system. Contact daniel@origenedu.ai about the records involved in your request.
 
+Operational and progress records
+
+When enabled, limited guidance history records session times, topics, confirmed student references, language, connection events, model configuration references and official-source links for 90 days. It does not store audio or a transcript. Accepted academic profile changes, plan revisions, optional helpfulness feedback and self-reported progress also have 90-day cleanup schedules. These records are private; institution reports do not receive them. Onboarding diagnostic records have a retention period of 7 to 90 days, with 90 days as the default. Scheduled cleanup runs periodically rather than at the exact expiration time.
+
 
 
 6. ELIGIBILITY AND GUARDIAN PERMISSION

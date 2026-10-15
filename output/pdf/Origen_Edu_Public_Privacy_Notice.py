@@ -124,7 +124,9 @@ PAGES = [
 ('h','Deletion receipts and closure records'),
 ('p','Limited deletion records can remain after private content is removed. They contain account or record identifiers, hashed identifiers, record type and deletion dates so deleted information is not inadvertently restored or recreated. They do not contain the deleted conversation prose, but they are not necessarily anonymous. These safeguards currently have no automatic expiration and may remain indefinitely.'),
 ('h','Backups, support and provider records'),
-('p','Backups, infrastructure and security logs, support correspondence and records needed for legal obligations follow separate retention rules. They are not removed simply by changing summary retention. We do not promise immediate erasure from every backup or provider system. Contact daniel@origenedu.ai about the records involved in your request.')
+('p','Backups, infrastructure and security logs, support correspondence and records needed for legal obligations follow separate retention rules. They are not removed simply by changing summary retention. We do not promise immediate erasure from every backup or provider system. Contact daniel@origenedu.ai about the records involved in your request.'),
+('h','Operational and progress records'),
+('p','When enabled, limited guidance history records session times, topics, confirmed student references, language, connection events, model configuration references and official-source links for 90 days. It does not store audio or a transcript. Accepted academic profile changes, plan revisions, optional helpfulness feedback and self-reported progress also have 90-day cleanup schedules. These records are private; institution reports do not receive them. Onboarding diagnostic records have a retention period of 7 to 90 days, with 90 days as the default. Scheduled cleanup runs periodically rather than at the exact expiration time.')
 ]),
 ('6. Eligibility and guardian permission', [
 ('h','Who can use an account'),
@@ -202,6 +204,8 @@ for n,(title,blocks) in enumerate(PAGES):
     if n:story.append(PageBreak())
     story.append(Paragraph(escape(title),styles['title']));text.append(title.upper()+'\n')
     for kind,value in blocks:
+        if n==5 and kind=='h' and value=='Deletion receipts and closure records':
+            story.extend([PageBreak(),Paragraph(escape(title+' (continued)'),styles['title'])])
         if kind=='table':
             cells=[[Paragraph(escape(cell),styles['headcell' if row==0 else 'cell']) for cell in pair] for row,pair in enumerate(value)]
             table=Table(cells,colWidths=[140,378],repeatRows=1,hAlign='LEFT')
