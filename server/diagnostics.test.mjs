@@ -7,15 +7,16 @@ import {Readable} from 'node:stream';
 import {createDiagnostics,createDiagnosticHandler,diagnosticRecord} from './diagnostics.mjs';
 test('diagnostics excludes content and writes ordered technical records',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'camino-diagnostics-'));
+ const log=createDiagnostics(dir);
  try{
-  const log=createDiagnostics(dir);
   await Promise.all([log({sessionId:'test-session',event:'session_start',transcript:'private',profile:{name:'private'},apiKey:'secret',audio:'private'}),log({sessionId:'test-session',event:'api_error',code:'invalid_value',parameter:'item_id',operation:'conversation.item.delete',message:'private'})]);
   const text=await readFile(join(dir,'voice.jsonl'),'utf8');
   const records=text.trim().split('\n').map(JSON.parse);
   assert.deepEqual(records.map(r=>r.event),['session_start','api_error']);
-  assert.equal(records[1].parameter,'item_id');assert.ok(!/private|secret/.test(text));
+  assert.equal(records[1].parameter,undefined);assert.ok(!/private|secret/.test(text));
+  assert.equal(records[0].producer,'browser');assert.equal(records[0].sessionId,undefined);
   assert.equal(diagnosticRecord({code:'unsafe\nvalue'}).code,undefined);
- }finally{await rm(dir,{recursive:true,force:true});}
+ }finally{await log.close();await rm(dir,{recursive:true,force:true});}
 });
 test('diagnostic endpoint requires local origin and bounds the payload',async()=>{
  const records=[],handler=createDiagnosticHandler(x=>records.push(diagnosticRecord(x)));

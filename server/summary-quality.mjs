@@ -1,3 +1,4 @@
+import {providerOperation} from './observability/dependencies.mjs';
 export const summaryCategories=['summary_correction','summary_omission','summary_unsupported_claim','summary_commitment','summary_uncertainty'];
 const reasons={summary_correction:'A later explicit correction may not be reflected in the summary.',summary_omission:'An important goal or unresolved question may be missing.',summary_unsupported_claim:'A summary claim may lack support in the captured conversation.',summary_commitment:'A suggestion or discussion may have become an agreement or completed action.',summary_uncertainty:'A qualification, failed verification or uncertainty may have been lost.'};
 
@@ -11,6 +12,7 @@ export function validateSummaryReview(value,turns){
 }
 
 export function createSummaryReviewer(env,request=fetch){
+ request=providerOperation('summary.review',request,{model:env.OPENAI_MODEL_SUMMARY||env.OPENAI_MODEL_CONVERSATION||'gpt-4.1-mini'});
  return async(summary,turns)=>{
   if(!env.OPENAI_API_KEY)return {status:'unavailable'};
   // Do not silently truncate evidence and then judge a summary using partial context.

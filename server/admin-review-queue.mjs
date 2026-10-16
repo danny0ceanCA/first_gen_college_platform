@@ -118,5 +118,5 @@ export async function purgeAdminReviews(db,now=new Date(),env={}){
  // Remove decisions whose source no longer exists, including configured shorter
  // onboarding retention. No content or long-lived shadow incident database.
  const f=reviewFilters({days:90,status:'all',evidence:'all'},now);
- await db.query(`${reviewFactsSQL} DELETE FROM origen_admin_issue_reviews r WHERE NOT EXISTS(SELECT 1 FROM facts f WHERE f.account_id=r.account_id AND f.issue_key=r.issue_key)`,params(f,now,env));
+ await db.query(`${reviewFactsSQL} DELETE FROM origen_admin_issue_reviews r WHERE r.ctid IN (SELECT candidate.ctid FROM origen_admin_issue_reviews candidate WHERE NOT EXISTS(SELECT 1 FROM facts f WHERE f.account_id=candidate.account_id AND f.issue_key=candidate.issue_key) LIMIT 250)`,params(f,now,env));
 }

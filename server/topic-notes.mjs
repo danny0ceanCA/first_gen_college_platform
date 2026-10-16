@@ -1,3 +1,4 @@
+import {databaseOperation,providerOperation} from './observability/dependencies.mjs';
 import {randomUUID,createHash} from 'node:crypto';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {safeErrorCode} from './api-logging.mjs';
@@ -31,7 +32,7 @@ const present=row=>({id:row.id,studentId:row.student_id,topic:row.topic,kind:row
 export function createTopicRepository(database){
  return async(subject,input)=>{
   if(!database)throw fail(503,'notes_unavailable');
-  const c=await database.connect();
+  const c=await databaseOperation(database,['list','read-note','source'].includes(input.action)?'notes.list':'notes.save');
   try{
    await c.query('BEGIN');await guardAccountTransaction(c,subject);
    const account=(await c.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1 FOR UPDATE',[subject])).rows[0];
@@ -96,6 +97,7 @@ export function validateSuggestions(values,summary){
  });
 }
 async function modelText(env,request,instructions,input,json=false){
+ request=providerOperation('notes.generate',request,{model:env.OPENAI_MODEL_SUMMARY||'gpt-4.1-mini'});
  if(!env.OPENAI_API_KEY)throw fail(503,'notes_ai_unavailable');
  const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL_SUMMARY||'gpt-4.1-mini',store:false,max_output_tokens:2200,instructions,input,...(json?{text:{format:{type:'json_schema',name:'topic_notes',strict:true,schema:{type:'object',properties:{notes:{type:'array',maxItems:6,items:{type:'object',properties:{topic:{type:'string',enum:topics},kind:{type:'string',enum:kinds},content:{type:'string'},quote:{type:'string'}},required:['topic','kind','content','quote'],additionalProperties:false}}},required:['notes'],additionalProperties:false}}}}:{})}),signal:AbortSignal.timeout(30000)});
  if(!response.ok)throw fail(503,'notes_ai_unavailable');const data=await response.json();
@@ -153,7 +155,7 @@ export function createTopicNotesHandler(database,env=process.env,request=fetch){
   if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
   if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
-  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16000)return send(413,{error:'too_large'});}let input;try{input=validateTopicRequest(JSON.parse(raw));}catch{return send(400,{error:'invalid_note'});}return send(200,await run(req.origenIdentity.sub,input));}
-  catch(error){const known=[400,403,404,409,429].includes(error.status);if(!known)req.log?.({event:'api_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'notes_unavailable'});}
+  try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16000)return send(413,{error:'too_large'});}let input;try{input=validateTopicRequest(JSON.parse(raw));}catch{return send(400,{error:'invalid_note'});}await req.bindDiagnosticOperation?.('notes',input.studentId);const result=await run(req.origenIdentity.sub,input);req.log?.({event:'note.operation.finished',outcome:'completed'});return send(200,result);}
+  catch(error){req.log?.({event:'note.operation.finished',outcome:'failed',code:safeErrorCode(error)});const known=[400,403,404,409,429].includes(error.status);if(!known)req.log?.({event:'api_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'notes_unavailable'});}
  };
 }

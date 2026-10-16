@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "performedAt": "2026-10-07T05:10:04.145Z",
+  "performedAt": "2026-10-16T20:25:32.348Z",
   "status": "passed",
   "method": "isolated pg-mem synthetic stale snapshot, closure replay twice",
   "checks": [
@@ -13,7 +13,7 @@
   "limitations": [
     "Not PostgreSQL backup/PITR evidence",
     "Only accounts/students/summaries snapshot; no production or phase 2/3 tables",
-    "Linked family and institution conflicts require operator review before reopening traffic",
+    "Family closure preservation and institutional review guards are checked separately in test:ops",
     "No measured RPO/RTO or provider identity deletion"
   ]
 }

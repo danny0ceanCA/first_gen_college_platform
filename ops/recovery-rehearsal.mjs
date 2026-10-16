@@ -14,8 +14,8 @@ export async function restoreSyntheticSnapshot(pool,snapshot){
   const columns=Object.keys(row);await pool.query(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map((_,i)=>`$${i+1}`).join(',')})`,Object.values(row));
  }
 }
-// Deliberately scoped to isolated fixtures. Existing lifecycle safeguards stop
-// replay when restored family links or institution obligations need review.
+// Deliberately scoped to isolated fixtures. Lifecycle closure detaches restored
+// family links while preserving the survivor; institutional duties still stop replay.
 export async function replaySyntheticClosures(pool,receipts){
  const accounts=(await pool.query('SELECT auth0_subject FROM origen_accounts')).rows;
  const close=createLifecycleRepository(pool);
@@ -41,7 +41,7 @@ export async function rehearseRecovery(){
   const remaining=(await restored.pool.query('SELECT * FROM origen_students')).rows;
   const survivor=(await restored.run('synthetic-survivor',{action:'load'})).students;
   if(!resurrectedBeforeReplay||!blocked||remaining.length!==1||survivor[0]?.name!=='Synthetic B')throw new Error('Recovery invariant failed');
-  return {schemaVersion:1,performedAt:new Date().toISOString(),status:'passed',method:'isolated pg-mem synthetic stale snapshot, closure replay twice',checks:['stale restore reproduces resurrection risk','closure receipt blocks closed identity','private student rows removed','surviving account preserved','replay idempotent'],limitations:['Not PostgreSQL backup/PITR evidence','Only accounts/students/summaries snapshot; no production or phase 2/3 tables','Linked family and institution conflicts require operator review before reopening traffic','No measured RPO/RTO or provider identity deletion']};
+  return {schemaVersion:1,performedAt:new Date().toISOString(),status:'passed',method:'isolated pg-mem synthetic stale snapshot, closure replay twice',checks:['stale restore reproduces resurrection risk','closure receipt blocks closed identity','private student rows removed','surviving account preserved','replay idempotent'],limitations:['Not PostgreSQL backup/PITR evidence','Only accounts/students/summaries snapshot; no production or phase 2/3 tables','Family closure preservation and institutional review guards are checked separately in test:ops','No measured RPO/RTO or provider identity deletion']};
  }finally{await original.pool.end();await restored.pool.end();}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){

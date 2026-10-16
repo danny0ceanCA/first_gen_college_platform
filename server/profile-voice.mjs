@@ -1,3 +1,4 @@
+import {providerOperation} from './observability/dependencies.mjs';
 import {bilingualTranscriptionPrompt,voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 import {loadVoiceWorkspace,validateWorkspaceFocus,workspaceInstructions,binderInstructions} from './voice-workspace.mjs';
 import {safeErrorCode} from './api-logging.mjs';
@@ -98,6 +99,7 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
 }
 
 export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, database = null) {
+  request=providerOperation('voice.negotiate',request,{model:env.OPENAI_MODEL_VOICE||'gpt-realtime-2.1'});
   let active = 0;
   const guidance=createGuidanceRepository(database);
   return async(req,res,next) => {
@@ -152,6 +154,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
           }
         }catch(error){return send([400,404,409].includes(error.status)?error.status:503,{error:[400,404,409].includes(error.status)?error.message:'workspace_unavailable'});}
       }
+      if(req.origenAuthorized&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed))await req.bindDiagnosticOperation?.('voice',input.studentId);
       const config=voiceSession(input,env);
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);

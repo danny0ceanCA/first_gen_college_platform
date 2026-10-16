@@ -18,7 +18,7 @@ test('all API outcomes have unique request IDs, safe logs and CORS-visible corre
   responses.push(await fetch(base+'/api/family',{method:'POST',headers:{Origin:'https://other.example',Authorization:'Bearer valid'}}));
   responses.push(await fetch(base+'/api/missing-private-path',{method:'POST',headers:{Authorization:'Bearer valid'}}));
   assert.deepEqual(responses.map(r=>r.status),[401,401,403,503]);
-  assert.equal(responses[0].headers.get('Access-Control-Expose-Headers'),'X-Request-ID');
+  assert.equal(responses[0].headers.get('Access-Control-Expose-Headers'),'X-Request-ID, X-Origen-Operation-ID');
   const records=logs.filter(r=>r.event==='api_request');assert.equal(records.length,4);
   assert.deepEqual(records.map(r=>r.code),['authentication_required','invalid_token','origin_not_allowed','permission_unavailable']);
   const ids=responses.map(r=>r.headers.get('X-Request-ID'));assert.equal(new Set(ids).size,4);assert.deepEqual(records.map(r=>r.requestId),ids);

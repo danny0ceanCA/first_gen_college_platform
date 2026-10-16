@@ -12,7 +12,7 @@ export const ADMIN_ACTIONS=Object.freeze({
 });
 export const staffHash=value=>createHash('sha256').update(value).digest('hex');
 export function staffPermissions(identity,env={}){
- const known=new Set([...Object.values(ADMIN_ACTIONS),'manage:institutions']);
+ const known=new Set([...Object.values(ADMIN_ACTIONS),'manage:institutions','observability:investigate']);
  const permissions=new Set((Array.isArray(identity?.permissions)?identity.permissions:[]).filter(p=>known.has(p)));
  // Legacy allowlists retain reporting only. They cannot grant new write powers.
  if((env.ADMIN_SUBJECTS||'').split(',').map(s=>s.trim()).filter(Boolean).includes(identity?.sub))permissions.add('read:activity');
@@ -37,7 +37,7 @@ export function adminCapabilities(identity,env){
 // No arbitrary payloads, names, email addresses, notes, tokens, or conversation
 // contents can enter this log. "authorized" records a gate decision, not success.
 export async function auditStaffDecision(database,identity,{scope,action,target,outcome}){
- if(!['admin','institution','inquiry','campaign','metrics','family'].includes(scope)||!/^[a-z][a-z-]{0,40}$/.test(action)||!['authorized','denied','completed'].includes(outcome))throw new Error('invalid_audit_event');
+ if(!['admin','institution','inquiry','campaign','metrics','family','support'].includes(scope)||!/^[a-z][a-z-]{0,40}$/.test(action)||!['authorized','denied','completed'].includes(outcome))throw new Error('invalid_audit_event');
  await database.query('INSERT INTO origen_privileged_access_audit(id,actor_hash,area,action,target_hash,outcome) VALUES($1,$2,$3,$4,$5,$6)',
   [randomUUID(),staffHash(identity.sub),scope,action,typeof target==='string'&&target?staffHash(target):null,outcome]);
 }

@@ -26,7 +26,7 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
   privacyLease.assert();
   const token=await getAccessTokenSilently();
   privacyLease.assert();
-  const response=await apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(operation),signal:signal?AbortSignal.any([signal,privacyLease.signal]):privacyLease.signal});
+  const response=await apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...(typeof operation.onboardingAttemptId==='string'?{'X-Origen-Operation':operation.onboardingAttemptId}:{})},body:JSON.stringify(operation),signal:signal?AbortSignal.any([signal,privacyLease.signal]):privacyLease.signal});
   const result=await response.json();
   privacyLease.assert();
   if(!response.ok||!Array.isArray(result.students)||!result.account)throw new Error(result.error||'family_unavailable');

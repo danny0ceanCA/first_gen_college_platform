@@ -5,6 +5,8 @@ import {animate} from 'animejs';
 import {useAuth0} from '@auth0/auth0-react';
 import {ArrowLeft,Check,ChevronRight,Compass,Download,GraduationCap,Languages,Map,MessageCircle,Plus,Trash2,Wallet} from 'lucide-react';
 import {apiFetch} from './api';
+import {apiFailure,diagnosticHint} from './diagnosticClient.mjs';
+import {ErrorReference} from './ErrorReference';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import {distinctConversationPoints} from './binderKeyPoints.mjs';
 import {binderExportData} from './binderExport.mjs';
@@ -42,7 +44,7 @@ export default function TopicNotebook({renderGuide,renderSummary,studentId,name,
  const showingPage=!mobile||mobilePage;
  const contents=useRef<HTMLElement>(null),pageView=useRef<HTMLDivElement>(null);
  const navigationPending=useRef(false);
- const [message,setMessage]=useState<{scope:string;text:string;error:boolean}|null>(null),[busy,setBusy]=useState(false);
+ const [message,setMessage]=useState<{scope:string;text:string;error:boolean;reference?:string}|null>(null),[busy,setBusy]=useState(false);
  const inFlight=useRef(false),mutationVersion=useRef(0),panel=useRef<HTMLElement>(null),editor=useRef<HTMLTextAreaElement>(null);
  const [originals,setOriginals]=useState<Record<string,boolean>>({});
  const tabs=useRef<HTMLDivElement>(null);
@@ -107,10 +109,10 @@ export default function TopicNotebook({renderGuide,renderSummary,studentId,name,
   if(!user?.sub||sub!==user.sub)throw new Error('account_changed');
   lease.assert();
   const timeout=AbortSignal.timeout(body.action==='sync'?105000:40000);
-  const response=await apiFetch('/api/topic-notes',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),signal:AbortSignal.any([controller.signal,lease.signal,timeout,...(signal?[signal]:[])])});
+  const response=await apiFetch('/api/topic-notes',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,'X-Origen-Operation':diagnosticHint('notes',body.studentId as string|null,JSON.stringify([body.action,body.id,body.summaryId,body.version]))},body:JSON.stringify(body),signal:AbortSignal.any([controller.signal,lease.signal,timeout,...(signal?[signal]:[])])});
   const result=await response.json();
   lease.assert();if(controller.signal.aborted)throw new DOMException('Request cancelled','AbortError');
-  if(!response.ok)throw new Error(result.error||'notes_unavailable');
+  if(!response.ok)throw apiFailure(response,result.error||'notes_unavailable');
   if(!Array.isArray(result.notes)||!Array.isArray(result.generatedSummaryIds)||result.notes.some((note:Note)=>note.studentId!==body.studentId))throw new Error('notes_unavailable');
   return result as Omit<Data,'scope'>;
   }finally{lease.release();requests.current.delete(controller);}
@@ -160,7 +162,7 @@ export default function TopicNotebook({renderGuide,renderSummary,studentId,name,
   if(inFlight.current)return;inFlight.current=true;setBusy(true);setMessage(null);
   const actionScope=scope,actionDraftKey=draftKey;
   try{const result=await request({...body,studentId:target});if(latestScope.current===actionScope){mutationVersion.current++;setData({scope:actionScope,...result});setLoadError(false);setMessage({scope:actionScope,text:success,error:false});}if(clearDraft)setDrafts(prev=>({...prev,[actionDraftKey]:undefined}));}
-  catch(error){if(latestScope.current===actionScope)setMessage({scope:actionScope,text:errorText(error instanceof Error?error.message:''),error:true});}
+  catch(error){if(latestScope.current===actionScope)setMessage({scope:actionScope,text:errorText(error instanceof Error?error.message:''),error:true,reference:(error as {errorReference?:string})?.errorReference});}
   finally{inFlight.current=false;setBusy(false);}
  }
  function edit(note?:Note,kind?:Kind){
@@ -235,7 +237,7 @@ export default function TopicNotebook({renderGuide,renderSummary,studentId,name,
    {showingPage&&open==='summary'&&renderSummary&&<section className="notebook-panel notebook-summary-page" ref={panel} id="notebook-panel" role={mobile?'region':'tabpanel'} tabIndex={0} aria-label={mobile?t('Summary','Resumen'):undefined} aria-labelledby={mobile?undefined:'notebook-tab-summary'}>{renderSummary(target,mobile)}<div className="notebook-export-toolbar">{exportButton()}</div></section>}
    {showingPage&&selected&&<section className="notebook-panel" id="notebook-panel" role={mobile?'region':'tabpanel'} ref={panel} tabIndex={0} aria-label={mobile?selected.title:undefined} aria-labelledby={mobile?undefined:`notebook-tab-${selected.id}`}><div className="notebook-panel-heading"><div><span className="home-kicker">{scopeLabel}</span><h3 id="notebook-topic-heading">{selected.title}</h3></div></div>
     <div className="notebook-toolbar"><WorkspaceTalkButton t={t} disabled={busy||loading||loadError} focus={{kind:'topic',studentId:target,topic:selected.id}}/><button type="button" className="button primary" disabled={busy||loading||loadError} onClick={()=>edit()}><Plus size={16} aria-hidden="true"/>{t('Add a note','Agregar una nota')}</button>{exportButton(selected.id)}</div>
-    {message?.scope===scope&&<div className="notebook-message" role={message.error?'alert':'status'}>{message.text}{message.error&&<button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Reload notebook','Recargar cuaderno')}</button>}</div>}
+    {message?.scope===scope&&<div className="notebook-message" role={message.error?'alert':'status'}>{message.text}{message.error&&<ErrorReference reference={message.reference} language={language}/>}{message.error&&<button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Reload notebook','Recargar cuaderno')}</button>}</div>}
     {busy&&<p role="status">{t('Working on your request…','Procesando tu solicitud…')}</p>}
     {draft&&<form className="notebook-editor" onSubmit={e=>{e.preventDefault();void act({action:draft.version?'update':'create',id:draft.id,...(draft.version?{version:draft.version}:{}),note:{topic:draft.topic,kind:draft.kind,content:draft.content,language:draft.language,decisionConfirmed:draft.decisionConfirmed}},t('Note saved to your account.','Nota guardada en tu cuenta.'),true);}}>
      <h4>{draft.version?t('Edit your note','Editar tu nota'):t('Write something worth keeping','Escribe algo que quieras conservar')}</h4><div className="notebook-editor-fields"><label>{t('Type','Tipo')}<select value={draft.kind} disabled={busy} onChange={e=>setDrafts(prev=>({...prev,[draftKey]:{...draft,kind:e.target.value as Kind,decisionConfirmed:false}}))}>{Object.entries(kinds).map(([kind,label])=><option value={kind} key={kind}>{label}</option>)}</select></label><label>{t('Topic','Tema')}<select value={draft.topic} disabled={busy} onChange={e=>setDrafts(prev=>({...prev,[draftKey]:{...draft,topic:e.target.value as Topic}}))}>{topics.map(topic=><option value={topic.id} key={topic.id}>{topic.title}</option>)}</select></label><label>{t('Writing language','Idioma del texto')}<select value={draft.language} disabled={busy} onChange={e=>setDrafts(prev=>({...prev,[draftKey]:{...draft,language:e.target.value as Language}}))}><option value="en">English</option><option value="es">Español</option></select></label></div>

@@ -1,0 +1,33 @@
+name: Diagnostic sandbox release gate
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Reviewed runner image including sha256 digest, already installed on the disposable host
+        required: true
+      lock_digest:
+        description: Reviewed package-lock.json SHA256 used to build that image
+        required: true
+permissions:
+  contents: read
+jobs:
+  isolation:
+    # ONLY an ephemeral, one-job, credential-free VM. Never use a persistent shared runner.
+    runs-on: [self-hosted, linux, x64, ephemeral-diagnostic-sandbox]
+    timeout-minutes: 15
+    environment: diagnostic-sandbox-review
+    env:
+      RUNNER_DISPOSABLE_VM: 'true'
+      RUNNER_TEST_IMAGE: ${{ inputs.image }}
+      RUNNER_TEST_LOCK_SHA256: ${{ inputs.lock_digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run test:diagnostic-runner
+      - run: npm run test:diagnostic-isolation
+      # VM destruction is mandatory in the host provisioner even on cancellation/timeout.
+      # No output uploads: test payload output can contain deliberately seeded sensitive markers.

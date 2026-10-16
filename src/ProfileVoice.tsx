@@ -18,6 +18,8 @@ import {voiceResearchProgress,researchEvidence} from './voiceResearchProgress.mj
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
+import {apiFailure,responseReference,diagnosticHint} from './diagnosticClient.mjs';
+import {ErrorReference} from './ErrorReference';
 import {withRequestDeadline} from './requestDeadline.mjs';
 import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
@@ -115,7 +117,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
     const subject=history.cloud?user?.sub:undefined,date=new Date().toISOString();
     const lease=browserPrivacy.capture({id,studentId,mode:savedMode});
     lease.signal.addEventListener('abort',()=>{summaryQueue.current.remove(id);lease.release();},{once:true});
-    summaryQueue.current.add(id,async signal=>{privacyLease.assert();lease.assert();let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}privacyLease.assert();lease.assert();const response=await apiFetch('/api/conversation-summary',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,signal:AbortSignal.any([signal,lease.signal]),keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok){if(response.status===410){summaryQueue.current.remove(id);privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);return;}throw new Error();}const {summary}=await response.json();privacyLease.assert();lease.assert();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);lease.release();});
+    summaryQueue.current.add(id,async signal=>{privacyLease.assert();lease.assert();let token:string|undefined;if(subject){token=await getAccessTokenSilently();if(!token)throw new Error('authentication_required');let tokenSubject;try{tokenSubject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(tokenSubject!==subject)throw new Error('summary_account_changed');}privacyLease.assert();lease.assert();const response=await apiFetch('/api/conversation-summary',{diagnostic:{kind:'summary',studentId,hint:diagnosticHint('summary',studentId,id)},method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body,signal:AbortSignal.any([signal,lease.signal]),keepalive:new TextEncoder().encode(body).length<60000});if(!response.ok){if(response.status===410){summaryQueue.current.remove(id);privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);return;}setErrorReference(responseReference(response));throw apiFailure(response,'summary_unavailable');}const {summary}=await response.json();privacyLease.assert();lease.assert();await latestHistory.current.add({id,studentId,date,mode:savedMode,summary,sources});privateRecovery(`origen.onboarding-summaries.${subject||'preview'}`).removeEntry(id);lease.release();});
     await retrySummaries();
   }
   const informational=mode!=='profile';
@@ -141,6 +143,8 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
   useEffect(()=>{if(!draftSuggestions.write(changes))setNotice(t('Keep this page open until you save; voice suggestions could not be backed up.','Mantén la página abierta hasta guardar; no se pudo conservar las sugerencias.'));},[changes,draftSuggestions]);
   const [sources,setSources]=useState<{title:string;url:string;checkedAt:string}[]>([]);
   const [diagnosticId,setDiagnosticId]=useState('');
+  const [errorReference,setErrorReference]=useState<string|undefined>();
+  const logOperation=useRef('');const logTarget=useRef<string|null|undefined>(undefined);
   const [failureCode,setFailureCode]=useState('');
 
   const usage=useRef<{id:string;timer?:ReturnType<typeof setInterval>}>({id:''});
@@ -152,7 +156,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
   function log(event:string,details:Record<string,unknown>={}){
     if(!logSession.current)return;
     if(event==='connection_failure'){onboardingEndReason.current=details.code==='connection_timeout'?'connection_timeout':details.code==='connection_lost'?'connection_lost':'connection_failed';trackOnboarding('voice_connection_failed',details);}
-    void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:logSession.current,attemptId:logAttempt.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
+    void apiFetch('/api/voice-diagnostics',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Operation':logOperation.current},body:JSON.stringify({operationKind:'voice',studentId:logTarget.current,sessionId:logSession.current,attemptId:logAttempt.current,sequence:++logSequence.current,event,...details}),keepalive:true}).catch(()=>{});
   }
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
@@ -233,7 +237,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
     scopePending.current=false;
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
-    const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logAttempt.current=crypto.randomUUID();logSequence.current=0;setDiagnosticId(sessionId);
+    const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logAttempt.current=crypto.randomUUID();logSequence.current=0;setDiagnosticId('');setErrorReference(undefined);logOperation.current=crypto.randomUUID();logTarget.current=scope.confirmed?scope.id:undefined;
     if(continuingSession)guidance.current.resetScope();else guidance.current.reset();const segmentId=crypto.randomUUID();finalReason.current='disconnected';
     onboardingEndReason.current='unknown';trackOnboarding('voice_start_requested',{language:sessionLanguage});
     onboardingVoice.current?.stop();onboardingVoice.current=onboardingVoiceDiagnostics(trackOnboarding);
@@ -284,11 +288,11 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
         const updateProfile=voiceProfile(next,latestSetup.current.profile,currentStudents,updateScope.id);
         changingGuide=true;
         let nextGuidance:ReturnType<typeof guidance.current.current>;
-        setSwitchingGuide(true);log('guide_update_start',{mode:next});
+        logTarget.current=updateScope.confirmed?updateScope.id:undefined;setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
           await languageControl.configure(currentLanguage=>withRequestDeadline(async signal=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
-            const data=await response.json();if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
+            const data=await response.json();if(!response.ok)setErrorReference(responseReference(response));if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
             signal.throwIfAborted();
             if(generation.current!==version)throw new Error('voice_session_stopped');
             nextGuidance=data.guidance;
@@ -563,11 +567,12 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
       log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Segment':segmentId},body:JSON.stringify({workspaceFocus:focus,sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':segmentId},body:JSON.stringify({workspaceFocus:focus,sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
       if(generation.current!==version)return;
+      setDiagnosticId(responseReference(response)||'');
       guidance.current.accept(data?.guidance);
-      if(!response.ok)throw new Error(data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
+      if(!response.ok)throw apiFailure(response,data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
       if(generation.current!==version)return;
@@ -621,14 +626,14 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
       </>}
       {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
-    {error&&<p role="alert" className="error">{error}</p>}
+    {error&&<p role="alert" className="error">{error} <ErrorReference reference={errorReference||diagnosticId} language={language}/></p>}
     {notice&&<p className="voice-notice" role="status">{notice}</p>}
     <audio ref={audio} autoPlay controls onPlaying={event=>{setAudioBlocked(false);onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0?'silent':'playing');}} onPause={()=>onboardingVoice.current?.playback('paused')} onVolumeChange={event=>onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0||event.currentTarget.paused?'silent':'playing')} onError={()=>onboardingVoice.current?.playback('blocked')} hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     <div className="voice-session-details" hidden={ownerId==='shared'&&!detailsOpen}>
     {ownerId==='shared'&&<div className="voice-details-heading"><h3>{t('Conversation details','Detalles de la conversación')}</h3><button type="button" className="button outline" onClick={onCloseDetails}>{t('Close','Cerrar')}</button></div>}
     <p className="small-text">{history.cloud?t('Relevant saved notes, accepted actions and past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Las notas guardadas, las acciones aceptadas y los resúmenes pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {savingSummary&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
-    {summaryFailed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><button type="button" className="button outline" disabled={savingSummary} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
+    {summaryFailed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><ErrorReference reference={errorReference} language={language}/><button type="button" className="button outline" disabled={savingSummary} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
     {latestAnswer&&<details className="voice-answer"><summary>{t('Latest answer','Última respuesta')}</summary><p>{latestAnswer}</p></details>}

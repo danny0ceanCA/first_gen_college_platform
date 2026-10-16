@@ -1,3 +1,4 @@
+import {providerOperation} from './observability/dependencies.mjs';
 import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {researchQuality} from './research-quality.mjs';
@@ -15,6 +16,7 @@ export function parseFinanceResearch(data,institution){
  return result;
 }
 export function createFinanceResearchHandler(env,request=fetch,log=()=>{},database=null){
+ request=providerOperation('finance.lookup',request,{model:env.OPENAI_MODEL_FINANCE_RESEARCH||env.OPENAI_MODEL_RESEARCH||'gpt-6.1-sol'});
  return async(req,res,next)=>{
   if(req.url?.split('?')[0]!=='/api/finance-research')return next();
   const started=Date.now();

@@ -13,6 +13,7 @@ export async function fixture(){
  db.public.none((await readFile(new URL('./migrations/036_privileged_access.sql',import.meta.url),'utf8')).split('ALTER TABLE')[0]);
  db.public.none((await readFile(new URL('./migrations/038_privacy_verification.sql',import.meta.url),'utf8')).split('ALTER TABLE')[0]);
  db.public.none((await readFile(new URL('./migrations/039_guardian_permission.sql',import.meta.url),'utf8')).split('ALTER TABLE')[0]);
+ db.public.none((await readFile(new URL('./migrations/041_permission_hangup_progress.sql',import.meta.url),'utf8')).split('CREATE INDEX')[0]);
  db.public.registerFunction({name:'to_char',args:[DataType.date,DataType.text],returns:DataType.text,implementation:value=>new Date(value).toISOString().slice(0,10)});
  const {Pool}=db.adapters.createPg();const pool=new Pool();
  // pg-mem does not parse savepoints. Production rollback behavior is checked

@@ -18,7 +18,9 @@ export async function grantRuntimeAccess(pool,role,{schema='public'}={}){
   for(const {tablename} of tables){
    const table=`${base}.${sqlIdentifier(tablename)}`;
    await client.query(`REVOKE ALL ON TABLE ${table} FROM ${who},PUBLIC`);
-   const permissions=tablename==='origen_privacy_events'?'SELECT,INSERT,DELETE':tablename==='origen_privileged_access_audit'?'INSERT':['origen_schema_migrations','origen_student_links','origen_staff_access_controls','origen_deletion_journal','origen_identity_closures'].includes(tablename)?'SELECT':tablename==='origen_closed_accounts'?'SELECT,INSERT':tablename==='origen_subject_locks'?'SELECT,INSERT,UPDATE':'SELECT,INSERT,UPDATE,DELETE';
+   if(['origen_telemetry_erasure_outbox','origen_support_case_actors'].includes(tablename))continue;
+   if(tablename==='origen_support_cases'){await client.query(`GRANT SELECT,INSERT ON TABLE ${table} TO ${who}`);await client.query(`GRANT UPDATE(status) ON TABLE ${table} TO ${who}`);continue;}
+   const permissions=['origen_privacy_events','origen_diagnostic_operations','origen_diagnostic_request_refs'].includes(tablename)?'SELECT,INSERT,DELETE':tablename==='origen_privileged_access_audit'?'INSERT':['origen_schema_migrations','origen_student_links','origen_staff_access_controls','origen_deletion_journal','origen_identity_closures'].includes(tablename)?'SELECT':tablename==='origen_closed_accounts'?'SELECT,INSERT':tablename==='origen_subject_locks'?'SELECT,INSERT,UPDATE':'SELECT,INSERT,UPDATE,DELETE';
    await client.query(`GRANT ${permissions} ON TABLE ${table} TO ${who}`);
   }
   await client.query(`REVOKE ALL ON ALL TABLES IN SCHEMA ${reporting} FROM ${who},PUBLIC`);

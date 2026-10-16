@@ -1,0 +1,25 @@
+# Phase 8: incident rehearsal and ongoing operations
+
+Implemented locally October 16, 2026 over the uncommitted phases 1–7. No production data was queried, provider settings changed, service deployed, notification sent or new processor enabled.
+
+The implementation adds eleven deterministic synthetic incident contracts, diagnosis/unknown assertions and content-canary checks; an aggregate-only monitor database role and additive telemetry migration `002_monitor.sql`; strict finite alert inputs, incident deduplication and seven-day shadow review tracking; independent live agent/runner controls; expiring detailed-span collection; and [operating runbooks](RUNBOOKS.md) plus an [operations evidence record](OPERATIONS_RECORD.md).
+
+The rehearsal command records time to evidence, correct/incorrect constructed diagnoses, unknowns, negative controls, bytes and external-call cost. One final local run produced 11 expected diagnoses, including one explicit playback-unknown conclusion, with 6,014 evidence bytes, three negative controls, zero false positives on those controls and no external provider requests/cost. These are synthetic contract results, not field accuracy, actual voice playback or whole-system recovery claims. Existing component, real PostgreSQL and real gVisor suites remain separate evidence layers.
+
+## Verification and deployment gates
+
+Local contract and real database tests cover alert thresholds, conservative sample/coverage handling, deduplication/resolution, stale snapshots and private-field rejection, seven-day review gating, live switch/context revocation, gateway withholding of late machine responses, expiring sampling, monitor privileges, environment isolation, deletion/ledger outage, expiry and restore behavior.
+
+Final targeted verification: **25 observability tests, 11 support tests, 13 agent tests and 7 runner contract tests passed**. Real PostgreSQL was used for the applicable checks. The full server suite passed **518 tests, zero failures, one existing skip**. The repository onboarding release check (server/build), production build, logging policy and whitespace checks passed; no browser checks were requested for that command. The existing `test:ops` shared-family-obligation recovery test still fails as documented in phase 1 (expected 409 rejection missing); its other two tests pass. This is not hidden or counted as a pass. The disposable PostgreSQL instance was stopped and its synthetic clusters and temporary logs removed after verification.
+
+An initial restricted-shell build/test attempt failed because esbuild could not read parent directories; rerunning through the approved ordinary host shell passed. Concurrent synthetic database/build workloads also produced a transient monitor connection failure and a bounded mapping timeout. The database suites were rerun without competing workloads; observability files are now serialized to keep disposable database creation/cleanup from competing across files. Explicit concurrency test cases remain in those suites. These local passes do not establish production performance budgets.
+
+Subsequent October 16 follow-up resolved the separately recorded `test:ops` failure by replacing its outdated blanket family-closure rejection with preservation checks for both linked accounts and separate institutional rejection checks. All six ops tests now pass; production lifecycle behavior was unchanged. See the [recovery regression resolution](BASELINE_PREPARATION.md#recovery-regression-resolution--october-16-2026) for the current verification record. The earlier failed run above remains historical evidence.
+
+Production readiness is intentionally incomplete: no seven-day shadow observation, current provider plans/regions/retention/access verification, named primary/backup acceptance, approved external monitoring integration, actual independent probe/drop/baseline adapter or real Linux/gVisor boundary evidence exists from this phase. Historical Render metadata is labeled by date. A phase 7 host limitation is not resolved by these synthetic tests. No phase is called production-ready merely because its source exists.
+
+## Activation and rollback
+
+Use RUNBOOKS.md to apply only additive telemetry migration 002, provision the narrow monitor role, configure an independent scheduler/private state and collect seven shadow days before a noise review. Changing collection flags never broadens the event schema. Agent/gateway/runner launch configurations now need their separate operator control files; omission denies access. Existing retention, erasure and audit identities do not depend on those files.
+
+Rollback disables the failing optional export/agent/runner path and destroys active sandboxes as applicable, while preserving narrow baseline logging, permission supervision, erasure, expiry and audit. Do not drop tables/functions or delete the independent ledger as a rollback shortcut. Retain content-free incident receipts and repeat the failed exercise before reopening access. No commit or push is included in this phase.

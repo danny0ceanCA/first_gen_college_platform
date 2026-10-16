@@ -1,3 +1,4 @@
+import {databaseOperation} from './observability/dependencies.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {allowedRequest} from './origin.mjs';
@@ -23,7 +24,7 @@ export function createHistoryRepository(database){
  return async(subject,input)=>{
   if(input.action==='context'&&(input.studentId===undefined||input.studentId!==null&&!identifier(input.studentId)))throw fail(400,'memory_scope_required');
   if(!database)throw fail(503,'database_unavailable');
-  const client=await database.connect();
+  const client=await databaseOperation(database,['save','import','reserve','defer'].includes(input.action)?'history.save':['delete','clear'].includes(input.action)?'history.delete':'history.read');
   try{
    await client.query('BEGIN');
    await guardAccountTransaction(client,subject);
@@ -87,7 +88,9 @@ export function createHistoryHandler(database){
   try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2000000)return send(413,{error:'too_large'});}let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
    if(!['load','delete','clear','import','save'].includes(input?.action)||input.attribution!==undefined||input.studentId!==undefined&&input.studentId!==null&&!identifier(input.studentId)||input.action==='clear'&&(input.studentId===undefined||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode))||input.action==='delete'&&!identifier(input.id)||input.action==='import'&&(!Array.isArray(input.items)||input.items.length>100))throw fail(400,'invalid_request');
    if(input.action==='save')input.item=validateMemory(input.item);
-   return send(200,await run(req.origenIdentity.sub,input));
-  }catch(error){if(![400,403,404,409,410].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409,410].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
+   const target=input.action==='save'?input.item.studentId:input.studentId;
+   if(target!==undefined)await req.bindDiagnosticOperation?.(input.action==='save'?'summary':'history',target);
+   const result=await run(req.origenIdentity.sub,input);req.log?.({event:'history.operation.finished',outcome:'completed'});return send(200,result);
+  }catch(error){req.log?.({event:'history.operation.finished',outcome:'failed',code:safeErrorCode(error)});if(![400,403,404,409,410].includes(error.status))req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});const status=[400,403,404,409,410].includes(error.status)?error.status:503;return send(status,{error:status===503?'history_unavailable':error.message});}
  };
 }

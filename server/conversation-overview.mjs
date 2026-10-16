@@ -1,3 +1,4 @@
+import {providerOperation} from './observability/dependencies.mjs';
 import {createHash} from 'node:crypto';
 import {createHistoryRepository,validateMemory} from './history.mjs';
 
@@ -5,6 +6,7 @@ const invalid=()=>{throw Object.assign(new Error('invalid_request'),{status:400}
 // Cache only derived text, isolated by account and the exact saved-history content.
 // A changed/deleted conversation changes the key before anything can be returned.
 export function createConversationOverview(env,request,database){
+ request=providerOperation('summary.overview',request,{model:env.OPENAI_MODEL_SUMMARY||env.OPENAI_MODEL_CONVERSATION||'gpt-4.1-mini'});
  const cache=new Map();
  return async(req,input)=>{
   if(!['en','es'].includes(input.language)||input.studentId!==null&&(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128)||input.mode!==undefined&&!['profile','finance','admissions','planning','loans'].includes(input.mode)||input.presentation!==undefined&&!['basic','complete'].includes(input.presentation))invalid();
@@ -13,6 +15,7 @@ export function createConversationOverview(env,request,database){
    if(!req.origenIdentity?.sub)throw Object.assign(new Error('authentication_required'),{status:401});
    // Never trust a signed-in client's supplied memories or account identifier.
    items=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'load',studentId:input.studentId})).items;
+   await req.bindDiagnosticOperation?.('summary',input.studentId);
   }else{
    if(!Array.isArray(input.items)||input.items.length>100)invalid();
    items=input.items.map(validateMemory);

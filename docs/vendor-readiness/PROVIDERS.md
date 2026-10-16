@@ -17,3 +17,11 @@ Observed in source October 3, 2026. Inclusion describes technical integrations, 
 Twilio is referenced as a future/pending SMS setup in existing documentation. Do not list it as verified active until the actual Auth0 messaging configuration is checked. Search-provider processing through AI tools must be confirmed from applicable provider documentation/agreements.
 
 Do not copy secret keys, tokens, private account records or contract-sensitive material into this public repository. Record redacted references and keep confidential evidence in a restricted location.
+
+## Private diagnostics addition — October 16, 2026
+
+Phases 1–8 add locally implemented, separately controlled content-free diagnostics: technical events up to 14 days, detailed spans up to 7 days, aggregate metrics up to 90 days, an independent 30-day erasure ledger, short case-bound agent reports and 90-day access audit. Application account/student mappings stay in the application database. Provider backups/platform logs have separate unverified expiry and access policies; erasing application telemetry does not certify provider erasure.
+
+No new external log/model processor, diagnostic database service, agent provider project, runner host or notification destination was activated. The diagnostic agent uses scripted synthetic fixtures only; production model processing and the runner's real isolation gate remain unapproved/unverified. The proposed runner uses a reviewed pinned Node 22 image and gVisor on a disposable host, not production Render or a developer workstation. Record the actual hosting provider, region, plans, TLS, backup horizons, retention, access owners, terms and model project before activation in [the operations record](../observability/OPERATIONS_RECORD.md). A dependency on gVisor/Docker software does not establish a new hosted processor.
+
+English/Spanish source notices describe this pipeline conditionally. Confirm deployed behavior against those notices before publishing the revised legal reference and enabling export or technical investigations. Existing OpenAI user-facing voice/text processing is separate from approval to send technical diagnostic evidence to a future agent model.

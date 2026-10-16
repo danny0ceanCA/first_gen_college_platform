@@ -1,10 +1,11 @@
 import pg from 'pg';
 import {createHash} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
+import {runtimeLog} from './observability/logger.mjs';
 
 const migrationDirectory=new URL('./migrations/',import.meta.url);
 
-export function createDatabase(env=process.env,Pool=pg.Pool){
+export function createDatabase(env=process.env,Pool=pg.Pool,{max=5}={}){
  if(!env.DATABASE_URL?.trim())return null;
  // Five connections per API instance leaves room on the small Render database.
  // Production always requires TLS. Public connections verify certificates.
@@ -18,8 +19,8 @@ export function createDatabase(env=process.env,Pool=pg.Pool){
   if(internal&&(env.RENDER!=='true'||!/^dpg-[a-z0-9-]+$/.test(url.hostname)))throw new Error('invalid_database_tls_mode');
   connectionString=url.href;ssl={rejectUnauthorized:!internal,...(!internal&&env.DATABASE_SSL_CA?{ca:env.DATABASE_SSL_CA}:{})};
  }
- const pool=new Pool({connectionString,...(ssl?{ssl}:{}),max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000});
- pool.on('error',()=>console.error('Origen database connection error.'));
+ const pool=new Pool({connectionString,...(ssl?{ssl}:{}),max,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000});
+ pool.on('error',()=>runtimeLog({event:'database_error',code:'operation_failed'}));
  return pool;
 }
 

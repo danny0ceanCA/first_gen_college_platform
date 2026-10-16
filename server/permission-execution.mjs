@@ -2,6 +2,10 @@ import {permissionContext,assertPermission,permissionError,eligibilityAllowed} f
 import {subjectHash} from './account-lifecycle.mjs';
 import {runRetentionJob} from './account-isolation.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
+import {runtimeLog} from './observability/logger.mjs';
+import {metrics} from './observability/metrics.mjs';
+import {safeErrorCode} from './observability/error-codes.mjs';
+import {runDiagnosticJob} from './observability/context.mjs';
 
 // All provider work inherits the HTTP permission revision, including promises
 // created by tool calls. Never let an old request continue on a fresh approval.
@@ -17,7 +21,7 @@ export function permissionFetch(database,env,request=fetch){
    try{
     await database.query('INSERT INTO origen_permission_calls(call_id,subject_hash,revision,expires_at) VALUES($1,$2,$3,$4)',[callId,subjectHash(lease.subject),lease.revision,new Date(Date.now()+10*60000)]);
     await assertPermission(database,lease);
-   }catch(error){await hangup(request,env,callId).catch(()=>{});throw error;}
+   }catch(error){const started=performance.now();try{await hangup(request,env,callId);runtimeLog({event:'permission.hangup.finished',outcome:'completed',durationMs:performance.now()-started});}catch(stopError){runtimeLog({event:'permission.hangup.finished',outcome:'failed',durationMs:performance.now()-started,code:safeErrorCode(stopError)});}throw error;}
   }else await assertPermission(database,lease);
   // Fetch resolves before the body. Recheck after every body read as well.
   return new Proxy(response,{get(target,key){
@@ -32,16 +36,26 @@ async function hangup(request,env,id){
 }
 // Durable rows survive API restarts; every process can sweep them safely. A
 // failed hangup stays queued. Only call IDs, hashes and times are stored.
-export async function sweepPermissionCalls(database,env,request=fetch,now=Date.now()){
+export async function sweepPermissionCalls(database,env,request=fetch,now=Date.now(),log=runtimeLog){
  if(!database)return;
- const {rows}=await database.query('SELECT c.*,e.status,e.permission_expires_at,e.revision AS current_revision FROM origen_permission_calls c LEFT JOIN origen_eligibility e ON e.subject_hash=c.subject_hash');
+ const {rows}=await database.query(`SELECT c.*,e.status,e.permission_expires_at,e.revision AS current_revision FROM origen_permission_calls c LEFT JOIN origen_eligibility e ON e.subject_hash=c.subject_hash
+ WHERE e.subject_hash IS NULL OR e.revision<>c.revision OR c.expires_at<=$1 OR NOT(e.status='adult' OR (e.status='approved' AND e.permission_expires_at>$1))
+ ORDER BY c.hangup_pending_at NULLS FIRST,c.expires_at LIMIT 100`,[new Date(now)]);
+ let failed=0,oldestMs=0;
  for(const row of rows){
   if(eligibilityAllowed(row,now)&&row.revision===row.current_revision&&Date.parse(row.expires_at)>now)continue;
-  try{await hangup(request,env,row.call_id);await database.query('DELETE FROM origen_permission_calls WHERE call_id=$1',[row.call_id]);}catch{/* Retry next sweep, without logging call identifiers or credentials. */}
+  const started=performance.now();let outcome='completed',code;
+  try{await database.query('UPDATE origen_permission_calls SET hangup_pending_at=COALESCE(hangup_pending_at,$2),hangup_attempts=LEAST(1000000,hangup_attempts+1) WHERE call_id=$1',[row.call_id,new Date(now)]);await hangup(request,env,row.call_id);await database.query('DELETE FROM origen_permission_calls WHERE call_id=$1',[row.call_id]);}catch(error){outcome='failed';code=safeErrorCode(error);failed++;oldestMs=Math.max(oldestMs,now-Date.parse(row.hangup_pending_at||new Date(now)),0);}
+  finally{const durationMs=performance.now()-started;metrics.observe('provider','permission.hangup',outcome,durationMs);log({event:'permission.hangup.finished',outcome,durationMs,code});}
  }
+ const backlog=(await database.query(`SELECT count(*) AS count,min(c.hangup_pending_at) AS oldest FROM origen_permission_calls c LEFT JOIN origen_eligibility e ON e.subject_hash=c.subject_hash
+ WHERE e.subject_hash IS NULL OR e.revision<>c.revision OR c.expires_at<=$1 OR NOT(e.status='adult' OR (e.status='approved' AND e.permission_expires_at>$1))`,[new Date(now)])).rows[0];
+ const count=Number(backlog?.count)||0;oldestMs=backlog?.oldest?Math.max(0,now-new Date(backlog.oldest).getTime()):oldestMs;
+ metrics.gauge('hangupBacklog',count);metrics.gauge('hangupOldestMs',oldestMs);
+ log({event:'permission.supervisor.finished',outcome:failed?'failed':'completed',sourceCount:rows.length,backlog:count,...(backlog?.oldest?{oldestMs}:{})});
 }
-export function startPermissionSupervisor(database,env,request=fetch){
- let busy=false;const tick=()=>{if(busy)return;busy=true;void runRetentionJob(()=>sweepPermissionCalls(database,env,request)).catch(()=>{}).finally(()=>{busy=false;});};
+export function startPermissionSupervisor(database,env,request=fetch,runner){
+ let busy=false;const tick=()=>{if(busy)return;busy=true;const task=runner?runner.run('permission-supervisor',db=>sweepPermissionCalls(db,env,request)):runDiagnosticJob(()=>runRetentionJob(()=>sweepPermissionCalls(database,env,request)));void task.catch(error=>runtimeLog({event:'permission.supervisor.finished',outcome:'failed',code:safeErrorCode(error)})).finally(()=>{busy=false;});};
  const timer=setInterval(tick,2000);timer.unref();tick();return()=>clearInterval(timer);
 }
 

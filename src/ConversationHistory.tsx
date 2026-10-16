@@ -1,5 +1,7 @@
 import {conversationIsActive} from './liveConversation.mjs';
 import {apiFetch} from './api';
+import {ErrorReference} from './ErrorReference';
+import {apiFailure,diagnosticHint} from './diagnosticClient.mjs';
 import {privateRecovery} from './privateRecovery';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import {MessageCircle,Trash2} from 'lucide-react';
@@ -27,7 +29,7 @@ function AccountConversationHistory({children}:{children:ReactNode}){
  const pending=useRef(new Map<string,ConversationMemory>(pendingStorage.read<ConversationMemory[]>([]).map(item=>[item.id,item])));
  const persistPending=()=>{if(!pendingStorage.write([...pending.current.values()]))throw new Error('draft_storage_unavailable');};
  const [items,setItems]=useState<ConversationMemory[]>(()=>cloud?[]:read());const [loading,setLoading]=useState(cloud),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);
- async function request(path:string,body:Record<string,unknown>,keepalive=false){privacyLease.assert();const lease=browserPrivacy.capture(body.action==='save'?body.item as ConversationMemory:path==='/api/conversation-summary'?body:undefined);try{const token=await getAccessTokenSilently();if(!token)throw new Error("authentication_required");let subject;try{subject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(!user?.sub||subject!==user.sub)throw new Error('history_account_changed');privacyLease.assert();lease.assert();const response=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),keepalive,signal:lease.signal});const data=await response.json() as {items:ConversationMemory[];summary?:string};privacyLease.assert();lease.assert();if(!response.ok||(path==='/api/conversation-history'&&!Array.isArray(data.items)))throw Object.assign(new Error('history_unavailable'),{status:response.status});return data;}finally{lease.release();}}
+ async function request(path:string,body:Record<string,unknown>,keepalive=false){privacyLease.assert();const lease=browserPrivacy.capture(body.action==='save'?body.item as ConversationMemory:path==='/api/conversation-summary'?body:undefined);try{const token=await getAccessTokenSilently();if(!token)throw new Error("authentication_required");let subject;try{subject=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;}catch{}if(!user?.sub||subject!==user.sub)throw new Error('history_account_changed');privacyLease.assert();lease.assert();const item=body.item as ConversationMemory|undefined;const summaryTarget=(item?item.studentId:body.studentId) as string|null|undefined;const summaryKey=item?.id||(typeof body.id==='string'?body.id:undefined);const response=await apiFetch(path,{...(summaryKey&&summaryTarget!==undefined?{diagnostic:{kind:'summary' as const,studentId:summaryTarget,hint:diagnosticHint('summary',summaryTarget,summaryKey)}}:{}),method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),keepalive,signal:lease.signal});const data=await response.json() as {items:ConversationMemory[];summary?:string};privacyLease.assert();lease.assert();if(!response.ok||(path==='/api/conversation-history'&&!Array.isArray(data.items)))throw apiFailure(response,'history_unavailable');return data;}finally{lease.release();}}
  useEffect(()=>browserPrivacy.subscribe(event=>{
   if(event.type==='end'){pending.current.clear();overviewCache.current.clear();setItems([]);return;}
   for(const [id,item] of pending.current)if(browserPrivacy.matches(event.target!,item))pending.current.delete(id);
@@ -93,6 +95,7 @@ export default function ConversationHistory({studentId,mode,t,title,basic=false,
  const {clear:clearHistory,overview,cloud,loading,error:loadError,reload}=useConversationHistory();
  const section=useRef<HTMLElement>(null),headingId=useId();
  const [visible,setVisible]=useState(false),[result,setResult]=useState<Overview|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(false),[attempt,setAttempt]=useState(0),[deleting,setDeleting]=useState(false);
+ const [errorReference,setErrorReference]=useState<string|undefined>();
  const language=t('en','es') as 'en'|'es';
  useEffect(()=>{
   if(!section.current)return;
@@ -102,19 +105,19 @@ export default function ConversationHistory({studentId,mode,t,title,basic=false,
  },[]);
  useEffect(()=>{
   if(!visible||loading||loadError||deleting)return;
-  let active=true;setResult(null);setError(false);setBusy(true);
-  void overview(studentId,mode,language,basic?'basic':'complete').then(value=>{if(active)setResult(value);}).catch(()=>{if(active)setError(true);}).finally(()=>{if(active)setBusy(false);});
+  let active=true;setResult(null);setError(false);setErrorReference(undefined);setBusy(true);
+  void overview(studentId,mode,language,basic?'basic':'complete').then(value=>{if(active)setResult(value);}).catch(error=>{if(active){setError(true);setErrorReference(error?.errorReference);}}).finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;};
  },[visible,loading,loadError,deleting,overview,studentId,mode,language,basic,attempt]);
  const clear=async()=>{
   if(deleting||!window.confirm(t('Delete the saved discussions behind this summary? Notes created from these discussions will also be deleted. Notes you wrote separately actions you accepted into your plan, and separately saved sheets will remain. Origen will no longer use these discussions as context.','¿Eliminar las conversaciones guardadas de este resumen? También se eliminarán las notas creadas a partir de ellas. Las notas que escribiste por separado las acciones que aceptaste en tu plan y las hojas guardadas por separado se conservarán. Origen dejará de usar estas conversaciones como contexto.')))return;
-  setDeleting(true);try{await clearHistory(studentId,mode);}catch{setError(true);}finally{setDeleting(false);}
+  setDeleting(true);try{await clearHistory(studentId,mode);}catch(error){setError(true);setErrorReference((error as {errorReference?:string})?.errorReference);}finally{setDeleting(false);}
  };
  return <section ref={section} className="conversation-history" aria-labelledby={headingId}><h3 id={headingId} className="history-heading"><span className="history-icon"><MessageCircle size={17} aria-hidden="true"/></span><span className="history-label">{title??(studentId===null?t('Family discussion summary','Resumen de conversaciones familiares'):mode==='planning'?t('Your planning summary','Tu resumen de planificación'):t('Conversation summary','Resumen de conversaciones'))}</span></h3><div className="history-content">
   <p className="small-text muted">{basic?t('One overview across your binder topics. Each topic has the detailed key points.','Un resumen de los temas de tu carpeta. Los puntos clave detallados están en cada tema.'):cloud?t('One summary of your latest saved discussions. Origen remembers your conversations.','Un resumen de tus conversaciones guardadas más recientes. Origen recuerda lo conversado.'):t('One summary of the discussions saved in this browser preview.','Un resumen de las conversaciones guardadas en esta vista previa.')}</p>
   {(loading||busy)&&<p className="small-text muted" role="status">{t('Updating your summary…','Actualizando tu resumen…')}</p>}
   {loadError&&<p role="alert">{t('History could not be loaded.','No se pudo cargar el historial.')} <button className="text-button" onClick={reload}>{t('Try again','Intentar de nuevo')}</button></p>}
-  {error&&<p role="alert">{t('Could not update the summary. Your saved discussions are still available.','No se pudo actualizar el resumen. Tus conversaciones siguen guardadas.')} <button className="text-button" onClick={()=>setAttempt(value=>value+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
+  {error&&<p role="alert"><ErrorReference reference={errorReference} language={language}/>{t('Could not update the summary. Your saved discussions are still available.','No se pudo actualizar el resumen. Tus conversaciones siguen guardadas.')} <button className="text-button" onClick={()=>setAttempt(value=>value+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
   {!loading&&!busy&&!loadError&&!error&&result&&(result.summary?<article className="history-entry history-overview"><p className={`history-summary${flowing?' history-summary-flowing':''}`} role={flowing?undefined:'region'} aria-label={flowing?undefined:t('Conversation summary. Scroll to read more.','Resumen de conversaciones. Desplázate para leer más.')} tabIndex={flowing?undefined:0}>{result.summary}</p>{result.date&&<small>{t('Latest discussion: ','Última conversación: ')}{new Date(result.date).toLocaleDateString()}</small>}{result.sources.length>0&&<details className="history-sources"><summary>{t('Sources discussed','Fuentes consultadas')}</summary>{result.sources.map(source=><p key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></p>)}</details>}<button disabled={deleting} className="text-button history-delete" onClick={()=>void clear()}><Trash2 size={13} aria-hidden="true"/>{deleting?t('Deleting…','Eliminando…'):t('Delete saved discussions','Eliminar conversaciones guardadas')}</button></article>:<div className="history-empty"><strong>{t('Your story, in one place','Tu historia, en un solo lugar')}</strong><p>{t('After you talk with Origen, one summary will bring your discussions together here.','Después de hablar con Origen, un resumen reunirá aquí tus conversaciones.')}</p></div>)}
  </div></section>;
 }

@@ -129,7 +129,9 @@ export function createFamilyHandler(database,repository=database?createFamilyRep
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2_000_000)return send(413,{error:'request_too_large'});}
    let input;try{input=JSON.parse(raw);}catch{return send(400,{error:'invalid_family_request'});}
    const operation=validateFamily(input);
-   return send(200,await repository(req.origenIdentity.sub,operation));
+   const result=await repository(req.origenIdentity.sub,operation);
+   if(operation.action==='complete-onboarding')await req.bindDiagnosticOperation?.('onboarding',null);
+   return send(200,result);
   }catch(error){const known=[400,403,404,409].includes(error.status);if(!known)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'database_unavailable'});}
  };
 }

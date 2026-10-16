@@ -62,7 +62,7 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
 // preference under the same account lock as saves/closure before each sweep.
 export async function purgePrivateSummaries(database){
  if(!database)return;
- const candidates=(await database.query('SELECT a.auth0_subject FROM origen_accounts a JOIN origen_privacy_preferences p ON p.account_id=a.id WHERE p.summary_days IS NOT NULL')).rows;
+ const candidates=(await database.query("SELECT a.auth0_subject FROM origen_accounts a JOIN origen_privacy_preferences p ON p.account_id=a.id WHERE p.summary_days IS NOT NULL AND EXISTS(SELECT 1 FROM origen_conversation_summaries s WHERE s.account_id=a.id AND s.created_at<now()-p.summary_days*interval '1 day') ORDER BY a.id LIMIT 50")).rows;
  const run=createPrivacyRepository(database);
  for(const {auth0_subject:sub} of candidates)try{await runAsAccount({sub},()=>run(sub,{action:'expire'}));}catch(error){if(![403,404].includes(error.status))throw error;}
 }

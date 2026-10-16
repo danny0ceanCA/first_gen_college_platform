@@ -61,8 +61,8 @@ test('untrusted telemetry cannot smuggle content through technical-looking field
  const result=clientDiagnosticRecord(Object.fromEntries(['event','code','sessionId','attemptId','eventId','responseId','callId','operation','parameter','reason','mode','language','status','upstreamRequestId'].map(k=>[k,'Private_Family_Story'])));
  assert.doesNotMatch(JSON.stringify(result),/Private_Family_Story/);assert.equal(result.event,'unknown_client_event');assert.equal(result.code,'other');assert.equal(result.operation,undefined);
  const valid=clientDiagnosticRecord({event:'connection_failure',code:'network_error',language:'es',durationMs:NaN});assert.equal(valid.code,'network_error');assert.equal(valid.language,'es');assert.equal(valid.durationMs,undefined);
- const uuid=crypto.randomUUID();assert.equal(diagnosticRecord(clientDiagnosticRecord({sessionId:uuid})).sessionId,diagnosticRecord({sessionId:uuid}).sessionId);
- const header='Private_Family_Story';assert.doesNotMatch(JSON.stringify(diagnosticRecord({sessionId:header})),/Private_Family/);assert.equal(diagnosticRecord(clientDiagnosticRecord({sessionId:header})).sessionId,diagnosticRecord({sessionId:header}).sessionId);
+ const uuid=crypto.randomUUID();assert.equal(diagnosticRecord(clientDiagnosticRecord({sessionId:uuid})).sessionId,undefined);assert.equal(diagnosticRecord({sessionId:uuid}).sessionId,undefined);
+ const header='Private_Family_Story';assert.doesNotMatch(JSON.stringify(diagnosticRecord({sessionId:header})),/Private_Family/);assert.equal(diagnosticRecord(clientDiagnosticRecord({sessionId:header})).sessionId,undefined);
 });
 test('production PostgreSQL always uses TLS and public endpoints verify certificates',()=>{
  let options;class Pool{constructor(value){options=value}on(){}}

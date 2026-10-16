@@ -1,6 +1,7 @@
 import {guardAccountTransaction} from './account-guard.mjs';
 import {onboardingUUID,sanitizeOnboardingMetadata,onboardingEventName} from '../src/onboardingEventSchema.mjs';
 import {onboardingSettings} from './onboarding-settings.mjs';
+import {runtimeLog} from './observability/logger.mjs';
 export {onboardingUUID,sanitizeOnboardingMetadata};
 const invalid=()=>{throw Object.assign(new Error('invalid_onboarding_event'),{status:400});};
 export function onboardingBatch(input,now=Date.now()){
@@ -36,7 +37,7 @@ export async function recordOnboardingSave(client,owner,id){
   }
  }catch{
   await client.query('ROLLBACK TO SAVEPOINT origen_onboarding_tracking');
-  console.warn('Origen onboarding save tracking was unavailable.');
+  runtimeLog({event:'onboarding.tracking.failed',code:'operation_failed'});
  }finally{await client.query('RELEASE SAVEPOINT origen_onboarding_tracking');}
 }
 export async function storeOnboardingBatch(database,subject,input){
@@ -66,6 +67,7 @@ export function createOnboardingHandler(database){return async(req,res,next)=>{
  try{
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000)return send(413,'request_too_large');}
   let input;try{input=onboardingBatch(JSON.parse(raw));}catch{return send(400,'invalid_onboarding_event');}
+  await req.bindDiagnosticOperation?.('onboarding',null);
   await storeOnboardingBatch(database,req.origenIdentity.sub,input);return send(200);
  }catch(error){return send([403,404,429].includes(error.status)?error.status:503,[403,404,429].includes(error.status)?error.message:'onboarding_tracking_unavailable');}
 };}

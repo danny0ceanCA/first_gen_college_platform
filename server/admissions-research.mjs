@@ -1,3 +1,4 @@
+import {providerOperation} from './observability/dependencies.mjs';
 import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
 import {planningResearchInstructions} from './education-planning.mjs';
 import {researchQuality} from './research-quality.mjs';
@@ -17,6 +18,7 @@ export function parseAdmissionsResearch(data,institution){
  return result;
 }
 export function createAdmissionsResearchHandler(env,request=fetch,log=()=>{},database=null){
+ request=providerOperation('admissions.lookup',request,{model:env.OPENAI_MODEL_ADMISSIONS_RESEARCH||env.OPENAI_MODEL_RESEARCH||'gpt-6.1-sol'});
  return async(req,res,next)=>{
   if(req.url?.split('?')[0]!=='/api/admissions-research')return next();
   const started=Date.now();

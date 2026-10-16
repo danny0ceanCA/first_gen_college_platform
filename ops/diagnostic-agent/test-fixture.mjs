@@ -1,0 +1,30 @@
+import {mkdtemp,mkdir,writeFile,rm,realpath} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {keys,actor} from '../diagnostics-gateway/test-fixture.mjs';
+import {seal,newCapability,hash} from '../diagnostics-gateway/capabilities.mjs';
+import {diagnosticRecord,createMetadata} from '../../server/observability/event-schema.mjs';
+import {loadPolicy} from './policy.mjs';
+import {startInvestigation} from './broker.mjs';
+export async function agentFixture({sourceText='// Synthetic reviewed source.\nexport async function saveSummary(store,value){ return store.save(value); }\n',mutatePacket}={}){
+ const root=await mkdtemp(path.join(os.tmpdir(),'origen-agent-synthetic-')),workspace=path.join(root,'workspace');await mkdir(workspace);await mkdir(path.join(root,'code','server'),{recursive:true});await mkdir(path.join(root,'books'));
+ const key=keys(),revision='a'.repeat(40),state={now:Date.now(),revoked:false,auditDown:false,completionDown:false,fetches:0,audits:[],reports:new Map(),lease:null},scope={id:randomUUID(),origin:'user_report',purpose:'saving',environment:'test',operations:[randomUUID()],start:new Date(Date.now()-900000).toISOString(),end:new Date(Date.now()+900000).toISOString(),dataClasses:['technical_events','aggregate_metrics'],expiresAt:new Date(Date.now()+86400000).toISOString()};
+ const cap=newCapability({scope,actor:actor(),recipient:actor().sub,audience:'support',clock:()=>state.now}),capability=seal(cap,key.signingKey),sourceRoot='https://github.com/example/origen';
+ const requestId=randomUUID(),metadata=createMetadata({NODE_ENV:'test',APPLICATION_REVISION:revision});
+ const events=[diagnosticRecord({event:'summary.generate.finished',outcome:'completed',durationMs:10},{metadata,operationId:scope.operations[0],requestId}),diagnosticRecord({event:'summary.save.finished',outcome:'failed',code:'operation_failed',durationMs:10},{metadata,operationId:scope.operations[0],requestId})].map(e=>{const {schemaVersion,eventId,time,service,environment,release,instanceId,event,level,producer,evidence,operationId,requestId,...attributes}=e;return {event_id:eventId,received_at:time,event_time:time,release,event,level,producer,evidence,operation_id:operationId,request_id:requestId,attributes};});
+ await writeFile(path.join(root,'code','server','summary.mjs'),sourceText);const book='Synthetic storage failure: compare generation and save outcomes. Missing playback receipts remain unknown.';await writeFile(path.join(root,'books','summary.md'),book);
+ const manifest={version:1,mode:'synthetic',environment:'test',caseIds:[scope.id],sourceRoot,releases:[{revision,lockDigest:'b'.repeat(64),schemaId:'synthetic-schema-1',configId:'synthetic-config-1',files:[{path:'server/summary.mjs',file:'code/server/summary.mjs',sha256:hash(sourceText)}]}],runbooks:[{name:'summary-save',file:'books/summary.md',sha256:hash(book)}],expiresAt:new Date(Date.now()+86400000).toISOString()},policyFile=path.join(root,'policy.json');await writeFile(policyFile,JSON.stringify(manifest));
+ const policy=await loadPolicy({policyFile,expectedDigest:hash(JSON.stringify(manifest)),agentWorkspace:workspace,clock:()=>state.now});
+ const makePacket=query=>{
+  const selected=query?.kind==='metrics'?[]:query?.kind==='incident'?events.slice(0,1):query?.kind==='request'?events.filter(e=>e.request_id===query.requestId):events;
+  const packet={caseId:scope.id,environment:'test',scope:{start:scope.start,end:scope.end,operations:scope.operations},verifiedFacts:structuredClone(selected),clientReports:[],aggregateMetrics:{population:'service_environment',rows:[]},sources:selected.length?[{revision,url:sourceRoot+'/tree/'+revision}]:[],hypotheses:[],coverage:{sampling:'best_effort',missingEvents:'unknown',missingOutcomes:'unknown',truncated:false,unmappedRequests:'excluded',sourceRevisionMissing:false},...(query?{query,next:null}:{})};
+  mutatePacket?.(packet);return {packet,manifest:seal({type:'evidence_manifest',id:randomUUID(),caseId:scope.id,capabilityId:cap.id,aud:'support',environment:'test',gatewayRevision:'c'.repeat(40),keyId:'d'.repeat(64),issuedAt:new Date(state.now).toISOString(),expiresAt:new Date(cap.exp*1000).toISOString(),sha256:hash(JSON.stringify(packet)),eventIds:[...packet.verifiedFacts,...packet.clientReports].map(e=>e.event_id),receiptTimes:[...packet.verifiedFacts,...packet.clientReports].map(e=>e.received_at),sources:packet.sources,integrity:'packaging_only'},key.signingKey)};
+ };
+ const gateway={async validate(){if(state.revoked)throw Error('private connection details');return {caseId:scope.id,capabilityId:cap.id,environment:'test',expiresAt:new Date(cap.exp*1000).toISOString(),scope:structuredClone(scope)};},async evidence(_cap,query){state.fetches++;if(state.revoked)throw Error();return makePacket(query);}};
+ const audit=async e=>{if(state.auditDown||state.completionDown&&e.phase==='completion')throw Error('PRIVATE audit unavailable');state.audits.push(e);};
+ const reports={async claim(id){if(state.lease)return false;state.lease=id;return true;},async release(id){if(state.lease===id)state.lease=null;},async save(r){state.reports.set(r.runId,structuredClone(r));},async load(id,caseId,runId){const row=state.reports.get(runId);return row&&row.id===id&&row.caseId===caseId?row.report:null;},async revoke(id){state.reports.delete(id);}};
+ const options={capability,publicKey:key.publicKey,audience:'support',policy,gateway,audit,reports,clock:()=>state.now};let broker;
+ const close=async()=>{await broker?.close().catch(()=>{});const resolved=await realpath(root),parent=await realpath(os.tmpdir());if(path.dirname(resolved)!==parent||!path.basename(resolved).startsWith('origen-agent-synthetic-'))throw Error('unsafe synthetic cleanup');await rm(resolved,{recursive:true,force:true});};
+ return {root,workspace,policyFile,manifest,key,cap,capability,scope,events,revision,requestId,state,options,makePacket,async start(){broker=await startInvestigation(options);return broker;},close};
+}
