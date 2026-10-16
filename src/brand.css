@@ -18,7 +18,7 @@
 .landing .scene-caption,.landing .scene-caption button{color:#625b55}
 .landing .landscape-sky,.landing .drawing-tip{color:var(--brand-clay);filter:none}
 .landing .landing-hero+.landing-resource{background:var(--brand-clay);color:var(--brand-ivory);padding:36px;border-radius:16px}
-.landing .landing-hero+.landing-resource .landing-resource-grid p{color:#fff0e0}
+.landing .landing-hero+.landing-resource>p,.landing .landing-hero+.landing-resource .landing-resource-grid p{color:#fff0e0}
 .landing .landing-share-description{border-color:var(--brand-clay)}
 .landing .landing-closing{background:var(--brand-clay);color:var(--brand-ivory);border-color:var(--brand-clay)}
 .landing .landing-footer strong{color:var(--brand-clay)}
