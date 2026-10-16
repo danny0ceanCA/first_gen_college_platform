@@ -23,3 +23,5 @@
 
 .landing-copy .landing-preview-note{font-size:13px;line-height:1.6;margin:16px 0 0;max-width:435px}.landing-how{padding-left:24px}.landing-how li{padding-left:8px}.landing-how p{color:#f4eee4;line-height:1.8}.landing-share-description{padding:16px 20px;border-left:2px solid #c77758}.landing-footer{flex-wrap:wrap}.landing-nav nav{justify-content:flex-end}@media(max-width:760px){.landing-nav{flex-wrap:wrap;gap:18px}.landing-nav nav{width:100%;justify-content:flex-start}.landing-nav nav>a{display:inline-flex;min-height:44px;align-items:center}.landing-nav .institution-register-link{display:none}.landing-nav nav>a{font-size:12px}.landing-copy .landing-eyebrow{max-width:320px}}
 .landing-auth-dialog{max-width:360px;padding:62px 28px 28px}.landing-auth-actions{display:grid;gap:12px}.landing-auth-actions .landing-primary{justify-content:space-between;margin:0;min-height:52px}
+.landing-resource>.landing-reassurance{margin-bottom:30px;font-weight:550}
+.landing-start-actions{margin-top:24px}
