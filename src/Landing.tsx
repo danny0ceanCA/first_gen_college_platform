@@ -1,4 +1,3 @@
-import {RegistrationScreen} from './EligibilityGate';
 import LandingStory from './LandingStory';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
@@ -11,9 +10,7 @@ export default function Landing(){
  const [copyStatus,setCopyStatus]=useState('');
  const copy=async(value:string)=>{try{await navigator.clipboard.writeText(value);setCopyStatus(t('Copied. Ready to share.','Copiado. Listo para compartir.'));}catch{setCopyStatus(t('Copy was unavailable. Select the description or link below to copy it.','No se pudo copiar. Selecciona la descripción o el enlace para copiarlo.'));}};
  const [signinError,setSigninError]=useState(false);
- const [registration,setRegistration]=useState<boolean|null>(null);
- const signIn=(register=false)=>{if(isAuthenticated){window.location.hash='app';return;}setLogin(false);setRegistration(register);};
- const continueSignIn=(register=false)=>{if(isAuthenticated){window.location.hash='app';return;}setSigninError(false);void loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{ui_locales:es?'es':'en',...(register?{screen_hint:'signup'}:{})}}).catch(()=>setSigninError(true));};
+ const signIn=(register=false)=>{if(isAuthenticated){window.location.hash='app';return;}setLogin(false);setSigninError(false);void loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{ui_locales:es?'es':'en',...(register?{screen_hint:'signup'}:{})}}).catch(()=>{setSigninError(true);setLogin(true);});};
  const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
  const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false),heroVisible=useRef(true);
  const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
@@ -138,7 +135,6 @@ export default function Landing(){
   motion.current.forEach(animation=>{if(paused||!heroVisible.current||document.hidden)animation.pause();else if(!animation.completed)animation.play();});
  },[paused]);
  useEffect(()=>{if(login)dialog.current?.showModal();else dialog.current?.close();},[login]);
- if(registration!==null)return <RegistrationScreen es={es} error={signinError} onExit={()=>setRegistration(null)} onContinue={()=>continueSignIn(registration)}/>;
  return <div className="landing">
   <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a className="institution-register-link" href="#institutions">{t('Register your institution','Registra tu institución')}</a><a href="#educators">{t('For educators','Para educadores')}</a><a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><a href="#how">{t('How it works','Cómo funciona')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>{setEs(!es);setCopyStatus('');}}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
   <main className="landing-main">

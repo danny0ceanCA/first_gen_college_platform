@@ -13,12 +13,6 @@ export function EligibilityQuestions({es,onSubmit,busy=false}:{es:boolean;onSubm
   <button className="button primary" disabled={busy||!ageBand||!audience}>{t('Continue','Continuar')}</button>
  </form>;
 }
-// A neutral screen before normal sign-in; server repeats and records the
-// answers against the authenticated account. This is not identity verification.
-export function RegistrationScreen({es,onContinue,onExit,error=false}:{es:boolean;onContinue:()=>void;onExit:()=>void;error?:boolean}){
- const [blocked,setBlocked]=useState(false);const t=(en:string,sp:string)=>es?sp:en;
- return <main className="eligibility-panel"><h1>{t('Before you begin','Antes de comenzar')}</h1>{error&&<p role="alert">{t('Sign-in could not be opened. Please try again.','No se pudo abrir el inicio de sesión. Intenta de nuevo.')}</p>}{blocked?<p role="status">{t('We cannot open registration for this request. Contact daniel@origenedu.ai for help.','No podemos abrir el registro para esta solicitud. Contacta a daniel@origenedu.ai para obtener ayuda.')}</p>:<EligibilityQuestions es={es} onSubmit={answer=>{if(answer.ageBand==='under13'||answer.audience==='other'||answer.audience==='adult_supporter'&&answer.ageBand!=='18plus')setBlocked(true);else onContinue();}}/>}<button className="button outline" onClick={onExit}>{t('Return to Origen','Volver a Origen')}</button></main>;
-}
 export default function EligibilityGate({children,onAllowed,hideSignOut=false}:{children?:ReactNode;onAllowed?:()=>void;hideSignOut?:boolean}){
  const auth=useAuth0(),subject=auth.user?.sub;const [state,setState]=useState<Status>(),[error,setError]=useState(false),[busy,setBusy]=useState(false),[email,setEmail]=useState(''),[es,setEs]=useState(()=>document.documentElement.lang==='es');
  const active=useRef(true),allowed=useRef(false),sequence=useRef(0),callback=useRef(onAllowed);callback.current=onAllowed;
