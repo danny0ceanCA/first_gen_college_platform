@@ -6,7 +6,7 @@ function writtenText(text:string){
  return text.split(/(\*\*[^*]+\*\*|__[^_]+__)/g).map((part,index)=>/^(?:\*\*[^*]+\*\*|__[^_]+__)$/.test(part)?<strong key={index}>{part.slice(2,-2)}</strong>:part);
 }
 
-export default function BinderSummary({summary,language,t}:{summary:string;language:'en'|'es';t:(en:string,es:string)=>string}){
+export default function BinderSummaryReader({summary,language,t}:{summary:string;language:'en'|'es';t:(en:string,es:string)=>string}){
  const pages=useMemo(()=>binderSummaryPages(summary,language),[summary,language]);
  const [position,setPosition]=useState({summary,index:0});
  const page=position.summary===summary?Math.min(position.index,Math.max(0,pages.length-1)):0;

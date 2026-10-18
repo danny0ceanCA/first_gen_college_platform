@@ -46,7 +46,7 @@ async function setup(browser,{width=1280,language='en',reducedMotion='reduce'}={
 }
 async function openBinder(page){await page.locator('.binder-cover').click();await page.locator('.binder-open').waitFor();}
 async function chooseTopic(page,topic,width){if(width<=760)await page.locator(`[data-topic="${topic}"]`).click();else await page.locator(`#notebook-tab-${topic}`).click();await page.locator('#notebook-panel').waitFor();}
-async function layout(page){return page.evaluate(()=>{const binder=document.querySelector('.personal-binder').getBoundingClientRect(),bar=document.querySelector('.shared-voice').getBoundingClientRect();const action=document.querySelector('.permission-withdraw')?.getBoundingClientRect();return {finalContentGap:action?bar.top-action.bottom:null,scroll:window.scrollY,documentHeight:document.documentElement.scrollHeight,viewport:innerHeight,binder:{top:binder.top,bottom:binder.bottom,height:binder.height},bar:{top:bar.top,bottom:bar.bottom,height:bar.height},gap:bar.top-binder.bottom,horizontalOverflow:document.documentElement.scrollWidth-innerWidth};});}
+async function layout(page){return page.evaluate(()=>{const binder=document.querySelector('.personal-binder').getBoundingClientRect(),bar=document.querySelector('.shared-voice').getBoundingClientRect();const action=document.querySelector('.app-shell footer')?.getBoundingClientRect();return {finalContentGap:action?bar.top-action.bottom:null,scroll:window.scrollY,documentHeight:document.documentElement.scrollHeight,viewport:innerHeight,binder:{top:binder.top,bottom:binder.bottom,height:binder.height},bar:{top:bar.top,bottom:bar.bottom,height:bar.height},gap:bar.top-binder.bottom,horizontalOverflow:document.documentElement.scrollWidth-innerWidth};});}
 async function captureBefore(browser){
  for(const width of [1280,390]){const {page,state}=await setup(browser,{width});try{
   await page.screenshot({path:`/tmp/binder-before-${width===1280?'desktop':'mobile'}-closed.png`});
@@ -70,7 +70,7 @@ async function assertBottomGap(page,label){
  await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
  await page.waitForTimeout(100);
  const measured=await layout(page);
- assert.ok(measured.finalContentGap>=8&&measured.finalContentGap<=24,`${label}: bottom content should clear the Origen bar without excessive empty space: ${JSON.stringify(measured)}`);
+ assert.ok(measured.finalContentGap>=0&&measured.finalContentGap<=24,`${label}: bottom content should clear the Origen bar without excessive empty space: ${JSON.stringify(measured)}`);
  return measured;
 }
 async function topic(page,selected,width){

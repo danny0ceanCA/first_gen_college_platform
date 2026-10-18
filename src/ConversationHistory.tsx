@@ -10,7 +10,7 @@ import {useAuth0} from '@auth0/auth0-react';
 import {createContext,useContext,useEffect,useRef,useState,useCallback,useId,type ReactNode} from 'react';
 import {useFamily} from './FamilyStore';
 import {flushPendingHistory} from './pendingHistory.mjs';
-import BinderSummary from './BinderSummary';
+import BinderSummary from './BinderSummaryReader';
 export type ConversationMemory={id:string;studentId:string|null;date:string;mode:string;summary:string;sources:{title:string;url:string;checkedAt:string}[]};
 type Overview={summary:string;sources:ConversationMemory['sources'];date:string|null};
 type Store={clear:(studentId:string|null,mode?:string)=>Promise<void>;overview:(studentId:string|null,mode:string|undefined,language:'en'|'es',presentation?:'basic'|'complete')=>Promise<Overview>;items:ConversationMemory[];cloud:boolean;loading:boolean;error:boolean;reload:()=>void;add:(item:ConversationMemory)=>Promise<void>;remove:(id:string)=>Promise<void>};

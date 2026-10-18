@@ -104,11 +104,13 @@
 .notebook-panel .notebook-read-more{font-size:12px;text-decoration:underline;text-decoration-color:#ba9d87;text-underline-offset:4px}
 .notebook-topic-description{margin:8px 0 0;font-size:13px;line-height:1.65;color:#776a5e;max-width:55ch}
 .notebook-reading-room{margin-top:28px}
-.notebook-section-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #d8c9b8;padding:0 0 10px}
-.notebook-section-tabs>button{display:flex;align-items:center;justify-content:space-between;gap:9px;min-height:44px;padding:9px 10px;border:1px solid transparent;border-radius:7px;font-size:12px;font-weight:500;text-align:left;color:#766759;background:transparent;flex:1 1 auto}
-.notebook-section-tabs>button[aria-selected=true]{color:#6f392b;background:#f4e8da;border-color:#d7bba4;font-weight:650;box-shadow:inset 0 -2px #ad6a4b}
-.notebook-section-count{font-size:10px;min-width:19px;padding:1px 4px;text-align:center;background:#ded1c334;border-radius:4px;font-variant-numeric:tabular-nums}
-.notebook-section-tabs>button[aria-selected=true] .notebook-section-count{background:#ffffff8c}
+.notebook-section-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;border-bottom:1px solid #d8c9b8;padding:0 0 16px}
+.notebook-section-tabs>button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;min-height:58px;padding:12px 14px;border:1px solid #cbb29b;border-radius:10px;font-size:13px;font-weight:650;line-height:1.4;text-align:left;color:#5f4a3e;background:#f5ede1;box-shadow:0 2px 0 #d8c4af55;cursor:pointer}
+.notebook-section-tabs>button>span:first-child{min-width:0;overflow-wrap:anywhere}
+.notebook-section-tabs>button[aria-selected=true]{color:#fffaf3;background:#9b4834;border-color:#883e2d;box-shadow:inset 0 -3px #783a2b,0 2px 4px #813e2e18}
+.notebook-section-count{display:grid;place-items:center;flex-shrink:0;font-size:12px;font-weight:700;min-width:28px;min-height:28px;padding:2px 6px;text-align:center;color:#684737;background:#e7d6c3;border-radius:8px;font-variant-numeric:tabular-nums}
+.notebook-section-tabs>button[aria-selected=true] .notebook-section-count{color:#fffaf3;background:#ffffff26;box-shadow:inset 0 0 0 1px #ffffff42}
+@media(hover:hover){.notebook-section-tabs>button:not([aria-selected=true]):hover{background:#edddca;border-color:#9b4834}}
 .notebook-section-tabs>button:focus-visible,.notebook-pagination>button:focus-visible{outline:2px solid #8f4c37;outline-offset:3px}
 .notebook-reading-page{min-width:0;outline-offset:5px}
 .notebook-reading-page:focus-visible{outline:2px solid #b47b5e}
@@ -145,8 +147,8 @@
  .binder-pages .notebook-mobile .notebook-note{padding:18px 0 10px}
  .binder-pages .notebook-mobile .notebook-note-content{font-size:20px}
  .notebook-reading-room{margin-top:22px}
- .notebook-section-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
- .notebook-section-tabs>button{min-width:0;font-size:11px;gap:5px;padding:8px}
+ .notebook-section-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .notebook-section-tabs>button{font-size:13px;gap:8px;padding:11px 12px}
  .notebook-reading-heading{margin-top:20px;gap:10px}
  .notebook-reading-heading h4{font-size:16px}
  .notebook-note-origin{font-size:10px;gap:4px}

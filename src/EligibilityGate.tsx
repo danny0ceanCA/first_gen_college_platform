@@ -39,7 +39,7 @@ export default function EligibilityGate({children,onAllowed,hideSignOut=false}:{
  },[subject]);
  useEffect(()=>{if(!state?.allowed)return;const id=sessionStorage.getItem('origen-login-event');if(!id)return;void apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',id})}).then(response=>{if(response.ok&&sessionStorage.getItem('origen-login-event')===id)sessionStorage.removeItem('origen-login-event');}).catch(()=>{});},[state?.allowed,subject]);
  const act=async(body:Record<string,unknown>)=>{if(busy)return;setBusy(true);try{await check(body);}catch{pause();}finally{if(active.current)setBusy(false);}};
- if(state?.allowed)return <>{children}<button className="permission-withdraw" onClick={()=>void act({action:'withdraw'})}>{t('Withdraw account permission','Retirar el permiso de la cuenta')}</button></>;
+ if(state?.allowed)return <>{children}</>;
  return <main className="eligibility-panel"><button className="button outline" onClick={()=>setEs(!es)}>{es?'English':'Español'}</button><h1>{t('Account eligibility and permission','Elegibilidad y permiso de la cuenta')}</h1>
   {error&&<p role="alert">{t('We could not confirm permission. Please try again.','No pudimos confirmar el permiso. Intenta de nuevo.')}</p>}
   {!state&&!error&&<p role="status">{t('Checking account permission…','Comprobando el permiso de la cuenta…')}</p>}
