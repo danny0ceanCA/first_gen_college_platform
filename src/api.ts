@@ -23,6 +23,7 @@ export function onboardingTransport(subject:string|undefined,getToken:()=>Promis
 export async function apiFetch(path:string,options:APIOptions={}){
  const lease=browserPrivacy.capture();
  try{
+ options.signal?.throwIfAborted();
  lease.assert();
  const base=(import.meta.env.VITE_API_URL||'').replace(/\/$/,'');
  const headers=new Headers(options.headers);
@@ -31,6 +32,7 @@ export async function apiFetch(path:string,options:APIOptions={}){
  if(headers.has('Authorization')){/* Keep the original live-session account through cleanup. */}
  else if(tokenProvider){const token=await tokenProvider();if(!token)throw new Error('Sign in to use Origen AI.');headers.set('Authorization',`Bearer ${token}`);}
  else throw new Error('Sign in to use Origen AI.');
+ options.signal?.throwIfAborted();
  lease.assert();
  const response=await fetch(`${base}${path}`,{...requestOptions,headers,signal:options.signal?AbortSignal.any([options.signal,lease.signal]):lease.signal});
  if(response.status===403){const data=await response.clone().json().catch(()=>null);if(data?.error==='permission_required')browserPrivacy.stop('eligibility_changed');}

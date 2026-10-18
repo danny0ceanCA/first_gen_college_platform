@@ -5,6 +5,8 @@ import {exportConfiguration} from './observability/exporter.mjs';
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
  const issues=[];
+ for(const key of ['ORIGEN_VOICE_PREPARATION','ORIGEN_BINDER_JOBS'])if(env[key]&&!['true','false'].includes(env[key]))issues.push(`${key}: use true or false`);
+ if(env.ORIGEN_BINDER_JOBS==='true'&&!env.MAINTENANCE_DATABASE_URL)issues.push('MAINTENANCE_DATABASE_URL: required for binder background processing');
  if(env.OBSERVABILITY_EXPORT&&!['true','false'].includes(env.OBSERVABILITY_EXPORT))issues.push('OBSERVABILITY_EXPORT: use true or false');
  try{exportConfiguration(env);}catch{issues.push('OBSERVABILITY_EXPORT: verified HTTPS, lifecycle readiness, deployment record and backup horizon required');}
  if(env.OBSERVABILITY_DETAILED_SPANS&&!['true','false'].includes(env.OBSERVABILITY_DETAILED_SPANS))issues.push('OBSERVABILITY_DETAILED_SPANS: use true or false');

@@ -1,0 +1,627 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-historical-retrieval",
+  "method": "postgres-keyword-v1",
+  "generatedAt": "2026-10-18T17:54:43.308Z",
+  "catalogHash": "6271df2cd1840c5890de2dc2a3f6eca8eb7a3e8b2b01d9aa8c07b9088b1c943d",
+  "sourceHashes": {
+    "server/history-retrieval.mjs": "cf282eab6490a22152f13878a8913d2a8487ffd0ab74ec3d9c59d28b991b9da4",
+    "server/migrations/045_historical_retrieval.sql": "0df5f00c05d056a43fbe2bd579bfe07b96d734a3b3cc5fefa7a7aa691ab4fe1b"
+  },
+  "cases": 28,
+  "answerable": 24,
+  "recallAtFive": 1,
+  "target": 0.9,
+  "targetMet": true,
+  "languages": {
+    "en": {
+      "answerable": 12,
+      "hits": 12,
+      "recallAtFive": 1,
+      "noRelevant": 2,
+      "noRelevantPassed": 2
+    },
+    "es": {
+      "answerable": 12,
+      "hits": 12,
+      "recallAtFive": 1,
+      "noRelevant": 2,
+      "noRelevantPassed": 2
+    }
+  },
+  "boundaryFailures": [],
+  "retrievalLatencyMs": {
+    "p50": 3.5,
+    "p95": 4.61
+  },
+  "embeddingCalls": 0,
+  "embeddingTokens": 0,
+  "embeddingCostUSD": 0,
+  "liveResponsesEvaluated": 0,
+  "phaseOneComparison": {
+    "path": "Actual profile-voice handler with real PostgreSQL; provider negotiation mocked, current query supplied as same-conversation continuity.",
+    "baselineRequiredEvidence": 14,
+    "baselineCatalogHash": "2281e672fdd838bb4d0460eb361a02a8793880ae13fcd6ddf102cc3f4352a13a",
+    "answerableCases": 16,
+    "requiredEvidenceAvailable": 16,
+    "boundaryFailures": [],
+    "cases": [
+      {
+        "id": "recent-constraint-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "older-than-window-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "cross-topic-recall-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "latest-correction-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "parent-attribution-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "deleted-memory-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": false,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "student-isolation-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "missing-context-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": false,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "unverified-research-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "cross-language-memory-en",
+        "language": "en",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "recent-constraint-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "older-than-window-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "cross-topic-recall-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "latest-correction-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "parent-attribution-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "deleted-memory-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": false,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "student-isolation-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "missing-context-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": false,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "unverified-research-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      },
+      {
+        "id": "cross-language-memory-es",
+        "language": "es",
+        "voiceStatus": 200,
+        "answerable": true,
+        "missingRequiredIds": [],
+        "boundaryPassed": true
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "en-labs",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-labs"
+      ],
+      "latencyMs": 7.74
+    },
+    {
+      "id": "en-transport",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-transport"
+      ],
+      "latencyMs": 3.8
+    },
+    {
+      "id": "en-credit",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-credit"
+      ],
+      "latencyMs": 3.63
+    },
+    {
+      "id": "en-deposit",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-deposit"
+      ],
+      "latencyMs": 3.44
+    },
+    {
+      "id": "en-program",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-program"
+      ],
+      "latencyMs": 3.53
+    },
+    {
+      "id": "en-scholarship",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-scholarship"
+      ],
+      "latencyMs": 3.48
+    },
+    {
+      "id": "en-equipment",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-equipment"
+      ],
+      "latencyMs": 3.24
+    },
+    {
+      "id": "en-office",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-office"
+      ],
+      "latencyMs": 4.61
+    },
+    {
+      "id": "en-forms",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "note",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-forms"
+      ],
+      "latencyMs": 3.54
+    },
+    {
+      "id": "en-portfolio",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "note",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-portfolio"
+      ],
+      "latencyMs": 3.68
+    },
+    {
+      "id": "en-format",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "memory",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-format"
+      ],
+      "latencyMs": 3.5
+    },
+    {
+      "id": "en-care",
+      "language": "en",
+      "answerable": true,
+      "sourceKind": "memory",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "en-care"
+      ],
+      "latencyMs": 3.45
+    },
+    {
+      "id": "es-horario",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-horario"
+      ],
+      "latencyMs": 3.43
+    },
+    {
+      "id": "es-transporte",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-transporte"
+      ],
+      "latencyMs": 3.37
+    },
+    {
+      "id": "es-creditos",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-creditos"
+      ],
+      "latencyMs": 3.35
+    },
+    {
+      "id": "es-renta",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-renta"
+      ],
+      "latencyMs": 3.58
+    },
+    {
+      "id": "es-carrera",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-carrera",
+        "en-program"
+      ],
+      "latencyMs": 3.55
+    },
+    {
+      "id": "es-beca",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-beca"
+      ],
+      "latencyMs": 3.33
+    },
+    {
+      "id": "es-equipo",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-equipo"
+      ],
+      "latencyMs": 3.29
+    },
+    {
+      "id": "es-acceso",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "summary",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-acceso"
+      ],
+      "latencyMs": 3.56
+    },
+    {
+      "id": "es-formulario",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "note",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-formulario"
+      ],
+      "latencyMs": 3.63
+    },
+    {
+      "id": "es-portafolio",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "note",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-portafolio"
+      ],
+      "latencyMs": 3.58
+    },
+    {
+      "id": "es-formato",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "memory",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-formato"
+      ],
+      "latencyMs": 3.71
+    },
+    {
+      "id": "es-cuidado",
+      "language": "es",
+      "answerable": true,
+      "sourceKind": "memory",
+      "available": true,
+      "expectedSourceRank": 1,
+      "topFiveHit": true,
+      "noRelevantPassed": null,
+      "boundaryPassed": true,
+      "selectedCaseIds": [
+        "es-cuidado"
+      ],
+      "latencyMs": 3.43
+    },
+    {
+      "id": "en-none-hobby",
+      "language": "en",
+      "answerable": false,
+      "sourceKind": null,
+      "available": true,
+      "expectedSourceRank": null,
+      "topFiveHit": null,
+      "noRelevantPassed": true,
+      "boundaryPassed": true,
+      "selectedCaseIds": [],
+      "latencyMs": 3.16
+    },
+    {
+      "id": "en-none-pet",
+      "language": "en",
+      "answerable": false,
+      "sourceKind": null,
+      "available": true,
+      "expectedSourceRank": null,
+      "topFiveHit": null,
+      "noRelevantPassed": true,
+      "boundaryPassed": true,
+      "selectedCaseIds": [],
+      "latencyMs": 4.18
+    },
+    {
+      "id": "es-none-viaje",
+      "language": "es",
+      "answerable": false,
+      "sourceKind": null,
+      "available": true,
+      "expectedSourceRank": null,
+      "topFiveHit": null,
+      "noRelevantPassed": true,
+      "boundaryPassed": true,
+      "selectedCaseIds": [],
+      "latencyMs": 3.17
+    },
+    {
+      "id": "es-none-comida",
+      "language": "es",
+      "answerable": false,
+      "sourceKind": null,
+      "available": true,
+      "expectedSourceRank": null,
+      "topFiveHit": null,
+      "noRelevantPassed": true,
+      "boundaryPassed": true,
+      "selectedCaseIds": [],
+      "latencyMs": 3.26
+    }
+  ],
+  "limitations": "Actual isolated PostgreSQL 17, restricted runtime role, sequential synthetic queries. Latency includes pool acquisition and scoped transaction, excludes fixture setup and live audio; not production latency. Keyword fallback only, no embeddings or vector similarity. Zero embedding cost means no embedding calls, not free model inference. Recall measures source selection, not answer correctness. No live provider calls. Phase 1 baseline is preserved; the matched comparison checks source text reaching the current voice prompt."
+}

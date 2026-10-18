@@ -4,6 +4,7 @@ import {createFamilyRepository,validateFamily} from './family.mjs';
 
 export async function fixture(){
  const db=newDb();
+ db.public.registerFunction({name:'current_schema',returns:DataType.text,implementation:()=> 'public'});
  db.public.registerOperator({operator:'~',left:DataType.text,right:DataType.text,returns:DataType.bool,implementation:(value,pattern)=>new RegExp(pattern).test(value)});
  db.public.registerFunction({name:'gen_random_uuid',returns:DataType.uuid,impure:true,implementation:()=>crypto.randomUUID()});
  db.public.registerFunction({name:'btrim',args:[DataType.text],returns:DataType.text,implementation:value=>value.trim()});

@@ -21,6 +21,7 @@ jobs:
           --health-retries 10
     env:
       TELEMETRY_TEST_DATABASE_URL: postgresql://postgres:synthetic-test-only@127.0.0.1:5432/postgres
+      DATABASE_TEST_URL: postgresql://postgres:synthetic-test-only@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +33,21 @@ jobs:
       - run: npm run test:support
       - run: npm run test:diagnostic-agent
       - run: npm run test:diagnostic-runner
+      - name: Verify personalization isolation, rollout and migration compatibility
+        run: npm run test:personalization
+      - name: Measure synthetic retrieval and prepare unrun live evaluation captures
+        run: |
+          node scripts/evaluate-history-retrieval.mjs --output output/personalization-retrieval.json
+          npm run eval:personalization:release -- prepare output/personalization-live
+      - name: Save personalization evidence (offline only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: personalization-offline-evidence
+          path: |
+            output/personalization-retrieval.json
+            output/personalization-live/
+          if-no-files-found: error
   application:
     runs-on: ubuntu-latest
     steps:

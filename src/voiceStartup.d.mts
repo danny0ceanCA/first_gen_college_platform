@@ -1,0 +1,1 @@
+export function voiceStartup(options:{getToken:(signal:AbortSignal)=>Promise<string|undefined>;getMedia:()=>Promise<MediaStream>;prepare?:(token:string|undefined,signal:AbortSignal)=>Promise<string|undefined>;signal?:AbortSignal;timeoutMs?:number}):Promise<{token:string|undefined;stream:MediaStream;prepared:()=>string|undefined}>;

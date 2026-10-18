@@ -1,0 +1,521 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-memory-selection-baseline",
+  "synthetic": true,
+  "catalogHash": "2281e672fdd838bb4d0460eb361a02a8793880ae13fcd6ddf102cc3f4352a13a",
+  "sourceHashes": {
+    "server/history.mjs": "01829208726995e2a2a14a9de1ecf0b35b851c5e0b691e5934849e7d1b241a2c",
+    "src/voiceMemory.mjs": "bf6c0eadb955b1648f514237fc5c6186e3ba1e3b7f927fcaa0259bda8d3b798f",
+    "server/profile-voice.mjs": "b9ebd6894783c8b6e98bb67f0f3edbd4b5b231ae7990fa6a87431e2c62a446c8"
+  },
+  "sampleSize": 20,
+  "answerableCases": 16,
+  "casesWithRequiredEvidence": 14,
+  "boundaryFailures": [],
+  "liveResponsesEvaluated": 0,
+  "results": [
+    {
+      "id": "recent-constraint-en",
+      "category": "recent-constraint",
+      "language": "en",
+      "critical": false,
+      "selectedIds": [
+        "schedule"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23173,
+      "expectedBehavior": [
+        "Use the stated evening schedule when explaining options.",
+        "Ask for missing program details; do not invent a suitable schedule."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "older-than-window-en",
+      "category": "older-than-window",
+      "language": "en",
+      "critical": false,
+      "selectedIds": [
+        "filler-19",
+        "filler-20",
+        "filler-21",
+        "filler-22",
+        "filler-23",
+        "filler-24"
+      ],
+      "missingRequiredIds": [
+        "schedule"
+      ],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": false,
+      "boundaryPassed": true,
+      "promptCharacters": 23647,
+      "expectedBehavior": [
+        "Retrieve the older work constraint despite many recent unrelated conversations.",
+        "Check whether the older schedule still applies."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "cross-topic-recall-en",
+      "category": "cross-topic-recall",
+      "language": "en",
+      "critical": false,
+      "selectedIds": [
+        "schedule",
+        "filler-4",
+        "filler-5",
+        "filler-6",
+        "filler-7",
+        "unrelated-planning"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 27697,
+      "expectedBehavior": [
+        "Recall relevant constraints across guides.",
+        "Verify current aid rules without assuming eligibility."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "latest-correction-en",
+      "category": "latest-correction",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [
+        "old-goal",
+        "corrected-goal"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23280,
+      "expectedBehavior": [
+        "Treat nursing as the latest explicitly stated interest.",
+        "Do not describe engineering as the current goal."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "parent-attribution-en",
+      "category": "parent-attribution",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [
+        "attributed-goals"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23187,
+      "expectedBehavior": [
+        "Attribute engineering to the parent.",
+        "Keep the student undecided; do not invent agreement."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "deleted-memory-en",
+      "category": "deleted-memory",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 22473,
+      "expectedBehavior": [
+        "Ask a focused question because the removed detail is unavailable.",
+        "Do not claim to remember or infer the deleted schedule."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "student-isolation-en",
+      "category": "student-isolation",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [
+        "alex-goal"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23138,
+      "expectedBehavior": [
+        "Use only the confirmed student scope.",
+        "Never disclose the sibling or other account memory."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "missing-context-en",
+      "category": "missing-context",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [
+        "general-question"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23172,
+      "expectedBehavior": [
+        "Say no campus decision is available and ask one focused question.",
+        "Do not turn a prior explanation into a decision."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "unverified-research-en",
+      "category": "unverified-research",
+      "language": "en",
+      "critical": true,
+      "selectedIds": [
+        "failed-check"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 21981,
+      "expectedBehavior": [
+        "Acknowledge that the deadline remains unverified.",
+        "Check the applicable official source and cycle before giving a current deadline."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "cross-language-memory-en",
+      "category": "cross-language-memory",
+      "language": "en",
+      "critical": false,
+      "selectedIds": [
+        "next-step"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23176,
+      "expectedBehavior": [
+        "Preserve the meaning of the memory in the requested language.",
+        "Keep the comparison incomplete; do not claim success."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "recent-constraint-es",
+      "category": "recent-constraint",
+      "language": "es",
+      "critical": false,
+      "selectedIds": [
+        "schedule"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23184,
+      "expectedBehavior": [
+        "Use the stated evening schedule when explaining options.",
+        "Ask for missing program details; do not invent a suitable schedule."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "older-than-window-es",
+      "category": "older-than-window",
+      "language": "es",
+      "critical": false,
+      "selectedIds": [
+        "filler-19",
+        "filler-20",
+        "filler-21",
+        "filler-22",
+        "filler-23",
+        "filler-24"
+      ],
+      "missingRequiredIds": [
+        "schedule"
+      ],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": false,
+      "boundaryPassed": true,
+      "promptCharacters": 23644,
+      "expectedBehavior": [
+        "Retrieve the older work constraint despite many recent unrelated conversations.",
+        "Check whether the older schedule still applies."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "cross-topic-recall-es",
+      "category": "cross-topic-recall",
+      "language": "es",
+      "critical": false,
+      "selectedIds": [
+        "schedule",
+        "filler-4",
+        "filler-5",
+        "filler-6",
+        "filler-7",
+        "unrelated-planning"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 27726,
+      "expectedBehavior": [
+        "Recall relevant constraints across guides.",
+        "Verify current aid rules without assuming eligibility."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "latest-correction-es",
+      "category": "latest-correction",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [
+        "old-goal",
+        "corrected-goal"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23283,
+      "expectedBehavior": [
+        "Treat nursing as the latest explicitly stated interest.",
+        "Do not describe engineering as the current goal."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "parent-attribution-es",
+      "category": "parent-attribution",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [
+        "attributed-goals"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23181,
+      "expectedBehavior": [
+        "Attribute engineering to the parent.",
+        "Keep the student undecided; do not invent agreement."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "deleted-memory-es",
+      "category": "deleted-memory",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 22470,
+      "expectedBehavior": [
+        "Ask a focused question because the removed detail is unavailable.",
+        "Do not claim to remember or infer the deleted schedule."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "student-isolation-es",
+      "category": "student-isolation",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [
+        "alex-goal"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23137,
+      "expectedBehavior": [
+        "Use only the confirmed student scope.",
+        "Never disclose the sibling or other account memory."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "missing-context-es",
+      "category": "missing-context",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [
+        "general-question"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23181,
+      "expectedBehavior": [
+        "Say no campus decision is available and ask one focused question.",
+        "Do not turn a prior explanation into a decision."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "unverified-research-es",
+      "category": "unverified-research",
+      "language": "es",
+      "critical": true,
+      "selectedIds": [
+        "failed-check"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 21985,
+      "expectedBehavior": [
+        "Acknowledge that the deadline remains unverified.",
+        "Check the applicable official source and cycle before giving a current deadline."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    },
+    {
+      "id": "cross-language-memory-es",
+      "category": "cross-language-memory",
+      "language": "es",
+      "critical": false,
+      "selectedIds": [
+        "next-step"
+      ],
+      "missingRequiredIds": [],
+      "forbiddenSelectedIds": [],
+      "unexpectedScopeIds": [],
+      "requiredEvidenceAvailable": true,
+      "boundaryPassed": true,
+      "promptCharacters": 23177,
+      "expectedBehavior": [
+        "Preserve the meaning of the memory in the requested language.",
+        "Keep the comparison incomplete; do not claim success."
+      ],
+      "liveResponseReview": "not-run",
+      "repeatQuestions": null,
+      "firstAudioMs": null,
+      "retrievalLatencyMs": null,
+      "providerCostUSD": null
+    }
+  ],
+  "limitations": "Actual history repository and prompt construction with isolated pg-mem fixtures. Covers summary selection only, not all workspace/profile context. No provider calls, speech, current-source verification, or semantic answer scoring. Null timings/costs are unmeasured. Required-source coverage does not establish that the model used it correctly. Later phases must rerun the same cases against their integrated context path."
+}

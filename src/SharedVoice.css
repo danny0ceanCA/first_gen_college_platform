@@ -26,6 +26,7 @@
 .shared-voice .voice-details-heading h3{font-size:20px}
 .shared-voice .voice-details-heading .button{min-height:44px}
 .shared-voice.compact{max-height:140px}
+.shared-voice.compact:has(.voice-audio-recovery,.voice-research-cancel){max-height:45dvh}
 .shared-voice.compact:has(.profile-voice>.error){max-height:45dvh}.shared-voice .profile-voice>.error{font-size:13px;margin:8px 0 0}
 @media(max-width:760px){.shared-voice.compact.details-open .profile-voice>.voice-session-details:not([hidden]){top:16px;right:12px;bottom:calc(var(--shared-voice-height,140px) + 12px);width:calc(100vw - 24px);padding:20px}}
 

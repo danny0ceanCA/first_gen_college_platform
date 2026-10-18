@@ -56,6 +56,8 @@ export function createHistoryRepository(database){
      if(input.action==='save'&&input.attribution)await attachSummarySegments(client,owner,item,input.attribution);
      if(input.action==='save')await reconcileSummaryAttribution(client,owner,item);
      await linkConversationQuality(client,owner,item);
+     const organizationLanguage=input.language||item.language;
+     if(['en','es'].includes(organizationLanguage)&&(await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_binder_jobs'")).rows.length)await client.query("UPDATE origen_binder_jobs SET language=$3 WHERE account_id=$1 AND summary_id=$2 AND status='pending' AND attempts=0",[owner,item.id,organizationLanguage]);
     }
    }
    if(input.action==='delete'){

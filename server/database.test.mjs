@@ -81,7 +81,8 @@ test('PostgreSQL migration, account boundaries and cascade deletion', {skip:!pro
   const b=(await client.query("INSERT INTO origen_accounts(auth0_subject) VALUES ('auth0|b') RETURNING id")).rows[0].id;
   await client.query("UPDATE origen_accounts SET first_name='50%_Student',role='student',onboarding_started_at=now(),onboarding_completed_at=now() WHERE id=$1",[a]);
   await client.query("INSERT INTO origen_voice_activity(id,account_id,topic,seconds) VALUES($1,$2,'planning',90)",[crypto.randomUUID(),a]);
-  const directory=await adminUsers(scoped,{search:'50%_',role:'student',status:'complete'});
+  // The directory window is exclusive; keep it after PostgreSQL's submillisecond timestamp.
+  const directory=await adminUsers(scoped,{search:'50%_',role:'student',status:'complete'},new Date(Date.now()+1000));
   assert.equal(directory.total,1);assert.equal(directory.users[0].id,a);assert.equal(Number(directory.funnel.completed),1);
   assert.equal(Number(directory.funnel.first_conversation),1);
   assert.equal((await adminUsers(scoped,{page:2})).users.length,0);

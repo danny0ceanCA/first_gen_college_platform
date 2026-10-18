@@ -1,0 +1,20 @@
+.student-memory{margin:14px 0 22px;border:1px solid #d8d0c2;border-radius:10px;background:#fffdf6;color:#34372e;min-width:0}
+.student-memory>summary{padding:14px 16px;cursor:pointer;font-weight:700;line-height:1.5}
+.student-memory>summary>span{font-size:.78rem;font-weight:400;color:#5d6256;margin-left:12px;display:inline-block}
+.student-memory-body{padding:0 16px 18px;min-width:0;font-size:.91rem;line-height:1.6}
+.student-memory-body h3{font-family:var(--binder-writing-font),cursive;font-size:1.6rem;margin:8px 0}
+.student-memory-body p{overflow-wrap:anywhere}
+.memory-call-note,.memory-attribution,.memory-evidence p{color:#5b6055;font-size:.82rem}
+.memory-toolbar,.memory-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.student-memory button{min-height:44px;padding:8px 12px;border:1px solid #b5bba9;border-radius:8px;background:#f7f8ed;color:#343c2b;font:inherit;cursor:pointer;max-width:100%;white-space:normal}
+.student-memory button:disabled{opacity:.55;cursor:default}
+.student-memory :focus-visible{outline:3px solid #53663f;outline-offset:3px}
+.memory-toolbar label,.memory-editor label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;flex:1;min-width:0}
+.student-memory select,.student-memory textarea{font:inherit;border:1px solid #aaa98e;background:white;border-radius:7px;min-height:44px;padding:9px;width:100%;box-sizing:border-box;max-width:100%;color:#34372e}
+.memory-editor{padding:14px;border:1px solid #aeb698;border-radius:10px;background:#f7f7ef;display:grid;gap:12px;margin:15px 0}
+.memory-entry{border-top:1px solid #ded7c6;padding:18px 0 6px;min-width:0}
+.memory-meta{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;color:#636958;font-size:.76rem}
+.memory-writing{font-family:var(--binder-writing-font),cursive;font-size:1.4rem;line-height:1.55;white-space:pre-wrap;margin:10px 0}
+.memory-evidence summary,.memory-profile summary{cursor:pointer;padding:8px 0;min-height:28px}
+.memory-evidence blockquote{border-left:3px solid #c9c7b2;padding-left:12px;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:480px){.student-memory-body{padding:0 12px 14px}.student-memory>summary{padding:12px}.student-memory>summary>span{display:block;margin-left:16px}.memory-toolbar{align-items:stretch}.memory-toolbar label{flex-basis:100%}.memory-actions{gap:8px}.memory-actions button{flex:1 1 auto}.memory-writing{font-size:1.28rem}}

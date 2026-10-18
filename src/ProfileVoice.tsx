@@ -1,3 +1,6 @@
+import {voiceStartup} from './voiceStartup.mjs';
+import {voiceMemoryTools} from './voiceMemoryTools.mjs';
+import {notifyMemoryContext,subscribeMemoryContext,watchMemoryRevision} from './memoryContext.mjs';
 import {workspaceGuide,voiceWorkspaceQueue,type WorkspaceSelection} from './voiceWorkspace.mjs';
 import {voiceSaveCompletion} from './voiceSaveCompletion.mjs';
 import {onboardingVoiceDiagnostics} from './onboardingVoiceDiagnostics.mjs';
@@ -15,6 +18,7 @@ import OnboardingVoiceDisclosure from './OnboardingVoiceDisclosure';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import {voiceResearchCache,voiceResearchBudget,wantsFreshLookup} from './voiceResearchCache.mjs';
 import {voiceResearchProgress,researchEvidence} from './voiceResearchProgress.mjs';
+import {voiceResearchRequest} from './voiceResearchRequest.mjs';
 import {useFamily} from './FamilyStore';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
@@ -94,6 +98,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const [savingSummary,setSavingSummary]=useState(false);
   const summaryQueue=useRef(shared?.queue||summarySaveQueue());
   const [summaryFailed,setSummaryFailed]=useState(false);
+  const summarySaveState=shared?.saveState||{failed:summaryFailed,saving:savingSummary};
   async function retrySummaries(){
     setSavingSummary(true);setSummaryFailed(false);shared?.reportSave(false,true);
     try{await summaryQueue.current.flush();}
@@ -121,6 +126,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     await retrySummaries();
   }
   const informational=mode!=='profile';
+  const [memoryRevision,setMemoryRevision]=useState<number|null>(null);
+  const memoryRevisionRef=useRef<number|null>(null);
+  const memoryPolicyRef=useRef<string|undefined>(undefined);
+  const liveMemorySaving=useRef(false);
+  const [checkingMemorySave,setCheckingMemorySave]=useState(false);
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
   useEffect(()=>{if(state==='idle'&&screenLanguage.current!==language){screenLanguage.current=language;spokenLanguage.current=language;}},[language,state]);
   const [muted,setMuted]=useState(false);
@@ -161,11 +171,19 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection)=>Promise<boolean>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopMemory?:()=>void;cancelResearch?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection)=>Promise<boolean>}>({});
   const generation=useRef(0);
   const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
   const preserveLogicalSession=useRef(false);
   const audio=useRef<HTMLAudioElement>(null);
+  function resumeAudio(){
+    const element=audio.current,version=generation.current;
+    if(!element)return;
+    element.muted=false;if(element.volume===0)element.volume=1;
+    void element.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{
+      if(generation.current===version){setAudioBlocked(true);onboardingVoice.current?.playback('blocked');}
+    });
+  }
   function cleanup(){
     resources.current.workspace?.stop();
     resources.current.studentSelection?.stop();
@@ -180,7 +198,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     const r=resources.current;resources.current={};
     r.abort?.abort();clearInterval(r.timer);clearTimeout(r.deadline);
     transitionToHome.current=null;
-    r.stopWake?.();r.stopProgress?.();
+    r.stopWake?.();r.stopProgress?.();r.stopMemory?.();
     r.stopConnection?.();r.stopTurns?.();r.stopGuide?.();onBusy?.(false);
     if(r.dc){r.dc.onclose=null;r.dc.close();}
     if(r.pc){r.pc.onconnectionstatechange=null;r.pc.close();}
@@ -195,12 +213,34 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
     cleanup();setLatestAnswer('');setChanges({});setSources([]);setState('idle');onActive(false);shared?.claim(ownerId,false);
   }),[]);
+  function invalidateRememberedContext(unavailable=false){
+    if(!resources.current.pc)return;
+    // Do not summarize an assistant reply containing information just removed.
+    memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
+    summaryQueue.current.remove(summaryId.current);
+    privateRecovery(`origen.onboarding-summaries.${user?.sub||'preview'}`).removeEntry(summaryId.current);
+    end();setLatestAnswer('');setChanges({});setSources([]);
+    setNotice(unavailable?t('We could not verify your saved information. Start a new conversation to reload it. This interrupted call was not saved.','No pudimos verificar tu información guardada. Inicia otra conversación para cargarla. Esta llamada interrumpida no se guardó.'):t('Your saved information changed. Start a new conversation to use the updated details. This interrupted call was not saved.','Tu información guardada cambió. Inicia otra conversación para usar los datos actualizados. Esta llamada interrumpida no se guardó.'));
+  }
+  useEffect(()=>subscribeMemoryContext(user?.sub,studentId=>{
+    if(summaryScope.current.confirmed&&summaryScope.current.id===studentId)invalidateRememberedContext();
+  }),[user?.sub]);
+  useEffect(()=>{
+    if(state!=='live'||memoryRevision===null||!summaryScope.current.confirmed)return;
+    const studentId=summaryScope.current.id;
+    return watchMemoryRevision({revision:memoryRevision,read:async signal=>{
+      if(liveMemorySaving.current)return memoryRevisionRef.current!;
+      const response=await apiFetch('/api/student-memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'revision',studentId}),signal});
+      const data=await response.json();if(!response.ok||typeof data.revision!=='number')throw new Error('memory_unavailable');return memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current?-1:data.revision;
+    },onChange:()=>{if(!liveMemorySaving.current&&memoryRevisionRef.current===memoryRevision)invalidateRememberedContext();},onUnavailable:()=>{if(!liveMemorySaving.current)invalidateRememberedContext(true);}});
+  },[state,memoryRevision]);
   useEffect(()=>{if(state==='live'&&workspaceFocus&&workspaceSeen.current!==workspaceFocus.serial&&resources.current.workspace){workspaceSeen.current=workspaceFocus.serial;resources.current.workspace.select(workspaceFocus);}},[workspaceFocus?.serial,state]);
   function end(){resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function handoffContext():VoiceHandoff{return {studentId:summaryScope.current.id,confirmed:summaryScope.current.confirmed,language:spokenLanguage.current,turns:sessionTurns.current.slice(-8).map(turn=>({...turn,text:turn.text.slice(0,2000)}))};}
   function finishCall(drain=true,preserveSession=false){
     if(finishPromise.current)return finishPromise.current;
     setFinishing(true);
+    resources.current.cancelResearch?.();
     resources.current.stream?.getAudioTracks().forEach(track=>{track.enabled=false;});
     const dc=resources.current.dc;
     if(speechInProgress.current&&dc?.readyState==='open')dc.send(JSON.stringify({type:'input_audio_buffer.commit'}));
@@ -224,11 +264,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const latestCleanup=useRef(cleanup);
   useEffect(()=>{latestCleanup.current=cleanup;});
   useEffect(()=>()=>{latestCleanup.current();onActive(false);shared?.claim(ownerId,false);},[]);
-  async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest='',continuingSession=''){
+  async function start(scope=target,sessionLanguage=spokenLanguage.current,spokenRequest='',continuingSession='',memoryResume=false){
     if(!privacyLease.valid())return;
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
-    const focus=workspaceFocus?.studentId===scope.id?workspaceFocus:undefined;
+    const focus=!memoryResume&&workspaceFocus?.studentId===scope.id?workspaceFocus:undefined;
     currentWorkspace.current=focus;
     if(focus)workspaceSeen.current=focus.serial;
     const profile=voiceProfile(mode,initialProfile,family.students,scope.id);
@@ -237,23 +277,51 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     scopePending.current=false;
     spokenLanguage.current=sessionLanguage;
     awaitingTranscription.current.clear();speechInProgress.current=false;assistantSpeaking.current=false;
+    memoryRevisionRef.current=null;memoryPolicyRef.current=undefined;setMemoryRevision(null);
     const sessionId=continuingSession||crypto.randomUUID();logSession.current=sessionId;logAttempt.current=crypto.randomUUID();logSequence.current=0;setDiagnosticId('');setErrorReference(undefined);logOperation.current=crypto.randomUUID();logTarget.current=scope.confirmed?scope.id:undefined;
     if(continuingSession)guidance.current.resetScope();else guidance.current.reset();const segmentId=crypto.randomUUID();finalReason.current='disconnected';
     onboardingEndReason.current='unknown';trackOnboarding('voice_start_requested',{language:sessionLanguage});
     onboardingVoice.current?.stop();onboardingVoice.current=onboardingVoiceDiagnostics(trackOnboarding);
     log('session_start',{mode,language:sessionLanguage});
-    const carriedRequest=spokenRequest||(continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
+    const carriedRequest=spokenRequest||(!memoryResume&&continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
     setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
     const version=++generation.current;
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
+    const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version,
+      post:async(body,signal)=>{const response=await apiFetch('/api/live-memory',{method:'POST',headers:{'Content-Type':'application/json',...(summaryToken.current?{Authorization:`Bearer ${summaryToken.current}`}:{})},body:JSON.stringify(body),signal});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'live_memory_unavailable'),{status:response.status});return data;},
+      onWriting:value=>{liveMemorySaving.current=value;setCheckingMemorySave(value);},
+      onConflict:()=>invalidateRememberedContext(),
+      onUncertain:()=>{invalidateRememberedContext();setNotice(t('The save result could not be confirmed. Check your binder before trying again.','No se pudo confirmar el resultado. Revisa tu carpeta antes de volver a intentarlo.'));},
+      onSaved:async result=>{
+        if(generation.current!==version)return;
+        const nextScope={id:summaryScope.current.id,confirmed:true},nextLanguage=spokenLanguage.current;
+        memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];summaryQueue.current.remove(summaryId.current);
+        privateRecovery(`origen.onboarding-summaries.${user?.sub||'preview'}`).removeEntry(summaryId.current);
+        end();if(user?.sub)notifyMemoryContext(user.sub,nextScope.id);
+        setNotice(t('Saved. Reconnecting with your updated information…','Guardado. Reconectando con tu información actualizada…'));
+        await start(nextScope,nextLanguage,'',sessionId,true);
+        setNotice(result.kind==='next-step'?t('Your next step was saved.','Se guardó tu próximo paso.'):t('Your memory change was saved.','Se guardó el cambio en tus recuerdos.'));
+      },
+    });resources.current.stopMemory=()=>memoryTools.stop();
+    const memoryResponseTurns=new Map<string,number>();
+    const research=voiceResearchRequest({signal:abort.signal});
+    resources.current.cancelResearch=()=>research.cancel();
     resources.current.deadline=setTimeout(()=>{if(generation.current===version){log('connection_failure',{code:'connection_timeout'});end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
     try {
-      if(summaryQueue.current.size){setNotice(t('Saving your previous conversation before reconnecting…','Guardando la conversacion anterior antes de reconectar…'));try{await summaryQueue.current.flush();await new Promise(resolve=>setTimeout(resolve,0));}catch{shared?.reportSave(true,false);setNotice(t('Some previous summaries could not be saved. You can talk, but those discussions may not be available to this guide yet.','Algunos resumenes anteriores no se guardaron. Puedes conversar, pero la guia puede no recordar esas conversaciones todavia.'));}if(generation.current!==version)return;}
-      summaryToken.current=history.cloud?await getAccessTokenSilently():undefined;if(summaryToken.current)guidanceTokens.current.set(sessionId,summaryToken.current);summaryId.current=continuingSession?crypto.randomUUID():sessionId;holdConversation(summaryId.current);
+      if(summaryQueue.current.size){setNotice(t('Your previous conversation is still saving. You can start talking while it finishes.','Tu conversación anterior sigue guardándose. Puedes empezar a hablar mientras termina.'));void retrySummaries();}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
-      const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;});
+      const voiceInput={enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
+      const startup=await voiceStartup({signal:abort.signal,
+        getToken:async()=>history.cloud?getAccessTokenSilently():undefined,
+        getMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;}),
+        prepare:history.cloud&&informational&&(!routing||scope.confirmed)&&voiceInput.studentId!==undefined?async(token,signal)=>{
+          const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({...voiceInput,action:'prepare'}),signal:AbortSignal.any([signal,AbortSignal.timeout(8000)])});
+          if(!response.ok)return undefined;const data=await response.json();return typeof data.preparedContextId==='string'?data.preparedContextId:undefined;
+        }:undefined,
+      });
+      const {stream}=startup;summaryToken.current=startup.token;if(startup.token)guidanceTokens.current.set(sessionId,startup.token);summaryId.current=continuingSession?crypto.randomUUID():sessionId;holdConversation(summaryId.current);
       if(generation.current!==version){stream.getTracks().forEach(track=>track.stop());return;}
       trackOnboarding('microphone_allowed');
       resources.current.stream=stream;
@@ -291,10 +359,13 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         logTarget.current=updateScope.confirmed?updateScope.id:undefined;setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
           await languageControl.configure(currentLanguage=>withRequestDeadline(async signal=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',enableLiveMemory:history.cloud,memorySessionId:memoryTools.session()?.id,workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
             const data=await response.json();if(!response.ok)setErrorReference(responseReference(response));if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
             signal.throwIfAborted();
             if(generation.current!==version)throw new Error('voice_session_stopped');
+            if(memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryPolicyRef.current=data.memoryPolicy;
+            if(typeof data.memoryRevision==='number'){if(memoryRevisionRef.current!==null&&memoryRevisionRef.current!==data.memoryRevision){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
+            memoryTools.configure(data.liveMemorySession);
             nextGuidance=data.guidance;
             return data.session;
           },{signal:abort.signal}),()=>{
@@ -367,7 +438,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         }
       };
       const progress=voiceResearchProgress({speak:sentence=>turns.progress(sentence),language:()=>spokenLanguage.current,isCurrent:()=>generation.current===version&&!abort.signal.aborted,onProgress:elapsed=>log('lookup_progress',{durationMs:elapsed})});
-      const stopProgress=progress.stop;
+      const stopProgress=()=>{progress.stop();turns.endProgress();};
       resources.current.stopProgress=stopProgress;
       dc.onopen=()=>{
         if(generation.current!==version)return;
@@ -408,12 +479,13 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
         if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);if(['completed','failed','cancelled','incomplete'].includes(e.response?.status))void guidance.current.event('response.finished',{status:e.response.status})?.catch(()=>{});}
-        if(e.type==='input_audio_buffer.speech_started'){speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
+        if(e.type==='input_audio_buffer.speech_started'){memoryTools.begin(e.item_id,spokenLanguage.current);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
         if(finishPromise.current&&e.type==='error'&&e.error?.code==='input_audio_buffer_commit_empty')return;
         if(e.type==='input_audio_buffer.speech_started'){speechTimes.set(e.item_id,Date.now());turns.speechStarted(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){const started=speechTimes.get(e.item_id);if(started!==undefined){log('speech_segment',{speechDurationMs:Date.now()-started});speechTimes.delete(e.item_id);}}
+        if(e.type==='response.created'&&e.response?.id)memoryResponseTurns.set(e.response.id,memoryTools.sequence());
         if(e.type==='response.done'&&e.response?.status==='cancelled')log('response_cancelled',{responseId:e.response.id,reason:e.response.status_details?.reason,toolCount:(e.response.output||[]).filter((item:{type:string})=>item.type==='function_call').length});
         if(e.type==='conversation.item.input_audio_transcription.failed'){onboardingVoice.current?.transcript(e.item_id,'failed');turns.transcript(e.item_id,'');}
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
@@ -422,6 +494,10 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           const release=userTurn?turns.holdReply():()=>{};
           try{
             if(userTurn){
+              // Wait for intelligible speech: noise must not cancel a lookup.
+              // The reply hold and transcription gate keep cancellation from
+              // answering before the new turn is recorded and language updated.
+              if(typeof e.transcript==='string'&&/[\p{L}\p{N}]/u.test(e.transcript))research.cancel();
               const next=spokenLanguageFromText(e.transcript,languageControl.language());
               if(next!==languageControl.language()){
                 try{await languageControl.change(next);log('spoken_language_changed',{language:next});}
@@ -429,11 +505,12 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
                 if(generation.current!==version)return;
               }
             }
+            if(userTurn)memoryTools.transcript(e.item_id,e.transcript,spokenLanguage.current);
             const valid=userTurn?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
             if(userTurn)onboardingVoice.current?.transcript(e.item_id,valid?'accepted':'empty');
             if(valid&&userTurn){replyRecoveryUsed=false;setNotice('');}
             if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:e.transcript,topic:liveMode.current,...(userTurn?{language:spokenLanguage.current}:{expectedLanguage:spokenLanguage.current})});checkpointSummary();}
-            if(valid&&!userTurn&&!scopePending.current)setLatestAnswer(e.transcript);
+            if(valid&&!userTurn&&!scopePending.current){setLatestAnswer(e.transcript);memoryTools.assistant(e.transcript);}
           }finally{release();}
         }
         if(e.type==='error'){
@@ -458,11 +535,17 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           }
           const hasTools=(e.response?.output||[]).some((item:{type:string})=>item.type==='function_call');
           if(!turns.beginDone(e.response?.id,hasTools,e.response?.status==='cancelled'))return;
+          const researchRevision=research.revision();
+          const memoryTurn=memoryResponseTurns.get(e.response?.id)??memoryTools.sequence();
           let called=await voiceLanguageTools(e.response?.output||[],languageControl,send)>0;
           if(generation.current!==version)return;
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             called=true;let accepted=false;
+            if(memoryTools.isTool(item.name)){
+              const output=await memoryTools.invoke(item,memoryTurn);if(generation.current!==version)return;
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
+            }
             if(item.name==='set_conversation_language'||item.name==='save_onboarding_profile')continue;
             if(item.name==='switch_college_guide'&&onGuideChanged){
               let next:string|undefined;try{next=JSON.parse(item.arguments).guide;}catch{}
@@ -502,23 +585,27 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
               log('lookup_start',{callId:item.call_id});
               researchStarted.current=Date.now();setResearching(true);
               try{
-                const args=JSON.parse(item.arguments);
-                const lookupLanguage=languageControl.language();
-                if(typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw new Error('invalid_lookup');
-                const latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'';
-                const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution,forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};
-                let result=cache.get(query);
-                const reused=Boolean(result);
-                if(result){log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});}
-                else {
-                  if(!researchBudget.take(query)){budgetExceeded=true;throw new Error('research_budget_reached');}
-                  progress.start();
-                  const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,...(guidance.current.current()?{'X-Origen-Segment':guidance.current.current()!.segmentId}:{})},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal:abort.signal});
-                  result=await response.json();
-                  if(generation.current!==version)return;
-                  if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error(result?.error==='private_search_details'?'private_search_details':'lookup_failed');
-                  cache.put(query,result);
-                }
+                const {result,reused,query}=await research.run(async signal=>{
+                  const args=JSON.parse(item.arguments);
+                  const lookupLanguage=languageControl.language();
+                  if(typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw new Error('invalid_lookup');
+                  const latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'';
+                  const query={mode:researchMode,language:lookupLanguage,question:args.question,institution:researchMode==='loans'?'':args.institution,forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};
+                  let result=cache.get(query);
+                  const reused=Boolean(result);
+                  if(result)log('lookup_cache_hit',{callId:item.call_id,sourceCount:result.sources.length});
+                  else {
+                    if(!researchBudget.take(query)){budgetExceeded=true;throw new Error('research_budget_reached');}
+                    progress.start();
+                    const response=await apiFetch((researchMode==='finance'||researchMode==='loans')?'/api/finance-research':'/api/admissions-research',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,...(guidance.current.current()?{'X-Origen-Segment':guidance.current.current()!.segmentId}:{})},body:JSON.stringify({question:args.question,institution:researchMode==='loans'?'':args.institution,language:lookupLanguage,purpose:researchMode==='planning'?'planning':undefined}),signal});
+                    result=await response.json();
+                    signal.throwIfAborted();
+                    if(!response.ok||!result||!Array.isArray(result.sources)||!result.sources.length)throw new Error(result?.error==='private_search_details'?'private_search_details':'lookup_failed');
+                  }
+                  return {result,reused,query};
+                },researchRevision);
+                if(generation.current!==version)return;
+                if(!reused)cache.put(query,result);
                 log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
                 output=researchEvidence(result,reused);
                 sessionSources.current=mergeConversationSources(sessionSources.current,result.sources);
@@ -527,10 +614,14 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
               }catch(error){
                 if(generation.current!==version)return;
                 const privateQuery=error instanceof Error&&error.message==='private_search_details';
+                const cancelled=error instanceof Error&&error.name==='AbortError';
+                const timedOut=error instanceof Error&&error.name==='TimeoutError';
+                if(cancelled)output={error:'lookup_cancelled',instruction:'The previous lookup was cancelled by the user or superseded by a newer spoken turn. Follow their latest request. Do not retry the cancelled lookup unless asked, and do not claim results.'};
+                if(timedOut)output={error:'lookup_timeout',instruction:'The source check timed out. Briefly explain that it could not be verified and continue the conversation. Do not retry this lookup automatically or invent findings.'};
                 if(privateQuery)output={error:'private_search_details',instruction:'This lookup was blocked before searching. Do not repeat these arguments. Explain briefly that searches should use a general college or aid question without private details or instructions to reveal data. Continue the conversation; do not read the blocked text aloud.'};
                 log('lookup_failure',{callId:item.call_id});
                 if(budgetExceeded)output={error:'research_budget_reached',instruction:'Do not retry research in this call. Explain the limit briefly and use already verified evidence only when its scope and year match; otherwise offer the official source or counselor as the next step. Keep the conversation open and never invent a policy.'};
-                setNotice(privateQuery?t('Please use a general college or aid question for this search.','Para esta búsqueda, usa una pregunta general sobre la universidad o ayuda financiera.'):budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
+                setNotice(cancelled?t('Search stopped. You can keep talking.','Búsqueda detenida. Puedes seguir hablando.'):timedOut?t('The search took too long. You can keep talking or ask to try again.','La búsqueda tardó demasiado. Puedes seguir hablando o pedir otro intento.'):privateQuery?t('Please use a general college or aid question for this search.','Para esta búsqueda, usa una pregunta general sobre la universidad o ayuda financiera.'):budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
               }finally{stopProgress();}
               if(generation.current!==version)return;
               setResearching(false);
@@ -567,7 +658,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
       log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
-      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':segmentId},body:JSON.stringify({workspaceFocus:focus,sdp:offer.sdp,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))}),signal:abort.signal});
+      const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':segmentId},body:JSON.stringify({...voiceInput,sdp:offer.sdp,preparedContextId:startup.prepared()}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
       if(generation.current!==version)return;
       setDiagnosticId(responseReference(response)||'');
@@ -576,12 +667,16 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
       if(generation.current!==version)return;
+      memoryTools.configure(data.liveMemorySession);
+      memoryPolicyRef.current=data.memoryPolicy;
+      if(typeof data.memoryRevision==='number'){memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){
       if(generation.current!==version)return;
       const code=err instanceof Error?err.message:'';
       finalReason.current='failed';void guidance.current.event('voice.start_failed',{phase:'transport'})?.catch(()=>{});
       const messages:Record<string,[string,string]>={
+        memory_changed:['Your saved information changed while connecting. Start again to load the latest details.','Tu información cambió durante la conexión. Inicia de nuevo para cargar los datos actuales.'],
         workspace_item_changed:['This saved item changed. Refresh your notebook or plan, then choose Talk about this again.','Este elemento guardado cambió. Actualiza tu cuaderno o plan y vuelve a elegir Hablemos de esto.'],
         workspace_item_unavailable:['This saved item is no longer available. Refresh your notebook or plan.','Este elemento guardado ya no está disponible. Actualiza tu cuaderno o plan.'],
         workspace_unavailable:['Your saved work could not be loaded. Please try again.','No se pudieron cargar tus notas y acciones. Inténtalo de nuevo.'],
@@ -624,16 +719,19 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{trackOnboarding(muted?'microphone_unmuted':'microphone_muted');resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>{onboardingEndReason.current='user_end';void finishCall();}}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
       </>}
+      {state==='live'&&audioBlocked&&<button type="button" className="button outline voice-audio-recovery" onClick={resumeAudio}>{t('Play Origen audio','Reproducir audio de Origen')}</button>}
+      {state==='live'&&researching&&<button type="button" className="button outline voice-research-cancel" onClick={()=>resources.current.cancelResearch?.()}>{t('Cancel search','Cancelar búsqueda')}</button>}
       {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
     {error&&<p role="alert" className="error">{error} <ErrorReference reference={errorReference||diagnosticId} language={language}/></p>}
     {notice&&<p className="voice-notice" role="status">{notice}</p>}
     <audio ref={audio} autoPlay controls onPlaying={event=>{setAudioBlocked(false);onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0?'silent':'playing');}} onPause={()=>onboardingVoice.current?.playback('paused')} onVolumeChange={event=>onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0||event.currentTarget.paused?'silent':'playing')} onError={()=>onboardingVoice.current?.playback('blocked')} hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
+    {checkingMemorySave&&<p className="voice-save-status" role="status">{t('Checking your save request…','Revisando tu solicitud para guardar…')}</p>}
     <div className="voice-session-details" hidden={ownerId==='shared'&&!detailsOpen}>
     {ownerId==='shared'&&<div className="voice-details-heading"><h3>{t('Conversation details','Detalles de la conversación')}</h3><button type="button" className="button outline" onClick={onCloseDetails}>{t('Close','Cerrar')}</button></div>}
     <p className="small-text">{history.cloud?t('Relevant saved notes, accepted actions and past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Las notas guardadas, las acciones aceptadas y los resúmenes pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
-    {savingSummary&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
-    {summaryFailed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><ErrorReference reference={errorReference} language={language}/><button type="button" className="button outline" disabled={savingSummary} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
+    {summarySaveState.saving&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
+    {summarySaveState.failed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><ErrorReference reference={errorReference} language={language}/><button type="button" className="button outline" disabled={summarySaveState.saving} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
     {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
     {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
     {latestAnswer&&<details className="voice-answer"><summary>{t('Latest answer','Última respuesta')}</summary><p>{latestAnswer}</p></details>}

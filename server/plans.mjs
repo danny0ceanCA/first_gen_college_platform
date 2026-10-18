@@ -14,9 +14,9 @@ export function validatePlan(input){
  if(input.action!=='create'){out.id=uuid(input.id);if(!Number.isSafeInteger(input.version)||input.version<1)throw fail(400,'invalid_plan');out.version=input.version;}
  if(input.action==='delete')return out;
  const p=input.plan;
- if(!p||!['education','courses','transfer','degree','career','financial','other'].includes(p.category)||!['active','archived'].includes(p.status)||!Array.isArray(p.steps)||p.steps.length>30||!Array.isArray(p.summaryIds)||p.summaryIds.length>30)throw fail(400,'invalid_plan');
+ if(!p||!['education','courses','transfer','degree','career','financial','applications','other'].includes(p.category)||!['active','archived'].includes(p.status)||!Array.isArray(p.steps)||p.steps.length>30||!Array.isArray(p.summaryIds)||p.summaryIds.length>30)throw fail(400,'invalid_plan');
  out.plan={studentId:p.studentId===null?null:id(p.studentId),title:text(p.title,200,true),goal:text(p.goal,4000),category:p.category,status:p.status,summaryIds:[...new Set(p.summaryIds.map(id))],steps:p.steps.map(s=>{
-  if(!s||!['not-started','in-progress','complete'].includes(s.status)||!Array.isArray(s.sources)||s.sources.length>10)throw fail(400,'invalid_plan');
+  if(!s||!['not-started','in-progress','complete','deferred'].includes(s.status)||!Array.isArray(s.sources)||s.sources.length>10)throw fail(400,'invalid_plan');
   if(s.dueDate!==null&&(typeof s.dueDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)||!Number.isFinite(Date.parse(s.dueDate))||new Date(s.dueDate).toISOString().slice(0,10)!==s.dueDate))throw fail(400,'invalid_plan');
   return {id:id(s.id),title:text(s.title,200,true),action:text(s.action,4000),notes:text(s.notes,4000),status:s.status,dueDate:s.dueDate,sources:s.sources.map(source=>{const title=text(source.title,300,true),url=text(source.url,2000,true);let parsed;try{parsed=new URL(url);}catch{throw fail(400,'invalid_plan');}if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw fail(400,'invalid_plan');return {title,url:parsed.href};})};
  })};
@@ -24,11 +24,12 @@ export function validatePlan(input){
  if(input.fromNote!==undefined){const n=input.fromNote;if(!n||!Number.isSafeInteger(n.version)||n.version<1||!out.plan.steps.some(s=>s.id===n.stepId))throw fail(400,'invalid_plan');out.fromNote={id:uuid(n.id),version:n.version,stepId:id(n.stepId)};}
  return out;
 }
-export function createPlanRepository(database,env=process.env){return async(subject,input)=>{
+export function createPlanRepository(database,env=process.env){return async(subject,input,{client:transactionClient}={})=>{
  if(!database)throw fail(503,'plans_unavailable');
- const c=await database.connect();
+ const c=transactionClient||await database.connect();
+ const commit=()=>transactionClient?Promise.resolve():c.query('COMMIT');
  try{
-  await c.query('BEGIN');
+  if(!transactionClient)await c.query('BEGIN');
   await guardAccountTransaction(c,subject);
   const account=(await c.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1 FOR UPDATE',[subject])).rows[0];
   if(!account)throw fail(404,'account_not_found');const owner=account.id;
@@ -102,8 +103,8 @@ export function createPlanRepository(database,env=process.env){return async(subj
    plans.push({id:row.id,studentId:row.student_id,title:row.title,goal:row.goal,category:row.category,status:row.status,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at,summaryIds:summaries.filter(s=>s.plan_id===row.id).map(s=>s.summary_id),steps:steps.filter(s=>s.plan_id===row.id).map(s=>({id:s.id,title:s.title,action:s.action,notes:s.notes,status:s.status,dueDate:s.due_date?s.due_date.slice(0,10):null,sources:sources.filter(x=>x.plan_id===row.id&&x.step_id===s.id).map(x=>({title:x.title,url:x.url}))}))});
   }
   const creations=extended?(await c.query('SELECT request_id FROM origen_plan_creations WHERE account_id=$1',[owner])).rows.map(row=>row.request_id):[];
-  await c.query('COMMIT');return {plans,creationIds:creations,limited:allRows.length>rows.length,supportsActions:extended};
- }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
+  await commit();return {plans,creationIds:creations,limited:allRows.length>rows.length,supportsActions:extended};
+ }catch(error){if(!transactionClient)await c.query('ROLLBACK').catch(()=>{});throw error;}finally{if(!transactionClient)c.release();}
 };}
 export function createPlanHandler(database,env=process.env){const run=createPlanRepository(database,env);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/plans')return next();

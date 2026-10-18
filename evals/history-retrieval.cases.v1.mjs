@@ -1,0 +1,33 @@
+// Held out from Phase 1's summary-selection catalog and Phase 3 lifecycle tests.
+// Synthetic only. Freeze this catalog when comparing subsequent retrieval versions.
+const cases=[
+ ['en-labs','en','summary','The student can attend evening laboratory sections after the bakery shift.','Which laboratory sections work after the bakery shift?'],
+ ['en-transport','en','summary','The last commuter bus leaves campus at eight, limiting late classes.','What limits did I mention about the commuter bus?'],
+ ['en-credit','en','summary','A counselor still needs to check whether the statistics credit transfers.','Which statistics credit needs a counselor check?'],
+ ['en-deposit','en','summary','The housing deposit is unaffordable before the summer paycheck.','What was the housing deposit concern?'],
+ ['en-program','en','summary','The student is comparing respiratory therapy certificates with radiology programs.','Which respiratory therapy and radiology paths were compared?'],
+ ['en-scholarship','en','summary','The library scholarship requires an essay about community volunteering.','What essay topic did the library scholarship require?'],
+ ['en-equipment','en','summary','The borrowed laptop cannot run the architecture software used in class.','What was wrong with the laptop for architecture?'],
+ ['en-office','en','summary','The accessibility office offered to discuss extended examination time.','Which office could discuss extended examination time?'],
+ ['en-forms','en','note','Ask the financial aid office about missing tax documents.','What question did I save about tax documents?'],
+ ['en-portfolio','en','note','Portfolio review: choose three ceramic pieces for the arts submission.','Which ceramic pieces are needed for the portfolio review?'],
+ ['en-format','en','memory','I prefer short explanations followed by a concrete example.','What explanation format do I prefer?'],
+ ['en-care','en','memory','I pick up my younger brother from school on Tuesdays.','Which day do I pick up my younger brother?'],
+ ['es-horario','es','summary','La estudiante necesita cursos de fin de semana por su horario en el restaurante.','¿Qué cursos encajan con el horario del restaurante?'],
+ ['es-transporte','es','summary','El tren de regreso sale a las siete y limita las clases nocturnas.','¿Qué límite mencioné sobre el tren y las clases nocturnas?'],
+ ['es-creditos','es','summary','La consejera debe revisar si los créditos de álgebra se pueden transferir.','¿Qué créditos de álgebra debe revisar la consejera?'],
+ ['es-renta','es','summary','El depósito de renta vence antes del pago de verano.','¿Cuál era el problema con el depósito de renta?'],
+ ['es-carrera','es','summary','El estudiante compara programas de enfermería y nutrición.','¿Qué programas de enfermería y nutrición comparaba?'],
+ ['es-beca','es','summary','La beca del museo solicita un ensayo sobre servicio comunitario.','¿Qué solicita la beca del museo en el ensayo?'],
+ ['es-equipo','es','summary','La computadora prestada no tiene capacidad para el programa de diseño.','¿Qué problema tiene la computadora para diseño?'],
+ ['es-acceso','es','summary','La oficina de accesibilidad puede explicar el tiempo adicional para exámenes.','¿Quién puede explicar el tiempo adicional para exámenes?'],
+ ['es-formulario','es','note','Preguntar por los documentos fiscales que faltan para ayuda financiera.','¿Qué documentos fiscales faltan para ayuda financiera?'],
+ ['es-portafolio','es','note','Seleccionar tres esculturas para la revisión del portafolio artístico.','¿Qué esculturas necesito para el portafolio artístico?'],
+ ['es-formato','es','memory','Prefiero explicaciones breves con un ejemplo concreto después.','¿Cómo prefiero las explicaciones y ejemplos?'],
+ ['es-cuidado','es','memory','Cuido a mi abuela los jueves por la tarde.','¿Cuándo cuido a mi abuela?'],
+ ['en-none-hobby','en',null,null,'What is my favorite constellation?'],
+ ['en-none-pet','en',null,null,'What is my pet hamster called?'],
+ ['es-none-viaje','es',null,null,'¿Cuál es mi destino favorito para vacaciones?'],
+ ['es-none-comida','es',null,null,'¿Cuál es mi comida favorita?'],
+];
+export const historyRetrievalCatalog={version:1,synthetic:true,cases:cases.map(([id,language,kind,content,query])=>({id,language,kind,content,query}))};

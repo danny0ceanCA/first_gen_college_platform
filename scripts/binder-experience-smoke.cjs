@@ -97,6 +97,8 @@ async function readAllNotes(page,language){
 }
 async function readSummary(page,language,width){
  if(width<=760)await chooseTopic(page,'summary',width);
+ // Summary generation starts when its section enters the viewport.
+ await page.locator('.home-memory').scrollIntoViewIfNeeded();
  await page.locator('.binder-summary-writing').waitFor();
  const reader=page.locator('.binder-summary-reader');let written='';let pages=0;
  assert.equal(await reader.getByRole('button',{name:language==='es'?'Anterior':'Previous',exact:true}).isDisabled(),true);

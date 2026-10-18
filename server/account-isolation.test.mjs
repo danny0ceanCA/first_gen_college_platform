@@ -1,3 +1,4 @@
+import {createMemoryRepository} from './student-memory.mjs';
 import {createPermissionRepository} from './guardian-permission.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -109,6 +110,9 @@ test('PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and
    const bob=await as('bob',()=>family('bob',{action:'load'}));assert.equal(bob.students[0].interest,'Design');assert.equal(bob.students[0].notes,'PRIVATE bob notes');
    assert.equal((await as('alice',()=>db.query('SELECT * FROM origen_students WHERE account_id=$1',[accountIds.bob]))).rows.length,0);
    const exported=await as('alice',()=>lifecycle('alice',{action:'export'}));assert.doesNotMatch(JSON.stringify(exported),/PRIVATE bob/);assert.match(JSON.stringify(exported),/PRIVATE alice local note/);
+   const memory=createMemoryRepository(db),before=(await as('alice',()=>memory('alice',{action:'revision',studentId:joined.studentId}))).revision;
+   await as('bob',()=>family('bob',{action:'save-student',student:{...bob.students.find(s=>s.id==='same-id'),goals:'Updated shared academic goal'}}));
+   assert.ok((await as('alice',()=>memory('alice',{action:'revision',studentId:joined.studentId}))).revision>before,'linked profile changes invalidate the receiving account snapshot');
    await as('bob',()=>links('bob',{action:'unlink',id:joined.links[0].id}));
    loaded=await as('alice',()=>family('alice',{action:'load'}));assert.equal(loaded.students.find(s=>s.id===joined.studentId).interest,'Design');assert.equal(loaded.students.find(s=>s.id===joined.studentId).notes,'PRIVATE alice local note');
    assert.equal((await as('alice',()=>db.query('SELECT * FROM origen_shared_profile($1)',[joined.studentId]))).rows.length,0);

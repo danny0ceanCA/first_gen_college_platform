@@ -1,3 +1,6 @@
+import {binderJobsEnabled,binderJobsReady,startBinderWorker} from './binder-jobs.mjs';
+import {createLiveMemoryHandler} from './live-memory.mjs';
+import {createMemoryHandler} from './student-memory.mjs';
 import {createPermissionHandler,purgePermissionData} from './guardian-permission.mjs';
 import {eligibilityAllowed} from './permission-context.mjs';
 import {permissionFetch,runPermittedRequest,startPermissionSupervisor} from './permission-execution.mjs';
@@ -63,7 +66,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const lifecycle=createLifecycleHandler(database);
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
- const handlers=[createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ const handlers=[createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
  const privacyMonitor=createPrivacyMonitor(database,log);
@@ -108,9 +111,12 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   {try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255||domain&&identity.iss!==undefined&&identity.iss!==`https://${domain}/`)throw new Error();}catch{return send(401,'invalid_token');}}
   req.origenIdentity=identity;
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
-  const bucketKey=`account:${identity.sub}`;
+  // Frequent diagnostic events must never spend the budget used by permission
+  // checks, saves, or research. Both lanes stay bounded before database work.
+  const diagnostic=req.url.split('?')[0]==='/api/voice-diagnostics';
+  const bucketKey=JSON.stringify([identity.sub,diagnostic?'diagnostics':'application']);
   const bucket=buckets.get(bucketKey)||{count:0,reset:now+60000};buckets.set(bucketKey,bucket);
-  if(++bucket.count>120){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
+  if(++bucket.count>(diagnostic?240:120)){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
   // Apply the account budget before database lookups so excess traffic cannot
   // consume a closure-status query on every rejected request.
   return runAsAccount(identity,async()=>{
@@ -143,7 +149,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  app.privacyMonitor=privacyMonitor;app.flushLogs=log.flush;return app;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- let database,maintenancePool,jobs;
+ let database,maintenancePool,jobs,stopBinderWorker=async()=>{};
  let crashing=false;
  const fatal=()=>{if(crashing)return;crashing=true;runtimeLog({event:'service.crashed',code:'operation_failed'});setTimeout(()=>process.exit(1),1000).unref();void runtimeLog.flush().finally(()=>process.exit(1));};
  process.on('uncaughtException',fatal);process.on('unhandledRejection',fatal);
@@ -169,6 +175,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   await cleanup();
   const metricsCleanup=setInterval(()=>{void cleanup().catch(()=>runtimeLog({event:'retention.failed',code:'operation_failed'}));},60*60*1000);metricsCleanup.unref();
   const application=createApp(process.env,undefined,database),server=createServer(application);
+  if(binderJobsEnabled(process.env)&&(!database||!maintenancePool||!await binderJobsReady(database)))throw new Error('binder_jobs_configuration_required');
+  stopBinderWorker=binderJobsEnabled(process.env)?startBinderWorker({application:database,maintenance:maintenancePool,env:process.env}):async()=>{};
   const stopRuntimeMetrics=startRuntimeMetrics(rawDatabase);
   const stopPermissionSupervisor=jobs?startPermissionSupervisor(null,process.env,fetch,jobs):()=>{};
   const emitPrivacyAlert=createPrivacyAlertEmitter(runtimeLog);
@@ -181,11 +189,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    if(stopping)return;stopping=true;runtimeLog({event:'service.stopping'});
    clearInterval(metricsCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
-   server.close(async()=>{try{await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
+   server.close(async()=>{try{await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
   };
   process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
  }catch(error){
   runtimeLog({event:'service.startup.failed',code:['telemetry_configuration_invalid','telemetry_lifecycle_required','restricted_database_runtime_required','database_migration_required','maintenance_database_required','restricted_maintenance_role_required','separate_maintenance_role_required','maintenance_migration_required'].includes(error?.message)?error.message:'startup_failed'});
-  await jobs?.stop();await maintenancePool?.end().catch(()=>{});await database?.end().catch(()=>{});await runtimeLog.flush();process.exitCode=1;
+  await stopBinderWorker();await jobs?.stop();await maintenancePool?.end().catch(()=>{});await database?.end().catch(()=>{});await runtimeLog.flush();process.exitCode=1;
  }
 }

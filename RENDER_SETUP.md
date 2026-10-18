@@ -119,3 +119,13 @@ The web defaults and Blueprint now use `origenedu.us.auth0.com` and Origen Web c
 ### Phase 3 progress history (off by default)
 
 Migration 016 adds private academic observations, plan revisions and optional feedback/reported milestones. See [phase 3 rollout](docs/data-architecture/PHASE_3.md). Backend opt-in: `PROGRESS_HISTORY_ENABLED=true`, `PROGRESS_DATA_OWNER`, and an application revision. Frontend opt-in: `VITE_PROGRESS_HISTORY_ENABLED=true` after API readiness. Retention is 90 days; no research access or verified institutional outcomes are enabled. Validate on a dedicated staging PostgreSQL database before production collection.
+
+
+### Personalization release (off by default)
+
+See [Personalization Phase 6](docs/voice-experience/PERSONALIZATION_PHASE_6.md) for the exact cohort configuration, evaluation gates, migration rehearsal, and rollback procedure. Apply migrations 044–047 and runtime grants before the compatible backend/web release. The Blueprint defaults `ORIGEN_PERSONALIZATION_MODE=off` and `ORIGEN_PERSONALIZATION_EXTRACTION=false`; a reviewed internal synthetic cohort is the first enablement. All personalization flags are backend-only. Keep the current backend when disabling features: older plan validators cannot edit new application/deferred actions. No production deployment or paid evaluation is implied by local tests.
+
+
+### Voice startup and binder background processing
+
+The [voice infrastructure guide](docs/voice-experience/VOICE_INFRASTRUCTURE.md) documents migrations 048–049 and the backend switches `ORIGEN_VOICE_PREPARATION` and `ORIGEN_BINDER_JOBS`, both off by default. Reapply runtime/maintenance grants before enablement. Binder processing runs in the existing API process using the existing PostgreSQL database and separate maintenance identity; there is no new service or Redis dependency. Once a narrative summary is saved, its organization job survives page closure and API restarts. Initial unsaved conversations retain the existing browser recovery boundary.

@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "kind": "voice-infrastructure-offline-verification",
+  "generatedAt": "2026-10-18T22:57:46.628242+00:00",
+  "productionDeployed": false,
+  "paidProviderCalls": 0,
+  "sourceSha256": {
+    "server/profile-voice.mjs": "18e961a080df6c17c744ee01e608171e6694107c27030f55e6c615c33864f05f",
+    "server/voice-preparation.mjs": "e20e1b7a3feadf75269aefaf0c503fa72c2ab7e55f334453dce40d93d17f9bc8",
+    "server/binder-jobs.mjs": "3443fdeccaeac40652400d6afb10fe039d6c2a5aec2e5e9a54043a8b25aaa938",
+    "server/topic-notes.mjs": "0adf6acae72bac4d692eec7284266c572234de01744ac79cd5b2d62a56b2d01f",
+    "server/history.mjs": "502c9b30979998230a56b2ef6364211cc0fd39f3a7c2c7bd37cd7d0a2bf19234",
+    "server/conversation-summary.mjs": "7cd6e4417775c885d7d932c9ebb6f9d6af89983a901b978764dd8845f3b29a01",
+    "server/privacy-controls.mjs": "8a4a40cf9efad76efd2f7c2522991a1098ce7a24cdcc7cb9ee5b2ae0075a36b0",
+    "server/maintenance-database.mjs": "b3e609e791e596d0db392d01368b1257f9393dd6b4068266ee5112b3eed12fa4",
+    "server/index.mjs": "a747337b305c9d2baf8aac227ba72953f91acdc17f5cd7fa42b2dfa05784d309",
+    "server/production-config.mjs": "995c691a15329f0842468dc7d15bc6b49d2721dc99d0da7d1ed164985fdafa0c",
+    "server/observability/metrics.mjs": "4106a901f2c3bf673ae6d93c7a0d2959e47c84b8cad7b418e81c46f05b420fb3",
+    "server/observability/event-catalog.mjs": "8a46e118f341087570f50389bbb65f11de86f5177a08072e56379189ad9bf1ae",
+    "src/ProfileVoice.tsx": "ad5778fb65ffbcb44164844a506bf8240e6dbabb1465dd452800a9dc3f4f4ab7",
+    "src/TopicNotebook.tsx": "08d736c81d5574ec67c2bfa7853f2830ac31e324b258be851d841c1a72644747",
+    "src/voiceStartup.mjs": "1033e1e0e8737f21fd8c97cbeb5b48bb07a104869615272f6f33ff8548d904ff",
+    "server/migrations/048_voice_preparation.sql": "f3f8ce80f02ea212ed331a79c1958413fdda98af6c6114c01cb4beedcc087383",
+    "server/migrations/049_binder_jobs.sql": "2c91f53a6c782a91b78095f480d097160af0e80fdc801ac5f7db3d1e761b204c",
+    "server/voice-startup.test.mjs": "b195dd31dce6f779d53129087647c37acdfa59bb3f43870c4bf27a770ee2618e",
+    "server/binder-jobs.test.mjs": "0f05e94b7eebde350d25f71f7b91400c4d0ad6f5ed6924c42eb351f7ae2b53a1",
+    "scripts/voice-infrastructure-smoke.cjs": "0d8604a7dde779025c025b30782b008f4e01dcd58d51b4a92ac2a0c82306200b"
+  },
+  "fullServer": {
+    "tests": 608,
+    "pass": 608,
+    "fail": 0,
+    "skipped": 0
+  },
+  "finalFocusedInfrastructure": {
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skipped": 0
+  },
+  "finalStartupChecks": {
+    "tests": 6,
+    "pass": 6,
+    "fail": 0,
+    "skipped": 0
+  },
+  "countingNote": "Focused checks overlap the full suite; these are not additional unique server test counts.",
+  "browser": {
+    "passed": 43,
+    "failed": 0,
+    "suites": {
+      "infrastructureBrowser": 6,
+      "adaptiveBrowser": 6,
+      "liveMemoryBrowser": 6,
+      "reliabilityBrowser": 25
+    },
+    "languages": [
+      "en",
+      "es"
+    ],
+    "widths": [
+      1280,
+      390,
+      320
+    ],
+    "authMicrophoneAndProviders": "synthetic; API/database/worker/browser real",
+    "physicalDevicesTested": false
+  },
+  "preparation": {
+    "coldDatabaseOperations": 60,
+    "preparedDatabaseOperations": 7,
+    "measuredFrom": "Actual isolated PostgreSQL test; counts exclude provider negotiation and are not live latency."
+  },
+  "migrations": {
+    "applied": [
+      "048_voice_preparation.sql",
+      "049_binder_jobs.sql"
+    ],
+    "database": "isolated local test database",
+    "repeatApplication": "passed"
+  },
+  "build": "passed; existing bundle-size warning",
+  "logging": "passed",
+  "runtime": "existing API process, existing PostgreSQL, no extra database or Redis",
+  "flagsDefaultOff": [
+    "ORIGEN_VOICE_PREPARATION",
+    "ORIGEN_BINDER_JOBS"
+  ],
+  "verifiedBoundaries": [
+    "exact account/request/revision/policy preparation tickets",
+    "single-use and expiry",
+    "parallel auth/mic startup and immediate/late cancellation",
+    "summary save does not block reconnection",
+    "transactional outbox",
+    "browser-closed processing and worker restart",
+    "competing workers and stale leases",
+    "bounded retries and persisted per-account budget",
+    "permission withdrawal and processing disable",
+    "source deletion/suppression and note erasure",
+    "Spanish language preservation",
+    "restricted maintenance grants and trigger function execution"
+  ],
+  "limitations": [
+    "Initial summary must commit before background organization is durable.",
+    "No live voice latency, provider cost, physical microphone or Safari measurement.",
+    "Earlier phase reports remain historical evidence; new live captures must use the current build."
+  ],
+  "evidenceLogs": {
+    "server": {
+      "path": "/tmp/origen-infra-server-final.log",
+      "sha256": "1dbad6858d0c1fb15e4b6651a134d52a233d94799c3c49464e46da905e2e3986"
+    },
+    "focused": {
+      "path": "/tmp/origen-infra-focused-final.log",
+      "sha256": "a29304054eea8e88f5d8763dcae2371318b64053bf95684a35a893d75e55c480"
+    },
+    "startup": {
+      "path": "/tmp/origen-infra-startup-final.log",
+      "sha256": "8560dff370cd92d786bff073d5067c3d141a794c2e3fde43b8c371c6a8d5f0c5"
+    },
+    "infrastructureBrowser": {
+      "path": "/tmp/origen-infra-browser-final.log",
+      "sha256": "65e501e1c247296cd01218fe8deeabe6c5da81b68f3e21cf9a810c3f66bfc44f"
+    },
+    "adaptiveBrowser": {
+      "path": "/tmp/origen-infra-adaptive-browser-final.log",
+      "sha256": "b83a6a527cc84ac609c8cbfce6f610a22cb6da3380379705031ecc772436a815"
+    },
+    "liveMemoryBrowser": {
+      "path": "/tmp/origen-infra-live-browser.log",
+      "sha256": "38f0325ec1e13c4b64b798dd79f2fcf3c97c5d2a6817c2008ff16897f265f690"
+    },
+    "reliabilityBrowser": {
+      "path": "/tmp/origen-infra-voice-browser.log",
+      "sha256": "798421e5402ca02074cc605d946c26e787700f06bf4153d1fd82ae27d398a425"
+    },
+    "build": {
+      "path": "/tmp/origen-infra-build-final.log",
+      "sha256": "38081483456494330fcdfb92b85d599cd1f48bf81e4aa80dc15b97f5c8385fde"
+    },
+    "logging": {
+      "path": "/tmp/origen-infra-logging-final.log",
+      "sha256": "6ae0ecbb9cbf999941e4f660026549a1ba4ff25dc76564176980f01d17eef47d"
+    },
+    "migration": {
+      "path": "/tmp/origen-infra-local-migration.log",
+      "sha256": "854c14014dbea013147a3678da258ff1db85c5e2bc046822e330e7128e6d32d8"
+    }
+  }
+}
