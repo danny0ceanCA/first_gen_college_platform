@@ -1,63 +1,76 @@
-.personal-binder{position:relative;min-width:0;perspective:1600px}
-.binder-cover{position:relative;display:block;width:100%;min-height:330px;text-align:left;border:1px solid #8a402e;border-radius:10px 24px 24px 10px;background:linear-gradient(115deg,#984932,#ae5941 65%,#a4513c);color:#f9ecda;box-shadow:5px 5px 0 #e5d2bf,9px 9px 0 #f9f1e5,12px 12px 0 #d7bba7,0 16px 35px #813e2e18;transform-origin:left center;backface-visibility:hidden;overflow:visible;padding:38px 56px 38px 76px}
+@font-face{font-family:'Binder Hand';src:url('/fonts/patrick-hand.woff') format('woff');font-style:normal;font-weight:400;font-display:swap}
+
+.personal-binder{--binder-writing-font:'Binder Hand','Segoe Print','Bradley Hand',cursive;--binder-paper:#fffdf7;position:relative;min-width:0;perspective:1800px;perspective-origin:15% 45%;isolation:isolate}
+.binder-cover{position:relative;display:block;width:100%;min-height:410px;padding:38px 56px 38px 76px;text-align:left;border:1px solid #7e3c2e;border-radius:9px 22px 22px 9px;background:repeating-linear-gradient(0deg,#ffffff03 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#3b170505 0 1px,transparent 1px 3px),linear-gradient(110deg,#8c412e,#a6533c 60%,#98452f);color:#fff3df;box-shadow:2px 3px 0 #d3bda5,5px 5px 0 #fff7e8,7px 7px 0 #cdb69f,9px 9px 0 #f9f0df,11px 11px 0 #ad8062,0 18px 30px #653e2c17;transform-origin:18px center;backface-visibility:hidden;overflow:visible}
+.binder-cover::after{content:'';position:absolute;inset:12px 12px 12px 47px;border:1px dashed #efc5a83d;border-radius:3px 12px 12px 3px;pointer-events:none}
 .binder-cover:disabled{opacity:1;cursor:default}
-.binder-cover-spine{position:absolute;left:18px;top:0;bottom:0;width:18px;border-left:1px solid #ffffff20;border-right:1px solid #59251635;background:#79362422}
-.binder-cover-content{position:relative;display:flex;flex-direction:column;align-items:flex-start;max-width:560px}
-.binder-brand{font-size:24px;font-weight:650;letter-spacing:-1px;margin-bottom:28px}
-.binder-cover-kicker{font-size:10px;letter-spacing:.17em;font-weight:600;color:#f2d5bc}
-.binder-cover-content>strong{font-family:'Manrope',sans-serif;font-size:clamp(30px,4vw,46px);letter-spacing:-.045em;line-height:1.2;margin:10px 0}
-.binder-cover-owner{font-size:18px;line-height:1.5;overflow-wrap:anywhere}
-.binder-cover-description{font-size:14px;line-height:1.65;margin-top:14px;max-width:40ch;color:#f5dfca}
-.binder-open-label{display:flex;align-items:center;gap:12px;padding:13px 18px;background:#f7ecdc;color:#813e2e;border-radius:9px;font-size:14px;font-weight:650;margin-top:28px;box-shadow:0 2px 6px #49241812}
+.binder-cover-spine{position:absolute;left:0;top:0;bottom:0;width:37px;border-radius:8px 0 0 8px;border-right:1px solid #55251670;background:linear-gradient(90deg,#542a252e,#ffffff0b 38%,#5225172e 78%,#d99b6633);box-shadow:3px 0 4px #3d1d111a,inset -1px 0 #f3c5a333}
+.binder-cover-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-start;max-width:560px;min-width:0}
+.binder-brand{font-size:23px;font-weight:650;letter-spacing:-1px;margin-bottom:24px;text-shadow:0 1px 1px #54251780}
+.binder-cover-kicker{font-size:10px;letter-spacing:.17em;font-weight:600;color:#f4d9bc}
+.binder-cover-content>strong{font-family:'Manrope',sans-serif;font-size:clamp(34px,4vw,48px);letter-spacing:-.045em;line-height:1.2;margin:9px 0 20px;text-shadow:0 2px 1px #56231945}
+.binder-owner-label{display:flex;flex-direction:column;align-items:flex-start;min-width:min(240px,100%);max-width:100%;padding:10px 18px 8px;background:#f8edd7;border:1px solid #e0c5a3;border-radius:3px;box-shadow:0 2px 5px #4c271b24;transform:rotate(-1deg);color:#4d514b}
+.binder-owner-label>span:first-child{font-size:8px;letter-spacing:.15em;font-weight:600;color:#6e6252}
+.binder-cover-owner{display:block;width:100%;font-family:var(--binder-writing-font);font-size:27px;font-weight:400;line-height:1.4;border-bottom:1px solid #b4a28a80;overflow-wrap:anywhere}
+.binder-cover-description{font-size:14px;line-height:1.65;margin-top:20px;max-width:42ch;color:#f8e4ce}
+.binder-open-label{display:flex;align-items:center;gap:12px;padding:12px 17px;background:#f7ecdc;color:#793b2b;border:1px solid #fcefd5;border-radius:8px;font-size:14px;font-weight:650;margin-top:24px;box-shadow:0 2px 4px #49241820;transition:background .18s,box-shadow .18s}
 .binder-open-label>svg:last-child{margin-left:12px}
-.binder-cover-tabs{position:absolute;right:-9px;top:70px;bottom:70px;display:flex;flex-direction:column;justify-content:space-around;z-index:-1}
-.binder-cover-tabs i{display:block;width:18px;height:48px;background:#d3a581;border:1px solid #bd8a68;border-radius:0 7px 7px 0}.binder-cover-tabs i:nth-child(2){background:#ead8bf}.binder-cover-tabs i:nth-child(3){background:#bd765a}
-.binder-cover:focus-visible{outline:3px solid #813e2e;outline-offset:17px}
-@media(hover:hover){.binder-cover:hover .binder-open-label{background:#fff8ec}}
-.binder-pages{position:relative;min-width:0;padding:18px 22px 28px 48px;border:1px solid #cfad94;border-radius:12px 20px 20px 12px;background:linear-gradient(90deg,#e6d4c0 0, #f6ebdd 38px,#fbf4e9 65px);box-shadow:0 8px 24px #813e2e0b}
-.binder-pages[hidden]{display:none}
-.binder-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;font-size:13px;color:#813e2e}.binder-topline>span,.binder-topline>button{display:flex;align-items:center;gap:8px}.binder-topline>button{min-height:44px;padding:8px 12px;border:1px solid #ddc6b0;background:#fffaf3;border-radius:8px}
-.binder-rings{position:absolute;top:140px;bottom:70px;left:13px;width:28px;display:flex;flex-direction:column;justify-content:space-around;pointer-events:none}
-.binder-rings i{height:17px;width:28px;border-radius:9px;border:3px solid #b99b80;background:linear-gradient(#fef8ee,#dac5b0);box-shadow:0 2px 3px #71523b22,inset 0 1px #fff}
+.binder-cover-tabs{position:absolute;right:-10px;top:72px;bottom:72px;display:flex;flex-direction:column;justify-content:space-around;z-index:-1}
+.binder-cover-tabs i{display:block;width:18px;height:44px;background:#ded5b9;border:1px solid #b7a384;border-radius:0 6px 6px 0;box-shadow:1px 2px 2px #59432e15}
+.binder-cover-tabs i:nth-child(2){background:#bacab6;border-color:#95a58e}.binder-cover-tabs i:nth-child(3){background:#e4be8b;border-color:#c59961}.binder-cover-tabs i:nth-child(4){background:#cfc0d6;border-color:#b2a0bc}
+.binder-cover:focus-visible{outline:3px solid #813e2e;outline-offset:15px}
+@media(hover:hover){.binder-cover:hover .binder-open-label{background:#fff8ec;box-shadow:0 3px 9px #49241833}}
+
+/* Metal rings sit over the inner cover; the writing stays on its own paper. */
+.binder-pages{position:relative;min-width:0;padding:18px 22px 26px 50px;border:1px solid #c4a58a;border-radius:9px 18px 18px 9px;background:linear-gradient(90deg,#aa8266 0,#d1b99b 7px,#e3d2b9 18px,#f1e6d2 40px,#f8efdf 64px);box-shadow:2px 3px 0 #e0cbb3,4px 5px 0 #f8efdf,6px 7px 0 #be9979,0 12px 26px #653e2c10}
+.binder-pages[hidden],.binder-cover[hidden]{display:none}
+.binder-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;font-size:13px;color:#74432f}
+.binder-topline>span,.binder-topline>button{display:flex;align-items:center;gap:8px}
+.binder-topline>button{min-height:44px;padding:8px 12px;border:1px solid #d8c4a8;background:#fffaf0;border-radius:8px}
+.binder-rings{position:absolute;top:156px;bottom:72px;left:12px;width:29px;display:flex;flex-direction:column;justify-content:space-around;pointer-events:none;z-index:2}
+.binder-rings::before{content:'';position:absolute;inset:-14px 7px;border-radius:9px;background:linear-gradient(90deg,#9d9a8f,#e3e0d4 50%,#b5afa2);box-shadow:1px 1px 3px #4b352d40}
+.binder-rings i{position:relative;height:18px;width:30px;border-radius:8px;border:4px solid #b6b8ae;background:linear-gradient(#746e6355,#fff9ec);box-shadow:0 3px 3px #443a3050,inset 0 1px 2px #fff,0 -1px 0 #fffff6;transform:rotate(-6deg)}
+.binder-rings i::after{content:'';position:absolute;right:-4px;top:0;height:8px;border-right:1px solid #6f756d}
 .binder-pages>.topic-notebook{min-width:0;background:transparent;border:0;padding:0;box-shadow:none}
-.binder-pages .notebook-panel{padding:30px 32px 28px 42px;border-top-width:2px;background:linear-gradient(90deg,transparent 25px,#b6755630 25px,#b6755630 26px,transparent 26px),#fffdfa;min-height:290px}
-.binder-pages .notebook-panel-heading,.binder-pages .history-heading{border-bottom:1px solid #eadbcd;padding-bottom:16px;margin-bottom:18px}
-.binder-pages .notebook-group>h4{font-size:13px;letter-spacing:.03em;color:#813e2e;margin-top:24px}
-.binder-pages .history-summary{max-width:76ch;margin-right:auto;font-size:15px}
-.binder-pages .notebook-note{border-left:3px solid #c88d6c;box-shadow:0 3px 10px #813e2e06}
+.binder-pages .notebook-panel{padding:28px 30px 26px 40px;border-color:#d9c7b0;border-top-width:2px;background:linear-gradient(90deg,transparent 23px,#c57d6a30 23px,#c57d6a30 24px,transparent 24px),var(--binder-paper);min-height:290px;box-shadow:0 3px 0 -1px #f8f1e3,0 4px 0 -1px #dbcbb7,0 7px 0 -3px #fff9eb}
+.binder-pages .notebook-panel-heading,.binder-pages .history-heading{border-bottom:1px solid #e3d8c7;padding-bottom:16px;margin-bottom:18px}
 .binder-pages .notebook-topics{overflow-y:hidden;padding-bottom:0;align-items:stretch}
 .binder-pages .notebook-topic{transform:none;margin-top:6px}
 .binder-pages .notebook-topic[aria-selected=true]{margin-top:0;padding-top:23px}
 @media(hover:hover){.binder-pages .notebook-topic:not([aria-selected=true]):hover{transform:none}}
-@media(max-width:760px){.binder-cover{padding:28px 30px 30px 52px;min-height:340px}.binder-brand{margin-bottom:22px}.binder-cover-spine{left:12px;width:13px}.binder-cover-description{font-size:13px}.binder-pages{padding:12px 10px 22px 28px}.binder-rings{left:5px;width:18px}.binder-rings i{width:18px;height:14px;border-width:2px}.binder-pages .notebook-panel{padding:22px 16px 22px 24px;background:linear-gradient(90deg,transparent 13px,#b6755630 13px,#b6755630 14px,transparent 14px),#fffdfa}.binder-topline{font-size:12px;gap:6px}.binder-topline>button{padding-inline:8px}.binder-open-label{padding:12px 14px}}
 
-/* Both surfaces overlap during motion, avoiding an unmount/height jump midway. */
-.personal-binder.is-transitioning{overflow:hidden;overflow:clip;isolation:isolate;overflow-anchor:none;border-radius:12px 24px 24px 12px;background:#fbf4e9;box-shadow:0 8px 24px #813e2e0b}
+/* Overlap the cover and paper while the left hinge turns. Never unmount notes. */
+.personal-binder.is-transitioning{overflow:hidden;overflow:clip;overflow-anchor:none;border-radius:9px 22px 22px 9px;background:#f1e6d2;box-shadow:0 8px 24px #813e2e0b}
 .personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{position:absolute;top:0;left:0;width:100%;will-change:transform,opacity}
-.personal-binder.is-transitioning>.binder-cover{z-index:2;pointer-events:none;transition:none;box-shadow:none}
+.personal-binder.is-transitioning>.binder-cover{z-index:3;pointer-events:none;transition:none;box-shadow:6px 0 24px #3b231c30}
 .personal-binder.is-transitioning>.binder-pages{z-index:1;pointer-events:none;box-shadow:none}
 .personal-binder.binder-closing>.binder-pages{height:100%;overflow:hidden}
-.binder-cover[hidden]{display:none}
-@media(prefers-reduced-motion:reduce){.personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{will-change:auto}}
+@media(prefers-reduced-motion:reduce){.personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{will-change:auto}.binder-open-label{transition:none}}
 
 /* A phone carries one portrait cover and one readable page at a time. */
 @media(max-width:760px){
- .binder-cover{min-height:clamp(360px,112vw,480px);padding:30px 24px 32px 42px;border-radius:10px 20px 20px 10px;box-shadow:3px 4px 0 #e5d2bf,6px 7px 0 #f9f1e5,8px 9px 0 #d7bba7,0 12px 26px #813e2e18}
- .binder-cover-spine{left:10px;width:12px}
- .binder-cover-content{min-width:0}
- .binder-cover-content>strong{font-size:36px;margin:14px 0}
- .binder-cover-owner{font-size:17px}
- .binder-cover-tabs{right:-6px}.binder-cover-tabs i{width:12px;height:42px}
- .binder-open-label{gap:8px;font-size:13px;padding:12px;max-width:100%}
+ .binder-cover{min-height:420px;padding:28px 24px 30px 42px;border-radius:9px 18px 18px 9px;box-shadow:2px 3px 0 #d3bda5,4px 5px 0 #fff7e8,6px 7px 0 #b49172,0 12px 26px #813e2e18;transform-origin:12px center}
+ .binder-cover::after{inset:10px 10px 10px 29px}
+ .binder-cover-spine{width:23px}
+ .binder-brand{margin-bottom:22px;font-size:21px}
+ .binder-cover-content>strong{font-size:36px;margin:12px 0 18px}
+ .binder-cover-kicker{font-size:9px;line-height:1.6}
+ .binder-owner-label{padding:8px 12px 6px;min-width:min(200px,100%)}
+ .binder-cover-owner{font-size:26px}
+ .binder-cover-description{font-size:13px;margin-top:18px}
+ .binder-cover-tabs{right:-7px;top:64px;bottom:64px}.binder-cover-tabs i{width:12px;height:38px}
+ .binder-open-label{gap:8px;font-size:13px;padding:12px;max-width:100%;margin-top:22px}
  .binder-open-label>svg:last-child{margin-left:0}
  .binder-cover:focus-visible{outline-offset:4px}
- .binder-pages{padding:12px 8px 22px 18px;border-radius:10px 18px 18px 10px;background:linear-gradient(90deg,#e6d4c0,#fbf4e9 30px)}
- .binder-rings{left:2px;width:14px;top:130px;bottom:60px}
- .binder-rings i{width:14px;height:12px}
- .binder-topline{margin-bottom:18px}
- .binder-topline>button{font-size:11px;gap:5px}
- .binder-pages .notebook-panel{padding:22px 12px 24px 16px;border-radius:8px 8px 12px 12px;min-width:0;background:linear-gradient(90deg,transparent 8px,#b6755620 8px,#b6755620 9px,transparent 9px),#fffdfa}
- .binder-pages .notebook-summary-page .history-summary{max-height:none;overflow:visible;scrollbar-gutter:auto;padding-right:0;font-size:15px;line-height:1.8}
+ .binder-pages{padding:12px 8px 20px 23px;border-radius:9px 16px 16px 9px;background:linear-gradient(90deg,#bda080,#e3d2b9 13px,#f8efdf 30px);box-shadow:2px 3px 0 #e0cbb3,4px 5px 0 #be9979,0 10px 20px #653e2c0d}
+ .binder-rings{left:3px;width:16px;top:130px;bottom:60px}
+ .binder-rings::before{inset:-12px 4px}
+ .binder-rings i{width:18px;height:13px;border-width:2px}
+ .binder-rings i::after{right:-2px;height:7px}
+ .binder-topline{font-size:12px;gap:6px;margin-bottom:18px}
+ .binder-topline>span{gap:5px}
+ .binder-topline>button{font-size:11px;gap:5px;padding-inline:8px}
+ .binder-pages .notebook-panel{padding:22px 12px 24px 16px;border-radius:7px 7px 10px 10px;min-width:0;background:linear-gradient(90deg,transparent 8px,#c57d6a25 8px,#c57d6a25 9px,transparent 9px),var(--binder-paper)}
  .binder-pages .notebook-summary-page .history-heading{padding:0 0 16px}
  .binder-pages .notebook-summary-page .history-content{padding:0}
  .binder-pages .notebook-summary-page .history-content>*{min-width:0}
