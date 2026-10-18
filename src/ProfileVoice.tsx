@@ -40,7 +40,7 @@ const labels = {
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export type VoiceHandoff={studentId:string|null;confirmed:boolean;language:'en'|'es';turns:{role:'user'|'assistant';text:string}[]};
-export type VoiceProps={workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={onBusy?:(busy:boolean)=>void;workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
@@ -52,7 +52,7 @@ export default function ProfileVoice(props:VoiceProps){
  if(shared.active&&shared.owner!==localOwner.current)return <p role="status">{props.t('End your current voice conversation before starting profile setup.','Termina la conversacion actual antes de iniciar el perfil.')} <button className="text-button" onClick={shared.open}>{props.t('Open conversation','Abrir conversacion')}</button></p>;
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
-export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
   const disclosureId=useId();
   const workspaceSeen=useRef<string|undefined>(undefined);
   const currentWorkspace=useRef<WorkspaceSelection|undefined>(workspaceFocus);
@@ -181,7 +181,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
     r.abort?.abort();clearInterval(r.timer);clearTimeout(r.deadline);
     transitionToHome.current=null;
     r.stopWake?.();r.stopProgress?.();
-    r.stopConnection?.();r.stopTurns?.();r.stopGuide?.();
+    r.stopConnection?.();r.stopTurns?.();r.stopGuide?.();onBusy?.(false);
     if(r.dc){r.dc.onclose=null;r.dc.close();}
     if(r.pc){r.pc.onconnectionstatechange=null;r.pc.close();}
     r.stream?.getTracks().forEach(track=>track.stop());
@@ -244,7 +244,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
     log('session_start',{mode,language:sessionLanguage});
     const carriedRequest=spokenRequest||(continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
-    setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);
+    setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
     const version=++generation.current;
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
@@ -328,7 +328,7 @@ export function LocalProfileVoice({workspaceFocus,onOnboardingEvent,profileSaved
         }catch{transitioned.current=false;trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved, but home could not open yet. Please try again.','Tu perfil está guardado, pero no se pudo abrir el inicio. Intenta de nuevo.'));}finally{release();}
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
-      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
+      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onBusy,onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
       resources.current.studentSelection=voiceWorkspaceQueue<string|null>({
         busy:()=>turns.busy()||changingGuide,
         apply:async id=>{

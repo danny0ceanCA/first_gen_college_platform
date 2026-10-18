@@ -2,7 +2,7 @@ import {ChevronDown,ChevronUp,AudioLines} from 'lucide-react';
 import VoiceStartButton from './VoiceStartButton';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {browserPrivacy} from './browserPrivacy.mjs';
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import {LocalProfileVoice,type VoiceProps} from './ProfileVoice';
 import './SharedVoice.css';
@@ -15,7 +15,24 @@ export default function SharedVoice({children}:{children:ReactNode}){
  const [owner,setOwner]=useState<string|null>(null),[expanded,setExpanded]=useState(false);
  const ownerRef=useRef<string|null>(null),queue=useRef(summarySaveQueue());
  const [saveFailed,setSaveFailed]=useState(false),[saving,setSaving]=useState(false);
+ const dock=useRef<HTMLDivElement>(null);
  const active=owner!==null;
+ useLayoutEffect(()=>{
+  const container=dock.current;
+  if(!container)return;
+  const root=document.documentElement;
+  const bars=Array.from(container.children) as HTMLElement[];
+  // Reserve exactly the visible dock, including wrapped text and mobile safe area.
+  // A fixed allowance left an empty tail below the binder's last page.
+  const measure=()=>{
+   const height=Math.ceil(Math.max(0,...bars.map(bar=>bar.getBoundingClientRect().height)));
+   root.style.setProperty('--shared-voice-height',`${height}px`);
+  };
+  measure();
+  const observer=new ResizeObserver(measure);
+  bars.forEach(bar=>observer.observe(bar,{box:'border-box'}));
+  return()=>{observer.disconnect();root.style.removeProperty('--shared-voice-height');};
+ },[!!session,!!entry,saveFailed]);
  useEffect(()=>browserPrivacy.subscribe(event=>{if(event.type==='end'){queue.current.clear();ownerRef.current=null;setOwner(null);setSession(null);setEntry(null);}}),[]);
  useEffect(()=>{if(!active)setExpanded(false);},[active]);
  useEffect(()=>{if(!active&&entry?.mode&&entry.mode!=='profile')setGuide(entry.mode);},[active,entry?.mode]);
@@ -38,6 +55,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
 
  return <SharedVoiceContext.Provider value={{start:()=>{if(entry)launch({...entry,mode:guide});},ready:!!entry,talkAbout,configure,profileSaved:()=>{if(!ownerRef.current)return false;setSession(previous=>previous?{...previous,props:{...previous.props,profileSaved:(previous.props.profileSaved||0)+1}}:previous);return true;},syncOnboarding:props=>setSession(previous=>previous?.props.onboarding&&previous.props.recoveryKey===props.recoveryKey?{...previous,props:{...previous.props,...props}}:previous),active,owner,claim,queue:queue.current,reportSave:(failed,saving)=>{setSaveFailed(failed);setSaving(saving);},open:()=>setExpanded(true),launch}}>
  {children}
+ <div ref={dock} className="shared-voice-dock">
  {!session&&entry&&<aside className="shared-voice voice-ready" aria-label={t('Origen voice guide','Guía de voz Origen')}><div className="shared-voice-heading"><strong>Origen</strong><span className="voice-current-section">{guideName(entry.mode)}</span></div><div className="voice-ready-controls"><VoiceStartButton label={t('Talk with Origen','Hablar con Origen')} disabled={active} onClick={()=>launch({...entry,mode:guide})}/></div></aside>}
  {!session&&saveFailed&&<aside className="shared-voice"><p role="alert">Conversation summary not saved / Resumen sin guardar</p><button className="button outline" disabled={saving} onClick={()=>void retry()}>Retry / Reintentar</button></aside>}
  {session&&<aside className={`shared-voice compact${expanded?' details-open':''}`} aria-label={t('Live conversation','Conversacion en vivo')}>
@@ -46,5 +64,6 @@ export default function SharedVoice({children}:{children:ReactNode}){
  {!active&&entry&&<div className="voice-ready-controls"><span className="voice-current-section">{guideName(entry.mode)}</span></div>}
  <LocalProfileVoice detailsOpen={expanded} onCloseDetails={()=>setExpanded(false)} onGuideChanged={mode=>{setGuide(mode);setSession(previous=>previous?{...previous,props:{...previous.props,mode,...(previous.props.onboarding?{onboarding:false,onSaveProfile:undefined,onAccountDraft:undefined,onDraft:undefined,onProfileSaveComplete:undefined,recoveryKey:undefined}: {})}}:previous);}} switchGuideMode={active&&entry&&entry.mode!=='profile'&&entry.mode!==session.props.mode?entry.mode:undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} t={t} onLanguageChanged={next=>{voiceLanguage.current=next;setSession(previous=>previous?{...previous,props:{...previous.props,language:next}}:previous);session.props.onLanguageChanged?.(next);}} autoStart onActive={live=>{claim('shared',live);session.props.onActive(live);}}/>
  </aside>}
+ </div>
  </SharedVoiceContext.Provider>;
 }

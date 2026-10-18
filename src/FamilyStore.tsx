@@ -2,6 +2,7 @@ import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
 import {browserPrivacy} from './browserPrivacy.mjs';
+import {withRequestDeadline} from './requestDeadline.mjs';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 
 export type Account={firstName:string;email:string;role?:'parent'|'student';welcomeHeard?:boolean;usedVoice?:boolean};
@@ -23,14 +24,16 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  const [errorCode,setErrorCode]=useState('');
  const busy=useRef(false);
  async function request(operation:Record<string,unknown>,signal?:AbortSignal):Promise<Family>{
+  return withRequestDeadline(async requestSignal=>{
   privacyLease.assert();
   const token=await getAccessTokenSilently();
-  privacyLease.assert();
-  const response=await apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...(typeof operation.onboardingAttemptId==='string'?{'X-Origen-Operation':operation.onboardingAttemptId}:{})},body:JSON.stringify(operation),signal:signal?AbortSignal.any([signal,privacyLease.signal]):privacyLease.signal});
+  privacyLease.assert();requestSignal.throwIfAborted();
+  const response=await apiFetch('/api/family',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...(typeof operation.onboardingAttemptId==='string'?{'X-Origen-Operation':operation.onboardingAttemptId}:{})},body:JSON.stringify(operation),signal:requestSignal});
   const result=await response.json();
-  privacyLease.assert();
+  privacyLease.assert();requestSignal.throwIfAborted();
   if(!response.ok||!Array.isArray(result.students)||!result.account)throw new Error(result.error||'family_unavailable');
   return result;
+  },{signal:signal?AbortSignal.any([signal,privacyLease.signal]):privacyLease.signal});
  }
  useEffect(()=>{
   if(!cloud)return;

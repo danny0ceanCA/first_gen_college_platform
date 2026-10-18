@@ -1,4 +1,4 @@
-export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>void,options?:{schedule?:(callback:()=>void,delay:number)=>any;cancel?:(timer:any)=>void;transcriptionTimeout?:number;onMissing?:(itemId:string)=>void}): {
+export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>void,options?:{schedule?:(callback:()=>void,delay:number)=>any;cancel?:(timer:any)=>void;transcriptionTimeout?:number;onMissing?:(itemId:string)=>void;onBusy?:(busy:boolean)=>void}): {
   request:()=>void;
   holdReply:()=>()=>void;
   busy:()=>boolean;
