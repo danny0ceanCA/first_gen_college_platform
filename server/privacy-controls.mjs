@@ -4,13 +4,13 @@ import {recentlyAuthenticated} from './recent-auth.mjs';
 import {runAsAccount} from './account-isolation.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
-const tables={summaries:'origen_conversation_summaries',notes:'origen_topic_notes',plans:'origen_plans',sheets:'origen_workspace_sheets'};
+const tables={summaries:'origen_conversation_summaries',notes:'origen_topic_notes',plans:'origen_plans',sheets:'origen_workspace_sheets',memories:'origen_student_memories'};
 export function validatePrivacyRequest(input){
  if(!input||Array.isArray(input)||!['status','preview','erase','retention'].includes(input.action))throw fail(400,'invalid_privacy_request');
  const keys={status:['action'],preview:['action','categories','studentId'],erase:['action','categories','studentId','revision','confirmation'],retention:['action','days']}[input.action];
  if(Object.keys(input).some(k=>!keys.includes(k)))throw fail(400,'invalid_privacy_request');
  if(['preview','erase'].includes(input.action)){
-  if(!Array.isArray(input.categories)||!input.categories.length||input.categories.length>4||new Set(input.categories).size!==input.categories.length||input.categories.some(k=>!Object.hasOwn(tables,k)))throw fail(400,'invalid_privacy_request');
+  if(!Array.isArray(input.categories)||!input.categories.length||input.categories.length>5||new Set(input.categories).size!==input.categories.length||input.categories.some(k=>!Object.hasOwn(tables,k)))throw fail(400,'invalid_privacy_request');
   if(input.studentId!==undefined&&input.studentId!==null&&(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128))throw fail(400,'invalid_privacy_request');
  }
  if(input.action==='erase'&&(input.confirmation!=='DELETE'||typeof input.revision!=='string'||!/^[a-f0-9]{64}$/.test(input.revision)))throw fail(400,'confirmation_required');
@@ -37,8 +37,9 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
   const all={},selected={},args=[owner,...(typeof input.studentId==='string'?[input.studentId]:[])];
   const scope=input.studentId===undefined?'':input.studentId===null?' AND student_id IS NULL':' AND student_id=$2';
   for(const [key,table] of Object.entries(tables)){
+   if(key==='memories'&&!(await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_student_memories'")).rows.length){all[key]=[];selected[key]=[];continue;}
    // Include versions so a confirmation cannot silently erase newly edited work.
-   all[key]=(await c.query(`SELECT id,${key==='summaries'?'created_at':'version'},${key==='notes'?'source_summary_id':'student_id'} FROM ${table} WHERE account_id=$1${scope} ORDER BY id`,args)).rows;
+   all[key]=(await c.query(`SELECT id,${key==='summaries'?'created_at':'version'},${['notes','memories'].includes(key)?'source_summary_id':'student_id'} FROM ${table} WHERE account_id=$1${scope}${key==='memories'?" AND status IN ('proposed','confirmed')":''} ORDER BY id`,args)).rows;
    selected[key]=(input.categories||[]).includes(key)?all[key]:[];
   }
   if(input.action==='status'){
@@ -48,14 +49,28 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
   const summaryIds=new Set(selected.summaries.map(r=>r.id));
   const derived=all.notes.filter(r=>summaryIds.has(r.source_summary_id));
   selected.notes=[...new Map([...selected.notes,...derived].map(r=>[r.id,r])).values()].sort((a,b)=>a.id.localeCompare(b.id));
+  const derivedMemories=all.memories.filter(r=>summaryIds.has(r.source_summary_id));
+  selected.memories=[...new Map([...selected.memories,...derivedMemories].map(r=>[r.id,r])).values()].sort((a,b)=>a.id.localeCompare(b.id));
   const counts=Object.fromEntries(Object.entries(selected).map(([k,v])=>[k,v.length]));
   const revision=createHash('sha256').update(JSON.stringify({owner,studentId:input.studentId,categories:[...input.categories].sort(),selected})).digest('hex');
   if(input.action==='erase'){
    if(input.revision!==revision)throw fail(409,'privacy_selection_changed');
+   if(input.categories.includes('memories')){
+    const sources=(await c.query(`SELECT id,student_id FROM origen_conversation_summaries WHERE account_id=$1${scope}`,args)).rows;
+    for(const source of sources)await c.query("INSERT INTO origen_memory_batches(account_id,summary_id,source_version,suppressed) VALUES($1,$2,'privacy-erased',true) ON CONFLICT(account_id,summary_id) DO UPDATE SET suppressed=true",[owner,source.id]);
+    const targets=input.studentId!==undefined?[input.studentId]:[null,...(await c.query('SELECT id FROM origen_students WHERE account_id=$1',[owner])).rows.map(r=>r.id)];
+    for(const target of targets)await c.query('INSERT INTO origen_memory_scopes(account_id,scope_key,student_id) VALUES($1,$2,$3) ON CONFLICT(account_id,scope_key) DO UPDATE SET revision=origen_memory_scopes.revision+1',[owner,target??'',target]);
+   }
+   if(input.categories.includes('notes')){
+    // Erasing notes also fences an extraction already in flight. Empty source
+    // receipts prevent old summaries from automatically recreating removed notes.
+    await c.query(`INSERT INTO origen_topic_note_batches(account_id,summary_id) SELECT account_id,id FROM origen_conversation_summaries WHERE account_id=$1${scope} ON CONFLICT DO NOTHING`,args);
+    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_binder_jobs'")).rows.length)await c.query(`UPDATE origen_binder_jobs SET status='cancelled',lease_token=NULL,lease_until=NULL WHERE account_id=$1${scope} AND status<>'complete'`,args);
+   }
    // Receipts/tombstones are written by DB triggers, including normal UI deletes.
-   for(const key of ['summaries','notes','plans','sheets'])for(const row of selected[key])await c.query(`DELETE FROM ${tables[key]} WHERE account_id=$1 AND id=$2`,[owner,row.id]);
+   for(const key of ['summaries','notes','plans','sheets','memories'])for(const row of selected[key])await c.query(`DELETE FROM ${tables[key]} WHERE account_id=$1 AND id=$2`,[owner,row.id]);
   }
-  await c.query('COMMIT');return {counts,derivedNotes:derived.length,revision,deleted:input.action==='erase'};
+  await c.query('COMMIT');return {counts,derivedNotes:derived.length,derivedMemories:derivedMemories.length,revision,deleted:input.action==='erase'};
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 };}
 // Called only by the scheduled retention job. The repository rechecks the

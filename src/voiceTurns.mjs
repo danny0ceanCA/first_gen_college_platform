@@ -7,8 +7,10 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   const playing=new Set();
   let stopped=false;
   let progressActive = false, progressId = '', progressEvent = '';
+  let progressSequence = 0, progressToken = '';
   const progressResponses = new Set();
   const progressRequests = new Set();
+  const retiredProgress = new Set();
   let lastBusy;
   const busy=()=>!stopped&&Boolean(active||pending||tools||replyHolds||awaiting.size||progressActive||playing.size);
   function notify(){const next=busy();if(next!==lastBusy){lastBusy=next;onBusy(next);}}
@@ -23,10 +25,21 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     }finally{notify();}
   }
   function request() { pending = true; flush(); }
+  function cancelProgress(id){
+    if(!id)return;
+    retiredProgress.add(id);
+    try{
+      const event=send({type:'response.cancel',response_id:id});
+      if(event)progressRequests.add(event);
+      if(playing.has(id))send({type:'output_audio_buffer.clear'});
+    }catch{/* A failed status cancellation must still release the local reply. */}
+    finally{playing.delete(id);}
+  }
   return {
     busy,
     playback(event){
       if(stopped)return;
+      if(retiredProgress.has(event.response_id))return;
       if(event.type==='output_audio_buffer.started')playing.add(event.response_id||'audio');
       if(event.type==='output_audio_buffer.stopped'||event.type==='output_audio_buffer.cleared'){
         const clearedAnswer=event.type==='output_audio_buffer.cleared'&&(event.response_id?playing.has(event.response_id)&&!progressResponses.has(event.response_id):[...playing].some(id=>!progressResponses.has(id)));
@@ -52,17 +65,30 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     progress(sentence) {
       if (stopped || !tools || active || progressActive || awaiting.size || playing.size) return false;
       progressActive = true;
+      progressToken = String(++progressSequence);
       try{
-        progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress'},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Keep the same warm voice, volume and pace as this call. No greeting, filler or extra claims. Say only this brief status update: ${sentence}`}}) || '';
+        progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress',request:progressToken},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Keep the same warm voice, volume and pace as this call. No greeting, filler or extra claims. Say only this brief status update: ${sentence}`}}) || '';
       }catch{progressActive=false;progressEvent='';notify();return false;}
       if(!progressEvent){progressActive=false;notify();return false;}
       if (progressEvent) progressRequests.add(progressEvent);
       notify();return true;
     },
+    endProgress(){
+      // An expired/cancelled lookup cannot wait indefinitely for status audio.
+      const ids=new Set([progressId,...[...playing].filter(id=>progressResponses.has(id))]);
+      try{for(const id of ids)cancelProgress(id);}finally{
+        progressActive=false;progressId='';progressEvent='';progressToken='';flush();
+      }
+    },
     progressEvent(event) {
       if (event.response?.metadata?.topic === 'origen_lookup_progress') {
-        progressId = event.response.id;
-        if (progressId) progressResponses.add(progressId);
+        const id=event.response.id,token=event.response.metadata.request;
+        if(id)progressResponses.add(id);
+        if(!progressActive||(token&&token!==progressToken)){
+          if(event.type==='response.created')cancelProgress(id);
+          return true;
+        }
+        progressId = id;
         if (event.type === 'response.created' && awaiting.size && progressId) {
           const id = send({type:'response.cancel',response_id:progressId});
           if (id) progressRequests.add(id);
@@ -70,7 +96,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
       }
       const owned = progressResponses.has(event.response_id || event.response?.id);
       const failed = event.type === 'error' && progressEvent && event.error?.event_id === progressEvent;
-      if ((owned && event.type === 'response.done') || failed) {
+      if ((owned && event.type === 'response.done' && !retiredProgress.has(event.response?.id)) || failed) {
         progressActive = false; progressId = ''; progressEvent = ''; flush();
       }
       return Boolean(owned || (event.type === 'error' && progressRequests.has(event.error?.event_id)));

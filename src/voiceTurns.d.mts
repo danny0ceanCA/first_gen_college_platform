@@ -6,6 +6,7 @@ export function voiceTurns(send:(event:unknown)=>void|string,onRecovery?:()=>voi
   speechStopped:(itemId:string)=>void;
   stop:()=>void;
   progress:(sentence:string)=>boolean;
+  endProgress:()=>void;
   progressEvent:(event:any)=>boolean;
   created:()=>void;
   speechStarted:(itemId:string)=>void;

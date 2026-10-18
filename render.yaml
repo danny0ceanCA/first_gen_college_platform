@@ -12,6 +12,14 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: ORIGEN_VOICE_PREPARATION
+        value: "false"
+      - key: ORIGEN_BINDER_JOBS
+        value: "false"
+      - key: ORIGEN_PERSONALIZATION_MODE
+        value: "off"
+      - key: ORIGEN_PERSONALIZATION_EXTRACTION
+        value: "false"
       - key: OPENAI_API_KEY
         sync: false
       - key: AUTH0_DOMAIN

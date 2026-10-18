@@ -1,5 +1,5 @@
 export const workspaceGuide=topic=>topic==='costs'?'finance':topic==='applications'?'admissions':'planning';
-export const planTopic=category=>category==='financial'?'costs':category==='transfer'||category==='courses'?'transfer':'options';
+export const planTopic=category=>category==='applications'?'applications':category==='financial'?'costs':category==='transfer'||category==='courses'?'transfer':'options';
 
 // A selection waits for a quiet turn. It never cancels output or recreates audio.
 export function voiceWorkspaceQueue({busy,apply,onPending=()=>{},onError=()=>{},schedule=setTimeout,cancel=clearTimeout}){

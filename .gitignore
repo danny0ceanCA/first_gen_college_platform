@@ -17,3 +17,6 @@ mobile/.expo/
 mobile/android/
 mobile/ios/
 mobile/web-build/
+
+# Synthetic live evaluation captures and local release evidence
+/output/personalization-*/

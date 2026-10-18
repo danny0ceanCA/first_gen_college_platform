@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const kinds={student:'origen_students',summary:'origen_conversation_summaries',note:'origen_topic_notes',plan:'origen_plans',sheet:'origen_workspace_sheets'};
+const kinds={student:'origen_students',summary:'origen_conversation_summaries',note:'origen_topic_notes',plan:'origen_plans',sheet:'origen_workspace_sheets',memory:'origen_student_memories'};
 const subjectHash=value=>createHash('sha256').update(value).digest('hex');
 const hex=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value);
@@ -10,6 +10,14 @@ export function validateDeletionManifest(manifest){
  if(payload.version!==1||!date(payload.exportedAt)||!Array.isArray(payload.deletions)||!Array.isArray(payload.closures)||!hex(checksum)||checksum!==hash(payload))throw new Error('invalid_deletion_manifest');
  for(const r of payload.deletions)if(!hex(r.subject_hash)||!uuid(r.account_id)||!['account',...Object.keys(kinds)].includes(r.kind)||typeof r.record_id!=='string'||!r.record_id||r.record_id.length>128||!date(r.deleted_at))throw new Error('invalid_deletion_manifest');
  for(const r of payload.closures)if(!hex(r.subject_hash)||!date(r.closed_at)||r.completed_at!==null&&!date(r.completed_at))throw new Error('invalid_deletion_manifest');
+ if(payload.memoryExclusions!==undefined){
+  if(!Array.isArray(payload.memoryExclusions))throw new Error('invalid_deletion_manifest');
+  for(const r of payload.memoryExclusions)if(!uuid(r.account_id)||typeof r.summary_id!=='string'||!r.summary_id||r.summary_id.length>128||typeof r.source_version!=='string'||r.source_version.length>128)throw new Error('invalid_deletion_manifest');
+ }
+ if(payload.memoryFences!==undefined){
+  if(!Array.isArray(payload.memoryFences))throw new Error('invalid_deletion_manifest');
+  for(const r of payload.memoryFences)if(!uuid(r.account_id)||!uuid(r.id)||!Number.isSafeInteger(r.version)||r.version<1)throw new Error('invalid_deletion_manifest');
+ }
  return payload;
 }
 // Operator credential only, invoked while writes are stopped for final cutover.
@@ -19,7 +27,10 @@ export async function exportDeletionManifest(pool){
   await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
   const deletions=(await c.query('SELECT subject_hash,account_id,kind,record_id,deleted_at FROM origen_deletion_journal ORDER BY id')).rows;
   const closures=(await c.query('SELECT c.subject_hash,c.closed_at,i.completed_at FROM origen_closed_accounts c LEFT JOIN origen_identity_closures i USING(subject_hash) ORDER BY c.subject_hash')).rows;
-  const payload=JSON.parse(JSON.stringify({version:1,exportedAt:new Date().toISOString(),deletions,closures}));
+  const memoryReady=(await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_student_memories'")).rows.length;
+  const memoryExclusions=memoryReady?(await c.query('SELECT account_id,summary_id,source_version FROM origen_memory_batches WHERE suppressed=true ORDER BY account_id,summary_id')).rows:[];
+  const memoryFences=memoryReady?(await c.query("SELECT account_id,id,version FROM origen_student_memories WHERE status<>'superseded' AND version>1 ORDER BY account_id,id")).rows:[];
+  const payload=JSON.parse(JSON.stringify({version:1,memoryExclusions,memoryFences,exportedAt:new Date().toISOString(),deletions,closures}));
   await c.query('COMMIT');return {...payload,checksum:hash(payload)};
  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}
 }
@@ -41,6 +52,15 @@ export async function replayDeletionManifest(pool,manifest){
   }
   const representatives=(await c.query('SELECT auth0_subject FROM origen_institution_representatives')).rows;
   for(const row of representatives)if(closed.has(subjectHash(row.auth0_subject)))await c.query('DELETE FROM origen_institution_representatives WHERE auth0_subject=$1',[row.auth0_subject]);
+  // Keep source suppression and version fences with the separately protected
+  // deletion journal. Neither manifest field contains private prose.
+  for(const r of payload.memoryExclusions||[]){
+   const account=accounts.find(a=>a.id===r.account_id);if(!account||closed.has(subjectHash(account.auth0_subject)))continue;
+   const source=(await c.query('SELECT id FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[r.account_id,r.summary_id])).rows.length;
+   if(source)await c.query('INSERT INTO origen_memory_batches(account_id,summary_id,source_version,suppressed) VALUES($1,$2,$3,true) ON CONFLICT(account_id,summary_id) DO UPDATE SET suppressed=true',[r.account_id,r.summary_id,r.source_version]);
+   else await c.query("INSERT INTO origen_deletion_journal(subject_hash,account_id,kind,record_id) VALUES($1,$2,'summary',$3) ON CONFLICT DO NOTHING",[subjectHash(account.auth0_subject),r.account_id,r.summary_id]);
+  }
+  for(const r of payload.memoryFences||[])await c.query("UPDATE origen_student_memories SET status='deleted',last_action='delete',content='',source_quote='' WHERE account_id=$1 AND id=$2 AND version<$3 AND status<>'superseded'",[r.account_id,r.id,r.version]);
   for(const r of payload.deletions){
    const account=accounts.find(a=>a.id===r.account_id);
    if(account&&subjectHash(account.auth0_subject)!==r.subject_hash)throw new Error('restored_account_identity_mismatch');

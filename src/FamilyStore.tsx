@@ -1,3 +1,4 @@
+import {notifyMemoryContext} from './memoryContext.mjs';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
@@ -71,7 +72,7 @@ export function FamilyProvider({children,previewStudents}:{children:ReactNode;pr
  return <Context.Provider value={{...family,recordVoiceExperience,returningUser:visitedBefore||!!family.account.firstName.trim(),cloud,loading,error,errorCode,saving,reload:()=>setAttempt(n=>n+1),
   completeOnboarding:(firstName,role,student,onboardingAttemptId)=>{const account={...family.account,firstName,role};return mutate({action:'complete-onboarding',account,...(onboardingAttemptId?{onboardingAttemptId}:{}),...(student?{student}:{})},{account,students:student?(family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]):family.students});},
   saveAccount:details=>{const account={...family.account,...details};return mutate({action:'save-account',account},{...family,account});},
-  saveStudent:student=>mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]}),
+  saveStudent:async student=>{const saved=await mutate({action:'save-student',student},{...family,students:family.students.some(s=>s.id===student.id)?family.students.map(s=>s.id===student.id?student:s):[...family.students,student]});if(saved&&user?.sub)notifyMemoryContext(user.sub,student.id);return saved;},
   removeStudent:async id=>{const removed=await mutate({action:'delete-student',id},{...family,students:family.students.filter(s=>s.id!==id)});if(removed)browserPrivacy.forget({studentId:id});return removed;}
  }}>{children}</Context.Provider>;
 }

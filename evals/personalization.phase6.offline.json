@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "kind": "personalization-phase6-offline-verification",
+  "generatedAt": "2026-10-18T19:05:50.561562+00:00",
+  "sourceHashes": {
+    "server/profile-voice.mjs": "8626f609ec9ae9f865a7566ccedcb2fb0ead4c83c2addbf5a800ab8095482801",
+    "server/student-memory.mjs": "b50e2d4f1b2e494d912af6e741773875ee462758546bd1d15415fe5719739ec6",
+    "server/history-retrieval.mjs": "b33698ae995af0ebc7dd958f510a5c1697dc5ce87dfdcbcf306eea81dd140b1e",
+    "server/live-memory.mjs": "6ceb290c193e31ccf013f8c95baf411d35deed34af8f4bf464dcee1466764bc0",
+    "server/live-memory-tools.mjs": "76dcb00485e86b6ad8a84216c0f1563bcf11b8ad1fc4fddff3f16841e501fcb2",
+    "server/live-memory-intent.mjs": "7dfa4e8c53d44ff36229cb519433511d6d599b6f50501b54f5bd635e6d4cbe6d",
+    "server/adaptive-guidance.mjs": "58ee892fd7b1e26dd25f67c7f2d95019248030cc3b5c613109ae1356abcfb610",
+    "server/personalization-controls.mjs": "284e3f4e0a309e0ba978102aee6b7edea57e189048d36cc40e916824cf313473",
+    "server/voice-workspace.mjs": "82ededfbaf9fe62a40401ff3780ea2bcc8ac1f6a434313bc93e2591ada871e2b",
+    "server/plans.mjs": "186a42c280ad07fff9bffda6130fa1475d541bf897300697e32774d32712ab1b",
+    "src/ProfileVoice.tsx": "3a7940a2c74d34a3ae387260bc02d3287303d6db31148d13368206094e411865",
+    "src/voiceMemoryTools.mjs": "1d72b7d2ded08fc8e01063288a77cfeb683764fea7ff2ad6d9d04a6a7b55b0c2",
+    "src/voiceTurns.mjs": "084097199241f409ed811693ec82b3d06a59f0f5a6ac4e1b501df9c2b1558b0d",
+    "server/migrations/044_student_memory.sql": "b06bbc67b2c184d7423b9fb2ac39928afc0c7ed112d29f6f95e7326cd0682fd1",
+    "server/migrations/045_historical_retrieval.sql": "f2f6cc406ac79e753de4ea6d706c13b60829dca036220ff5fb4ca62d74ce0ef3",
+    "server/migrations/046_live_memory.sql": "f5ddbeb1816111004e239e34f2a1e96f8a3d0ae25ea9c4b96543f372e19de3a9",
+    "server/migrations/047_adaptive_guidance.sql": "4a8b1ebe4f6fd0713cd585f1a0d73e2116ff8180fcb291928783a4e61e4b67a7"
+  },
+  "productionDeployed": false,
+  "releaseReady": false,
+  "server": {
+    "tests": 596,
+    "pass": 596,
+    "fail": 0,
+    "skipped": 0
+  },
+  "finalFocusedGates": {
+    "tests": 15,
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0
+  },
+  "countingNote": "Focused checks repeat some full-suite cases and include six operational readiness cases; do not sum them as unique server tests.",
+  "browser": {
+    "scenarios": 43,
+    "passed": 43,
+    "failed": 0,
+    "suites": {
+      "liveMemoryBrowser": 6,
+      "adaptiveBrowser": 6,
+      "memoryBrowser": 6,
+      "voiceReliabilityBrowser": 25
+    },
+    "provider": "synthetic",
+    "widths": [
+      1280,
+      390,
+      320
+    ],
+    "languages": [
+      "en",
+      "es"
+    ],
+    "physicalDevicesTested": false
+  },
+  "retrieval": {
+    "cases": 28,
+    "answerable": 24,
+    "recallAtFive": 1,
+    "languages": {
+      "en": {
+        "answerable": 12,
+        "hits": 12,
+        "recallAtFive": 1,
+        "noRelevant": 2,
+        "noRelevantPassed": 2
+      },
+      "es": {
+        "answerable": 12,
+        "hits": 12,
+        "recallAtFive": 1,
+        "noRelevant": 2,
+        "noRelevantPassed": 2
+      }
+    },
+    "boundaryFailures": [],
+    "retrievalLatencyMs": {
+      "p50": 3.46,
+      "p95": 4.4
+    },
+    "embeddingCalls": 0,
+    "embeddingCostUSD": 0
+  },
+  "matchedSourceSelection": {
+    "baselineRequiredEvidence": 14,
+    "answerableCases": 16,
+    "requiredEvidenceAvailable": 16,
+    "boundaryFailures": []
+  },
+  "softwareContracts": {
+    "cases": 20,
+    "passed": 20,
+    "failed": [],
+    "modelResponsesEvaluated": 0
+  },
+  "build": "passed; existing bundle-size warning",
+  "loggingPolicy": "passed",
+  "live": {
+    "reviewedResponses": 0,
+    "unrunBaseline": 28,
+    "unrunCandidate": 28,
+    "firstAudioMs": null,
+    "observedCostUSD": null,
+    "budgetAuthorized": false,
+    "technicalGatePassed": false,
+    "expectedScenarioRuns": 56
+  },
+  "rolloutRehearsal": [
+    "default off and exact-subject cohort",
+    "forged client controls rejected",
+    "existing write capability disabled",
+    "in-flight write rolls back record and receipt",
+    "disabled extraction makes no provider call",
+    "in-flight extraction discarded",
+    "removed source remains suppressed in fallback",
+    "active browser call closes on policy change",
+    "binder data survives disable",
+    "043 to 047 migration and repeat application",
+    "legacy plan read/write with old enum values",
+    "older plan validator rejects new enum values; compatible backend retained"
+  ],
+  "environmentDraft": {
+    "saved": true,
+    "change": "add api.openai.com to network allowed domains",
+    "applied": false,
+    "requiresPublish": true
+  },
+  "evidenceLogs": {
+    "server": {
+      "path": "/tmp/origen-phase6-server-final.log",
+      "sha256": "5e624f823c9eccc591369ac11be6bb831610c66a9fe46a615bbbe7e0cc98e5cd"
+    },
+    "finalFocusedGates": {
+      "path": "/tmp/origen-phase6-gates-final.log",
+      "sha256": "feef876bdad79eddbb6c4371f0bc0e30dff6a2c5d836f928a2f037f711976e5e"
+    },
+    "liveMemoryBrowser": {
+      "path": "/tmp/origen-phase6-live-browser.log",
+      "sha256": "b5ed82eebf3459c02b798daca264490890b55c36e7b66aa37a6fa8338bfa864b"
+    },
+    "adaptiveBrowser": {
+      "path": "/tmp/origen-phase6-adaptive-browser-final.log",
+      "sha256": "4f961a4dbb92176610de77ba6847666ea40a581aa252b4f072fb6f52cca630e8"
+    },
+    "memoryBrowser": {
+      "path": "/tmp/origen-phase6-memory-browser.log",
+      "sha256": "bbf239539d10f7bd4ac7fe08e55947fa607727df475a6298f6c9e3ac4b9a5c93"
+    },
+    "voiceReliabilityBrowser": {
+      "path": "/tmp/origen-phase6-voice-browser.log",
+      "sha256": "31c0fcef7fc367e3933c8b7eb539a0c331146cd8ca5d4d4df442ccce68e96d09"
+    },
+    "build": {
+      "path": "/tmp/origen-phase6-build.log",
+      "sha256": "9cbde1f4654e2303b6d95c8556565939765e9bb5157ae61cc9ce94c8c1d57647"
+    },
+    "logging": {
+      "path": "/tmp/origen-phase6-logging.log",
+      "sha256": "6ae0ecbb9cbf999941e4f660026549a1ba4ff25dc76564176980f01d17eef47d"
+    }
+  },
+  "limitations": [
+    "No live provider response, speech, production load, or physical-device evaluation.",
+    "No production migration/deployment or paid API calls.",
+    "Vector retrieval remains pending provider capability verification.",
+    "Feature rollback preserves schema and current enum-compatible backend."
+  ],
+  "evaluationSourceSha256": {
+    "evals/personalization.release.v1.mjs": "9ede2f829bcc497b30d50a35dd61f68abb55e2d7371c3b9988934b4b98ed4d6a",
+    "server/personalization-release.mjs": "316040f3a0fcb1d62d543d46e1587b2fc76a7e5557ff80991b5b3cb59924db93",
+    "server/personalization-release.test.mjs": "3986bd81795d457e22a81e20d26599f7efc30e80a1cb6f1083b0181df5068f0d",
+    "scripts/personalization-release.mjs": "b21fd1acfe650de49848e0b81ea2c5e74722756168e19e096058c08e5beabbfc"
+  }
+}

@@ -55,13 +55,13 @@ test('PostgreSQL privacy controls, delayed writes, retention and stale-backup de
    await as('alice',async()=>{
     await assert.rejects(privacy('bob',{action:'status'}),{status:403});
     await assert.rejects(privacy('alice',{action:'preview',categories:['summaries'],studentId:'foreign'}),{status:404});
-    const p=await privacy('alice',{action:'preview',categories:['summaries'],studentId:'student'});assert.deepEqual(p.counts,{summaries:1,notes:1,plans:0,sheets:0});
+    const p=await privacy('alice',{action:'preview',categories:['summaries'],studentId:'student'});assert.deepEqual(p.counts,{summaries:1,notes:1,plans:0,sheets:0,memories:0});
     await admin.query('UPDATE origen_topic_notes SET version=version+1 WHERE account_id=$1 AND id=$2',[owner,derived]);
     await assert.rejects(privacy('alice',{action:'erase',categories:['summaries'],studentId:'student',revision:p.revision,confirmation:'DELETE'}),{status:409});
     assert.equal((await history('alice',{action:'load'})).items.length,1);
     const fresh=await privacy('alice',{action:'preview',categories:['summaries'],studentId:'student'});
     await privacy('alice',{action:'erase',categories:['summaries'],studentId:'student',revision:fresh.revision,confirmation:'DELETE'});
-    assert.deepEqual((await privacy('alice',{action:'status'})).counts,{summaries:0,notes:1,plans:1,sheets:1});
+    assert.deepEqual((await privacy('alice',{action:'status'})).counts,{summaries:0,notes:1,plans:1,sheets:1,memories:0});
     await assert.rejects(history('alice',{action:'save',item:{id:'summary',studentId:'student',mode:'planning',date:new Date().toISOString(),summary:'stale retry',sources:[]}}),{status:410});
    });
   });
