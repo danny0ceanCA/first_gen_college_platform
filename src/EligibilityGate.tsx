@@ -15,30 +15,30 @@ export function EligibilityQuestions({es,onSubmit,busy=false}:{es:boolean;onSubm
 }
 export default function EligibilityGate({children,onAllowed,hideSignOut=false}:{children?:ReactNode;onAllowed?:()=>void;hideSignOut?:boolean}){
  const auth=useAuth0(),subject=auth.user?.sub;const [state,setState]=useState<Status>(),[error,setError]=useState(false),[busy,setBusy]=useState(false),[email,setEmail]=useState(''),[es,setEs]=useState(()=>document.documentElement.lang==='es');
- const active=useRef(true),allowed=useRef(false),sequence=useRef(0),callback=useRef(onAllowed);callback.current=onAllowed;
+ const active=useRef(true),allowed=useRef(false),unavailable=useRef(false),sequence=useRef(0),callback=useRef(onAllowed);callback.current=onAllowed;
  const t=(en:string,sp:string)=>es?sp:en;
  const check=async(body:Record<string,unknown>,signal?:AbortSignal)=>{
   const requestSequence=++sequence.current;let deadline:ReturnType<typeof setTimeout>|undefined;
   const token=await Promise.race([auth.getAccessTokenSilently(),new Promise<never>((_,reject)=>{deadline=setTimeout(()=>reject(new Error('permission_unavailable')),10000);})]).finally(()=>clearTimeout(deadline));signal?.throwIfAborted();
   const response=await fetch(`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/eligibility`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)});
-  const data=await response.json();if(!response.ok||data.subject!==subject)throw new Error('permission_unavailable');
+  const data=await response.json();if(!response.ok||data.subject!==subject||typeof data.allowed!=='boolean')throw new Error('permission_unavailable');
   if(!active.current||requestSequence!==sequence.current)return;
-  if(allowed.current&&!data.allowed)browserPrivacy.stop('eligibility_changed');
-  if(data.allowed&&subject&&!allowed.current)browserPrivacy.start(subject,{fresh:true});
-  allowed.current=data.allowed===true;setState(data);setError(false);if(data.allowed)callback.current?.();
+  if(!data.allowed&&(allowed.current||unavailable.current))browserPrivacy.stop('eligibility_changed');
+  if(data.allowed&&subject&&!allowed.current&&!browserPrivacy.start(subject,{fresh:!unavailable.current}))throw new Error('permission_unavailable');
+  unavailable.current=false;allowed.current=data.allowed===true;setState(data);setError(false);if(data.allowed)callback.current?.();
  };
+ const pause=()=>{if(!active.current)return;unavailable.current=true;allowed.current=false;setState(undefined);setError(true);browserPrivacy.pause();};
  useEffect(()=>{
   active.current=true;const controller=new AbortController();
-  const invalidate=()=>{if(!active.current)return;allowed.current=false;setState(undefined);setError(true);browserPrivacy.stop('eligibility_changed');};
-  let polling=false;const poll=async()=>{if(polling)return;polling=true;try{await check({action:'status'},controller.signal);}catch{if(!controller.signal.aborted)invalidate();}finally{polling=false;}};
+  let polling=false;const poll=async()=>{if(polling)return;polling=true;try{await check({action:'status'},controller.signal);}catch{if(!controller.signal.aborted)pause();}finally{polling=false;}};
   void poll();const timer=setInterval(()=>void poll(),5000);window.addEventListener('focus',poll);
-  const unsubscribe=browserPrivacy.subscribe(event=>{if(event.type==='end'&&event.reason==='eligibility_changed'){sequence.current++;allowed.current=false;setState(undefined);}});
+  const unsubscribe=browserPrivacy.subscribe(event=>{if(event.type==='end'&&['eligibility_changed','permission_unavailable'].includes(event.reason||'')){sequence.current++;allowed.current=false;setState(undefined);}});
   return()=>{active.current=false;sequence.current++;controller.abort();clearInterval(timer);window.removeEventListener('focus',poll);unsubscribe();};
   // Entry/native wrappers key this boundary by authenticated subject.
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[subject]);
  useEffect(()=>{if(!state?.allowed)return;const id=sessionStorage.getItem('origen-login-event');if(!id)return;void apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',id})}).then(response=>{if(response.ok&&sessionStorage.getItem('origen-login-event')===id)sessionStorage.removeItem('origen-login-event');}).catch(()=>{});},[state?.allowed,subject]);
- const act=async(body:Record<string,unknown>)=>{if(busy)return;setBusy(true);try{await check(body);}catch{setError(true);}finally{if(active.current)setBusy(false);}};
+ const act=async(body:Record<string,unknown>)=>{if(busy)return;setBusy(true);try{await check(body);}catch{pause();}finally{if(active.current)setBusy(false);}};
  if(state?.allowed)return <>{children}<button className="permission-withdraw" onClick={()=>void act({action:'withdraw'})}>{t('Withdraw account permission','Retirar el permiso de la cuenta')}</button></>;
  return <main className="eligibility-panel"><button className="button outline" onClick={()=>setEs(!es)}>{es?'English':'Español'}</button><h1>{t('Account eligibility and permission','Elegibilidad y permiso de la cuenta')}</h1>
   {error&&<p role="alert">{t('We could not confirm permission. Please try again.','No pudimos confirmar el permiso. Intenta de nuevo.')}</p>}

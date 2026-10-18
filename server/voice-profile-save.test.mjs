@@ -3,7 +3,20 @@ import assert from 'node:assert/strict';
 import {voiceProfileSaveTools} from '../src/voiceProfileSave.mjs';
 import {voiceSession} from './profile-voice.mjs';
 import {onboardingWelcome} from '../src/voiceWelcome.mjs';
+import {voiceTurns} from '../src/voiceTurns.mjs';
 const call=(id='save',requested=true)=>({type:'function_call',name:'save_onboarding_profile',call_id:id,arguments:JSON.stringify({requested_by_user:requested})});
+test('Save stays blocked across transcription, draft tools, follow-up replies and audio playback',()=>{
+ const states=[],turns=voiceTurns(()=>{},()=>{},{onBusy:value=>states.push(value)});
+ turns.speechStarted('correction');assert.equal(states.at(-1),true);
+ turns.speechStopped('correction');turns.transcript('correction','Actually, nursing.');
+ turns.created();turns.beginDone('draft-update',true);assert.equal(states.at(-1),true);
+ turns.toolsCompleted();assert.equal(states.at(-1),true,'the follow-up response request is still pending');
+ turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'ack'});
+ turns.beginDone('ack');turns.completed();assert.equal(states.at(-1),true,'generation completing must not unlock Save before playback finishes');
+ turns.playback({type:'output_audio_buffer.stopped',response_id:'ack'});assert.equal(states.at(-1),false);
+ assert.deepEqual(states,[true,false]);
+ turns.speechStarted('next');turns.stop();assert.deepEqual(states,[true,false,true,false]);
+});
 test('save acknowledges storage completion and deduplicates writes within a response',async()=>{
  let writes=0,resolve;const events=[];
  const pending=voiceProfileSaveTools([call('one'),call('two')],()=>{writes++;return new Promise(r=>{resolve=r;});},e=>events.push(e));
