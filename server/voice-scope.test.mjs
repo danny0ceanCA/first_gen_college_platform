@@ -17,7 +17,7 @@ test('unconfirmed parent sessions offer routing only and omit private history',(
 });
 test('confirmed family scope retains specialist tools and applies clear spoken switches automatically',()=>{
  const session=voiceSession({role:'parent',mode:'finance',language:'es',routeConversations:true,targetConfirmed:true,scopeRestart:true,studentId:null,students,profile:{}},{});
- assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language']);
+ assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language','highlight_binder_topics']);
  assert.match(session.instructions,/general family questions/);
  assert.match(session.instructions,/Do not greet or introduce yourself again/);
 });

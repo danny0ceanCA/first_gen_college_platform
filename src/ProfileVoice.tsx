@@ -9,6 +9,8 @@ import {voiceSaveCompletion} from './voiceSaveCompletion.mjs';
 import {onboardingVoiceDiagnostics} from './onboardingVoiceDiagnostics.mjs';
 import {voiceProfileSaveTools,type VoiceProfileSaveResult} from './voiceProfileSave.mjs';
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
+import {binderActivity} from './binderActivity';
+import type {BinderTopic} from './binderSignals.mjs';
 import {voiceDraft} from './voiceDraft.mjs';
 import {guidanceHistory} from './guidanceHistory.mjs';
 import {privateRecovery} from './privateRecovery';
@@ -94,6 +96,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const profile=voiceProfile(mode,initialProfile,family.students,target.id);
   const summaryScope=useRef<{id:string|null;name:string;confirmed:boolean}>({id:initialProfile.id||null,name:initialProfile.name,confirmed:!routing});
   const summaryToken=useRef<string|undefined>(undefined);const summaryId=useRef('');
+  const binderSource=useRef('');
+  function publishBinderActivity(topics:BinderTopic[]=[]){
+    if(!user?.sub||!privacyLease.valid()||liveMode.current==='profile'||!summaryScope.current.confirmed||scopePending.current)return;
+    binderActivity.begin(binderSource.current,user.sub,summaryScope.current.id,topics);
+  }
   const guidanceTokens=useRef(new Map<string,string>());
   const guidance=useRef(guidanceHistory(body=>{const token=guidanceTokens.current.get((body as {sessionId:string}).sessionId);if(!token)return Promise.resolve();return apiFetch('/api/guidance-history',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),keepalive:true}).then(response=>{if(!response.ok)throw new Error('guidance_event_failed');});}));
   const sessionTurns=useRef<{role:'user'|'assistant';text:string;topic?:string;language?:'en'|'es';expectedLanguage?:'en'|'es'}[]>([]);
@@ -190,6 +197,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     });
   }
   function cleanup(){
+    binderActivity.end(binderSource.current);binderSource.current='';
     resources.current.workspace?.stop();
     resources.current.studentSelection?.stop();
     void saveSummary();releaseConversation(summaryId.current);
@@ -292,6 +300,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
     setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
     const version=++generation.current;
+    binderSource.current=crypto.randomUUID();
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
     const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version,
@@ -382,6 +391,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             if(initialScope){summaryScope.current={...initialScope,name:updateProfile.name};memorySaved.current=false;setTarget(initialScope);log('initial_target_confirmed');}
             liveMode.current=next;checkpointSummary();setMode(next);onGuideChanged?.(next);setNotice('');log('guide_update_complete',{mode:next});
+            publishBinderActivity(focus?[focus.topic]:next==='finance'||next==='loans'?['costs']:next==='admissions'?['applications']:[]);
           });
           if(generation.current!==version)return false;
           // A specialty change remains one conversation and one recovery record.
@@ -450,6 +460,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       resources.current.stopProgress=stopProgress;
       dc.onopen=()=>{
         if(generation.current!==version)return;
+        publishBinderActivity(focus?[focus.topic]:[]);
         trackOnboarding('voice_connected');clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
         if(!resources.current.stopWake){
           const wake=voiceWakeLock(status=>{if(generation.current===version)setWakeStatus(status);});
@@ -550,6 +561,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             called=true;let accepted=false;
+            if(item.name==='highlight_binder_topics'){
+              let topics:unknown;try{topics=JSON.parse(item.arguments).topics;}catch{}
+              const applied=privacyLease.valid()&&!scopePending.current&&summaryScope.current.confirmed&&liveMode.current!=='profile'&&binderActivity.update(binderSource.current,topics);
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:applied?'topics_highlighted':'highlight_unavailable',instruction:'Visual update only. No notes were edited or saved. Continue the conversation naturally without announcing the highlight.'})}});continue;
+            }
             if(linkTools.isTool(item.name)){
               const output=await linkTools.invoke(item,linkResponseTurns.get(e.response?.id)??linkTools.sequence());if(generation.current!==version)return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;

@@ -7,7 +7,7 @@ import {Readable} from 'node:stream';
 test('planning voice adapts to different stages and verifies distinct requirement types',()=>{
  for(const role of ['student','parent'])for(const language of ['en','es'])for(const stage of ['10th grade','Community college','College']){
   const session=voiceSession({role,language,mode:'planning',profile:{name:'Sample',stage,school:'Test school',goals:'Explore engineering',notes:'PRIVATE NOTE',gpa:'PRIVATE GPA'}},{});
-  assert.deepEqual(session.tools.map(t=>t.name),['lookup_education_planning','set_conversation_language']);
+  assert.deepEqual(session.tools.map(t=>t.name),['lookup_education_planning','set_conversation_language','highlight_binder_topics']);
   assert.match(session.instructions,/Test school/);assert.match(session.instructions,/Explore engineering/);
   assert.match(session.instructions,/current stage and goal/);assert.match(session.instructions,/not high school A–G approval/);
   assert.match(session.instructions,/catalog year/);assert.match(session.instructions,/not automatically classify dual-enrollment students as transfers/);

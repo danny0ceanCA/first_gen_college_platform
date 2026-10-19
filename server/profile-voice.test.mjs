@@ -89,7 +89,7 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
   assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
-  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language']);
+  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language','highlight_binder_topics']);
   assert.equal(session.audio.output.speed,1);
   assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
  }
