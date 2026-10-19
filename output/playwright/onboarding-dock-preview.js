@@ -1,0 +1,21 @@
+// Layout-only preview of the real SharedVoice component. Voice transport is
+// replaced with inert controls; no microphone, provider or account API is used.
+async page=>{
+ const origin=new URL(page.url()).origin;
+ await page.route('**/src/ProfileVoice.tsx',route=>route.fulfill({contentType:'text/javascript',body:`
+ import React from '/node_modules/.vite/deps/react.js';
+ export function LocalProfileVoice(){return React.createElement('section',{className:'profile-voice'},React.createElement('div',{className:'voice-controls'},React.createElement('div',{className:'voice-activity',role:'status'},'Listening · You can speak naturally'),React.createElement('button',{className:'button outline voice-mute','aria-label':'Mute microphone'},'Mic'),React.createElement('button',{className:'button outline voice-end','aria-label':'End conversation'},'End')),React.createElement('div',{className:'voice-session-details'},React.createElement('h3',null,'Conversation details'),React.createElement('p',null,'Synthetic layout preview only.')));}
+ export default LocalProfileVoice;
+ `}));
+ await page.route('**/onboarding-dock-preview',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import SharedVoice from '/src/SharedVoice.tsx';import {SharedVoiceContext} from '/src/SharedVoiceContext.ts';import '/src/styles.css';import '/src/overview.css';import '/src/guidance.css';import '/src/brand.css';import '/src/Welcome.css';
+ const h=React.createElement,t=(en,es)=>en;
+ function Preview(){const voice=React.useContext(SharedVoiceContext),[mode,setMode]=React.useState('welcome');
+ const controls=h('div',{className:'welcome-header-actions'},h('button',{onClick:()=>setMode('welcome')},'Voice onboarding'),h('button',{onClick:()=>setMode('manual')},'Manual onboarding'),h('button',{onClick:()=>setMode('home')},'Home'),h('button',{onClick:()=>voice.launch({mode:'profile',onboarding:true,profile:{id:'synthetic',name:'Alex',stage:'Community college',interest:'',gpa:'',color:'peach'},language:'en',role:'student',t,apply:()=>{},onActive:()=>{}})},'Open synthetic conversation'));
+ if(mode==='home')return h('div',{className:'app-shell'},h('aside',{className:'sidebar'},h('strong',null,'Origen')),h('div',{className:'main-shell'},h('header',{className:'topbar'},controls),h('main',null,h('h1',null,'My binder'),h('p',null,'Synthetic home page'))));
+ if(mode==='manual')return h('main',{className:'application-panel welcome-panel welcome-profile-step'},controls,h('h1',null,'Review your profile'),h('p',null,'Synthetic manual onboarding'),...Array.from({length:8},(_,i)=>h('label',{className:'field',key:i},'Detail '+i,h('input',{defaultValue:'Synthetic detail'}))),h('div',{className:'welcome-save-bar'},h('p',null,'Review the profile before saving.'),h('button',{className:'button primary'},'Save profile')));
+ return h('main',{className:'welcome-conversation'},h('header',{className:'welcome-conversation-header'},h('strong',{className:'welcome-wordmark'},'origen.'),controls),h('section',{className:'welcome-story'},h('h1',null,'Welcome, Alex.'),h('div',{className:'welcome-live-notes'},...Array.from({length:8},(_,i)=>h('section',{className:'welcome-live-note',key:i},h('h2',null,['About you','Name','Education stage','Interests'][i%4]),h('p',null,['Alex · Student','Alex','Community college','Exploring college options'][i%4]))))),h('footer',{className:'welcome-conversation-dock'},h('p',null,'Open current conversation'),h('p',null,'Starting sends microphone audio and the profile details you provide to OpenAI. This preview does not start a voice connection.'),h('p',null,'During setup, saving to your account may wait until you save the profile. Saving your profile is a separate action.'),h('div',{className:'welcome-conversation-actions'},h('button',{className:'text-button'},'Edit details'),h('button',{className:'button primary'},'Save profile'))));}
+ ReactDOM.createRoot(document.getElementById('root')).render(h(SharedVoice,null,h(Preview)));
+ </script></body></html>`}));
+ await page.goto(origin+'/onboarding-dock-preview',{waitUntil:'domcontentloaded'});
+}

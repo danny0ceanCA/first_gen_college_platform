@@ -22,16 +22,27 @@ export default function SharedVoice({children}:{children:ReactNode}){
   if(!container)return;
   const root=document.documentElement;
   const bars=Array.from(container.children) as HTMLElement[];
+  let surface:HTMLElement|null=null;
+  const setVariable=(node:HTMLElement,name:string,value:string)=>{if(node.style.getPropertyValue(name)!==value)node.style.setProperty(name,value);};
   // Reserve exactly the visible dock, including wrapped text and mobile safe area.
-  // A fixed allowance left an empty tail below the binder's last page.
+  // Onboarding has no sidebar and can be centered inside a wide viewport.
+  // Follow the rendered surface rather than assuming the workspace's offset.
   const measure=()=>{
+   const next=document.querySelector<HTMLElement>('.welcome-conversation,.welcome-panel,.main-shell');
+   if(next!==surface){if(surface)observer.unobserve(surface);surface=next;if(surface)observer.observe(surface,{box:'border-box'});}
+   const bounds=surface?.getBoundingClientRect();
+   if(bounds&&bounds.width>0){
+    setVariable(container,'--shared-voice-left',`${Math.max(0,bounds.left)}px`);
+    setVariable(container,'--shared-voice-right',`${Math.max(0,root.clientWidth-bounds.right)}px`);
+   }else{container.style.removeProperty('--shared-voice-left');container.style.removeProperty('--shared-voice-right');}
    const height=Math.ceil(Math.max(0,...bars.map(bar=>bar.getBoundingClientRect().height)));
-   root.style.setProperty('--shared-voice-height',`${height}px`);
+   setVariable(root,'--shared-voice-height',`${height}px`);
   };
-  measure();
   const observer=new ResizeObserver(measure);
   bars.forEach(bar=>observer.observe(bar,{box:'border-box'}));
-  return()=>{observer.disconnect();root.style.removeProperty('--shared-voice-height');};
+  measure();
+  window.addEventListener('resize',measure);
+  return()=>{observer.disconnect();window.removeEventListener('resize',measure);container.style.removeProperty('--shared-voice-left');container.style.removeProperty('--shared-voice-right');root.style.removeProperty('--shared-voice-height');};
  },[!!session,!!entry,saveFailed]);
  useEffect(()=>browserPrivacy.subscribe(event=>{if(event.type==='end'){queue.current.clear();ownerRef.current=null;setOwner(null);setSession(null);setEntry(null);}}),[]);
  useEffect(()=>{if(!active)setExpanded(false);},[active]);
