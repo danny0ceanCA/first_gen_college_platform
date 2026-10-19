@@ -282,7 +282,7 @@ export default function Landing(){
        <h3>{t('Make sense of unfamiliar terms','Entiende los términos que no conoces')}</h3>
        <p>{t('Ask questions about college, financial aid, transfer requirements, or applications. Origen explains unfamiliar ideas in everyday language.','Pregunta sobre la universidad, la ayuda económica, los requisitos de transferencia o las solicitudes de ingreso. Origen explica las ideas que no conoces con palabras sencillas.')}</p>
       </div>
-      <LandingVideoPlaceholder title={t('Questions demo','Demostración de preguntas')} t={t}/>
+      <LandingVideo variant="college-costs" t={t}/>
      </div>
      <div className="landing-conversation-row">
       <div className="landing-conversation-copy">
