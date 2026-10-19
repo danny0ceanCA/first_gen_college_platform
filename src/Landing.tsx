@@ -1,10 +1,17 @@
 import LandingStory from './LandingStory';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
 import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
+const villageResidents=[
+ {route:0,kind:'lady',x:170,y:389},{route:8,kind:'person',x:270,y:389},
+ {route:1,kind:'person',x:438,y:389},{route:5,kind:'lady',x:510,y:389},
+ {route:4,kind:'child',x:72,y:398},{route:6,kind:'student',x:340,y:538},
+ {route:7,kind:'lady',x:354,y:447},{route:9,kind:'farmer',x:264,y:468},
+ {route:10,kind:'farmer',x:466,y:502}
+];
 export default function Landing(){
  const {loginWithRedirect,isLoading,isAuthenticated,error}=useAuth0();
  const [copyStatus,setCopyStatus]=useState('');
@@ -14,6 +21,7 @@ export default function Landing(){
  const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
  const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false),heroVisible=useRef(true);
  const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
+ const sceneId=useId().replace(/:/g,'');
  const t=(en:string,sp:string)=>es?sp:en;
  const shareDescription=t('Origen is an AI voice assistant that helps students and families make sense of college in English and Spanish. Ask questions, revisit explanations, and prepare for conversations with a counselor or coordinator. Explore it at https://origenedu.ai','Origen es un asistente de voz con inteligencia artificial que ayuda a estudiantes y familias a entender el camino a la universidad en español e inglés. Haz preguntas, repasa explicaciones y prepárate para conversar con un consejero o coordinador. Conócelo en https://origenedu.ai');
  useEffect(()=>{document.documentElement.lang=es?'es':'en';localStorage.setItem('origen.language',es?'es':'en');},[es]);
@@ -21,47 +29,18 @@ export default function Landing(){
   if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const scene=line.current;
   const animations:ReturnType<typeof animate>[]=[];
-  const originals=Array.from(scene.querySelectorAll<SVGPathElement>('path:not(.sky-drift):not(.life-route):not(.life-ink)'));
-  const fragments:SVGPathElement[]=[];
-  type Stroke={path:SVGPathElement;length:number;start:DOMPoint;end:DOMPoint};
-  const routes:Stroke[][]=[[],[]];
-  // Each pen owns a queue of strokes. No detail has its own animation clock.
-  originals.forEach(original=>{
-   const parts=original.getAttribute('d')!.match(/M[^M]*/g)||[];
-   parts.forEach(d=>{
-    const path=original.cloneNode() as SVGPathElement;
-    path.setAttribute('d',d);path.classList.add('pen-stroke');
-    original.parentNode!.insertBefore(path,original);
-    const length=path.getTotalLength(),start=path.getPointAtLength(0),end=path.getPointAtLength(length);
-    const side=original.dataset.side;
-    const index=side==='left'?0:side==='right'?1:(start.x<350?0:1);
-    path.style.strokeDasharray=`${length} ${length}`;
-    path.style.strokeDashoffset=String(length);
-    routes[index].push({path,length,start,end});fragments.push(path);
-   });
-   original.style.visibility='hidden';
-  });
-  routes.forEach((route,index)=>{
-   const tip=scene.querySelector<SVGCircleElement>(`.drawing-tip-${index}`)!;
-   let total=0,previous=route[0].start;
-   const steps=route.map(stroke=>{
-    // Lift and move the same pen between disconnected architectural details.
-    const travel=Math.min(50,Math.hypot(stroke.start.x-previous.x,stroke.start.y-previous.y));
-    const step={...stroke,from:previous,begin:total,ink:total+travel,finish:total+travel+stroke.length};
-    total=step.finish;previous=stroke.end;return step;
-   });
-   const pen={distance:0};
-   animations.push(animate(pen,{distance:[0,total],duration:9000,delay:index*120,ease:'linear',
-    onUpdate:()=>{
-     const active=steps.find(step=>pen.distance<=step.finish)||steps[steps.length-1];
-     steps.forEach(step=>{step.path.style.strokeDashoffset=String(step.length-Math.max(0,Math.min(step.length,pen.distance-step.ink)));});
-     const drawing=pen.distance>=active.ink;
-     const fraction=Math.max(0,Math.min(1,(pen.distance-active.begin)/(active.ink-active.begin||1)));
-     const point=drawing?active.path.getPointAtLength(pen.distance-active.ink):{x:active.from.x+(active.start.x-active.from.x)*fraction,y:active.from.y+(active.start.y-active.from.y)*fraction};
-     tip.setAttribute('cx',String(point.x));tip.setAttribute('cy',String(point.y));
-     tip.style.opacity=drawing?'1':'0.25';
-    },onComplete:()=>{tip.style.opacity='0';}}));
-  });
+  // A soft mask reveals the complete illustration from sky to foreground.
+  const gradient=scene.querySelector<SVGLinearGradientElement>('.scene-reveal-gradient')!;
+  const reveal={edge:0};
+  gradient.setAttribute('y1','-140');gradient.setAttribute('y2','0');
+  animations.push(animate(reveal,{edge:[0,710],duration:1500,ease:'outCubic',onUpdate:()=>{
+   gradient.setAttribute('y1',String(reveal.edge-140));gradient.setAttribute('y2',String(reveal.edge));
+  }}));
+  const sunArcs=scene.querySelector<SVGPathElement>('.sun-orbit')!;
+  const orbit={angle:0};
+  animations.push(animate(orbit,{angle:[0,360],duration:90000,loop:true,ease:'linear',onUpdate:()=>{
+   sunArcs.setAttribute('transform',`rotate(${orbit.angle} 370 105)`);
+  }}));
   // Clouds are already complete: they drift and breathe light, never draw or erase.
   const clouds=[...scene.querySelectorAll<SVGPathElement>('.sky-drift'),...ambient.current!.querySelectorAll<SVGPathElement>('path'),...sky.current!.querySelectorAll<SVGPathElement>('.upper-cloud')];
   clouds.forEach((cloud,index)=>{
@@ -80,8 +59,8 @@ export default function Landing(){
     star.style.filter=`drop-shadow(0 0 ${1+brightness*5}px #ffe2ad)`;
    }}));
   });
-  // Staggered walks keep at most two people visible; nobody waits in a crowd.
-  const residents=Array.from(scene.querySelectorAll<SVGGElement>('.village-visitor')).filter(visitor=>!['burro','dog'].includes(visitor.dataset.kind!)).map((visitor,order)=>{
+  // Neighbors meet in pairs, chat with room between their outlines, then head home.
+  const residents=Array.from(scene.querySelectorAll<SVGGElement>('.village-resident')).map((visitor,order)=>{
    const index=Number(visitor.dataset.route);
    const arrival=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!;
    const departure=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
@@ -90,45 +69,62 @@ export default function Landing(){
     arms:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-arm'))};
   });
   const village={time:0};
-  animations.push(animate(village,{time:[0,1],duration:64000,delay:9300,loop:true,ease:'linear',onUpdate:()=>{
+  const updateResidents=()=>{
    residents.forEach(({visitor,index,order,arrival,departure,arrivalLength,departureLength,legs,arms})=>{
-    const phase=(village.time+order/residents.length)%1;
-    const travel=Math.min(1,phase/0.30),totalLength=arrivalLength+departureLength;
-    const travelled=totalLength*travel,leaving=travelled>=arrivalLength;
+    const gathering=index===0||index===8?0:index===1||index===5?1:null;
+    const phase=(village.time+(gathering===null?0.42+order*0.11:gathering*0.32))%1;
+    const chatting=gathering!==null&&phase>=0.22&&phase<0.44;
+    const travelled=gathering!==null
+     ?phase<0.22?arrivalLength*phase/0.22:phase<0.44?arrivalLength:arrivalLength+departureLength*Math.min(1,(phase-0.44)/0.28)
+     :(arrivalLength+departureLength)*Math.min(1,phase/0.72);
+    const leaving=travelled>=arrivalLength;
     const route=leaving?departure:arrival,length=leaving?departureLength:arrivalLength;
     const distance=leaving?travelled-arrivalLength:travelled,point=route.getPointAtLength(distance);
     const next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
-    const facing=next.x<previous.x?-1:1,stride=Math.sin(travelled*0.46);
-    const fade=Math.max(0,Math.min(1,phase/0.018,(0.30-phase)/0.018));
-    const scale=index===4?0.63:index>=6?0.90-travel*0.12:0.78;
-    visitor.dataset.activity=fade>0?'walking':'away';
-    visitor.style.opacity=String(fade*0.9);
+    const resting=phase>=0.72;
+    const facing=chatting?(index===0||index===1?1:-1):next.x<previous.x?-1:1,stride=chatting||resting?0:Math.sin(travelled*0.46);
+    const scale=index===4?0.63:gathering!==null?0.78:index>=6?0.84:0.78;
+    // The return route ends where the next walk starts: no fade or teleport.
+    visitor.dataset.activity=chatting?'chatting':resting?'resting':'walking';
+    visitor.style.opacity='0.9';
     visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
     legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1);leg.setAttribute('d',`M0 -10 L${swing*3} -5 L${swing*5} 0`);});
-    arms.forEach((arm,i)=>{const swing=stride*(i?1:-1);arm.setAttribute('d',`M0 -18 L${swing*3} -14 L${swing*5} -12`);});
+    arms.forEach((arm,i)=>{const swing=chatting?Math.sin(phase*Math.PI*36+i)*0.55+0.7:stride*(i?1:-1);arm.setAttribute('d',`M0 -18 L${swing*3} -14 L${swing*5} -12`);});
    });
-  }}));
+  };
+  updateResidents();
+  animations.push(animate(village,{time:[0,1],duration:21000,delay:1500,loop:true,ease:'linear',onUpdate:updateResidents}));
   // Animals wander continuously on independent clocks.
-  scene.querySelectorAll<SVGGElement>('.village-visitor[data-kind="burro"],.village-visitor[data-kind="dog"]').forEach(visitor=>{
-   const index=Number(visitor.dataset.route),burro=visitor.dataset.kind==='burro';
+  scene.querySelectorAll<SVGGElement>('.village-animal').forEach(visitor=>{
+   const index=Number(visitor.dataset.route),burro=visitor.dataset.kind==='burro',bull=visitor.dataset.kind==='bull';
    const outward=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!,homeward=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
    const outwardLength=outward.getTotalLength(),homewardLength=homeward.getTotalLength();
    const legs=Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),wander={time:0};
-   animations.push(animate(wander,{time:[0,1],duration:burro?38000:27000,delay:burro?9300:11000,loop:true,ease:'linear',onUpdate:()=>{
+   const head=visitor.querySelector<SVGGElement>('.grazing-head'),tail=visitor.querySelector<SVGPathElement>('.animal-tail');
+   animations.push(animate(wander,{time:[0,1],duration:bull?28000+index*300:burro?22000:16000,delay:1500,loop:true,ease:'linear',onUpdate:()=>{
     const back=wander.time>=0.5,progress=back?(wander.time-0.5)*2:wander.time*2;
     const route=back?homeward:outward,length=back?homewardLength:outwardLength,distance=length*progress;
     const point=route.getPointAtLength(distance),next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
-    const facing=next.x<previous.x?-1:1,stride=Math.sin((distance+(back?outwardLength:0))*0.44),scale=burro?0.72:0.68;
+    const facing=next.x<previous.x?-1:1,stride=Math.sin((distance+(back?outwardLength:0))*0.44),scale=bull?0.94:burro?0.78:0.72;
     visitor.dataset.activity='walking';visitor.style.opacity='0.9';
     visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
-    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1),hip=burro?(i<2?-9:10):(i<2?-6:7),top=burro?-11:-7;leg.setAttribute('d',`M${hip} ${top} L${hip+swing*2.5} -5 L${hip+swing*4} 0`);});
+    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1),hip=bull?(i<2?-11:10):burro?(i<2?-9:10):(i<2?-6:7),top=bull?-12:burro?-11:-7;leg.setAttribute('d',`M${hip} ${top} L${hip+swing*2.5} -5 L${hip+swing*4} 0`);});
+    head?.setAttribute('transform',`rotate(${10+Math.sin(wander.time*Math.PI*16)*14} 12 -20)`);
+    tail?.setAttribute('transform',`rotate(${Math.sin(wander.time*Math.PI*24)*12} -17 -24)`);
+   }}));
+  });
+  // Farmers tend the terraces while walkers pass, each with a gentle hoeing rhythm.
+  scene.querySelectorAll<SVGGElement>('.field-worker').forEach((worker,index)=>{
+   const torso=worker.querySelector<SVGGElement>('.farmer-upper')!,work={phase:index*Math.PI};
+   animations.push(animate(work,{phase:[index*Math.PI,index*Math.PI+Math.PI*2],duration:4800+index*900,loop:true,ease:'linear',onUpdate:()=>{
+    torso.setAttribute('transform',`rotate(${4+Math.sin(work.phase)*12} 0 -10)`);
    }}));
   });
   motion.current=animations;
   const syncVisibility=()=>animations.forEach(a=>{if(pauseRef.current||!heroVisible.current||document.hidden)a.pause();else if(!a.completed)a.play();});
   const observer=new IntersectionObserver(([entry])=>{heroVisible.current=entry.isIntersecting;syncVisibility();},{rootMargin:'80px'});
   observer.observe(scene.closest('.landing-hero')!);document.addEventListener('visibilitychange',syncVisibility);syncVisibility();
-  return ()=>{observer.disconnect();document.removeEventListener('visibilitychange',syncVisibility);animations.forEach(animation=>animation.revert());fragments.forEach(path=>path.remove());originals.forEach(path=>path.style.removeProperty('visibility'));motion.current=[];};
+  return ()=>{observer.disconnect();document.removeEventListener('visibilitychange',syncVisibility);animations.forEach(animation=>animation.revert());gradient.setAttribute('y1','570');gradient.setAttribute('y2','710');motion.current=[];};
  },[replay]);
  useEffect(()=>{
   pauseRef.current=paused;
@@ -136,7 +132,7 @@ export default function Landing(){
  },[paused]);
  useEffect(()=>{if(login)dialog.current?.showModal();else dialog.current?.close();},[login]);
  return <div className="landing">
-  <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a className="institution-register-link" href="#institutions">{t('Register your institution','Registra tu institución')}</a><a href="#educators">{t('For educators','Para educadores')}</a><a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><a href="#how">{t('How it works','Cómo funciona')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>{setEs(!es);setCopyStatus('');}}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
+  <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a className="institution-register-link" href="#institutions">{t('Register your institution','Registra tu institución')}</a><a href="#educators">{t('For educators','Para educadores')}</a><a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>{setEs(!es);setCopyStatus('');}}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
   <main className="landing-main">
    <section className="landing-hero">
     <svg ref={sky} className="hero-sky" viewBox="0 0 1200 160" fill="none" aria-hidden="true" preserveAspectRatio="none" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round">
@@ -158,7 +154,9 @@ export default function Landing(){
     </svg>
     <div className="landing-copy"><div className="landing-eyebrow"><span/> {t('COLLEGE & TRANSFER GUIDANCE','ORIENTACIÓN PARA LA UNIVERSIDAD Y LA TRANSFERENCIA')}</div><h1>{t('Your next chapter.','Tu próximo capítulo.')}<br/><em>{t('A path that fits.','Un camino para ti.')}</em></h1><p>{t('Starting college, planning a transfer, or supporting someone you care about? Understand your options, applications, and financial aid—with guidance in English and Spanish, at your pace.','¿Vas a empezar la universidad, buscas transferirte o apoyas a alguien cercano? Entiende tus opciones, las solicitudes y la ayuda económica, con orientación en español e inglés y a tu ritmo.')}</p><div className="landing-actions"><button className="landing-primary" onClick={()=>setLogin(true)}>{t('Get started','Empezar')}<ArrowRight size={19}/></button></div><div className="landing-caption">{t('For your own journey. For the people beside you. En español también.','Para tu propio camino. Para quienes te acompañan. También en inglés.')}</div></div>
     <div className="landing-map pueblo-scene">
-     <svg ref={line} className="path-drawing" viewBox="0 0 700 570" fill="none" role="img" aria-label={t('Two edges of a winding path each draw their own pueblo village and mountains','Dos bordes de un camino dibujan cada uno su pueblo y sus montañas')} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
+     <svg ref={line} className="path-drawing" viewBox="0 0 700 570" fill="none" role="img" aria-label={t('A lively pueblo village with people walking, farmers tending fields, and grazing bulls beneath the mountains','Un pueblo lleno de vida, con personas caminando, agricultores trabajando y toros pastando al pie de las montañas')} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
+      <defs><linearGradient id={`${sceneId}-fade`} className="scene-reveal-gradient" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="570" y2="710"><stop offset="0" stopColor="white"/><stop offset="1" stopColor="black"/></linearGradient><mask id={`${sceneId}-reveal`} maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="570" style={{maskType:'luminance'}}><rect width="700" height="570" fill={`url(#${sceneId}-fade)`} stroke="none"/></mask></defs>
+      <g mask={`url(#${sceneId}-reveal)`}>
       {/* Each edge is one continuous stroke: road, village outline, then its mountain ridge. */}
       <path data-side="left" data-duration="7400" d="M296 560 C235 503 410 487 350 443 C329 427 322 411 334 391 C345 368 305 354 265 371 C218 391 151 389 138 361 L138 328 Q138 316 150 316 Q162 316 162 328 L162 364 L235 360 L235 316 L227 316 L227 301 L200 301 L200 316 L190 316 L190 285 L174 285 L174 254 L168 254 L168 239 L113 239 L113 254 L105 254 L105 285 L95 285 L95 323 L62 323 L62 363 M62 323 L62 296 L22 290 L72 230 L92 246 L184 126 L206 152 L248 91 L313 188 L342 159"/>
       <path data-side="right" data-duration="7400" d="M344 560 C287 509 459 493 388 437 C369 422 355 411 368 397 C388 383 419 392 446 374 C468 360 499 356 522 348 L522 308 Q522 298 532 298 Q542 298 542 308 L542 351 L624 347 L624 288 L614 288 L614 267 L580 267 L580 288 L566 288 L566 263 L553 263 L553 238 L490 238 L490 263 L476 263 L476 301 L448 301 L448 346 L476 350 L476 301 M476 263 L566 263 L566 288 L624 288 L644 278 L681 276 L644 226 L621 240 L512 124 L481 144 L455 109 L389 207 L342 159"/>
@@ -173,7 +171,7 @@ export default function Landing(){
       <path data-side="right" data-delay="9250" data-duration="1500" d="M480 267 L480 275 M490 267 L490 275 M552 267 L552 275 M562 267 L562 275 M495 284 L495 300 M552 284 L552 299 M587 328 L603 328 M633 311 L639 311 L639 320 L633 320 Z M652 311 L659 311 L659 320 L652 320 Z M421 298 L429 298 L429 308 L421 308 Z M435 298 L443 298 L443 308 L435 308 Z M579 340 L613 340"/>
       <path data-delay="9700" data-duration="1200" d="M287 335 L287 288 M295 335 L295 281 M287 293 L295 291 M287 304 L295 302 M287 315 L295 313 M287 326 L295 324 M399 329 L399 292 M406 329 L406 285 M399 298 L406 295 M399 309 L406 306 M399 320 L406 317"/>
       <path data-delay="9000" data-duration="1300" d="M344 105 A26 26 0 1 1 396 105 A26 26 0 1 1 344 105"/>
-      <g className="landscape-contours" strokeWidth="0.8" opacity="0.42">
+      <g className="landscape-contours" strokeWidth="0.8" opacity="0.25">
        <path data-delay="9300" data-duration="2300" d="M25 421 C95 436 152 409 221 418 C251 421 266 433 279 446"/>
        <path data-delay="9700" data-duration="2400" d="M8 447 C85 463 159 438 208 448 C231 453 245 465 248 480"/>
        <path data-delay="10100" data-duration="2100" d="M54 479 C121 481 157 472 190 484 C207 490 219 501 222 512"/>
@@ -186,52 +184,80 @@ export default function Landing(){
        <path className="sky-drift" d="M437 62 C483 49 515 69 545 60 C565 54 585 55 605 61"/>
       </g>
       <g strokeWidth="0.85" opacity="0.6">
-       <path data-delay="10400" data-duration="1600" d="M352 69 A41 41 0 0 1 411 107 M407 124 A41 41 0 0 1 377 145"/>
+       <path className="sun-orbit" data-delay="10400" data-duration="1600" d="M352 69 A41 41 0 0 1 411 107 M407 124 A41 41 0 0 1 377 145"/>
        <path data-delay="10800" data-duration="1400" d="M317 71 Q323 64 330 71 Q337 64 343 71 M575 180 Q581 174 587 180 Q593 174 599 180"/>
       </g>
       <g className="village-life" aria-hidden="true" strokeWidth="1.05">
-       <path className="life-route life-route-0" d="M150 363 Q165 378 209 373 Q253 363 280 373"/>
-       <path className="life-route life-exit-0" d="M280 373 Q242 391 203 372 L150 363"/>
-       <path className="life-route life-route-1" d="M532 352 Q496 366 441 371 Q367 387 300 375"/>
-       <path className="life-route life-exit-1" d="M300 375 Q357 404 410 382 Q470 366 532 352"/>
-       <path className="life-route life-route-2" d="M644 346 Q591 365 530 365 Q470 363 424 376"/>
-       <path className="life-route life-exit-2" d="M424 376 Q466 389 531 371 Q590 360 644 346"/>
-       <path className="life-route life-route-3" d="M252 358 Q256 386 279 399 Q304 405 321 391"/>
-       <path className="life-route life-exit-3" d="M321 391 Q310 411 268 385 L252 358"/>
-       <path className="life-route life-route-4" d="M35 350 Q89 377 160 378 Q227 397 280 391"/>
-       <path className="life-route life-exit-4" d="M280 391 Q215 401 157 383 Q76 365 35 350"/>
-       <path className="life-route life-route-5" d="M431 342 Q421 366 392 375 Q347 405 300 393"/>
-       <path className="life-route life-exit-5" d="M300 393 Q348 416 400 379 L431 342"/>
-       <path className="life-route life-route-6" d="M318 552 C264 507 426 487 367 440 C346 422 336 408 350 393 Q327 382 270 379"/>
-       <path className="life-route life-exit-6" d="M270 379 Q232 376 209 371 L150 363"/>
-       <path className="life-route life-route-7" d="M331 563 C277 518 442 495 379 446 C354 427 348 411 360 399 Q343 395 314 394"/>
-       <path className="life-route life-exit-7" d="M314 394 Q376 404 430 379 Q483 362 532 352"/>
-       {[0,1,4,5,6,7].map(index=><g className="village-visitor" data-route={index} data-kind={index===1||index===6?'farmer':index===0||index===7?'lady':'person'} key={index}>
+       <g className="village-crops" strokeWidth="0.9" opacity="0.65">
+        {[{x:80,y:431},{x:116,y:438},{x:154,y:445},{x:506,y:438},{x:545,y:443},{x:584,y:449}].map(({x,y},i)=><g key={i} transform={`translate(${x} ${y})`}>
+         {[0,8,16].map(offset=><path key={offset} d={`M${offset} 0 V-12 M${offset} -4 Q${offset-6} -7 ${offset-5} -10 M${offset} -7 Q${offset+5} -10 ${offset+5} -13`}/>)}
+        </g>)}
+       </g>
+       {[{x:205,y:453,flip:1},{x:538,y:476,flip:-1}].map(({x,y,flip},index)=><g className="field-worker" key={index} transform={`translate(${x} ${y}) scale(${flip*0.9} 0.9)`}>
+        <path className="life-ink" d="M0 -10 L-5 0 M0 -10 L6 0"/>
+        <g className="farmer-upper">
+         <circle cx="0" cy="-26" r="3.5"/>
+         <path className="life-ink" d="M-8 -28 Q0 -31 8 -28 M-4 -30 L-3 -35 L4 -35 L5 -29 M0 -22 L0 -10 M-3 -20 L-3 -12 L4 -12 L4 -20 M0 -20 L7 -15 L14 -16 M0 -18 L5 -12 L11 -11 M13 -21 L22 -1 L28 -1"/>
+        </g>
+       </g>)}
+       <path className="life-route life-route-0" d="M150 389 Q180 392 210 389"/>
+       <path className="life-route life-exit-0" d="M210 389 Q180 386 150 389"/>
+       <path className="life-route life-route-1" d="M420 389 Q435 392 450 389"/>
+       <path className="life-route life-exit-1" d="M450 389 Q435 386 420 389"/>
+       <path className="life-route life-route-2" d="M554 390 Q584 393 618 390"/>
+       <path className="life-route life-exit-2" d="M618 390 Q584 387 554 390"/>
+       <path className="life-route life-route-3" d="M260 418 Q281 421 302 418"/>
+       <path className="life-route life-exit-3" d="M302 418 Q281 415 260 418"/>
+       <path className="life-route life-route-4" d="M48 398 Q72 401 98 398"/>
+       <path className="life-route life-exit-4" d="M98 398 Q72 395 48 398"/>
+       <path className="life-route life-route-5" d="M512 389 Q495 392 478 389"/>
+       <path className="life-route life-exit-5" d="M478 389 Q495 386 512 389"/>
+       <path className="life-route life-route-8" d="M288 389 Q263 392 238 389"/>
+       <path className="life-route life-exit-8" d="M238 389 Q263 386 288 389"/>
+       <path className="life-route life-route-6" d="M332 550 Q344 532 350 514"/>
+       <path className="life-route life-exit-6" d="M350 514 Q338 532 332 550"/>
+       <path className="life-route life-route-7" d="M348 435 Q358 452 372 463"/>
+       <path className="life-route life-exit-7" d="M372 463 Q354 451 348 435"/>
+       <path className="life-route life-route-9" d="M258 465 Q269 469 280 475"/>
+       <path className="life-route life-exit-9" d="M280 475 Q269 467 258 465"/>
+       <path className="life-route life-route-10" d="M456 500 Q468 502 480 500"/>
+       <path className="life-route life-exit-10" d="M480 500 Q468 498 456 500"/>
+       <path className="life-route life-route-12" d="M91 509 Q115 512 140 509"/>
+       <path className="life-route life-exit-12" d="M140 509 Q115 506 91 509"/>
+       <path className="life-route life-route-13" d="M590 520 Q610 523 630 520"/>
+       <path className="life-route life-exit-13" d="M630 520 Q610 517 590 520"/>
+       {villageResidents.map(({route:index,kind,x,y})=><g className="village-visitor village-resident" data-route={index} data-kind={kind} key={index} transform={`translate(${x} ${y}) scale(${index===4?0.63:0.84})`}>
         <circle cx="0" cy="-24" r="3.4"/>
         <path className="life-ink" d="M0 -20 L0 -10"/>
         <path className="life-ink walking-arm" d="M0 -18 L-4 -12"/><path className="life-ink walking-arm" d="M0 -18 L4 -12"/>
         <path className="life-ink walking-leg" d="M0 -10 L-4 0"/><path className="life-ink walking-leg" d="M0 -10 L4 0"/>
-        {(index===1||index===6)&&<>
+        {kind==='farmer'&&<>
          <path className="life-ink" d="M-7 -26 Q0 -29 7 -26 M-4 -28 L-3 -32 L3 -32 L4 -28 M-3 -18 L-3 -11 L3 -11 L3 -18 M-3 -14 L3 -14"/>
          <path className="life-ink" d="M5 -13 L10 -12 L9 -7 L5 -7 Z M6 -13 Q7 -16 9 -13"/>
         </>}
-        {(index===0||index===7)&&<>
+        {kind==='lady'&&<>
          <path className="life-ink" d="M-4 -22 Q-7 -30 0 -29 Q6 -28 4 -21 M-3 -18 L-6 -9 Q0 -7 6 -9 L3 -18 M-3 -20 L0 -16 L3 -20"/>
          <path className="life-ink" d="M4 -13 Q10 -15 11 -11 L10 -7 L5 -7 Z"/>
         </>}
+        {kind==='student'&&<path className="life-ink" d="M-2 -20 Q-8 -22 -8 -15 L-7 -10 L-2 -11 Z M2 -17 L6 -15 L6 -9 L2 -10 Z"/>}
        </g>)}
-       <g className="village-visitor" data-route="2" data-kind="burro">
+       <g className="village-visitor village-animal" data-route="2" data-kind="burro" transform="translate(584 390) scale(0.78)">
         <path className="life-ink" d="M-13 -11 Q-17 -20 -10 -21 L7 -21 L13 -29 L20 -30 Q24 -28 23 -24 L18 -22 L15 -11 Z M13 -29 L11 -39 Q14 -41 16 -31 M18 -30 L19 -40 Q23 -40 22 -31 M-14 -19 Q-21 -21 -20 -12 M-8 -23 Q-3 -26 3 -23"/>
         <path className="life-ink" d="M20 -27 L21 -27 M-6 -22 L-6 -14 L5 -14 L5 -22"/>
         {[0,1,2,3].map(i=><path key={i} className="life-ink walking-leg" d={`M${i<2?-9:10} -11 L${i<2?-9:10} 0`}/>)}
        </g>
-       <g className="village-visitor" data-route="3" data-kind="dog">
+       <g className="village-visitor village-animal" data-route="3" data-kind="dog" transform="translate(280 418) scale(0.72)">
         <path className="life-ink" d="M-9 -7 L-9 -14 L8 -14 L12 -20 L18 -19 L22 -16 L17 -13 L12 -7 Z M12 -19 L10 -24 L16 -21 M-9 -13 Q-16 -20 -16 -14 M18 -17 L19 -17"/>
         {[0,1,2,3].map(i=><path key={i} className="life-ink walking-leg" d={`M${i<2?-6:7} -7 L${i<2?-6:7} 0`}/>)}
        </g>
+       {[{route:12,x:115,y:509},{route:13,x:610,y:520}].map(({route,x,y})=><g className="village-visitor village-animal" data-route={route} data-kind="bull" key={route} transform={`translate(${x} ${y}) scale(0.94)`}>
+        <path className="life-ink" d="M-17 -12 L-17 -23 Q-12 -28 -4 -26 L7 -25 Q13 -30 17 -24 L16 -12 Q4 -8 -7 -12 Z M-10 -26 Q-5 -31 1 -26"/>
+        <path className="life-ink animal-tail" d="M-17 -24 Q-25 -26 -24 -16 L-26 -12 M-26 -14 L-28 -10 L-24 -11"/>
+        <g className="grazing-head"><path className="life-ink" d="M12 -22 L21 -25 Q29 -25 28 -18 L25 -12 L18 -13 L13 -17 M18 -24 Q12 -27 13 -32 Q17 -29 20 -27 M25 -25 Q31 -27 32 -32 Q35 -26 29 -22 M24 -20 L25 -20 M19 -15 Q23 -17 27 -15"/></g>
+        {[0,1,2,3].map(i=><path key={i} className="life-ink walking-leg" d={`M${i<2?-11:10} -12 L${i<2?-11:10} 0`}/>)}
+       </g>)}
       </g>
-      <circle className="drawing-tip drawing-tip-0" r="3" opacity="0" strokeWidth="0.9"/>
-      <circle className="drawing-tip drawing-tip-1" r="3" opacity="0" strokeWidth="0.9"/>
+      </g>
      </svg>
      <div className="scene-caption"><span>{t('MANY PATHS. ONE COMMUNITY.','MUCHOS CAMINOS. UNA COMUNIDAD.')}</span><div><button className="motion-toggle" aria-pressed={paused} onClick={()=>setPaused(value=>!value)}>{paused?t('Play','Reproducir'):t('Pause','Pausar')}</button><button className="path-replay" onClick={()=>setReplay(n=>n+1)}>{t('Replay ↗','Repetir ↗')}</button></div></div>
     </div>
@@ -256,7 +282,6 @@ export default function Landing(){
     </ol>
     <div className="landing-actions landing-start-actions"><button className="landing-primary" onClick={()=>setLogin(true)}>{t('Get started with Origen','Empieza con Origen')}<ArrowRight size={18}/></button></div>
    </section>
-   <LandingStory t={t}/>
    <section className="landing-resource" id="educators" aria-labelledby="educators-title">
     <span className="landing-eyebrow">{t('FOR EDUCATORS AND OUTREACH TEAMS','PARA EDUCADORES Y EQUIPOS DE DIFUSIÓN')}</span>
     <h2 id="educators-title">{t('Help students keep moving between meetings.','Ayuda a tus estudiantes a seguir avanzando entre reuniones.')}</h2>
@@ -266,6 +291,7 @@ export default function Landing(){
     <p className="landing-share-description">{shareDescription}</p><p role="status" aria-live="polite">{copyStatus}</p>
     <a className="landing-share-link" href="https://origenedu.ai">origenedu.ai <ArrowUpRight size={16}/></a>
    </section>
+   <LandingStory t={t}/>
    <LandingDetails t={t} section="contact"/>
    <section className="landing-closing"><h2>{t('You belong in this conversation.','Tu voz tiene un lugar aquí.')}</h2><button onClick={()=>setLogin(true)}>{t('Let’s get started','Empecemos')}<ArrowRight size={18}/></button></section>
   </main>

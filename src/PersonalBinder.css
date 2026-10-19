@@ -1,7 +1,7 @@
 @font-face{font-family:'Binder Hand';src:url('/fonts/patrick-hand.woff') format('woff');font-style:normal;font-weight:400;font-display:swap}
 
 .personal-binder{--binder-writing-font:'Binder Hand','Segoe Print','Bradley Hand',cursive;--binder-paper:#fffdf7;position:relative;min-width:0;perspective:1800px;perspective-origin:15% 45%;isolation:isolate}
-.binder-cover{position:relative;display:block;width:100%;min-height:410px;padding:38px 56px 38px 76px;text-align:left;border:1px solid #7e3c2e;border-radius:9px 22px 22px 9px;background:repeating-linear-gradient(0deg,#ffffff03 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#3b170505 0 1px,transparent 1px 3px),linear-gradient(110deg,#8c412e,#a6533c 60%,#98452f);color:#fff3df;box-shadow:2px 3px 0 #d3bda5,5px 5px 0 #fff7e8,7px 7px 0 #cdb69f,9px 9px 0 #f9f0df,11px 11px 0 #ad8062,0 18px 30px #653e2c17;transform-origin:18px center;backface-visibility:hidden;overflow:visible}
+.binder-cover{position:relative;display:block;width:100%;min-height:470px;padding:38px 56px 38px 76px;text-align:left;border:1px solid #7e3c2e;border-radius:9px 22px 22px 9px;background:repeating-linear-gradient(0deg,#ffffff03 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#3b170505 0 1px,transparent 1px 3px),linear-gradient(110deg,#8c412e,#a6533c 60%,#98452f);color:#fff3df;box-shadow:2px 3px 0 #d3bda5,5px 5px 0 #fff7e8,7px 7px 0 #cdb69f,9px 9px 0 #f9f0df,11px 11px 0 #ad8062,0 18px 30px #653e2c17;transform-origin:18px center;backface-visibility:hidden;overflow:visible}
 .binder-cover::after{content:'';position:absolute;inset:12px 12px 12px 47px;border:1px dashed #efc5a83d;border-radius:3px 12px 12px 3px;pointer-events:none}
 .binder-cover:disabled{opacity:1;cursor:default}
 .binder-cover-spine{position:absolute;left:0;top:0;bottom:0;width:37px;border-radius:8px 0 0 8px;border-right:1px solid #55251670;background:linear-gradient(90deg,#542a252e,#ffffff0b 38%,#5225172e 78%,#d99b6633);box-shadow:3px 0 4px #3d1d111a,inset -1px 0 #f3c5a333}
@@ -49,7 +49,7 @@
 
 /* A phone carries one portrait cover and one readable page at a time. */
 @media(max-width:760px){
- .binder-cover{min-height:420px;padding:28px 24px 30px 42px;border-radius:9px 18px 18px 9px;box-shadow:2px 3px 0 #d3bda5,4px 5px 0 #fff7e8,6px 7px 0 #b49172,0 12px 26px #813e2e18;transform-origin:12px center}
+ .binder-cover{min-height:460px;padding:28px 24px 30px 42px;border-radius:9px 18px 18px 9px;box-shadow:2px 3px 0 #d3bda5,4px 5px 0 #fff7e8,6px 7px 0 #b49172,0 12px 26px #813e2e18;transform-origin:12px center}
  .binder-cover::after{inset:10px 10px 10px 29px}
  .binder-cover-spine{width:23px}
  .binder-brand{margin-bottom:22px;font-size:21px}

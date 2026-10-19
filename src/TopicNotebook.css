@@ -98,13 +98,14 @@
 .binder-pages .notebook-note-content{margin:0;font-family:var(--binder-writing-font);font-weight:400;font-size:21px;line-height:1.6;letter-spacing:.012em;color:#334753;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(1lh - 1px),#66849b18 calc(1lh - 1px),#66849b18 1lh);background-position:0 -2px;overflow-wrap:anywhere}
 .notebook-note-content.is-excerpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}
 .notebook-note-origin{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:7px;color:#6c736f;font-size:11px;line-height:1.5}
-.notebook-note-origin time{font-variant-numeric:tabular-nums;color:#7a756c}
-.notebook-suggestion .notebook-note-origin>span{color:#8b583f}
-.notebook-note-menu .notebook-note-meta{display:none}
+.notebook-note-origin time{margin-left:auto;font-variant-numeric:tabular-nums;color:#7a756c}
 .notebook-panel .notebook-read-more{font-size:12px;text-decoration:underline;text-decoration-color:#ba9d87;text-underline-offset:4px}
 .notebook-topic-description{margin:8px 0 0;font-size:13px;line-height:1.65;color:#776a5e;max-width:55ch}
 .notebook-reading-room{margin-top:28px}
-.notebook-section-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;border-bottom:1px solid #d8c9b8;padding:0 0 16px}
+.notebook-section-box{padding:16px;margin-bottom:22px;background:#f8f1e7;border:1px solid #dfcdb9;border-radius:14px;box-shadow:0 2px 6px #813e2e05}
+.notebook-section-box>h4{margin:0 0 12px;font-size:14px;font-weight:700;line-height:1.4;color:#684737}
+.notebook-section-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media(max-width:1100px){.notebook-section-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .notebook-section-tabs>button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;min-height:58px;padding:12px 14px;border:1px solid #cbb29b;border-radius:10px;font-size:13px;font-weight:650;line-height:1.4;text-align:left;color:#5f4a3e;background:#f5ede1;box-shadow:0 2px 0 #d8c4af55;cursor:pointer}
 .notebook-section-tabs>button>span:first-child{min-width:0;overflow-wrap:anywhere}
 .notebook-section-tabs>button[aria-selected=true]{color:#fffaf3;background:#9b4834;border-color:#883e2d;box-shadow:inset 0 -3px #783a2b,0 2px 4px #813e2e18}
@@ -130,14 +131,6 @@
 .binder-pages .notebook-key-points>p{font-size:12px;margin:12px 0;color:#7e7268}
 .binder-pages .notebook-points-list{max-height:none;overflow:visible;padding:0;scrollbar-gutter:auto;overscroll-behavior:auto}
 .binder-pages .notebook-points-list .notebook-note{margin:0;background:transparent;border-left:0}
-.notebook-note-menu{margin-top:8px;font-size:12px;color:#7e7268}
-.notebook-note-menu>summary{cursor:pointer;list-style:none;min-height:44px;display:flex;align-items:center;gap:6px;width:max-content;font-size:12px}
-.notebook-note-menu>summary::-webkit-details-marker{display:none}
-.notebook-note-menu>summary::before{content:'···';font-size:19px;letter-spacing:2px;color:#a4513c}
-.notebook-note-menu>summary:focus-visible{outline:2px solid #a4513c;outline-offset:3px;border-radius:4px}
-.notebook-note-menu[open]{border-radius:8px;padding:0 12px 10px;background:#f8f1e8;margin-left:-12px}
-.notebook-note-menu .notebook-note-meta{font-size:11px;margin:8px 0 12px}
-.notebook-note-menu .notebook-note-actions{gap:6px 16px;margin-top:10px}
 .notebook-pdf-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border:1px solid #ddc6b0;border-radius:8px;padding:10px 12px;font-size:12px;color:#813e2e;background:#fffaf3}
 .notebook-export-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin:0 2px 20px}
 .notebook-export-toolbar>span{font-size:12px;line-height:1.6;color:#7e7268}
@@ -147,12 +140,13 @@
  .binder-pages .notebook-mobile .notebook-note{padding:18px 0 10px}
  .binder-pages .notebook-mobile .notebook-note-content{font-size:20px}
  .notebook-reading-room{margin-top:22px}
+ .notebook-section-box{padding:12px;margin-bottom:20px}
  .notebook-section-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .notebook-section-tabs>button{font-size:13px;gap:8px;padding:11px 12px}
+ .notebook-section-tabs>button{font-size:12px;gap:6px;padding:11px 10px}
+ .notebook-section-count{min-width:24px;min-height:24px;font-size:11px}
  .notebook-reading-heading{margin-top:20px;gap:10px}
  .notebook-reading-heading h4{font-size:16px}
  .notebook-note-origin{font-size:10px;gap:4px}
- .notebook-note-menu[open]{margin-left:0;padding-inline:10px}
  .notebook-section-empty{font-size:20px}
  .notebook-pagination>button{padding-inline:6px;font-size:11px}
  .notebook-pagination>span{font-size:10px}

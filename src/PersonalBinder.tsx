@@ -3,8 +3,8 @@ import {animate,createTimeline} from 'animejs';
 import {ArrowRight,BookOpen,X} from 'lucide-react';
 import './PersonalBinder.css';
 
-export default function PersonalBinder({name,t,children,onOpen}:{name:string;t:(en:string,es:string)=>string;children:ReactNode;onOpen?:()=>void}){
- const [phase,setPhase]=useState<'closed'|'opening'|'open'|'closing'>('closed');
+export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=false}:{initiallyOpen?:boolean;name:string;t:(en:string,es:string)=>string;children:ReactNode;onOpen?:()=>void}){
+ const [phase,setPhase]=useState<'closed'|'opening'|'open'|'closing'>(initiallyOpen?'open':'closed');
  const opened=phase==='open',moving=phase==='opening'||phase==='closing';
  const pagesId=useId();
  const stage=useRef<HTMLDivElement>(null),cover=useRef<HTMLButtonElement>(null),pages=useRef<HTMLDivElement>(null),close=useRef<HTMLButtonElement>(null);

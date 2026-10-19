@@ -13,7 +13,7 @@
 @media(max-width:760px){.landing-hero{padding-top:150px}.hero-sky{height:115px}.hero-sky .line-star:nth-of-type(even){display:none}}
 @media(prefers-reduced-motion:reduce){.line-star{opacity:.65;filter:none}}
 
-.village-visitor{opacity:0;color:#f0dfc3;pointer-events:none}.life-route{visibility:hidden}.landing-mark{font-size:43px;line-height:1;margin-right:10px}@media(prefers-reduced-motion:reduce){.village-visitor{display:none}}
+.village-visitor{opacity:.9;color:#f0dfc3;pointer-events:none}.life-route{visibility:hidden}.landing-mark{font-size:43px;line-height:1;margin-right:10px}@media(prefers-reduced-motion:reduce){.village-visitor{opacity:.9}}
 
 @media(max-width:760px){.landing-hero{padding-top:85px;row-gap:32px}.landing-map.pueblo-scene{grid-row:1;margin-top:0;width:100%;justify-self:center}.landing-copy{grid-row:2}.hero-sky{height:75px}}
 

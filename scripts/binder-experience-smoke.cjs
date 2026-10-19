@@ -162,7 +162,7 @@ async function verifyExperience(browser,{width,language,reducedMotion}){
   assert.equal(state.writes.filter(write=>write.action==='create').length,1);
   assert.equal(state.notes.filter(note=>note.content===draft).length,1);
   await topic(page,'options',width);await page.locator('.notebook-section-tabs [role=tab]').first().click();
-  const first=page.locator('.notebook-reading-page .notebook-note').first();await first.locator('.notebook-note-menu>summary').click();
+  const first=page.locator('.notebook-reading-page .notebook-note').first();
   await first.getByRole('button',{name:language==='es'?'Editar original':'Edit',exact:true}).click();
   const edited=`Updated after counselor review. ${label}`;await page.locator('.notebook-editor textarea').fill(edited);
   await page.getByRole('button',{name:language==='es'?'Guardar nota':'Save note',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.notebook-editor'));

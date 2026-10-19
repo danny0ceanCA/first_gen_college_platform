@@ -1,3 +1,4 @@
+import {testAccountAdultScreen} from './testAccount.mjs';
 import {apiFetch} from './api';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
@@ -23,6 +24,8 @@ export default function EligibilityGate({children,onAllowed,hideSignOut=false}:{
   const response=await fetch(`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/eligibility`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)});
   const data=await response.json();if(!response.ok||data.subject!==subject||typeof data.allowed!=='boolean')throw new Error('permission_unavailable');
   if(!active.current||requestSequence!==sequence.current)return;
+  const adultScreen=testAccountAdultScreen(auth.user,data.status);
+  if(body.action==='status'&&adultScreen){await check(adultScreen,signal);return;}
   if(!data.allowed&&(allowed.current||unavailable.current))browserPrivacy.stop('eligibility_changed');
   if(data.allowed&&subject&&!allowed.current&&!browserPrivacy.start(subject,{fresh:!unavailable.current}))throw new Error('permission_unavailable');
   unavailable.current=false;allowed.current=data.allowed===true;setState(data);setError(false);if(data.allowed)callback.current?.();
