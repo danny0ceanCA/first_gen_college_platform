@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+ <rect width="1280" height="720" fill="#a4513c"/>
+ <rect x="34" y="34" width="1212" height="652" rx="30" fill="none" stroke="#f4eee4" stroke-opacity=".3"/>
+ <g fill="none" stroke="#f4eee4" stroke-opacity=".16" stroke-width="2">
+  <path d="M-20 610C180 400 252 695 470 580S760 500 940 600s260 10 360-80"/>
+  <path d="M-20 635C180 425 252 720 470 605S760 525 940 625s260 10 360-80"/>
+  <circle cx="1090" cy="160" r="70"/><circle cx="1090" cy="160" r="88"/>
+ </g>
+ <g fill="#f4eee4">
+  <circle cx="398" cy="280" r="43" fill="none" stroke="#f4eee4" stroke-width="6"/>
+  <text x="464" y="308" font-family="Arial,Helvetica,sans-serif" font-size="100" font-weight="700" letter-spacing="-5">origen.</text>
+ </g>
+</svg>

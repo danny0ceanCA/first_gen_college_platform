@@ -1,0 +1,21 @@
+.landing-video{width:100%;max-width:440px;margin:0;justify-self:center;min-width:0;border:1px solid var(--brand-border,#e4d7ca);border-radius:14px;overflow:hidden;background:#fff8f0;color:var(--brand-ink,#2f343b);box-shadow:0 16px 40px #2f343b12}
+.landing-video-heading{padding:20px}
+.landing-video-heading h4{margin:0 0 8px;font-size:20px;font-weight:500;line-height:1.3}
+.landing-video-heading p{margin:0;font-size:13px;line-height:1.7;color:#625b55}
+.landing-video-frame{aspect-ratio:16/9;background:#2f343b}
+.landing-video-frame video,.landing-video-poster{display:block;width:100%;height:100%;aspect-ratio:16/9}
+.landing-video-frame video{object-fit:contain}
+.landing-video-poster{position:relative;padding:0;border:0;background:#a4513c;cursor:pointer;text-align:center}
+.landing-video-poster img{display:block;width:100%;height:100%;object-fit:cover}
+.landing-video-play{position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 18px;border:1px solid #f4eee4;border-radius:40px;background:#f4eee4;color:#a4513c;font-size:14px;font-weight:650;white-space:nowrap}
+.landing-video-play svg{flex-shrink:0}
+.landing-video-poster:hover .landing-video-play{background:#fff8ed}
+.landing .landing-video-poster:focus-visible,.landing .landing-video-frame video:focus-visible{outline:3px solid #f4eee4;outline-offset:-6px}
+.landing-video-duration{position:absolute;right:18px;bottom:16px;padding:5px 10px;border:1px solid #f4eee45c;border-radius:16px;background:#2f343bcc;color:#f4eee4;font-size:12px}
+.landing-video-help{margin:0;padding:16px 24px;font-size:13px;line-height:1.7}
+.landing-video-help a{text-underline-offset:4px}
+.landing-video-play svg{width:22px;height:22px}
+.landing-video-placeholder{width:100%;max-width:440px;justify-self:center;overflow:hidden;border:1px solid #e4d7ca;border-radius:14px;background:#fff8f0;color:var(--brand-ink,#2f343b)}
+.landing-video-placeholder-frame{aspect-ratio:16/9;display:grid;place-items:center;padding:20px;background:#efe4d6;color:#76695e;border-top:1px dashed #cbbbaf;text-align:center;font-size:14px}
+.landing-video-placeholder-frame span{font-weight:550;line-height:1.6}
+@media(max-width:760px){.landing-video-heading{padding:18px}.landing-video-heading h4{font-size:19px}.landing-video-play{gap:8px;padding:10px 14px}.landing-video-duration{right:10px;bottom:10px;font-size:11px}.landing-video-help{padding:14px 18px}}
