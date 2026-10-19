@@ -12,6 +12,20 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: MAINTENANCE_DATABASE_URL
+        sync: false
+      - key: ORIGEN_COORDINATOR_ACCOUNTS
+        value: "false"
+      - key: ORIGEN_COORDINATOR_LINKING
+        value: "false"
+      - key: ORIGEN_BINDER_SHARING
+        value: "false"
+      - key: ORIGEN_COORDINATOR_BINDER_VIEWING
+        value: "false"
+      - key: ORIGEN_COORDINATOR_FEEDBACK
+        value: "false"
+      - key: ORIGEN_COORDINATOR_VOICE_LINKING
+        value: "false"
       - key: ORIGEN_VOICE_PREPARATION
         value: "false"
       - key: ORIGEN_BINDER_JOBS

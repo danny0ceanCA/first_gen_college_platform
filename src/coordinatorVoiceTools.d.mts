@@ -1,0 +1,2 @@
+import type {ConnectionCard} from './CoordinatorConnection';
+export function coordinatorVoiceTools(options:{post:(body:unknown)=>Promise<any>;studentId:string|null;onPrepared:(card:ConnectionCard)=>void;onClear:()=>void;onCode?:(code:string)=>void}):{isTool:(name:string)=>boolean;sequence:()=>number;configure:(enabled:boolean)=>void;begin:(id:string)=>void;invoke:(item:{name:string;call_id:string;arguments:string},sequence?:number)=>Promise<any>;stop:()=>void};

@@ -1,6 +1,7 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {createHash} from 'node:crypto';
 import pg from 'pg';
+import {coordinatorTables,lineageTables} from './binder-sharing-policy.mjs';
 
 const context=new AsyncLocalStorage();
 const fail=()=>Object.assign(new Error('account_scope_mismatch'),{status:403});
@@ -12,6 +13,13 @@ export const sqlIdentifier=value=>{if(!/^[a-z_][a-z0-9_]{0,52}$/.test(value))thr
 export function runAsAccount(identity,work){
  if(!validSubject(identity?.sub))throw fail();
  return context.run(Object.freeze({subject:identity.sub,purpose:'account'}),work);
+}
+// Called only after the coordinator HTTP gate verifies MFA, email and staff
+// controls. Never accept this capability or administrator flag from a body.
+export function runAsCoordinatorActor(subject,{administrator=false,issuedAt=0}={},work){
+ const current=context.getStore();
+ if(!current||current.subject!==subject||current.purpose!=='account')throw fail();
+ return context.run({...current,coordinatorVerified:true,coordinatorAdmin:administrator===true,coordinatorIssuedAt:Number.isSafeInteger(issuedAt)&&issuedAt>0?issuedAt:0},work);
 }
 // Public guardian capabilities scope only the matching hashed token's rows.
 export function runAsGuardian(hash,work){
@@ -46,6 +54,8 @@ export function isolateDatabase(pool,{schema='public'}={}){
   const configure=()=>raw.query(Object.entries({
    'origen.subject':scope.subject,'origen.subject_hash':scope.subject?createHash('sha256').update(scope.subject).digest('hex'):'',
    'origen.purpose':scope.purpose,'origen.guardian_hash':scope.guardianHash||'',
+   'origen.coordinator_verified':scope.coordinatorVerified?'true':'false','origen.coordinator_admin':scope.coordinatorAdmin?'true':'false',
+   'origen.coordinator_issued_at':String(scope.coordinatorIssuedAt||0),
   }).map(([key,value])=>`SET LOCAL ${key}=${pg.escapeLiteral(value)}`).concat(`SET LOCAL search_path TO ${scope.purpose==='analytics'?`${reporting},${base}`:base}`).join(';'));
   const client={
    isolated:true,
@@ -87,8 +97,11 @@ export async function assertRuntimeIsolation(pool,{schema='public'}={}){
   EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid AND a.attname='account_id' WHERE n.nspname=$1 AND c.relkind='r' AND NOT c.relrowsecurity) AS unprotected,
   EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND c.relkind='r' AND c.relname LIKE 'origen_%' AND has_table_privilege(current_user,c.oid,'TRUNCATE')) AS can_truncate,
   has_table_privilege(current_user,format('%I.origen_schema_migrations',$1),'INSERT,UPDATE,DELETE') AS can_migrate,
+  EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND
+   (c.relname=ANY($2::text[]) AND (NOT c.relrowsecurity OR has_table_privilege(current_user,c.oid,'SELECT,INSERT,UPDATE,DELETE')) OR
+    c.relname=ANY($3::text[]) AND (NOT c.relrowsecurity OR has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE')))) AS can_share_in_phase_one,
   has_table_privilege(current_user,format('%I.origen_privileged_access_audit',$1),'SELECT,UPDATE,DELETE') OR
-  has_table_privilege(current_user,format('%I.origen_staff_access_controls',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_deletion_journal',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_identity_closures',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_privacy_events',$1),'UPDATE') OR EXISTS(SELECT 1 FROM pg_class dc JOIN pg_namespace dn ON dn.oid=dc.relnamespace WHERE dn.nspname=$1 AND dc.relname='origen_diagnostic_operations' AND has_table_privilege(current_user,dc.oid,'UPDATE')) OR EXISTS(SELECT 1 FROM pg_class ec JOIN pg_namespace en ON en.oid=ec.relnamespace WHERE en.nspname=$1 AND ec.relname='origen_telemetry_erasure_outbox' AND has_table_privilege(current_user,ec.oid,'SELECT,INSERT,UPDATE,DELETE')) AS can_alter_controls`,[schema]);
+  has_table_privilege(current_user,format('%I.origen_staff_access_controls',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_deletion_journal',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_identity_closures',$1),'INSERT,UPDATE,DELETE') OR has_table_privilege(current_user,format('%I.origen_privacy_events',$1),'UPDATE') OR EXISTS(SELECT 1 FROM pg_class dc JOIN pg_namespace dn ON dn.oid=dc.relnamespace WHERE dn.nspname=$1 AND dc.relname='origen_diagnostic_operations' AND has_table_privilege(current_user,dc.oid,'UPDATE')) OR EXISTS(SELECT 1 FROM pg_class ec JOIN pg_namespace en ON en.oid=ec.relnamespace WHERE en.nspname=$1 AND ec.relname='origen_telemetry_erasure_outbox' AND has_table_privilege(current_user,ec.oid,'SELECT,INSERT,UPDATE,DELETE')) AS can_alter_controls`,[schema,coordinatorTables,lineageTables]);
  const row=rows[0];
- if(!row||row.powerful||row.can_create||row.owns_tables||row.owns_functions||row.can_truncate||row.can_migrate||row.can_alter_controls||row.unprotected||!row.protected)throw new Error('restricted_database_runtime_required');
+ if(!row||row.powerful||row.can_create||row.owns_tables||row.owns_functions||row.can_truncate||row.can_migrate||row.can_alter_controls||row.can_share_in_phase_one||row.unprotected||!row.protected)throw new Error('restricted_database_runtime_required');
 }

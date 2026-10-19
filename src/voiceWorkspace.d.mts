@@ -1,5 +1,5 @@
 export type WorkspaceTopic='options'|'transfer'|'costs'|'applications';
-export type WorkspaceFocus={kind:'topic';studentId:string|null;topic:WorkspaceTopic}|{kind:'note'|'point';studentId:string|null;topic:WorkspaceTopic;noteId:string;version:number}|{kind:'action';studentId:string|null;topic:WorkspaceTopic;planId:string;stepId:string;version:number};
+export type WorkspaceFocus={kind:'coordinator-guidance';studentId:string;topic:WorkspaceTopic;feedbackId:string;version:number}|{kind:'topic';studentId:string|null;topic:WorkspaceTopic}|{kind:'note'|'point';studentId:string|null;topic:WorkspaceTopic;noteId:string;version:number}|{kind:'action';studentId:string|null;topic:WorkspaceTopic;planId:string;stepId:string;version:number};
 export type WorkspaceSelection=WorkspaceFocus&{serial:string};
 export function workspaceGuide(topic:string):'planning'|'finance'|'admissions';
 export function planTopic(category:string):WorkspaceTopic;

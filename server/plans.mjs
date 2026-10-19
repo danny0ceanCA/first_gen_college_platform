@@ -1,3 +1,4 @@
+import {runFeedbackCommand} from './coordinator-feedback.mjs';
 import {progressEnabled,recordPlanRevision} from './progress-history.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -22,6 +23,7 @@ export function validatePlan(input){
  })};
  if(new Set(out.plan.steps.map(s=>s.id)).size!==out.plan.steps.length)throw fail(400,'invalid_plan');
  if(input.fromNote!==undefined){const n=input.fromNote;if(!n||!Number.isSafeInteger(n.version)||n.version<1||!out.plan.steps.some(s=>s.id===n.stepId))throw fail(400,'invalid_plan');out.fromNote={id:uuid(n.id),version:n.version,stepId:id(n.stepId)};}
+ if(input.fromFeedback!==undefined){const n=input.fromFeedback;if(input.action!=='create'||!input.requestId||input.fromNote||!n||!Number.isSafeInteger(n.version)||n.version<1||!out.plan.steps.some(s=>s.id===n.stepId))throw fail(400,'invalid_plan');out.fromFeedback={id:uuid(n.id),version:n.version,stepId:id(n.stepId)};}
  return out;
 }
 export function createPlanRepository(database,env=process.env){return async(subject,input,{client:transactionClient}={})=>{
@@ -38,7 +40,7 @@ export function createPlanRepository(database,env=process.env){return async(subj
   const requireStudent=async target=>{if(target!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[owner,target])).rows.length)throw fail(404,'student_not_found');};
   if(input.studentId!==undefined)await requireStudent(input.studentId);
   let planId=input.id;
-  const fingerprint=input.requestId?createHash('sha256').update(JSON.stringify({plan:input.plan,fromNote:input.fromNote})).digest('hex'):null;
+  const fingerprint=input.requestId?createHash('sha256').update(JSON.stringify({plan:input.plan,fromNote:input.fromNote,...(input.fromFeedback?{fromFeedback:input.fromFeedback}:{})})).digest('hex'):null;
   const receipt=input.requestId?(await c.query('SELECT * FROM origen_plan_creations WHERE account_id=$1 AND request_id=$2',[owner,input.requestId])).rows[0]:null;
   if(receipt){
    if(receipt.fingerprint!==fingerprint)throw fail(409,'create_request_changed');
@@ -73,6 +75,13 @@ export function createPlanRepository(database,env=process.env){return async(subj
      }
      noteLink={step_id:input.fromNote.stepId,note_id:source.id,note_version:source.version};
     }
+    let feedback;
+    if(input.fromFeedback){
+     feedback=await runFeedbackCommand(c,{action:'student-source',studentId:p.studentId,feedbackId:input.fromFeedback.id,version:input.fromFeedback.version});
+     const step=p.steps.find(s=>s.id===input.fromFeedback.stepId);
+     if(step.status!=='not-started')throw fail(400,'new_action_not_started');
+     step.notes=`Coordinator guidance · ${feedback.authorName} · ${feedback.organizationName} · v${feedback.version}\n${step.notes}`.slice(0,4000);
+    }
     const previous=progressEnabled(env)&&current?(await c.query('SELECT id,status FROM origen_plan_steps WHERE account_id=$1 AND plan_id=$2',[owner,planId])).rows:[];
     // A plan's target is immutable: moving it could mix two students' actions/history.
     if(current&&current.student_id!==p.studentId)throw fail(409,'plan_target_mismatch');
@@ -87,6 +96,7 @@ export function createPlanRepository(database,env=process.env){return async(subj
     }
     for(const summaryId of p.summaryIds)await c.query('INSERT INTO origen_plan_conversations(account_id,plan_id,summary_id) VALUES($1,$2,$3)',[owner,planId,summaryId]);
     for(const link of [...previousLinks,...(noteLink?[noteLink]:[])].filter(link=>p.steps.some(s=>s.id===link.step_id)))await c.query('INSERT INTO origen_plan_note_links(account_id,plan_id,step_id,note_id,note_version) VALUES($1,$2,$3,$4,$5)',[owner,planId,link.step_id,link.note_id,link.note_version]);
+    if(feedback)await runFeedbackCommand(c,{action:'student-link',studentId:p.studentId,feedbackId:feedback.id,version:feedback.version,planId,stepId:input.fromFeedback.stepId});
     if(input.requestId)await c.query('INSERT INTO origen_plan_creations(account_id,request_id,plan_id,fingerprint) VALUES($1,$2,$3,$4)',[owner,input.requestId,planId,fingerprint]);
     if(progressEnabled(env))await recordPlanRevision(c,owner,planId,current?current.version+1:1,p,previous);
    }

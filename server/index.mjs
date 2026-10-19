@@ -1,4 +1,11 @@
+import {createCoordinatorNotificationsHandler,maintainCoordinators,assertCoordinatorLifecycleReady} from './coordinator-notifications.mjs';
+import {createCoordinatorFeedbackHandler,assertCoordinatorFeedbackReady} from './coordinator-feedback.mjs';
+import {createCoordinatorBindersHandler,assertCoordinatorViewingReady,coordinatorViewingEnabled} from './coordinator-binders.mjs';
+import {createBinderSharingHandler,assertBinderSharingReady} from './binder-sharing.mjs';
 import {binderJobsEnabled,binderJobsReady,startBinderWorker} from './binder-jobs.mjs';
+import {isCoordinatorRoute} from './binder-sharing-policy.mjs';
+import {createCoordinatorConnectionsHandler,assertCoordinatorLinkingReady,linkingEnabled} from './coordinator-connections.mjs';
+import {createCoordinatorHandler,assertCoordinatorProvisioningReady} from './coordinator-access.mjs';
 import {createLiveMemoryHandler} from './live-memory.mjs';
 import {createMemoryHandler} from './student-memory.mjs';
 import {createPermissionHandler,purgePermissionData} from './guardian-permission.mjs';
@@ -66,7 +73,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const lifecycle=createLifecycleHandler(database);
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
- const handlers=[createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ const handlers=[createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
  const privacyMonitor=createPrivacyMonitor(database,log);
@@ -110,6 +117,9 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   let identity;
   {try{identity=await authenticate(token);if(typeof identity.sub!=='string'||!identity.sub.trim()||identity.sub.length>255||domain&&identity.iss!==undefined&&identity.iss!==`https://${domain}/`)throw new Error();}catch{return send(401,'invalid_token');}}
   req.origenIdentity=identity;
+  // Provisioning and pilot linking have separate gates. Student sharing uses
+  // its own kill switch, preserving stop controls; coordinator reads have a separate switch.
+  if(isCoordinatorRoute(req.url)&&req.url!=='/api/coordinator-notifications'&&req.url!=='/api/binder-sharing'&&req.url!=='/api/coordinator-feedback'&&!(req.url==='/api/coordinator-binders'&&coordinatorViewingEnabled(env)||req.url==='/api/coordinator-access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'||req.url==='/api/coordinator-connections'&&linkingEnabled(env)))return send(503,'coordinator_sharing_unavailable');
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
   // Frequent diagnostic events must never spend the budget used by permission
   // checks, saves, or research. Both lanes stay bounded before database work.
@@ -125,7 +135,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   req.origenPreview=false;
   req.origenIdentity=identity;
   if(req.url==='/api/eligibility')return permission.handle(req,res);
-  const exempt=new Set(['/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
+  const exempt=new Set(['/api/coordinator-notifications','/api/coordinator-feedback','/api/coordinator-binders','/api/binder-sharing','/api/coordinator-connections','/api/coordinator-access','/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
   const protectedRequest=!exempt.has(req.url?.split('?')[0]);
   let eligibility;
   if(protectedRequest){
@@ -139,6 +149,10 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   let i=0;const next=()=>{const handler=handlers[i++];return handler?handler(req,res,next):send(404,'not_found');};
   try{
    await next();
+   if(database&&isCoordinatorRoute(req.url)&&[403,404,409].includes(res.statusCode)){
+    const kind=res.statusCode===409?'publication_conflict':'authorization_denied';
+    try{await database.query('SELECT origen_coordinator_record_operation($1)',[kind]);}catch{req.log({event:'telemetry.gap',reason:'mapping_scope_unavailable'});}
+   }
   }catch(error){req.log({event:'api_error',level:'error',code:safeErrorCode(error)});if(!res.headersSent)send(500,'server_error');else res.end();}
   };
   if(protectedRequest)return runPermittedRequest(database,identity.sub,eligibility.revision,req,res,dispatch);
@@ -159,10 +173,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  for(const key of ['AUTH0_DOMAIN','AUTH0_AUDIENCE','ALLOWED_ORIGINS'])if(!process.env[key])throw new Error(`Missing ${key}`);
  const rawDatabase=createDatabase();
  database=rawDatabase?isolateDatabase(rawDatabase):null;
-  if(database){await assertRuntimeIsolation(rawDatabase);if(diagnosticOperationsEnabled(process.env))await assertDiagnosticOperationsReady(rawDatabase);if(process.env.SUPPORT_DIAGNOSTICS_ENABLED==='true')await assertSupportReady(rawDatabase);if(process.env.OBSERVABILITY_EXPORT==='true')await assertTelemetryLifecycle(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');runtimeLog({event:'service.database.verified'});}
+  if(database){await assertRuntimeIsolation(rawDatabase);await assertCoordinatorProvisioningReady(rawDatabase,process.env);await assertCoordinatorLinkingReady(rawDatabase,process.env);await assertBinderSharingReady(rawDatabase,process.env);await assertCoordinatorViewingReady(rawDatabase,process.env);await assertCoordinatorFeedbackReady(rawDatabase,process.env);if(diagnosticOperationsEnabled(process.env))await assertDiagnosticOperationsReady(rawDatabase);if(process.env.SUPPORT_DIAGNOSTICS_ENABLED==='true')await assertSupportReady(rawDatabase);if(process.env.OBSERVABILITY_EXPORT==='true')await assertTelemetryLifecycle(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');runtimeLog({event:'service.database.verified'});}
   else runtimeLog({event:'service.database.unavailable'});
   maintenancePool=createMaintenanceDatabase(process.env);
   if(maintenancePool)await assertMaintenanceAccess(maintenancePool);
+  if(database)await assertCoordinatorLifecycleReady(database,process.env,maintenancePool);
   jobs=maintenancePool?createJobRunner(maintenancePool):null;
   const cleanupTasks=[
    ['permission-data',purgePermissionData],['diagnostic-maps',purgeDiagnosticOperations],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
@@ -174,6 +189,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const cleanup=async()=>{if(!jobs||cleanupBusy)return;cleanupBusy=true;try{for(const [name,work] of cleanupTasks)await jobs.run(name,work);}finally{cleanupBusy=false;}};
   await cleanup();
   const metricsCleanup=setInterval(()=>{void cleanup().catch(()=>runtimeLog({event:'retention.failed',code:'operation_failed'}));},60*60*1000);metricsCleanup.unref();
+  let coordinatorBusy=false;
+  const coordinatorSweep=async()=>{if(!jobs||coordinatorBusy)return;coordinatorBusy=true;try{await jobs.run('coordinator-lifecycle',maintainCoordinators);}finally{coordinatorBusy=false;}};
+  await coordinatorSweep();
+  const coordinatorTimer=setInterval(()=>{void coordinatorSweep();},30000);coordinatorTimer.unref();
   const application=createApp(process.env,undefined,database),server=createServer(application);
   if(binderJobsEnabled(process.env)&&(!database||!maintenancePool||!await binderJobsReady(database)))throw new Error('binder_jobs_configuration_required');
   stopBinderWorker=binderJobsEnabled(process.env)?startBinderWorker({application:database,maintenance:maintenancePool,env:process.env}):async()=>{};
@@ -187,7 +206,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   let stopping=false;
   const shutdown=()=>{
    if(stopping)return;stopping=true;runtimeLog({event:'service.stopping'});
-   clearInterval(metricsCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
+   clearInterval(coordinatorTimer);clearInterval(metricsCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
    server.close(async()=>{try{await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
   };

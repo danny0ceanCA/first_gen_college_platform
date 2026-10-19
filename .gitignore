@@ -20,3 +20,7 @@ mobile/web-build/
 
 # Synthetic live evaluation captures and local release evidence
 /output/personalization-*/
+
+# Disposable databases, operator scratch files, and browser session captures
+/tmp/
+/.playwright-cli/

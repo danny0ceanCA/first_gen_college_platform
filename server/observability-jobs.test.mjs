@@ -81,7 +81,7 @@ test('actual API startup accepts the separate maintenance login and completes ev
   child=spawn(process.execPath,['server/index.mjs'],{env:{...process.env,NODE_ENV:'test',DATABASE_URL:apiUrl,MAINTENANCE_DATABASE_URL:url.href,AUTH0_DOMAIN:'synthetic.example',AUTH0_AUDIENCE:'synthetic',ALLOWED_ORIGINS:'https://synthetic.example',PORT:'0'},stdio:['ignore','pipe','pipe']});
   const events=[];let stderr='';child.stderr.on('data',data=>{stderr+=data;});
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('startup timed out')),10000);let lines='';child.stdout.on('data',data=>{lines+=data;const parts=lines.split('\n');lines=parts.pop();for(const line of parts)try{const event=JSON.parse(line);events.push(event);if(event.event==='service.started'){clearTimeout(timer);resolve();}}catch{}});child.once('exit',code=>{clearTimeout(timer);reject(Error(`startup exited ${code}: ${JSON.stringify(events)} ${stderr}`));});});
-  assert.equal(events.filter(e=>e.event==='job.finished'&&e.outcome==='completed').length,14);assert.ok(!events.some(e=>e.outcome==='failed'));
+  assert.equal(events.filter(e=>e.event==='job.finished'&&e.outcome==='completed').length,15);assert.ok(events.some(e=>e.event==='job.finished'&&e.job==='coordinator-lifecycle'&&e.outcome==='completed'));assert.ok(!events.some(e=>e.outcome==='failed'));
  }finally{
   if(child&&child.exitCode===null){const exited=once(child,'exit');child.kill();await exited;}await owner?.end();await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);for(const role of [apiRole,maintenanceRole])await admin.query(`DROP ROLE IF EXISTS ${role}`);await admin.end();
  }

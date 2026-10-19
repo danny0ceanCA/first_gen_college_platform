@@ -1,0 +1,19 @@
+.coordinator-workspace { max-width: 1040px; }
+.coordinator-workspace > nav { margin-bottom: 40px; }
+.coordinator-selector { display: grid; gap: 8px; margin: 20px 0; max-width: 480px; }
+.coordinator-selector select,.coordinator-card input { padding: 12px; border: 1px solid #d8c3af; border-radius: 10px; color: #353c3e; background: #fffdf8; max-width: 100%; }
+.coordinator-card { padding: clamp(20px,4vw,36px); margin-top: 24px; border: 1px solid #dfcbb8; border-radius: 20px; background: #fffcf6; }
+.coordinator-card h2 { margin-top: 0; }
+.coordinator-card form { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 24px 0 32px; }
+.coordinator-card label { display: grid; gap: 8px; }
+.coordinator-card form label { flex: 1; min-width: min(240px,100%); }
+.coordinator-members { list-style: none; padding: 0; }
+.coordinator-members li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid #e4d7c9; flex-wrap: wrap; }
+.coordinator-members p { margin: 6px 0 0; }
+.coordinator-code { background: #f5eddf; border-radius: 16px; margin-top: 24px; padding: 24px; }
+.coordinator-code input { font: 600 clamp(20px,4vw,30px) monospace; letter-spacing: .08em; width: 100%; box-sizing: border-box; }
+.coordinator-code img { display: block; max-width: 100%; height: auto; margin-top: 20px; border-radius: 12px; }
+.coordinator-workspace .institution-actions { flex-wrap: wrap; }
+.coordinator-workspace .text-button { min-height: 44px; font-size: 14px; }
+.coordinator-workspace button:focus-visible,.coordinator-workspace a:focus-visible { outline: 3px solid #a45139; outline-offset: 4px; }
+@media(max-width:600px){.coordinator-workspace { padding: 20px 16px; }.coordinator-card .button { white-space: normal; }.coordinator-code { padding: 16px; }}

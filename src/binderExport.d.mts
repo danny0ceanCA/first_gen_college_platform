@@ -1,4 +1,4 @@
 type ExportNote={studentId:string|null;id:string;topic:string;kind:string;language:string;content:string;status:string;origin:string;summaryId:string|null;conversationAt:string|null;updatedAt:string;translations?:Partial<Record<'en'|'es',string>>};
 export type BinderExport={language:'en'|'es';name:string;title:string;summary:string;topics:{title:string;sections:{title:string;recap:boolean;entries:{text:string;translated:boolean}[]}[]}[];caption:string;copy:string};
 export const binderTopicTitles:Record<'options'|'transfer'|'costs'|'applications',[string,string]>;
-export function binderExportData(input:{studentId:string|null;name:string;language:'en'|'es';notes:ExportNote[];summary?:string;topic?:'options'|'transfer'|'costs'|'applications';originalIds?:string[]}):BinderExport;
+export function binderExportData(input:{studentId:string|null;name:string;language:'en'|'es';notes:ExportNote[];summary?:string;topic?:'options'|'transfer'|'costs'|'applications';originalIds?:string[];includeGuidance?:boolean;coordinatorGuidance?:import('./CoordinatorGuidance').Guidance[]}):BinderExport;

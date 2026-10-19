@@ -1,3 +1,4 @@
+import {redactCoordinatorCodes} from '../src/coordinatorCodes.mjs';
 import {requireLiveCapability} from './personalization-controls.mjs';
 import {createHash} from 'node:crypto';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -16,7 +17,7 @@ export function validateLiveChange(value){
  if(['update','delete'].includes(value.kind)){if(!uuid(value.id)||!Number.isSafeInteger(value.version)||value.version<1)throw fail(400,'invalid_memory_change');out.id=value.id;out.version=value.version;}
  if(value.kind!=='delete'){
   if(!text(value.content,value.kind==='next-step'?2000:1000)||!(value.kind==='next-step'?['education','courses','transfer','degree','career','financial','applications','other']:['goal','constraint','preference','question']).includes(value.category))throw fail(400,'invalid_memory_change');
-  out.content=value.content.trim();out.category=value.category;
+  if(redactCoordinatorCodes(value.content)!==value.content)throw fail(400,'invalid_memory_change');out.content=value.content.trim();out.category=value.category;
  }
  return out;
 }

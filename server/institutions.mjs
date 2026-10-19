@@ -160,7 +160,7 @@ export function createInstitutionHandler(database,env={}){
     if(sharing[1]==='qr'){const url=publicInstitutionURL(env,input.slug,language,eventId);if(!url)return send(503,{error:'sharing_not_configured'});const png=await QRCode.toBuffer(url,{type:'png',width:640,margin:4,errorCorrectionLevel:'M'});res.writeHead(200,{'Content-Type':'image/png','Content-Disposition':`attachment; filename="${input.slug}-qr.png"`});return res.end(png);}
     res.setHeader('Content-Security-Policy',"default-src 'none'; img-src https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});return res.end(renderInstitutionPage(result,{env,language,eventId}));
    }
-   return send(200,result);
+   return send(200,!publicRequest&&['access','load'].includes(input.action)?{...result,coordinatorAccountsEnabled:env.ORIGEN_COORDINATOR_ACCOUNTS==='true'}:result);
   }catch(error){if(sharing?.[1]==='pages'&&error.status===404){res.writeHead(404,{'Content-Type':'text/html; charset=utf-8'});return res.end(renderUnavailableInstitutionPage(requestURL.searchParams.get('lang'),env));}const known=[400,403,404,409,410].includes(error.status);if(!known)req.log?.({event:'database_error',level:'error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'institutions_unavailable'});}
  };
 }

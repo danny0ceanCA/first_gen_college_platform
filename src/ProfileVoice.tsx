@@ -1,3 +1,6 @@
+import {coordinatorVoiceTools} from './coordinatorVoiceTools.mjs';
+import {CoordinatorConfirm,connectionRequest,type ConnectionCard} from './CoordinatorConnection';
+import {redactCoordinatorCodes,redactCoordinatorTurns} from './coordinatorCodes.mjs';
 import {voiceStartup} from './voiceStartup.mjs';
 import {voiceMemoryTools} from './voiceMemoryTools.mjs';
 import {notifyMemoryContext,subscribeMemoryContext,watchMemoryRevision} from './memoryContext.mjs';
@@ -57,6 +60,10 @@ export default function ProfileVoice(props:VoiceProps){
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
 export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+  const [connectionCard,setConnectionCard]=useState<ConnectionCard>();
+  const connectionController=useRef<ReturnType<typeof coordinatorVoiceTools>|undefined>(undefined);
+  useEffect(()=>{connectionController.current?.stop();setConnectionCard(undefined);},[initialProfile.id]);
+  useEffect(()=>{if(workspaceFocus&&workspaceFocus.studentId!==initialProfile.id){connectionController.current?.stop();setConnectionCard(undefined);}},[initialProfile.id,workspaceFocus?.studentId]);
   const disclosureId=useId();
   const workspaceSeen=useRef<string|undefined>(undefined);
   const currentWorkspace=useRef<WorkspaceSelection|undefined>(workspaceFocus);
@@ -107,6 +114,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   }
   function checkpointSummary(){
     if(!privacyLease.valid()||!sessionTurns.current.some(turn=>turn.role==='user')||!summaryId.current||!summaryScope.current.confirmed)return;
+    sessionTurns.current=redactCoordinatorTurns(sessionTurns.current);
     const store=privateRecovery(`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
     const records=store.read<Record<string,unknown>>({});
     records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,qualitySessionId:logSession.current,qualityComplete:false,sources:sessionSources.current,guidance:guidance.current.attribution()};
@@ -304,8 +312,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         await start(nextScope,nextLanguage,'',sessionId,true);
         setNotice(result.kind==='next-step'?t('Your next step was saved.','Se guardó tu próximo paso.'):t('Your memory change was saved.','Se guardó el cambio en tus recuerdos.'));
       },
-    });resources.current.stopMemory=()=>memoryTools.stop();
+    });
+    const linkTools=coordinatorVoiceTools({post:connectionRequest,studentId:scope.id,onPrepared:card=>setConnectionCard(card),onClear:()=>setConnectionCard(undefined),onCode:()=>{const last=[...sessionTurns.current].reverse().find(turn=>turn.role==='user');if(last)last.text='[Connection code omitted]';checkpointSummary();}});connectionController.current=linkTools;
+    resources.current.stopMemory=()=>{memoryTools.stop();linkTools.stop();};
     const memoryResponseTurns=new Map<string,number>();
+    const linkResponseTurns=new Map<string,number>();
     const research=voiceResearchRequest({signal:abort.signal});
     resources.current.cancelResearch=()=>research.cancel();
     resources.current.deadline=setTimeout(()=>{if(generation.current===version){log('connection_failure',{code:'connection_timeout'});end();setError(t('Connection timed out. Please try again.','La conexión tardó demasiado. Inténtalo de nuevo.'));}},35000);
@@ -365,7 +376,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             if(generation.current!==version)throw new Error('voice_session_stopped');
             if(memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryPolicyRef.current=data.memoryPolicy;
             if(typeof data.memoryRevision==='number'){if(memoryRevisionRef.current!==null&&memoryRevisionRef.current!==data.memoryRevision){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
-            memoryTools.configure(data.liveMemorySession);
+            memoryTools.configure(data.liveMemorySession);linkTools.configure(data.coordinatorLinking===true);
             nextGuidance=data.guidance;
             return data.session;
           },{signal:abort.signal}),()=>{
@@ -479,13 +490,13 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
         if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);if(['completed','failed','cancelled','incomplete'].includes(e.response?.status))void guidance.current.event('response.finished',{status:e.response.status})?.catch(()=>{});}
-        if(e.type==='input_audio_buffer.speech_started'){memoryTools.begin(e.item_id,spokenLanguage.current);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
+        if(e.type==='input_audio_buffer.speech_started'){memoryTools.begin(e.item_id,spokenLanguage.current);linkTools.begin(e.item_id);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
         if(finishPromise.current&&e.type==='error'&&e.error?.code==='input_audio_buffer_commit_empty')return;
         if(e.type==='input_audio_buffer.speech_started'){speechTimes.set(e.item_id,Date.now());turns.speechStarted(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){const started=speechTimes.get(e.item_id);if(started!==undefined){log('speech_segment',{speechDurationMs:Date.now()-started});speechTimes.delete(e.item_id);}}
-        if(e.type==='response.created'&&e.response?.id)memoryResponseTurns.set(e.response.id,memoryTools.sequence());
+        if(e.type==='response.created'&&e.response?.id){memoryResponseTurns.set(e.response.id,memoryTools.sequence());linkResponseTurns.set(e.response.id,linkTools.sequence());}
         if(e.type==='response.done'&&e.response?.status==='cancelled')log('response_cancelled',{responseId:e.response.id,reason:e.response.status_details?.reason,toolCount:(e.response.output||[]).filter((item:{type:string})=>item.type==='function_call').length});
         if(e.type==='conversation.item.input_audio_transcription.failed'){onboardingVoice.current?.transcript(e.item_id,'failed');turns.transcript(e.item_id,'');}
         if(e.type==='conversation.item.input_audio_transcription.completed' || e.type==='response.output_audio_transcript.done') {
@@ -505,11 +516,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
                 if(generation.current!==version)return;
               }
             }
-            if(userTurn)memoryTools.transcript(e.item_id,e.transcript,spokenLanguage.current);
+            if(userTurn){linkTools.begin(e.item_id);memoryTools.transcript(e.item_id,e.transcript,spokenLanguage.current);}
             const valid=userTurn?turns.transcript(e.item_id,e.transcript):typeof e.transcript==='string'&&e.transcript.trim().length>0;
             if(userTurn)onboardingVoice.current?.transcript(e.item_id,valid?'accepted':'empty');
             if(valid&&userTurn){replyRecoveryUsed=false;setNotice('');}
-            if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:e.transcript,topic:liveMode.current,...(userTurn?{language:spokenLanguage.current}:{expectedLanguage:spokenLanguage.current})});checkpointSummary();}
+            if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:redactCoordinatorCodes(e.transcript),topic:liveMode.current,...(userTurn?{language:spokenLanguage.current}:{expectedLanguage:spokenLanguage.current})});checkpointSummary();}
             if(valid&&!userTurn&&!scopePending.current){setLatestAnswer(e.transcript);memoryTools.assistant(e.transcript);}
           }finally{release();}
         }
@@ -542,6 +553,10 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             called=true;let accepted=false;
+            if(linkTools.isTool(item.name)){
+              const output=await linkTools.invoke(item,linkResponseTurns.get(e.response?.id)??linkTools.sequence());if(generation.current!==version)return;
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
+            }
             if(memoryTools.isTool(item.name)){
               const output=await memoryTools.invoke(item,memoryTurn);if(generation.current!==version)return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
@@ -667,7 +682,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
       if(generation.current!==version)return;
-      memoryTools.configure(data.liveMemorySession);
+      memoryTools.configure(data.liveMemorySession);linkTools.configure(data.coordinatorLinking===true);
       memoryPolicyRef.current=data.memoryPolicy;
       if(typeof data.memoryRevision==='number'){memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
@@ -713,6 +728,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     {onboarding?<OnboardingVoiceDisclosure id={disclosureId} t={t}/>:<p className="small-text">{routing?t('AI-generated voice · Starting sends microphone audio and student names to OpenAI. After you confirm whom you mean, their profile context and previous summaries are included. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y los nombres de estudiantes. Después de confirmar de quién hablas, se incluye su contexto y los resúmenes anteriores. Las sesiones terminan a los 10 minutos.'):informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Los cambios del perfil requieren tu revisión. La sesión termina a los 10 minutos.')}</p>}
     {history.cloud&&<p className="small-text">{t('When enabled, private session details are kept for 90 days to diagnose problems. This adds no stored audio or transcript and does not enroll you in research.','Cuando está habilitado, los detalles privados de la sesión se conservan durante 90 días para diagnosticar problemas. Esto no agrega audio ni transcripciones guardadas y no te inscribe en investigación.')}</p>}
     {state==='live'&&switchGuideMode&&<div className="voice-guide-switch"><span>{t('This page has a different guide: ','Esta página tiene otra guía: ')}{switchGuideLabel}</span><button type="button" className="text-button" disabled={finishing||switchingGuide||researching||activity!=='listening'} onClick={()=>void resources.current.switchGuide?.(switchGuideMode)}>{t('Switch guide','Cambiar guía')}</button></div>}
+    {connectionCard&&<CoordinatorConfirm card={connectionCard} t={t} onClose={()=>setConnectionCard(undefined)} onSent={()=>setNotice(t('Request sent. Your binder is still private.','Solicitud enviada. Tu carpeta sigue privada.'))}/>}
     <div className="voice-controls">
       {state==='idle'?<VoiceStartButton aria-describedby={onboarding?disclosureId:undefined} label={t('Talk with Origen','Hablar con Origen')} onClick={()=>{trackOnboarding('voice_button_pressed',{language});onRestart?onRestart():void start();}}/>:<>
         <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):switchingGuide?t('Following your question…','Siguiendo tu pregunta…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>

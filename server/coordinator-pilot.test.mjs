@@ -1,0 +1,68 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {coordinatorPilotFixture} from './fixtures/coordinator-pilot.mjs';
+import {coordinatorVoiceTools} from '../src/coordinatorVoiceTools.mjs';
+import {coordinatorFlags} from './binder-sharing-policy.mjs';
+import {checkCoordinatorDatabase} from '../ops/coordinator-readiness.mjs';
+const enabled={skip:!process.env.DATABASE_TEST_URL};
+for(const language of ['en','es'])test(`complete ${language} pilot workflow: invitation through voice preparation, publication, guidance and revocation`,enabled,async t=>{
+ const f=await coordinatorPilotFixture({language});t.after(()=>f.close());
+ const call=(actor,path,input)=>f.call(actor,`/api/${path}`,input),student=(path,input)=>call('other',path,{studentId:'alex',...input});
+ const outputs=[];const staff=async(path,input,actor='staff')=>{const r=await call(actor,path,{organizationId:f.org,...input});outputs.push(r);return r;};
+ const code=(await call('staff','coordinator-access',{action:'rotate-code',id:f.org})).code;
+ let card;const voice=coordinatorVoiceTools({studentId:'alex',post:input=>student('coordinator-connections',input),onPrepared:value=>{card=value;},onClear:()=>{}});
+ voice.configure(true);voice.begin('synthetic-turn');
+ const found=await voice.invoke({name:'lookup_coordinator_code',call_id:'lookup',arguments:JSON.stringify({code})});assert.ok(found.challengeId);
+ await voice.invoke({name:'prepare_coordinator_connection',call_id:'prepare',arguments:JSON.stringify({challengeId:found.challengeId})});assert.ok(card);outputs.push(found,card);
+ assert.equal((await f.owner.query('SELECT count(*)::int AS n FROM origen_binder_connections')).rows[0].n,0);
+ assert.equal(await voice.invoke({name:'confirm_coordinator_connection',call_id:'unauthorized',arguments:'{}'}),null);
+ const confirmation={action:'confirm',...card,topics:['options','costs'],confirmed:true};
+ const connection=await student('coordinator-connections',confirmation);assert.equal((await student('coordinator-connections',confirmation)).connectionId,connection.connectionId);
+ await assert.rejects(staff('coordinator-connections',{action:'accept',connectionId:connection.connectionId},'colleague'),{status:403});
+ await staff('coordinator-connections',{action:'accept',connectionId:connection.connectionId});
+ assert.equal((await staff('coordinator-binders',{action:'list'})).binders.length,0);
+ const eligible=await student('binder-sharing',{action:'entries'});assert.ok(!JSON.stringify(eligible).includes('FAMILY_DERIVED_SENTINEL'));
+ await assert.rejects(student('binder-sharing',{action:'preview',connectionId:connection.connectionId,topics:['options'],entryIds:[f.notes[3]]}),{status:409});
+ const preview=await student('binder-sharing',{action:'preview',connectionId:connection.connectionId,topics:['options','costs'],entryIds:f.notes.slice(0,2)});
+ const publication=await student('binder-sharing',{action:'publish',previewId:preview.previewId,confirmed:true});assert.deepEqual(await student('binder-sharing',{action:'publish',previewId:preview.previewId,confirmed:true}),publication);
+ const grant=(await student('binder-sharing',{action:'status'})).grants[0].id;
+ const binder=await staff('coordinator-binders',{action:'read',grantId:grant});assert.equal(binder.entries.length,2);
+ for(const actor of ['colleague','owner','reviewer'])await assert.rejects(staff('coordinator-binders',{action:'read',grantId:grant},actor),{status:actor==='colleague'?404:403});
+ const create={action:'staff-create',grantId:grant,publicationId:publication.publicationId,topic:'options',kind:'guidance',body:language==='es'?'Trae dos programas para comparar.':'Bring two programs to compare.',requestId:randomUUID()};
+ const feedback=await staff('coordinator-feedback',create);assert.equal((await staff('coordinator-feedback',create)).id,feedback.id);
+ const received=await student('coordinator-feedback',{action:'student-list'});assert.equal(received.feedback.length,1);assert.equal(received.feedback[0].authorName,'staff');
+ const reply={action:'student-reply',feedbackId:feedback.id,version:1,body:language==='es'?'Prepararé mis preguntas.':'I will prepare my questions.',requestId:randomUUID()};
+ await student('coordinator-feedback',reply);await student('coordinator-feedback',reply);
+ const thread=await staff('coordinator-feedback',{action:'staff-thread',grantId:grant,feedbackId:feedback.id});assert.equal(thread.replies.length,1);
+ await f.sweep();const notices=await staff('coordinator-notifications',{action:'list',audience:'staff'});assert.ok(notices.notifications.some(n=>n.kind==='reply'));assert.ok(!JSON.stringify(notices).includes(create.body));
+ const response=await f.request('staff','/api/coordinator-binders',{action:'read',organizationId:f.org,grantId:grant});assert.equal(response.cache,'no-store');
+ await student('binder-sharing',{action:'withdraw',grantId:grant,itemId:binder.entries[0].id});assert.equal((await staff('coordinator-binders',{action:'read',grantId:grant})).entries.length,1);
+ // Each kill switch must close dependent staff operations; student controls survive.
+ for(const flag of coordinatorFlags){f.env[flag]='false';
+  if(flag==='ORIGEN_COORDINATOR_VOICE_LINKING')await assert.rejects(student('coordinator-connections',{action:'open',channel:'voice'}),{status:403});
+  else if(flag==='ORIGEN_COORDINATOR_FEEDBACK')await assert.rejects(staff('coordinator-feedback',{...create,requestId:randomUUID()}),{status:503});
+  else await assert.rejects(staff('coordinator-binders',{action:'read',grantId:grant}),{status:503});
+  assert.equal((await student('coordinator-feedback',{action:'student-list'})).feedback.length,1);f.env[flag]='true';
+ }
+ for(const flag of coordinatorFlags)f.env[flag]='false';
+ await student('binder-sharing',{action:'revoke',grantId:grant});assert.equal((await student('coordinator-feedback',{action:'student-list'})).feedback[0].connectionEnded,true);
+ for(const flag of coordinatorFlags)f.env[flag]='true';
+ await assert.rejects(staff('coordinator-binders',{action:'read',grantId:grant}),{status:404});
+ await assert.rejects(staff('coordinator-notifications',{action:'open',audience:'staff',id:notices.notifications[0].id}),{status:404});
+ await f.sweep();assert.equal((await staff('coordinator-notifications',{action:'list',audience:'staff'})).notifications.length,0);
+ const audit=(await f.owner.query('SELECT * FROM origen_binder_share_events')).rows,outbox=(await f.owner.query('SELECT * FROM origen_coordinator_outbox')).rows;
+ for(const value of [...outputs,audit,outbox])assert.doesNotMatch(JSON.stringify(value),/FAMILY_CONVERSATION_SENTINEL|FAMILY_DERIVED_SENTINEL|GLOBAL_SUMMARY_SENTINEL|UNPUBLISHED_SENTINEL/);
+ assert.ok(!JSON.stringify([...outputs,audit,outbox]).includes(code));
+ await student('coordinator-connections',{action:'close',contextId:card.contextId});
+});
+
+test('read-only pilot database checker validates disabled capabilities and detects excessive access',enabled,async t=>{
+ const f=await coordinatorPilotFixture();t.after(()=>f.close());const opts={schema:f.schema,env:{}};
+ let result=await checkCoordinatorDatabase(f.runtime,f.maintenance,opts);assert.equal(result.passed,true,JSON.stringify(result.checks));assert.equal(result.changesApplied,false);assert.ok(Object.values(result.flags).every(v=>v===false));
+ await f.owner.query(`GRANT SELECT ON origen_binder_publication_items TO ${f.role}`);
+ result=await checkCoordinatorDatabase(f.runtime,f.maintenance,opts);assert.equal(result.passed,false);assert.equal(result.checks.find(c=>c.id==='runtime-isolation').passed,false);
+ await f.owner.query(`REVOKE SELECT ON origen_binder_publication_items FROM ${f.role}`);
+ await f.owner.query("UPDATE origen_schema_migrations SET checksum=repeat('0',64) WHERE name='056_coordinator_lifecycle.sql'");
+ result=await checkCoordinatorDatabase(f.runtime,f.maintenance,opts);assert.equal(result.checks.find(c=>c.id==='migration-checksums').passed,false);
+});

@@ -1,3 +1,4 @@
+import {redactCoordinatorCodes} from '../src/coordinatorCodes.mjs';
 import {personalizationControls,personalizationPolicy} from './personalization-controls.mjs';
 import {databaseOperation,providerOperation} from './observability/dependencies.mjs';
 import {createHash,randomUUID} from 'node:crypto';
@@ -20,6 +21,7 @@ export function validateMemoryRequest(input){
  if(['create','update'].includes(input.action)){
   const n=input.memory;
   if(!n||!categories.includes(n.category)||!speakers.includes(n.speaker)||!['en','es'].includes(n.language)||!validText(n.content,1000))throw fail(400,'invalid_memory');
+  if(redactCoordinatorCodes(n.content)!==n.content)throw fail(400,'invalid_memory');
   out.memory={category:n.category,content:n.content.trim(),speaker:n.speaker,language:n.language};
  }
  return out;

@@ -1,0 +1,22 @@
+.binder-sharing{margin:1rem 0;padding:clamp(16px,3vw,24px);border:1px solid #d6c3ad;border-radius:16px;background:#fffaf2;color:#343c3e;overflow-wrap:anywhere}
+.binder-share-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.binder-share-heading h3{margin:.35rem 0}.binder-share-eyebrow{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:#884331;font-weight:700}
+.binder-sharing button,.binder-share-review button{min-height:44px;white-space:normal;max-width:100%}
+.binder-share-actions{display:flex;flex-wrap:wrap;gap:.65rem;margin:1rem 0}
+.binder-share-person,.binder-share-compose{border-top:1px solid #dfcdbc;margin-top:1rem;padding-top:1rem}
+.binder-share-person h4,.binder-share-compose h4{font-size:1.05rem;margin:.4rem 0}
+.binder-share-current{padding:.8rem 1rem;background:#f5eee3;border-radius:8px;margin:.7rem 0}
+.binder-share-current p{white-space:pre-wrap;margin:0}
+.binder-share-recipient{display:grid;gap:.6rem}.binder-share-recipient select{width:100%;min-width:0;box-sizing:border-box;padding:.8rem;font:inherit;border:1px solid #b18e79;border-radius:8px;background:#fffdf8}
+.binder-sharing fieldset{min-width:0;border:1px solid #d6c3ad;border-radius:10px;padding:1rem;margin:1rem 0}
+.binder-share-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.binder-share-topics label,.binder-share-choices label{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem;cursor:pointer;min-width:0}
+.binder-sharing input[type=checkbox]{flex:0 0 20px;width:20px;height:20px;margin:2px 0;accent-color:#a44f39}
+.binder-share-choices{margin:1rem 0}.binder-share-choices label{border:1px solid #dfcdbc;border-radius:10px;background:#fffdf8;margin:.65rem 0;padding:1rem}
+.binder-share-choices label:has(:checked){border-color:#a44f39;background:#f6e9df}.binder-share-choices span>span{display:block;white-space:pre-wrap;margin-top:.35rem}
+.binder-share-choices small,.binder-share-review small{color:#735243;font-weight:600}
+.binder-share-review{box-sizing:border-box;width:min(680px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:clamp(18px,4vw,32px);border:1px solid #c5a68f;border-radius:18px;background:#fffaf2;color:#343c3e;box-shadow:0 20px 80px #25170a40;overflow:auto;overflow-wrap:anywhere}
+.binder-share-review::backdrop{background:#30251d80}.binder-share-review h2{margin:.5rem 0}
+.binder-share-preview-entries article{padding:1rem;border:1px solid #dfcdbc;border-radius:10px;background:#fffdf8;margin:.8rem 0}.binder-share-preview-entries p{white-space:pre-wrap}
+.binder-sharing :focus-visible,.binder-share-review :focus-visible{outline:3px solid #866c42;outline-offset:3px}
+@media(max-width:540px){.binder-share-topics{grid-template-columns:1fr}.binder-share-actions>*{flex:1 1 100%}.binder-share-heading>button{width:100%}}

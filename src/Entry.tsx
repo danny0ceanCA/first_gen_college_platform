@@ -1,3 +1,5 @@
+import CoordinatorConnectPage from './CoordinatorConnectPage';
+import CoordinatorWorkspace from './CoordinatorWorkspace';
 import EligibilityGate from './EligibilityGate';
 import AccountOpening from './AccountOpening';
 import {InquiryReceipt} from './InstitutionInquiry';
@@ -35,14 +37,14 @@ export default function Entry(){
   },{signal:controller.signal}).then(status=>{if(!controller.signal.aborted)setAdminAccess({subject,status});}).catch(()=>{if(!controller.signal.aborted)setAdminAccess({subject,status:'error'});});
   return()=>controller.abort();
  },[isAuthenticated,user?.sub,getAccessTokenSilently,adminRetry]);
- const [workspace,setWorkspace]=useState<{subject:string;memberships:{id:string;name:string;role:string}[];hasPersonalAccount:boolean}|null>(null);
+ const [workspace,setWorkspace]=useState<{subject:string;memberships:{id:string;name:string;role:string}[];hasPersonalAccount:boolean;coordinatorAccountsEnabled?:boolean}|null>(null);
  const [workspaceError,setWorkspaceError]=useState(false),[workspaceRetry,setWorkspaceRetry]=useState(0);
  useEffect(()=>{if(!isAuthenticated||!user?.sub){setWorkspace(null);return;}const controller=new AbortController(),subject=user.sub;setWorkspaceError(false);void withRequestDeadline(async signal=>{const token=await getAccessTokenSilently();signal.throwIfAborted();const response=await apiFetch('/api/institutions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'access'}),signal});if(!response.ok)throw new Error();const data=await response.json();signal.throwIfAborted();if(!Array.isArray(data.memberships)||typeof data.hasPersonalAccount!=='boolean')throw new Error();return data;},{signal:controller.signal}).then(data=>{if(!controller.signal.aborted)setWorkspace({...data,subject});}).catch(()=>{if(!controller.signal.aborted)setWorkspaceError(true);});return()=>controller.abort();},[isAuthenticated,user?.sub,getAccessTokenSilently,workspaceRetry]);
  const inside=route==='#app'||route==='#welcome'||route==='#mobile-design'||route==='#personal';
  useEffect(()=>{const update=()=>setRoute(window.location.hash||publicRoute());window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  useEffect(()=>{const frame=requestAnimationFrame(()=>{if(route==='#about'||route==='#privacy'){window.scrollTo(0,0);return;}const section=document.getElementById(route.slice(1));if(section)section.scrollIntoView({block:'start'});else window.scrollTo(0,0);});return()=>cancelAnimationFrame(frame);},[route]);
  if(closed)return <main><p role="status">Your Origen account is closed. Tu cuenta de Origen está cerrada.</p><a href="/">Return to Origen / Volver a Origen</a></main>;
- if(isLoading&&(inside||route==='#admin'||route==='#institutions'||route.startsWith('#invite/')||route.startsWith('#institution-invite/')||window.location.search.includes('code=')))return <AccountOpening/>;
+ if(isLoading&&(inside||route==='#admin'||route==='#institutions'||route==='#coordinators'||route.startsWith('#invite/')||route.startsWith('#institution-invite/')||window.location.search.includes('code=')))return <AccountOpening/>;
  if(error&&window.location.search.includes('error='))return <div><p role="alert">Sign-in could not be completed. Please try again.</p><a href="/">Return to Origen</a></div>;
  if(inside&&isAuthenticated&&(!adminAccess||adminAccess.subject!==user?.sub||adminAccess.status==='pending'))return <AccountOpening/>;
  if(inside&&isAuthenticated&&adminAccess?.status==='error')return <main className="application-panel"><p role={adminAccess?.status==='error'?'alert':'status'}>{adminAccess?.status==='error'?'Could not open your account. Please try again. / No se pudo abrir tu cuenta. Intenta de nuevo.':'Opening your account… / Abriendo tu cuenta…'}</p>{adminAccess?.status==='error'&&<button className="button primary" onClick={()=>setAdminRetry(x=>x+1)}>Try again / Intentar de nuevo</button>}<button className="button outline" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></main>;
@@ -51,11 +53,13 @@ export default function Entry(){
  if(inside&&route!=='#personal'&&isAuthenticated&&adminAccess?.status==='denied'){
   if((!workspace||workspace.subject!==user?.sub)&&!workspaceError)return <AccountOpening/>;
   if(!workspace||workspace.subject!==user?.sub)return <main className="institution-shell"><p role={workspaceError?'alert':'status'}>{workspaceError?'Could not open your workspace. / No se pudo abrir tu espacio.':'Opening your workspace… / Abriendo tu espacio…'}</p>{workspaceError&&<button className="button primary" onClick={()=>setWorkspaceRetry(x=>x+1)}>Try again / Intentar de nuevo</button>}<button className="button outline" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></main>;
-  if(workspace.memberships.length){if(!workspace.hasPersonalAccount)return <InstitutionPortal key={user?.sub}/>;return <main className="institution-shell"><h1>Choose your workspace / Elige tu espacio</h1><p>You have personal and institutional access. / Tienes acceso personal e institucional.</p><div className="institution-actions"><a className="button primary" href="#institutions">Institutions / Instituciones</a><a className="button outline" href="#personal">Personal / Personal</a><button className="text-button" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></div></main>;}
+  if(workspace.memberships.length){if(!workspace.hasPersonalAccount&&!workspace.coordinatorAccountsEnabled)return <InstitutionPortal key={user?.sub}/>;return <main className="institution-shell"><h1>Choose your workspace / Elige tu espacio</h1><p>Choose where you want to work today. / Elige dónde quieres trabajar hoy.</p><div className="institution-actions"><a className="button primary" href="#institutions">Institutions / Instituciones</a>{workspace.coordinatorAccountsEnabled&&<a className="button outline" href="#coordinators">Coordinators / Coordinadores</a>}<a className="button outline" href="#personal">Personal / Personal</a><button className="text-button" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></div></main>;}
  }
  if(/^#institution-invite\/[A-Za-z0-9_-]{43}$/.test(route))return <InstitutionInvite key={route} token={route.slice(20)}/>;
  if(/^#inquiry\/[A-Za-z0-9_-]{43}$/.test(route))return <InquiryReceipt key={route} receipt={route.slice(9)}/>;
  if(route==='#directory')return <InstitutionDirectory/>;
+ if(route==='#coordinators')return <CoordinatorWorkspace key={user?.sub||'anonymous'}/>;
+ if(/^#connect\/[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$/.test(route))return <CoordinatorConnectPage key={user?.sub||'anonymous'} code={route.slice(9)}/>;
  if(route==='#institutions')return <InstitutionPortal key={isAuthenticated?user?.sub:'anonymous'}/>;
  if(route==='#about'||route==='#privacy')return <LandingInformation page={route==='#about'?'about':'privacy'}/>;
  if(/^#institution\/[a-z0-9-]{1,100}$/.test(route))return <InstitutionPublic key={route} slug={route.slice(13)}/>;

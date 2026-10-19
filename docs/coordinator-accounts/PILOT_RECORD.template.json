@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "stage": "staging",
+  "release": {
+    "revision": null,
+    "sourceFingerprint": null,
+    "deploymentRef": null
+  },
+  "cohort": {
+    "organizationId": null,
+    "organizationCount": 1,
+    "coordinators": null,
+    "students": null,
+    "adultStudentOwnedOnly": true,
+    "consentConfirmed": false,
+    "testAccountBypass": false
+  },
+  "knownRevocationOrDeletionDefects": null,
+  "unauthorizedDisclosures": null,
+  "backup": {
+    "recoveryHorizonDays": null,
+    "deletionEvidenceDays": null
+  },
+  "gates": [
+    {
+      "id": "staging-configuration",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "auth0-live",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "bilingual-workflow",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "accessibility",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "incident-disable",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "restore-rehearsal",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "provider-retention",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "partner-training",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    },
+    {
+      "id": "cohort-approval",
+      "status": "pending",
+      "owner": null,
+      "reviewedBy": null,
+      "evidence": [],
+      "checkedAt": null,
+      "expiresAt": null,
+      "revision": null,
+      "sourceFingerprint": null
+    }
+  ],
+  "workflowMatrix": [
+    {
+      "language": "en",
+      "device": "mobile",
+      "passed": false,
+      "liveAuth0": false,
+      "liveVoice": false,
+      "evidence": null
+    },
+    {
+      "language": "en",
+      "device": "desktop",
+      "passed": false,
+      "liveAuth0": false,
+      "liveVoice": false,
+      "evidence": null
+    },
+    {
+      "language": "es",
+      "device": "mobile",
+      "passed": false,
+      "liveAuth0": false,
+      "liveVoice": false,
+      "evidence": null
+    },
+    {
+      "language": "es",
+      "device": "desktop",
+      "passed": false,
+      "liveAuth0": false,
+      "liveVoice": false,
+      "evidence": null
+    }
+  ]
+}

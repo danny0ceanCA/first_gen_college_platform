@@ -1,3 +1,4 @@
+import {redactCoordinatorTurns} from '../src/coordinatorCodes.mjs';
 import {providerOperation} from './observability/dependencies.mjs';
 import {createSummaryReviewer} from './summary-quality.mjs';
 import {safeErrorCode} from './api-logging.mjs';
@@ -20,6 +21,7 @@ export function createSummaryHandler(env,request=fetch,database=null){const over
  // A ten-minute session can easily exceed forty transcript entries. Bound
  // entry count separately from the existing 512 KB request-body limit.
  if(!input||!['en','es'].includes(input.language)||!Array.isArray(input.turns)||input.turns.length>400||input.turns.some(t=>!t||!['user','assistant'].includes(t.role)||typeof t.text!=='string'||t.text.length>12000))return send(400,{error:'invalid_request'});
+ input.turns=redactCoordinatorTurns(input.turns);
  let metadata,attribution;
  if(req.origenAuthorized){
   if(!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});

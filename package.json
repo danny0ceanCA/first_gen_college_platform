@@ -39,6 +39,8 @@
     "db:check-runtime": "node scripts/check-database-runtime.mjs",
     "check:production": "node server/production-config.mjs",
     "check:logging": "node scripts/check-logging-policy.mjs",
+    "coordinator:verify": "node scripts/verify-coordinator-release.mjs",
+    "coordinator:readiness": "node ops/coordinator-readiness.mjs",
     "test": "node --test server/*.test.mjs",
     "eval:contracts": "node server/model-evaluation.mjs contracts",
     "eval:personalization": "node scripts/evaluate-personalization.mjs",

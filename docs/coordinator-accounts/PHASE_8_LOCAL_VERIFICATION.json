@@ -1,0 +1,27 @@
+{
+  "kind": "coordinator-local-verification",
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-19T06:18:07.206Z",
+  "sourceFingerprint": "92fb32d0b07bec394016ee29c002f882af916aa5629a90c57bd4b40f76df6dbf",
+  "disposablePostgres": true,
+  "suites": {
+    "server": {
+      "tests": 704,
+      "pass": 704,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "operations": {
+      "tests": 35,
+      "pass": 35,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "build": true,
+  "logging": true,
+  "sourceUnchanged": true,
+  "passed": true
+}

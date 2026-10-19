@@ -1,4 +1,8 @@
+import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNotifications';
+import StudentGuidance,{useGuidanceRequest} from './CoordinatorGuidance';
+import BinderSharing from './BinderSharing';
 import {notifyMemoryContext} from './memoryContext.mjs';
+import CoordinatorConnection from './CoordinatorConnection';
 import StudentMemory from './StudentMemory';
 import type {ActionSeed} from './ActionPlan';
 import PersonalBinder from './PersonalBinder';
@@ -55,6 +59,8 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  const readingHeading=useRef<HTMLHeadingElement>(null),readingNavigationPending=useRef(false);
  const tabs=useRef<HTMLDivElement>(null);
  const requests=useRef(new Set<AbortController>());
+ const feedbackRequest=useGuidanceRequest();
+ const [includeGuidance,setIncludeGuidance]=useState(false);
  const [exporting,setExporting]=useState(false),[exportError,setExportError]=useState<string|null>(null);
  const exportLock=useRef(false);
  useEffect(()=>()=>{for(const controller of requests.current)controller.abort();},[]);
@@ -246,13 +252,14 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
   const snapshotScope=scope,version=mutationVersion.current;
   try{
    lease.assert();
-   const [{binderPdf},overview]=await Promise.all([
+   const [{binderPdf},overview,guidance]=await Promise.all([
     import('./binderPdf.mjs'),
-    !topic&&discussions.length?history.overview(target,undefined,language,'basic'):Promise.resolve(null)
+    !topic&&discussions.length?history.overview(target,undefined,language,'basic'):Promise.resolve(null),
+    includeGuidance&&role==='student'&&target?feedbackRequest({action:'student-list',studentId:target}):Promise.resolve(null)
    ]);
    const check=()=>{lease.assert();if(controller.signal.aborted||latestScope.current!==snapshotScope||version!==mutationVersion.current)throw new Error('export_changed');};
    check();
-   const document=binderPdf(binderExportData({studentId:target,name:scopeLabel,language,notes,summary:overview?.summary||'',topic,originalIds:Object.keys(originals).filter(id=>originals[id])}));
+   const document=binderPdf(binderExportData({studentId:target,name:scopeLabel,language,notes,includeGuidance,coordinatorGuidance:guidance?.feedback||[],summary:overview?.summary||'',topic,originalIds:Object.keys(originals).filter(id=>originals[id])}));
    check();
    const url=URL.createObjectURL(document.output('blob'));
    const link=window.document.createElement('a');link.href=url;link.download=`origen-${topic||'binder'}.pdf`;
@@ -261,7 +268,9 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
    if(!controller.signal.aborted&&latestScope.current===snapshotScope&&lease.valid())setExportError(t('The PDF could not be prepared. Please try again.','No se pudo preparar el PDF. Inténtalo de nuevo.'));
   }finally{lease.release();requests.current.delete(controller);exportLock.current=false;setExporting(false);}
  }
- function exportButton(topic?:Topic){return <button type="button" className="notebook-pdf-button" disabled={exporting||loading||loadError||busy||history.loading||history.error} onClick={()=>void downloadPdf(topic)}><Download size={16} aria-hidden="true"/>{exporting?t('Preparing PDF…','Preparando PDF…'):topic?t('Save topic as PDF','Guardar tema en PDF'):t('Save binder as PDF','Guardar carpeta en PDF')}</button>;}
+ function exportButton(topic?:Topic){return <><button type="button" className="notebook-pdf-button" disabled={exporting||loading||loadError||busy||history.loading||history.error} onClick={()=>void downloadPdf(topic)}><Download size={16} aria-hidden="true"/>{exporting?t('Preparing PDF…','Preparando PDF…'):topic?t('Save topic as PDF','Guardar tema en PDF'):t('Save binder as PDF','Guardar carpeta en PDF')}</button>{role==='student'&&target&&<label><input type="checkbox" checked={includeGuidance} onChange={e=>setIncludeGuidance(e.target.checked)}/>{t('Include coordinator guidance in PDF','Incluir orientación del coordinador en el PDF')}</label>}</>;}
+ const [noticeTarget,setNoticeTarget]=useState<(NoticeDestination & {sequence:number})>();
+ function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':value.destination==='connections'?'.coordinator-connection':'.binder-sharing')?.scrollIntoView({block:'start'})));}
  function dividerDetail(id:NotebookPage){
   if(id==='summary')return t('What we talked about','Lo que conversamos');
   if(loading||loadError)return '—';
@@ -272,6 +281,7 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  return <PersonalBinder initiallyOpen={initiallyOpen} name={name} t={t} onOpen={()=>setMobilePage(false)}><section className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
   {(!mobile||!mobilePage)&&<><div className="home-section-heading"><span className="home-kicker">{mobile?t('IN YOUR BINDER','EN TU CARPETA'):t('MAKE IT YOURS','HAZLO TUYO')}</span><h2 id="notebook-heading">{mobile?t('Choose a topic','Elige un tema'):t('My topics & notes','Mis temas y notas')}</h2></div>
   {role==='parent'&&<div className="home-summary-switch" role="group" aria-label={t('Notebook belongs to','Este cuaderno pertenece a')}><button type="button" aria-pressed={target!==null} onClick={()=>setFamilyFor(null)}>{name}</button><button type="button" aria-pressed={target===null} onClick={()=>setFamilyFor(studentId)}>{t('Family notes','Notas familiares')}</button></div>}
+  {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/><CoordinatorConnection key={target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/><BinderSharing key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0}/></>}
   <p className="notebook-scope">{t('Notebook for: ','Cuaderno de: ')}<strong>{scopeLabel}</strong></p></>}
   {!history.cloud?<p>{t('Sign in to save topic notes to your account.','Inicia sesión para guardar notas en tu cuenta.')}</p>:<>
    <StudentMemory key={scope} studentId={target} language={language} t={t} historyKey={JSON.stringify(history.items.filter(item=>item.studentId===target).map(item=>item.id))}/>
@@ -285,9 +295,10 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
    {mobile?!mobilePage&&<nav ref={contents} className="notebook-contents" aria-label={t('Binder topics','Temas de la carpeta')}>{dividers.map(({id,title,icon:Icon})=><button type="button" key={id} data-topic={id} className={`notebook-contents-topic divider-${id}`} onClick={()=>openTopic(id)}><span className="notebook-contents-icon" aria-hidden="true"><Icon size={21}/></span><span><strong>{title}</strong><small>{dividerDetail(id)}</small></span><ChevronRight size={19} aria-hidden="true"/></button>)}</nav>:<div ref={tabs} className="notebook-topics" role="tablist" aria-label={t('Notebook topics','Temas del cuaderno')}>{dividers.map(({id,title,icon:Icon},index)=><button type="button" role="tab" id={`notebook-tab-${id}`} key={id} className={`notebook-topic divider-${id}`} aria-selected={open===id} tabIndex={open===id?0:-1} aria-controls="notebook-panel" onClick={()=>openTopic(id)} onKeyDown={event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%dividers.length;else if(event.key==='ArrowLeft')next=(index+dividers.length-1)%dividers.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=dividers.length-1;else return;event.preventDefault();openTopic(dividers[next].id);document.getElementById(`notebook-tab-${dividers[next].id}`)?.focus();}}><span className="notebook-tab-icon" aria-hidden="true"><Icon size={19}/></span><span><strong>{title}</strong><small>{dividerDetail(id)}</small></span></button>)}</div>}
    {mobile&&mobilePage&&<div className="notebook-page-navigation"><button type="button" onClick={showContents}><ArrowLeft size={18} aria-hidden="true"/>{t('Topics','Temas')}</button><span>{scopeLabel}</span></div>}
    {renderNextSteps&&<div className="notebook-next-steps" hidden={!showingPage||open!=='summary'}>{renderNextSteps(target)}</div>}
-   {showingPage&&open==='summary'&&renderSummary&&<section className="notebook-panel notebook-summary-page" ref={panel} id="notebook-panel" role={mobile?'region':'tabpanel'} tabIndex={0} aria-label={mobile?t('Summary','Resumen'):undefined} aria-labelledby={mobile?undefined:'notebook-tab-summary'}>{renderSummary(target,mobile)}<div className="notebook-export-toolbar">{exportButton()}</div></section>}
+   {showingPage&&open==='summary'&&renderSummary&&<section className="notebook-panel notebook-summary-page" ref={panel} id="notebook-panel" role={mobile?'region':'tabpanel'} tabIndex={0} aria-label={mobile?t('Summary','Resumen'):undefined} aria-labelledby={mobile?undefined:'notebook-tab-summary'}>{renderSummary(target,mobile)}{role==='student'&&target&&<StudentGuidance studentId={target} t={t} onAction={onAction?seed=>{openTopic('summary');onAction(seed);}:undefined}/>}<div className="notebook-export-toolbar">{exportButton()}</div></section>}
    {showingPage&&selected&&<section className="notebook-panel" id="notebook-panel" role={mobile?'region':'tabpanel'} ref={panel} tabIndex={0} aria-label={mobile?selected.title:undefined} aria-labelledby={mobile?undefined:`notebook-tab-${selected.id}`}><div className="notebook-panel-heading"><div><span className="home-kicker">{scopeLabel}</span><h3 id="notebook-topic-heading">{selected.title}</h3><p className="notebook-topic-description">{selected.detail}</p></div></div>
     <div className="notebook-toolbar"><WorkspaceTalkButton t={t} disabled={busy||loading||loadError} focus={{kind:'topic',studentId:target,topic:selected.id}}/><button type="button" className="button primary" disabled={busy||loading||loadError} onClick={()=>edit()}><Plus size={16} aria-hidden="true"/>{t('Add a note','Agregar una nota')}</button>{exportButton(selected.id)}</div>
+    {role==='student'&&target&&<StudentGuidance studentId={target} topic={selected.id} t={t} onAction={onAction?seed=>{openTopic('summary');onAction(seed);}:undefined}/>}
     {message?.scope===scope&&<div className="notebook-message" role={message.error?'alert':'status'}>{message.text}{message.error&&<ErrorReference reference={message.reference} language={language}/>}{message.error&&<button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Reload notebook','Recargar cuaderno')}</button>}</div>}
     {busy&&<p role="status">{t('Working on your request…','Procesando tu solicitud…')}</p>}
     {draft&&<form className="notebook-editor" onSubmit={e=>{e.preventDefault();void act({action:draft.version?'update':'create',id:draft.id,...(draft.version?{version:draft.version}:{}),note:{topic:draft.topic,kind:draft.kind,content:draft.content,language:draft.language,decisionConfirmed:draft.decisionConfirmed}},t('Note saved to your account.','Nota guardada en tu cuenta.'),true);}}>

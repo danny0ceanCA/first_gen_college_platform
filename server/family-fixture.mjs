@@ -4,6 +4,9 @@ import {createFamilyRepository,validateFamily} from './family.mjs';
 
 export async function fixture(){
  const db=newDb();
+ // This legacy in-memory schema has no coordinator SQL functions. Real scoped
+ // export and function privileges are covered by coordinator-lifecycle.test.
+ db.public.registerFunction({name:'to_regprocedure',args:[DataType.text],returns:DataType.text,implementation:()=>null});
  db.public.registerFunction({name:'current_schema',returns:DataType.text,implementation:()=> 'public'});
  db.public.registerOperator({operator:'~',left:DataType.text,right:DataType.text,returns:DataType.bool,implementation:(value,pattern)=>new RegExp(pattern).test(value)});
  db.public.registerFunction({name:'gen_random_uuid',returns:DataType.uuid,impure:true,implementation:()=>crypto.randomUUID()});

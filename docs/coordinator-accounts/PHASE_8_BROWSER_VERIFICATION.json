@@ -1,0 +1,50 @@
+{
+  "kind": "coordinator-synthetic-browser-verification",
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-19T06:24:29.465Z",
+  "sourceFingerprint": "92fb32d0b07bec394016ee29c002f882af916aa5629a90c57bd4b40f76df6dbf",
+  "realApi": true,
+  "realPostgres": true,
+  "syntheticIdentities": true,
+  "liveAuth0": false,
+  "liveSpeech": false,
+  "applicationPageErrors": 0,
+  "cases": [
+    {
+      "language": "en",
+      "device": "mobile",
+      "width": 390,
+      "scrollWidth": 375,
+      "contrast": 7.705954195174327,
+      "stored": false,
+      "workflowPassed": true
+    },
+    {
+      "language": "en",
+      "device": "desktop",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "contrast": 7.705954195174327,
+      "stored": false,
+      "workflowPassed": true
+    },
+    {
+      "language": "es",
+      "device": "mobile",
+      "width": 390,
+      "scrollWidth": 375,
+      "contrast": 7.705954195174327,
+      "stored": false,
+      "workflowPassed": true
+    },
+    {
+      "language": "es",
+      "device": "desktop",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "contrast": 7.705954195174327,
+      "stored": false,
+      "workflowPassed": true
+    }
+  ]
+}

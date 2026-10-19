@@ -1,3 +1,5 @@
+import {coordinatorVoiceAvailable} from './coordinator-connections.mjs';
+import {coordinatorLinkTools,coordinatorLinkInstructions} from './coordinator-voice-tools.mjs';
 import {voicePreparationCache,voicePreparationKey,voiceContextVersion} from './voice-preparation.mjs';
 import {personalizationControls,personalizationPolicy} from './personalization-controls.mjs';
 import {adaptiveGuidanceInstructions} from './adaptive-guidance.mjs';
@@ -105,6 +107,7 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
   if(!routing||input.targetConfirmed)session.instructions+=retrievalInstructions(input.historicalEvidence);
   if(input.liveMemoryEnabled&&(!routing||input.targetConfirmed)){session.tools.push(...liveMemoryTools.filter(tool=>tool.name==='recall_student_context'?input.liveMemoryReadEnabled!==false:input.liveMemoryWriteEnabled!==false));session.instructions+=liveMemoryInstructions+(input.liveMemoryWriteEnabled===false?' Saving during this call is disabled. Use only the advertised recall tool; direct the user to binder controls for an explicit edit.':' These acknowledged live tools supersede earlier restrictions on saving memory and accepted next steps during the call; all other restrictions still apply.');}
   if(!routing||input.targetConfirmed)session.instructions+=input.adaptiveEnabled===false?'':adaptiveGuidanceInstructions(input);
+  if(input.coordinatorLinking){session.tools.push(...coordinatorLinkTools);session.instructions+=coordinatorLinkInstructions;}
   session.instructions=voiceLanguageInstructions(session.instructions,input.language);
   return session;
 }
@@ -130,7 +133,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
     try {
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
       let input; try {input=JSON.parse(raw);} catch {return send(400,{error:'invalid_request'});}
-      if(input&&typeof input==='object'){input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
+      if(input&&typeof input==='object'){input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
       const policy=personalizationControls(env,req.origenAuthorized?req.origenIdentity?.sub:undefined);
       if(input&&typeof input==='object'){input.adaptiveEnabled=policy.adaptive;input.liveMemoryReadEnabled=policy.retrieval;input.liveMemoryWriteEnabled=policy.writes;}
       const updating=input?.action==='update-guide',preparing=input?.action==='prepare';
@@ -196,6 +199,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         const preparedContextId=versionBefore!==undefined&&versionBefore===versionAfter?preparations.put(req.origenIdentity.sub,preparationKey,versionAfter,{input,storedRole}):undefined;
         return send(200,{preparedContextId:preparedContextId||null});
       }
+      input.coordinatorLinking=await coordinatorVoiceAvailable(database,env,input.studentId);
       let liveMemorySession;
       if(req.origenAuthorized&&(policy.retrieval||policy.writes)&&input.enableLiveMemory===true&&input.studentBrief?.available){
         liveMemorySession=await createLiveMemoryRepository(database,env)(req.origenIdentity.sub,{action:'open',studentId:input.studentId,revision:input.studentBrief.revision,sessionId:input.memorySessionId});
@@ -214,7 +218,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);
         if(!updating)execution=await guidance.startExecution(req.origenIdentity.sub,tracked,version,'voice');
       }
-      if(updating)return send(200,{liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice},guidance:tracked});
+      if(updating)return send(200,{...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice},guidance:tracked});
       const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(config));
       const response=await request('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});
   void (req.log||log)({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
@@ -227,7 +231,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const sdp=await response.text();
       if(!sdp.startsWith('v=0')) return send(502,{error:'voice_unavailable'});
       if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
-      return send(200,{sdp,liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
+      return send(200,{sdp,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
     } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
   };
 }

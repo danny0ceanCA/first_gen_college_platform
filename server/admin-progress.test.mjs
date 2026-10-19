@@ -1,3 +1,4 @@
+import {runAsAccount,isolateDatabase} from './account-isolation.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
@@ -66,7 +67,7 @@ test('PostgreSQL phase 6 migrations, measurement denominators, private deletion,
   await query("UPDATE origen_feedback_prompts SET recorded_at='2026-09-01' WHERE id=$1",[p.id]);
   report=await adminProgress(pool,{days:7},now);assert.deepEqual(report.feedback.participation,{numerator:0,denominator:2,percent:0});assert.equal(report.feedback.helpfulness.numerator,1);
   const empty=await adminProgress(pool,{days:7},new Date('2026-08-01'));assert.equal(empty.feedback.helpfulness.percent,null);assert.equal(empty.feedback.participation.percent,null);assert.equal(empty.collectionEnabled,false);
-  const exported=await createLifecycleRepository(pool)('owner',{action:'export'});assert.equal(exported.feedbackPrompts.length,3);
+  const exported=await runAsAccount({sub:'owner'},()=>createLifecycleRepository(isolateDatabase(pool,{schema}))('owner',{action:'export'}));assert.equal(exported.feedbackPrompts.length,3);
   // Institution reports read only institution operational facts, with a fixed closed month.
   const a=uuid(),b=uuid();await query("INSERT INTO origen_institutions(id,slug,draft,status,verification_status) VALUES($1,'college-a','{\"name\":\"College A\"}','published','verified'),($2,'unit-b','{\"name\":\"Unit B\"}','published','verified')",[a,b]);
   await query("UPDATE origen_institutions SET parent_institution_id=$1,unit_type='department' WHERE id=$2",[a,b]);

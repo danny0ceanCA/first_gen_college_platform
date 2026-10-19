@@ -1,10 +1,11 @@
 import {pathToFileURL} from 'node:url';
 import {onboardingConfigIssues} from './onboarding-settings.mjs';
 import {exportConfiguration} from './observability/exporter.mjs';
+import {coordinatorConfigurationIssues} from './binder-sharing-policy.mjs';
 
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
- const issues=[];
+ const issues=[...coordinatorConfigurationIssues(env)];
  for(const key of ['ORIGEN_VOICE_PREPARATION','ORIGEN_BINDER_JOBS'])if(env[key]&&!['true','false'].includes(env[key]))issues.push(`${key}: use true or false`);
  if(env.ORIGEN_BINDER_JOBS==='true'&&!env.MAINTENANCE_DATABASE_URL)issues.push('MAINTENANCE_DATABASE_URL: required for binder background processing');
  if(env.OBSERVABILITY_EXPORT&&!['true','false'].includes(env.OBSERVABILITY_EXPORT))issues.push('OBSERVABILITY_EXPORT: use true or false');

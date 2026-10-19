@@ -1,5 +1,10 @@
 // Reviewed finite compatibility vocabulary. Never populated from request/error text at runtime.
 export const responseCodes=Object.freeze([
+ "invalid_notification_request",
+ "notification_denied",
+ "notification_unavailable",
+ "notifications_unavailable",
+ "report_conflict",
  "account_closed",
  "account_not_found",
  "account_status_unavailable",

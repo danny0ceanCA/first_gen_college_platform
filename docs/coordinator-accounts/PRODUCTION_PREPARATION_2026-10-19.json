@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "kind": "coordinator-production-preparation",
+  "checkedAt": "2026-10-19T14:23:17.604Z",
+  "service": "srv-db02or0u01pc738ktekg",
+  "database": "dpg-db0806hsrm7s73efcupg-a",
+  "previousMigration": "043_support_diagnostics.sql",
+  "latestMigration": "056_coordinator_lifecycle.sql",
+  "migrationsApplied": [
+    "044_student_memory.sql",
+    "045_historical_retrieval.sql",
+    "046_live_memory.sql",
+    "047_adaptive_guidance.sql",
+    "048_voice_preparation.sql",
+    "049_binder_jobs.sql",
+    "050_coordinator_sharing_foundation.sql",
+    "051_coordinator_provisioning.sql",
+    "052_coordinator_connections.sql",
+    "053_binder_snapshot_publication.sql",
+    "054_coordinator_binder_workspace.sql",
+    "055_coordinator_guidance.sql",
+    "056_coordinator_lifecycle.sql"
+  ],
+  "databaseReadiness": {
+    "kind": "coordinator-database-check",
+    "schemaVersion": 1,
+    "checkedAt": "2026-10-19T14:23:07.124Z",
+    "passed": true,
+    "checks": [
+      {
+        "id": "flag-dependencies",
+        "passed": true
+      },
+      {
+        "id": "runtime-isolation",
+        "passed": true
+      },
+      {
+        "id": "maintenance-isolation",
+        "passed": true
+      },
+      {
+        "id": "same-database-separate-roles",
+        "passed": true
+      },
+      {
+        "id": "migration-checksums",
+        "passed": true
+      },
+      {
+        "id": "provisioning",
+        "passed": true
+      },
+      {
+        "id": "linking",
+        "passed": true
+      },
+      {
+        "id": "publication",
+        "passed": true
+      },
+      {
+        "id": "viewing",
+        "passed": true
+      },
+      {
+        "id": "guidance",
+        "passed": true
+      },
+      {
+        "id": "lifecycle",
+        "passed": true
+      }
+    ],
+    "flags": {
+      "ORIGEN_COORDINATOR_ACCOUNTS": false,
+      "ORIGEN_COORDINATOR_LINKING": false,
+      "ORIGEN_BINDER_SHARING": false,
+      "ORIGEN_COORDINATOR_FEEDBACK": false,
+      "ORIGEN_COORDINATOR_VOICE_LINKING": false,
+      "ORIGEN_COORDINATOR_BINDER_VIEWING": false
+    },
+    "changesApplied": false
+  },
+  "legacyRuntimeCompatible": true,
+  "legacyMaintenanceCompatible": true,
+  "productionConfiguration": true,
+  "frontendConfiguration": true,
+  "coordinatorMaintenance": {
+    "delivered": 0,
+    "suppressed": 0,
+    "expiredGrants": 0
+  },
+  "disabledFlags": {
+    "ORIGEN_COORDINATOR_ACCOUNTS": false,
+    "ORIGEN_COORDINATOR_LINKING": false,
+    "ORIGEN_BINDER_SHARING": false,
+    "ORIGEN_COORDINATOR_FEEDBACK": false,
+    "ORIGEN_COORDINATOR_VOICE_LINKING": false,
+    "ORIGEN_COORDINATOR_BINDER_VIEWING": false
+  },
+  "unrelatedEnvironmentPreserved": true,
+  "existingCredentialsPreserved": true,
+  "migrationCredentialInApi": false,
+  "recoveryStatus": "AVAILABLE",
+  "recoveryStartsAt": "2026-10-14T19:11:16Z",
+  "liveDeployment": {
+    "id": "dep-dbao7vrm8hqs73bkeot0",
+    "commit": "0051c4d4f3a5f5eb44291d196eeeb7f75c0ec4fc",
+    "unchanged": true
+  },
+  "apiHealth": true,
+  "frontendHealth": true,
+  "deploymentTriggered": false,
+  "credentialFilesWritten": false
+}

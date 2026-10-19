@@ -1,3 +1,4 @@
+import {redactCoordinatorCodes} from '../src/coordinatorCodes.mjs';
 import {databaseOperation} from './observability/dependencies.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -11,7 +12,7 @@ const identifier=value=>typeof value==='string'&&value.length>0&&value.length<=1
 export function validateMemory(value){
  if(!value||!identifier(value.id)||(value.studentId!==null&&!identifier(value.studentId))||!['profile','finance','admissions','planning','loans'].includes(value.mode)||typeof value.summary!=='string'||!value.summary.trim()||value.summary.length>12000||typeof value.date!=='string'||!Number.isFinite(Date.parse(value.date))||!Array.isArray(value.sources)||value.sources.length>30)throw fail(400,'invalid_request');
  const sources=value.sources.map(s=>{if(!s||typeof s.title!=='string'||s.title.length>300||typeof s.url!=='string'||s.url.length>2000||typeof s.checkedAt!=='string'||!Number.isFinite(Date.parse(s.checkedAt)))throw fail(400,'invalid_request');let url;try{url=new URL(s.url);}catch{throw fail(400,'invalid_request');}if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw fail(400,'invalid_request');return {title:s.title,url:url.href,checkedAt:new Date(s.checkedAt).toISOString()};});
- return {id:value.id,studentId:value.studentId,mode:value.mode,summary:value.summary.trim(),date:new Date(value.date).toISOString(),sources};
+ return {id:value.id,studentId:value.studentId,mode:value.mode,summary:redactCoordinatorCodes(value.summary.trim()),date:new Date(value.date).toISOString(),sources};
 }
 const memory=row=>({id:row.id,studentId:row.student_id,mode:row.mode,summary:row.summary,date:new Date(row.conversation_at).toISOString(),sources:row.sources});
 async function reserveConversation(client,owner,item){

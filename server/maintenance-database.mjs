@@ -26,6 +26,7 @@ export async function grantMaintenanceAccess(pool,role,{schema='public'}={}){
   await c.query(`GRANT INSERT,UPDATE ON ${base}.origen_subject_locks TO ${who}`);
   await c.query(`GRANT UPDATE(id) ON ${base}.origen_accounts TO ${who}`);
   await c.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_current_account_id() TO ${who}`);
+  if((await c.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_coordinator_maintain()`])).rows[0].fn)await c.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_coordinator_maintain() TO ${who}`);
   await c.query('COMMIT');
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 }

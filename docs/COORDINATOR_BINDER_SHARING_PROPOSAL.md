@@ -2,7 +2,7 @@
 
 Recorded: October 11, 2026
 
-**Status: Deferred proposal.** The user asked to table this idea and return to it later. This document preserves the discussion; it does not authorize implementation. The phases below are recommendations, not completed features or approved requirements.
+**Status: Superseded October 18, 2026.** Use the [coordinator accounts and binder sharing implementation plan](coordinator-accounts/IMPLEMENTATION_PLAN.md) for the current eight-phase proposal. It adds spoken connection codes, student-confirmed snapshot publication, red-ink coordinator guidance, and a strict exclusion of family conversations and their derivatives. The discussion below is historical context, not the implementation contract. Neither document enables production access.
 
 ## The idea
 
@@ -32,7 +32,7 @@ Use verified coordinator membership in a school or organization. Coordinator acc
 - Add “Share my binder” inside the binder.
 - Let students choose topics and individual notes, goals, or questions.
 - Identify the recipient clearly and show a preview before confirming access.
-- Keep conversation transcripts and full summaries private unless explicitly selected.
+- Keep conversation transcripts private. The current plan also prohibits sharing family-derived material and replaces global summary sharing with a digest of eligible published items.
 - Let students review recipients and stop sharing at any time.
 - Establish whether sharing includes a fixed snapshot or ongoing updates; explain the chosen behavior before consent.
 
@@ -67,7 +67,7 @@ Use verified coordinator membership in a school or organization. Coordinator acc
 
 ## Privacy boundaries to preserve
 
-- A parent's private notes must never be automatically included when a student shares a binder.
+- Family conversations and their derivatives must never be included when a student shares a binder; selecting a topic cannot override this exclusion.
 - Each person controls the information they own; linked family accounts do not imply consent to coordinator sharing.
 - Sharing one topic must not expose other topics, hidden summaries, transcripts, or voice context.
 - Revocation must stop future access; clarify that previously downloaded copies cannot be recalled.

@@ -1,0 +1,11 @@
+.coordinator-connection{margin:1rem 0;padding:1rem;border:1px solid #d9c7b2;border-radius:12px;background:#fffaf2;overflow-wrap:anywhere}
+.coordinator-connection article{border-top:1px solid #dfcdbc;padding:1rem 0}
+.connection-actions{display:flex;align-items:end;gap:.75rem;flex-wrap:wrap}
+.connection-actions label{display:grid;gap:.4rem;max-width:100%}
+.connection-actions input{box-sizing:border-box;max-width:100%;min-width:0;padding:.7rem;border:1px solid #b18e79;border-radius:8px;font:inherit}
+.connection-confirm{box-sizing:border-box;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:clamp(18px,4vw,32px);border:1px solid #c5a68f;border-radius:18px;background:#fffaf2;color:#333;box-shadow:0 20px 80px #25170a40;overflow:auto}
+.connection-confirm::backdrop{background:#30251d80}
+.connection-confirm fieldset{margin:1rem 0;border:1px solid #d9c7b2;border-radius:8px}
+.connection-confirm label{display:flex;gap:.65rem;align-items:center;padding:.55rem 0}
+.connection-confirm input{width:20px;height:20px;accent-color:#a44f39}
+.connection-confirm button{min-height:44px}
