@@ -1,4 +1,5 @@
 import LandingStory from './LandingStory';
+import LandingVideo,{LandingVideoPlaceholder} from './LandingVideo';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
@@ -262,15 +263,38 @@ export default function Landing(){
      <div className="scene-caption"><span>{t('MANY PATHS. ONE COMMUNITY.','MUCHOS CAMINOS. UNA COMUNIDAD.')}</span><div><button className="motion-toggle" aria-pressed={paused} onClick={()=>setPaused(value=>!value)}>{paused?t('Play','Reproducir'):t('Pause','Pausar')}</button><button className="path-replay" onClick={()=>setReplay(n=>n+1)}>{t('Replay ↗','Repetir ↗')}</button></div></div>
     </div>
    </section>
-   <section className="landing-resource" aria-labelledby="resource-title">
-    <span className="landing-eyebrow">{t('COLLEGE GUIDANCE, THROUGH CONVERSATION','ORIENTACIÓN UNIVERSITARIA, CONVERSANDO')}</span>
-    <h2 id="resource-title">{t('College questions? Let’s talk them through.','¿Preguntas sobre la universidad? Conversemos.')}</h2>
-    <p>{t('Origen is an AI voice assistant that helps students and families make sense of college. Ask questions out loud, explore your options, and get everyday explanations about applications, transferring, and paying for school—in English or Spanish.','Origen es un asistente de voz con inteligencia artificial que ayuda a estudiantes y familias a entender el camino a la universidad. Haz preguntas en voz alta, explora tus opciones y recibe explicaciones sencillas sobre solicitudes de ingreso, transferencias y cómo pagar tus estudios, en español o inglés.')}</p>
-    <p className="landing-reassurance">{t('You don’t have to know where to start. We can start there together.','No tienes que saber por dónde empezar. Podemos descubrirlo juntos.')}</p>
-    <div className="landing-resource-grid">
-     <article><h3>{t('Start with what’s on your mind.','Empieza con lo que tienes en mente.')}</h3><p>{t('Bring a specific question or simply say, “I’m not sure where to begin.” Origen asks helpful follow-up questions to help you figure out what matters next.','Trae una pregunta concreta o simplemente di: “No sé por dónde empezar”. Origen te hace preguntas para entender lo que necesitas y ayudarte a descubrir qué sigue.')}</p></article>
-     <article><h3>{t('Make sense of unfamiliar terms.','Entiende los términos que no conoces.')}</h3><p>{t('Financial aid. Transfer requirements. Application deadlines. Talk through what they mean, ask for examples, and revisit anything that still feels confusing.','Ayuda económica. Requisitos de transferencia. Fechas límite para solicitar ingreso. Conversa sobre lo que significan, pide ejemplos y vuelve a lo que todavía no te quede claro.')}</p></article>
-     <article><h3>{t('Feel more prepared for your next conversation.','Prepárate para tu próxima conversación.')}</h3><p>{t('Explore your questions before meeting with a counselor or coordinator. Come back afterward to review what you discussed and keep learning between meetings.','Explora tus preguntas antes de reunirte con un consejero o coordinador. Vuelve después para repasar lo que conversaron y seguir aprendiendo entre reuniones.')}</p></article>
+   <section className="landing-resource landing-conversation" id="college-guidance" aria-labelledby="resource-title">
+    <div className="landing-conversation-heading">
+     <span className="landing-eyebrow">{t('COLLEGE GUIDANCE, THROUGH CONVERSATION','ORIENTACIÓN UNIVERSITARIA, CONVERSANDO')}</span>
+     <h2 id="resource-title">{t('College questions? Let’s talk them through.','¿Preguntas sobre la universidad? Conversemos.')}</h2>
+     <p>{t('Origen is an AI voice assistant that helps students and families make sense of college—in English or Spanish.','Origen es un asistente de voz con inteligencia artificial que ayuda a estudiantes y familias a entender el camino a la universidad, en español o inglés.')}</p>
+    </div>
+    <div className="landing-conversation-rows">
+     <div className="landing-conversation-row">
+      <div className="landing-conversation-copy">
+       <h3>{t('Share your goals and what you want to understand','Comparte tus metas y lo que quieres entender')}</h3>
+       <p>{t('Tell Origen where you are in your college journey and what you’d like help with.','Cuéntale a Origen en qué parte de tu camino a la universidad estás y en qué te gustaría recibir ayuda.')}</p>
+      </div>
+      <LandingVideo t={t}/>
+     </div>
+     <div className="landing-conversation-row">
+      <div className="landing-conversation-copy">
+       <h3>{t('Make sense of unfamiliar terms','Entiende los términos que no conoces')}</h3>
+       <p>{t('Ask questions about college, financial aid, transfer requirements, or applications. Origen explains unfamiliar ideas in everyday language.','Pregunta sobre la universidad, la ayuda económica, los requisitos de transferencia o las solicitudes de ingreso. Origen explica las ideas que no conoces con palabras sencillas.')}</p>
+      </div>
+      <LandingVideoPlaceholder title={t('Questions demo','Demostración de preguntas')} t={t}/>
+     </div>
+     <div className="landing-conversation-row">
+      <div className="landing-conversation-copy">
+       <h3>{t('Review your notes and next steps','Revisa tus notas y próximos pasos')}</h3>
+       <p>{t('Return to your binder to revisit what you discussed and keep your questions together.','Vuelve a tu carpeta para repasar lo que conversaste y reunir tus preguntas en un solo lugar.')}</p>
+      </div>
+      <LandingVideoPlaceholder title={t('Binder walkthrough','Recorrido por la carpeta')} t={t}/>
+     </div>
+    </div>
+    <div className="landing-conversation-footer">
+     <p className="landing-reassurance">{t('You don’t have to know where to start. We can start there together.','No tienes que saber por dónde empezar. Podemos descubrirlo juntos.')}</p>
+     <div className="landing-actions landing-start-actions"><button className="landing-primary" onClick={()=>setLogin(true)}>{t('Get started with Origen','Empieza con Origen')}<ArrowRight size={18}/></button></div>
     </div>
    </section>
    <section className="landing-resource" id="how" aria-labelledby="how-title">
@@ -280,7 +304,6 @@ export default function Landing(){
      <li><h3>{t('Press Talk and start anywhere.','Presiona Hablar y empieza por donde quieras.')}</h3><p>{t('Speak naturally in English or Spanish. Origen answers questions, explains unfamiliar ideas, and helps guide the conversation at your pace.','Habla con naturalidad en español o inglés. Origen responde preguntas, explica ideas que no conoces y te ayuda a llevar la conversación a tu ritmo.')}</p></li>
      <li><h3>{t('Keep your thoughts together.','Reúne tus ideas en un solo lugar.')}</h3><p>{t('Your binder brings conversation summaries and key points together by topic. Add your own notes and questions, revisit them later, or download a PDF to bring to your next meeting.','Tu carpeta reúne resúmenes de conversaciones y puntos clave por tema. Agrega tus propias notas y preguntas, vuelve a consultarlas después o descarga un PDF para llevar a tu próxima reunión.')}</p></li>
     </ol>
-    <div className="landing-actions landing-start-actions"><button className="landing-primary" onClick={()=>setLogin(true)}>{t('Get started with Origen','Empieza con Origen')}<ArrowRight size={18}/></button></div>
    </section>
    <section className="landing-resource" id="educators" aria-labelledby="educators-title">
     <span className="landing-eyebrow">{t('FOR EDUCATORS AND OUTREACH TEAMS','PARA EDUCADORES Y EQUIPOS DE DIFUSIÓN')}</span>
