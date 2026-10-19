@@ -7,6 +7,7 @@ test('onboarding collects profile before introducing features in either language
   assert.match(opening,/focus on profile setup/);
   assert.match(opening,/before the profile is saved/);
   assert.match(opening,/Start with Hola/);
+  assert.match(opening,language==='en'?/Hola, I'm Origen, your AI guide\./:/Hola, soy Origen, tu guía de inteligencia artificial\./);
   assert.doesNotMatch(opening,/Family home|Mi familia|Paying for college|Planificación/);
   const home=homeVoiceIntroduction(language);
   assert.match(home,/home page is now open/);
