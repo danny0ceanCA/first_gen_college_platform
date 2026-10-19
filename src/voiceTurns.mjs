@@ -1,3 +1,5 @@
+import {brandVoicePronunciation} from './voiceStyle.mjs';
+
 // Serialize replies across transcription, interruptions and asynchronous tool calls.
 export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,cancel=clearTimeout,transcriptionTimeout=12000,onMissing=()=>{},onBusy=()=>{}}={}) {
   let active = false, pending = false, tools = 0, replyHolds = 0;
@@ -67,7 +69,7 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
       progressActive = true;
       progressToken = String(++progressSequence);
       try{
-        progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress',request:progressToken},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`Keep the same warm voice, volume and pace as this call. No greeting, filler or extra claims. Say only this brief status update: ${sentence}`}}) || '';
+        progressEvent = send({type:'response.create',response:{conversation:'none',metadata:{topic:'origen_lookup_progress',request:progressToken},input:[],output_modalities:['audio'],tool_choice:'none',instructions:`${brandVoicePronunciation}\nKeep the same warm voice, volume and pace as this call. No greeting, filler or extra claims. Say only this brief status update: ${sentence}`}}) || '';
       }catch{progressActive=false;progressEvent='';notify();return false;}
       if(!progressEvent){progressActive=false;notify();return false;}
       if (progressEvent) progressRequests.add(progressEvent);
