@@ -5,6 +5,40 @@ import {voiceTurns} from '../src/voiceTurns.mjs';
 
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 
+test('ordinary replies, clarification, language changes and unrelated cancellation wording preserve the active tool batch',async()=>{
+ const request=voiceResearchRequest(),gate=deferred(),started=deferred();let signal;
+ const version=request.revision();
+ const pending=request.run(async s=>{signal=s;started.resolve();return gate.promise;},version);
+ await started.promise;
+ for(const text of ['Okay, thank you.','Actually, I meant transfer applicants.','Please explain that in Spanish.','Sí, para el próximo otoño.','No pares la búsqueda.','Do not stop searching.','How do I cancel my application?','The website says cancel the search.',null,'...']){
+  assert.equal(request.spokenTurn(text),false);assert.equal(request.revision(),version);assert.equal(signal.aborted,false);
+ }
+ gate.resolve('verified result');assert.equal(await pending,'verified result');
+ assert.equal(await request.run(async()=> 'next queued tool',version),'next queued tool');
+});
+
+for(const command of ['Cancel the search.','Please stop searching.','Stop that lookup, please!','Cancela la búsqueda.','Por favor detén la consulta.','Deja de buscar, por favor.'])test(`spoken search cancellation still aborts pending and queued work: ${command}`,async()=>{
+ const request=voiceResearchRequest(),started=deferred(),version=request.revision();
+ const pending=request.run(async()=>{started.resolve();return new Promise(()=>{});},version);
+ await started.promise;assert.equal(request.spokenTurn(command),true);
+ await assert.rejects(pending,{name:'AbortError'});
+ await assert.rejects(request.run(async()=>assert.fail('cancelled batch continued'),version),{name:'AbortError'});
+});
+
+test('replying during a lookup retains its result and queues exactly one answer to the updated conversation',async()=>{
+ const events=[],turns=voiceTurns(e=>{events.push(e);return 'event-'+events.length;});
+ const request=voiceResearchRequest(),gate=deferred(),started=deferred();
+ turns.request();turns.beginDone('tool',true);
+ const pending=request.run(async()=>{started.resolve();return gate.promise;}).then(result=>events.push({type:'tool_output',result})).finally(()=>turns.toolsCompleted());
+ await started.promise;turns.speechStarted('clarification');
+ const release=turns.holdReply();assert.equal(request.spokenTurn('I meant transfer students.'),false);
+ turns.transcript('clarification','I meant transfer students.');release();
+ assert.equal(events.filter(e=>e.type==='response.create').length,1);
+ gate.resolve('verified sources');await pending;
+ assert.deepEqual(events.find(e=>e.type==='tool_output'),{type:'tool_output',result:'verified sources'});
+ assert.equal(events.filter(e=>e.type==='response.create').length,2);turns.stop();
+});
+
 for(const stage of ['authentication','fetch','response body'])test(`research deadline releases a stalled ${stage} even when it ignores abort`,async()=>{
  const request=voiceResearchRequest({timeoutMs:15}),gate=deferred();let signal;
  const stages=[];

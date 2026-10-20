@@ -27,5 +27,5 @@ export function voiceResearchProgress({speak,language=()=> 'en',isCurrent=()=>tr
 export function researchEvidence(result,reused){
  return {text:result.text,sources:result.sources,checkedAt:result.checkedAt,
   status:reused?'reused_verified_result':'source_check_completed',
-  instruction:reused?'This result was reused from this call. Do not claim a new search or fresh verification. Explain the relevant evidence, preserving its scope, date and uncertainty.':'The source check returned. Explain only what the evidence supports, preserving scope, date and uncertainty. Links are shown in the app; do not read URLs aloud.'};
+  instruction:(reused?'This result was reused from this call. Do not claim a new search or fresh verification. Explain the relevant evidence, preserving its scope, date and uncertainty.':'The source check returned. Explain only what the evidence supports, preserving scope, date and uncertainty. Links are shown in the app; do not read URLs aloud.')+' The person may have spoken while the search ran. Address their latest question or clarification first; use this evidence only where relevant, and never treat an answer to the earlier question as a complete answer to a changed request.'};
 }

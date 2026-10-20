@@ -513,10 +513,10 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           const release=userTurn?turns.holdReply():()=>{};
           try{
             if(userTurn){
-              // Wait for intelligible speech: noise must not cancel a lookup.
-              // The reply hold and transcription gate keep cancellation from
-              // answering before the new turn is recorded and language updated.
-              if(typeof e.transcript==='string'&&/[\p{L}\p{N}]/u.test(e.transcript))research.cancel();
+              // Replies and clarifications must not abort ongoing research.
+              // Only an explicit search-stop command cancels the tool batch;
+              // the reply hold still records this turn before any next answer.
+              research.spokenTurn(e.transcript);
               const next=spokenLanguageFromText(e.transcript,languageControl.language());
               if(next!==languageControl.language()){
                 try{await languageControl.change(next);log('spoken_language_changed',{language:next});}
