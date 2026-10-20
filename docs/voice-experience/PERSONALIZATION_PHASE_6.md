@@ -1,5 +1,33 @@
 # Personalization Phase 6 — release controls and evaluation
 
+## Production activation — October 19, 2026
+
+The product owner explicitly requested system-wide activation for all authenticated
+accounts, rather than the originally proposed synthetic-account cohort. The five
+backend personalization settings were saved on the existing Origen API service;
+the deployment and final verification are recorded in
+[the activation record](PERSONALIZATION_ACTIVATION_2026-10-19.json). The local
+`render.yaml` now matches those enabled settings. Coordinator accounts, linking,
+feedback and binder sharing remain disabled; unrelated environment settings and
+credentials were preserved.
+
+Production preflight verified migrations 044–047, all three history search indexes,
+memory-table permissions and active row-level isolation for the restricted runtime
+role. The isolated PostgreSQL personalization suite passed 67 tests with zero
+failures or skips. The checks did not read conversation content or modify production
+user records. No historical-memory backfill was initiated.
+
+This is a configuration activation, not evidence that the live listening, physical
+device, quality, cost or latency evaluation below has been completed. Those results
+remain unmeasured. Start a new voice call after the deployment to receive the new
+context and memory tools. A permanent rollback should set the backend master mode
+to `off`, redeploy, and update the Blueprint to match; retain all database tables and
+saved records. The operator script is `scripts/activate-personalization-render.mjs`;
+its `inspect` and `verify` modes are read-only, while `apply` saves the five settings
+and redeploys the exact currently live code revision.
+
+## Original Phase 6 implementation and evaluation record
+
 Status, October 18, 2026: implementation and local verification are complete. Live model/speech evaluation and production rollout remain pending. No paid provider calls or production database writes were made. This phase does not complete the plan's live release criteria by substituting mocked browser events for speech.
 
 ## Server controls

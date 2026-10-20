@@ -31,9 +31,15 @@ services:
       - key: ORIGEN_BINDER_JOBS
         value: "false"
       - key: ORIGEN_PERSONALIZATION_MODE
-        value: "off"
+        value: "on"
+      - key: ORIGEN_PERSONALIZATION_RETRIEVAL
+        value: "true"
+      - key: ORIGEN_PERSONALIZATION_LIVE_WRITES
+        value: "true"
+      - key: ORIGEN_PERSONALIZATION_ADAPTIVE
+        value: "true"
       - key: ORIGEN_PERSONALIZATION_EXTRACTION
-        value: "false"
+        value: "true"
       - key: OPENAI_API_KEY
         sync: false
       - key: AUTH0_DOMAIN

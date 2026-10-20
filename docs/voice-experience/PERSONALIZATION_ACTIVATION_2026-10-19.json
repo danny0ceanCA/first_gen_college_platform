@@ -1,0 +1,164 @@
+{
+  "kind": "personalization-activation",
+  "mode": "apply",
+  "checkedAt": "2026-10-20T03:46:45.818Z",
+  "databaseReadiness": {
+    "migrations": [
+      "044_student_memory.sql",
+      "045_historical_retrieval.sql",
+      "046_live_memory.sql",
+      "047_adaptive_guidance.sql"
+    ],
+    "indexes": 3,
+    "protectedTables": [
+      {
+        "name": "origen_live_memory_receipts",
+        "rls": true,
+        "enforced": true,
+        "permissions": true
+      },
+      {
+        "name": "origen_live_memory_sessions",
+        "rls": true,
+        "enforced": true,
+        "permissions": true
+      },
+      {
+        "name": "origen_memory_batches",
+        "rls": true,
+        "enforced": true,
+        "permissions": true
+      },
+      {
+        "name": "origen_memory_scopes",
+        "rls": true,
+        "enforced": true,
+        "permissions": true
+      },
+      {
+        "name": "origen_student_memories",
+        "rls": true,
+        "enforced": true,
+        "permissions": true
+      }
+    ],
+    "runtimeIsolation": true
+  },
+  "previousSettings": {
+    "ORIGEN_PERSONALIZATION_MODE": null,
+    "ORIGEN_PERSONALIZATION_RETRIEVAL": null,
+    "ORIGEN_PERSONALIZATION_LIVE_WRITES": null,
+    "ORIGEN_PERSONALIZATION_ADAPTIVE": null,
+    "ORIGEN_PERSONALIZATION_EXTRACTION": null
+  },
+  "settings": {
+    "ORIGEN_PERSONALIZATION_MODE": "on",
+    "ORIGEN_PERSONALIZATION_RETRIEVAL": "true",
+    "ORIGEN_PERSONALIZATION_LIVE_WRITES": "true",
+    "ORIGEN_PERSONALIZATION_ADAPTIVE": "true",
+    "ORIGEN_PERSONALIZATION_EXTRACTION": "true"
+  },
+  "capabilities": {
+    "enabled": true,
+    "retrieval": true,
+    "writes": true,
+    "adaptive": true,
+    "extraction": true
+  },
+  "coordinatorFeaturesDisabled": true,
+  "unrelatedSettingsPreserved": true,
+  "apiHealthy": true,
+  "previousLiveRevision": "e0dffac4d3ca3abef07c3ba16350abcbcffd7794",
+  "deploymentId": "dep-dbbe89lg1s2s738l2umg",
+  "deploymentStatus": "live",
+  "liveEvaluationPerformed": false,
+  "productionUserRecordsChanged": false,
+  "verifiedAt": "2026-10-20T03:48:26.760Z",
+  "finalVerification": {
+    "kind": "personalization-activation",
+    "mode": "verify",
+    "checkedAt": "2026-10-20T03:48:26.760Z",
+    "databaseReadiness": {
+      "migrations": [
+        "044_student_memory.sql",
+        "045_historical_retrieval.sql",
+        "046_live_memory.sql",
+        "047_adaptive_guidance.sql"
+      ],
+      "indexes": 3,
+      "protectedTables": [
+        {
+          "name": "origen_live_memory_receipts",
+          "rls": true,
+          "enforced": true,
+          "permissions": true
+        },
+        {
+          "name": "origen_live_memory_sessions",
+          "rls": true,
+          "enforced": true,
+          "permissions": true
+        },
+        {
+          "name": "origen_memory_batches",
+          "rls": true,
+          "enforced": true,
+          "permissions": true
+        },
+        {
+          "name": "origen_memory_scopes",
+          "rls": true,
+          "enforced": true,
+          "permissions": true
+        },
+        {
+          "name": "origen_student_memories",
+          "rls": true,
+          "enforced": true,
+          "permissions": true
+        }
+      ],
+      "runtimeIsolation": true
+    },
+    "previousSettings": {
+      "ORIGEN_PERSONALIZATION_MODE": "on",
+      "ORIGEN_PERSONALIZATION_RETRIEVAL": "true",
+      "ORIGEN_PERSONALIZATION_LIVE_WRITES": "true",
+      "ORIGEN_PERSONALIZATION_ADAPTIVE": "true",
+      "ORIGEN_PERSONALIZATION_EXTRACTION": "true"
+    },
+    "settings": {
+      "ORIGEN_PERSONALIZATION_MODE": "on",
+      "ORIGEN_PERSONALIZATION_RETRIEVAL": "true",
+      "ORIGEN_PERSONALIZATION_LIVE_WRITES": "true",
+      "ORIGEN_PERSONALIZATION_ADAPTIVE": "true",
+      "ORIGEN_PERSONALIZATION_EXTRACTION": "true"
+    },
+    "capabilities": {
+      "enabled": true,
+      "retrieval": true,
+      "writes": true,
+      "adaptive": true,
+      "extraction": true
+    },
+    "coordinatorFeaturesDisabled": true,
+    "unrelatedSettingsPreserved": true,
+    "apiHealthy": true,
+    "liveDeployment": {
+      "id": "dep-dbbe89lg1s2s738l2umg",
+      "status": "live",
+      "revision": "e0dffac4d3ca3abef07c3ba16350abcbcffd7794"
+    },
+    "previousLiveRevision": "e0dffac4d3ca3abef07c3ba16350abcbcffd7794",
+    "liveEvaluationPerformed": false,
+    "productionUserRecordsChanged": false
+  },
+  "automatedTests": {
+    "command": "npm run test:personalization",
+    "passed": 67,
+    "failed": 0,
+    "skipped": 0,
+    "database": "disposable-local-postgresql",
+    "productionDataUsed": false
+  }
+}
