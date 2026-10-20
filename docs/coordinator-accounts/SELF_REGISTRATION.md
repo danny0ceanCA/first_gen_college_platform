@@ -56,3 +56,7 @@ Migration 058 removes manual student pilot enrollment. Students use their own ac
 `server/coordinator-applications.test.mjs` uses disposable PostgreSQL with the actual restricted runtime role. It covers forged identity input, cross-account isolation, no automatic privileges, independent review, verified organization/membership gates, blocked staff, duplicate decisions, withdrawal, export/erasure, verified Auth0 email, MFA review gates, and the disabled rollout switch.
 
 `output/playwright/coordinator-registration-preview.js` mounts the actual registration/review components with synthetic Auth0/API responses. It checks English/Spanish at mobile and desktop widths. No real applicant or student data is used.
+
+## Authenticator setup now configured
+
+See [the October 20 MFA setup record](AUTH0_MFA_SETUP_2026-10-20.md). OTP, recovery codes and the two Login Actions are configured in the live Auth0 tenant. Become a coordinator and staff verification include bilingual setup guidance. Hosted synthetic tests verify the Action behavior; a real coordinator must still complete their first phone enrollment.

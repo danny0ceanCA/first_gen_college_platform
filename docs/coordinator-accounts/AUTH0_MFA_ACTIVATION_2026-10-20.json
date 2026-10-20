@@ -1,0 +1,60 @@
+{
+  "kind": "auth0-coordinator-mfa-activation",
+  "domain": "origenedu.us.auth0.com",
+  "checkedAt": "2026-10-20T18:43:46.012Z",
+  "otpEnabled": true,
+  "recoveryCodesEnabled": true,
+  "customizeMfaEnabled": true,
+  "actions": [
+    {
+      "id": "93cbc321-1af8-4688-9f97-4033e84b64b4",
+      "name": "Origen Staff MFA",
+      "codeHash": "884abfb971366982cfb66390d9b68a995e478a76d3ea6fa3ed2f90954511f80f",
+      "runtime": "node22",
+      "status": "built",
+      "versionId": "50c103f3-2df8-40bb-8522-cbfe08d2bbe1",
+      "deployed": true
+    },
+    {
+      "id": "3830eab1-cd8a-438c-bddc-63c8db4c81e3",
+      "name": "Origen Authentication Proof",
+      "codeHash": "c20e1f2ac50103be3cd35de2ab83f7b62a61773f6eef9f30f51dfbdcf47bef3a",
+      "runtime": "node22",
+      "status": "built",
+      "versionId": "fec8d580-279d-412e-ad30-727bd81c7e3a",
+      "deployed": true
+    }
+  ],
+  "bindingOrder": [
+    "Origen Staff MFA",
+    "Origen Authentication Proof"
+  ],
+  "syntheticChecks": [
+    {
+      "name": "normal-login",
+      "passed": true
+    },
+    {
+      "name": "first-time-enrollment",
+      "passed": true
+    },
+    {
+      "name": "enrolled-challenge",
+      "passed": true
+    },
+    {
+      "name": "completed-proof",
+      "passed": true
+    },
+    {
+      "name": "no-fabricated-mfa",
+      "passed": true
+    }
+  ],
+  "ordinaryLoginDoesNotRequestMfa": true,
+  "policiesPreserved": true,
+  "unrelatedTenantFlagsPreserved": true,
+  "otherFactorsPreserved": true,
+  "livePhoneEnrollmentTested": false,
+  "credentialsPrinted": false
+}

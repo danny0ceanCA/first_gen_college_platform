@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
+import {CoordinatorReadiness} from './AuthenticatorGuide';
 import './InstitutionPortal.css';
 import './CoordinatorWorkspace.css';
 
@@ -47,6 +48,7 @@ export default function CoordinatorRegistration(){
   <h1>{t('Help students take their next step.','Ayuda a los estudiantes a dar su siguiente paso.')}</h1>
   <p>{t('Apply to guide students through Origen. We’ll review your role and organization before enabling coordinator access.','Solicita acceso para orientar a estudiantes con Origen. Revisaremos tu función y organización antes de activar tu acceso.')}</p>
   <p>{t('Students choose what to share. Family conversations remain private.','Los estudiantes eligen qué compartir. Las conversaciones familiares permanecen privadas.')}</p>
+  <CoordinatorReadiness es={es}/>
   {isLoading?<p role="status">{t('Loading…','Cargando…')}</p>:!isAuthenticated?<section className="coordinator-card"><h2>{t('Start with your own account','Empieza con tu propia cuenta')}</h2><p>{t('Use the email you want associated with your coordinator work.','Usa el correo que deseas asociar con tu trabajo de coordinador.')}</p><div className="institution-actions"><button className="button primary" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'},authorizationParams:{screen_hint:'signup'}}).catch(()=>setError('signin'))}>{t('Register as a coordinator','Registrarme como coordinador')}</button><button className="button outline" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'}}).catch(()=>setError('signin'))}>{t('Already have an account? Sign in','¿Ya tienes cuenta? Inicia sesión')}</button></div></section>:<>
    <button className="text-button" disabled={busy} onClick={()=>setRetry(n=>n+1)}>{t('Refresh status','Actualizar estado')}</button>
    {busy&&<p role="status">{t('Checking your application…','Consultando tu solicitud…')}</p>}
