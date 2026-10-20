@@ -1,5 +1,5 @@
 import LandingStory from './LandingStory';
-import LandingVideo,{LandingVideoPlaceholder} from './LandingVideo';
+import LandingVideo from './LandingVideo';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
@@ -289,7 +289,7 @@ export default function Landing(){
        <h3>{t('Review your notes and next steps','Revisa tus notas y próximos pasos')}</h3>
        <p>{t('Return to your binder to revisit what you discussed and keep your questions together.','Vuelve a tu carpeta para repasar lo que conversaste y reunir tus preguntas en un solo lugar.')}</p>
       </div>
-      <LandingVideoPlaceholder title={t('Binder walkthrough','Recorrido por la carpeta')} t={t}/>
+      <LandingVideo variant="binder" t={t}/>
      </div>
     </div>
     <div className="landing-conversation-footer">
