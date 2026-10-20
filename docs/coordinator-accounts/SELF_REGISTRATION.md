@@ -60,3 +60,13 @@ Migration 058 removes manual student pilot enrollment. Students use their own ac
 ## Authenticator setup now configured
 
 See [the October 20 MFA setup record](AUTH0_MFA_SETUP_2026-10-20.md). OTP, recovery codes and the two Login Actions are configured in the live Auth0 tenant. Become a coordinator and staff verification include bilingual setup guidance. Hosted synthetic tests verify the Action behavior; a real coordinator must still complete their first phone enrollment.
+
+## Organization registration during coordinator signup
+
+The signup form now offers **Join an existing organization** and **Register my organization**. Existing-team applicants still need an email-bound owner invitation. Authorized representatives can add a short organization description, confirm authorization, and register from the same coordinator page.
+
+The application is saved first. The new-organization path then calls the existing MFA-protected institution `register` and `submit` commands. Registration creates an owner membership and sends the organization for independent review; it does not approve affiliation, enable coordinator access, publish student content, or bypass consent. The organization description is part of its page draft and can become public after approval; representative email stays private.
+
+An account-scoped session draft retains the exact registration payload and idempotency key across MFA redirects and uncertain network responses. A retry reuses that key and finishes review submission without creating another organization. Logout/account changes clear the private browser draft. Applicants with a pending application can also register inline. Withdrawing the coordinator application does not delete a registered organization.
+
+No new migrations, grants, environment variables, Auth0 tenant changes, or services are required. Unit checks in `server/coordinator-organization-signup.test.mjs` cover the existing institution contract, retries, MFA denial, and incomplete/unauthorized responses. Synthetic browser checks cover both choices, MFA return, review submission, and mobile/Spanish layouts.

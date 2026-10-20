@@ -65,6 +65,16 @@
 .coordinator-registration .coordinator-registration-form h2 { margin-bottom: 0; }
 .coordinator-registration .coordinator-registration-form label { font-size: 12px; color: #66594a; }
 .coordinator-registration .coordinator-registration-form input { padding: 14px; font-size: 15px; background: #fffefb; border-color: #dbcebe; }
+.coordinator-registration .coordinator-registration-form textarea { width: 100%; resize: vertical; padding: 14px; font: inherit; font-size: 15px; line-height: 1.6; background: #fffefb; border: 1px solid #dbcebe; border-radius: 8px; }
+.coordinator-organization-choice { margin: 0; padding: 16px; border: 1px solid #dfd3c4; border-radius: 10px; min-width: 0; }
+.coordinator-organization-choice legend { font-size: 13px; color: #66594a; padding: 0 6px; }
+.coordinator-registration .coordinator-organization-choice label, .coordinator-registration label.coordinator-organization-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; padding: 8px 0; cursor: pointer; }
+.coordinator-registration .coordinator-organization-choice input, .coordinator-registration .coordinator-organization-consent input { width: 18px; height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 auto; accent-color: #a4513c; }
+.coordinator-new-organization { display: grid; gap: 12px; }
+.coordinator-registration .coordinator-organization-progress, .coordinator-registration .coordinator-inline-organization { margin-top: 20px; }
+.coordinator-organization-progress > p, .coordinator-inline-organization p { font-size: 14px; line-height: 1.7; color: #75695e; }
+.coordinator-inline-organization summary { cursor: pointer; font-size: 14px; line-height: 1.6; font-weight: 600; }
+.coordinator-inline-organization form { margin-top: 18px; }
 .coordinator-application-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .coordinator-application-controls > span { font-size: 10px; letter-spacing: .13em; color: #8e6b53; font-weight: 700; }
 .coordinator-status-pill { display: inline-flex; padding: 6px 12px; margin-bottom: 19px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #f4e4c9; color: #85612b; }
