@@ -4,7 +4,6 @@ import {appendConversationTurn,mergeConversationSources,recentConversationMemory
 import {flushPendingHistory} from '../src/pendingHistory.mjs';
 import {validateMemory} from './history.mjs';
 import {voiceSession} from './profile-voice.mjs';
-import {voiceStartingPoints} from '../src/voiceStartingPoints.mjs';
 
 test('live summary retains early facts across sixty exchanges',()=>{
  let turns=[];for(let i=0;i<120;i++)turns=appendConversationTurn(turns,{role:i%2?'assistant':'user',text:`Fact ${i}`});
@@ -40,8 +39,9 @@ test('long memory retains final corrections and unconfirmed scope cannot embed p
  const input={language:'es',role:'parent',mode:'planning',memory:items,profile:{},students:[],routeConversations:true};
  const confirmed=voiceSession({...input,targetConfirmed:true,studentId:'one'},{});
  assert.match(confirmed.instructions,/Corrected goal: nursing/);assert.match(confirmed.instructions,/middle omitted/);
- // Keep the existing memory/base budget separate from the bounded phase 3 policy.
- assert.ok(confirmed.instructions.length-voiceStartingPoints(input).length<30000);
+ // Measure the bounded memory addition separately from evolving shared voice policies.
+ const withoutMemory=voiceSession({...input,memory:[],experience:{usedVoice:true},targetConfirmed:true,studentId:'one'},{});
+ assert.ok(confirmed.instructions.length-withoutMemory.instructions.length<6500);
  const unresolved=voiceSession({...input,targetConfirmed:false},{});
  assert.doesNotMatch(unresolved.instructions,/Corrected goal: nursing|Earlier goal/);
 });

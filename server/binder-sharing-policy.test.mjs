@@ -36,6 +36,15 @@ test('ownership, organization, consent, expiry and every relevant revision fail 
  assert.equal(evaluateBinderPublication(null).allowed,false);
  const malformed=eligibleBinderFacts();malformed.lineage.ancestors=[null];assert.equal(evaluateBinderPublication(malformed,sharingNow).allowed,false);
 });
+test('current guardian permission allows student choice, but expired or absent permission does not',()=>{
+ const facts=eligibleBinderFacts();facts.student.eligibility='approved';
+ facts.student.permissionExpiresAt=new Date(sharingNow+60000).toISOString();
+ assert.equal(evaluateBinderPublication(facts,sharingNow).allowed,true);
+ for(const expiry of [undefined,'invalid',new Date(sharingNow).toISOString()]){
+  facts.student.permissionExpiresAt=expiry;
+  assert.equal(evaluateBinderPublication(facts,sharingNow).reason,'permission_required');
+ }
+});
 test('protected classifications cannot be relaxed by safe or unknown derivations',()=>{
  assert.equal(inheritSharingClassification([]),'unknown');
  assert.equal(inheritSharingClassification(['student_only','untrusted']),'unknown');

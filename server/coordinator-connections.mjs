@@ -63,4 +63,5 @@ export async function assertCoordinatorLinkingReady(database,env){
  if(!linkingEnabled(env))return;
  const row=(await database.query("SELECT to_regprocedure('origen_coordinator_connection_command(jsonb)') AS fn")).rows[0];
  if(!row?.fn||!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_connection_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_linking_migration_or_grant_required');
+ if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='058_student_controlled_coordinator_sharing.sql') AS ready")).rows[0]?.ready)throw new Error('coordinator_student_permission_migration_required');
 }

@@ -8,6 +8,7 @@ import CoordinatorBinders from './CoordinatorBinders';
 import InstitutionTeam from './InstitutionTeam';
 import './InstitutionPortal.css';
 import './CoordinatorWorkspace.css';
+import {CoordinatorApplications,applicationError} from './CoordinatorRegistration';
 
 type Organization={id:string;name:string;role?:string;pilotStatus:string;verificationStatus:string;profile?:{id:string;displayName:string;status:string}};
 type Profile={displayName:string;organizationName:string;code?:{expiresAt:string}};
@@ -73,8 +74,9 @@ export default function CoordinatorWorkspace(){
   <nav className="institution-actions" aria-label={t('Switch workspace','Cambiar espacio')}><a href="#app">← {t('Workspaces','Espacios')}</a><a href="#institutions">{t('Institutions','Instituciones')}</a><a href="#personal">{t('Personal binder','Carpeta personal')}</a><button className="text-button" onClick={()=>setEs(!es)}>{es?'English':'Español'}</button><button className="text-button" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>{t('Log out','Cerrar sesión')}</button></nav>
   <div className="eyebrow">{t('A LITTLE GUIDANCE. A NEXT STEP.','ORIENTACIÓN PARA EL SIGUIENTE PASO.')}</div>
   <h1>{t('Your coordinator workspace','Tu espacio como coordinador')}</h1>
+  <a href="#coordinator-register">{t('Apply or check your application','Solicitar acceso o consultar tu solicitud')}</a>
   <p>{t('Review the pages students choose to share, respond to connection requests, and manage your profile.','Revisa las páginas que los estudiantes eligen compartir, responde a solicitudes de conexión y administra tu perfil.')}</p>
-  {error&&(staffVerificationErrors.includes(error)?<StaffVerification es={es} returnTo="#coordinators"/>:<p className="institution-error" role="alert">{messages[error]||t('We couldn’t open or update this workspace. Try again.','No pudimos abrir o actualizar este espacio. Intenta de nuevo.')}</p>)}
+  {error&&(staffVerificationErrors.includes(error)?<StaffVerification es={es} returnTo="#coordinators"/>:<p className="institution-error" role="alert">{messages[error]||applicationError(error,t)}</p>)}
   <button className="text-button" disabled={busy} onClick={()=>void load(selected)}>{t('Refresh workspace','Actualizar espacio')}</button>
   {overview&&<><label className="coordinator-selector">{t('Organization','Organización')}<select value={selected} disabled={busy} onChange={e=>{setTeam(false);setNotice('');void load(e.target.value);}}>{overview.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
    {org&&<section className="coordinator-card"><h2>{org.name}</h2><p>{org.pilotStatus==='active'?t('Coordinator pilot approved','Piloto de coordinadores aprobado'):org.pilotStatus==='suspended'?t('Coordinator pilot suspended','Piloto de coordinadores suspendido'):t('Awaiting coordinator pilot approval','Esperando aprobación del piloto')}</p>
@@ -86,7 +88,7 @@ export default function CoordinatorWorkspace(){
     <div className="institution-actions"><button className="button primary" disabled={busy} onClick={()=>{if(!profile.code||window.confirm(t('Replace your code? The previous code will stop working.','¿Reemplazar tu código? El anterior dejará de funcionar.')))void change('rotate-code');}}>{profile.code?t('Replace code','Reemplazar código'):t('Create code','Crear código')}</button>{profile.code&&<button className="button outline" disabled={busy} onClick={()=>void change('revoke-code')}>{t('Revoke code','Revocar código')}</button>}</div>
     {code&&<div className="coordinator-code"><label>{t('Save this code now','Guarda este código ahora')}<input readOnly value={code} onFocus={e=>e.target.select()}/></label><p>{t('Expires','Vence')} {new Date(expires).toLocaleDateString(es?'es':'en')}</p><div className="institution-actions"><button className="button outline" onClick={()=>void copy(code)}>{t('Copy code','Copiar código')}</button><button className="button outline" onClick={()=>void copy(`${window.location.origin}/#connect/${code}`)}>{t('Copy connection link','Copiar enlace')}</button></div>{qr&&<img src={qr} alt={t('Connection code QR','QR del código de conexión')} width={240} height={240}/>}</div>}
    </section>}
-   {overview.canApprove&&<CoordinatorOperations t={t}/>}
+   {overview.canApprove&&<><CoordinatorApplications request={request} organizations={overview.organizations} t={t} onError={setError}/><CoordinatorOperations t={t}/></>}
    {profile&&<CoordinatorNotifications key={`updates-${selected}-${user?.sub}`} organizationId={selected} t={t} onOpen={value=>{setNoticeTarget({...value,sequence:Date.now()});requestAnimationFrame(()=>document.querySelector(value.destination==='connections'?'.coordinator-inbox':'.coordinator-binders')?.scrollIntoView({block:'start'}));}}/>}
    {profile&&<CoordinatorBinders key={`binders-${selected}-${user?.sub}`} organizationId={selected} openRequest={noticeTarget?.organizationId===selected&&['binder','guidance'].includes(noticeTarget.destination)?noticeTarget:undefined} request={input=>request(input,false,true)} feedbackRequest={input=>request(input,false,false,true)} t={t} es={es}/>}
    {profile&&<CoordinatorInbox key={selected+(noticeTarget?.destination==='connections'?noticeTarget.sequence:'')} organizationId={selected} t={t} es={es}/>}

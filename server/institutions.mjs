@@ -156,6 +156,10 @@ export function createInstitutionHandler(database,env={}){
    }
    const identity=input.action==='accept-invite'?await invitationIdentity(req,env):req.origenIdentity;
    const result=await run(req.origenIdentity?.sub,input,identity);
+   if(!publicRequest&&input.action==='access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'){
+    const application=(await database.query(`SELECT origen_coordinator_application_command('{"action":"application-status"}'::jsonb) AS result`)).rows[0]?.result?.application;
+    result.coordinatorApplicationStatus=application?.status||null;
+   }
    if(sharing){const language=requestURL.searchParams.get('lang')||'en',eventId=requestURL.searchParams.get('event')||'';if(!['en','es'].includes(language)||eventId&&!/^[0-9a-f-]{36}$/i.test(eventId))return send(400,{error:'invalid_public_page'});if(eventId&&!result.page.content?.events?.some(e=>e.id===eventId))return send(404,{error:'event_not_found'});
     if(sharing[1]==='qr'){const url=publicInstitutionURL(env,input.slug,language,eventId);if(!url)return send(503,{error:'sharing_not_configured'});const png=await QRCode.toBuffer(url,{type:'png',width:640,margin:4,errorCorrectionLevel:'M'});res.writeHead(200,{'Content-Type':'image/png','Content-Disposition':`attachment; filename="${input.slug}-qr.png"`});return res.end(png);}
     res.setHeader('Content-Security-Policy',"default-src 'none'; img-src https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});return res.end(renderInstitutionPage(result,{env,language,eventId}));

@@ -49,6 +49,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_privacy_preferences'")).rows.length){data.formatVersion=4;data.privacyPreferences=await rows('origen_privacy_preferences');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_eligibility'")).rows.length){data.eligibility=(await c.query('SELECT age_band,audience,status,notice_version,request_id,guardian_email,permission_expires_at,decided_at FROM origen_eligibility WHERE subject_hash=$1',[subjectHash(subject)])).rows;data.permissionEvents=(await c.query('SELECT request_id,notice_version,decision,occurred_at FROM origen_permission_events WHERE subject_hash=$1',[subjectHash(subject)])).rows;}
    if((await c.query("SELECT to_regprocedure('origen_coordinator_export()') AS fn")).rows[0]?.fn)data.coordinatorSharing=(await c.query('SELECT origen_coordinator_export() AS result')).rows[0].result;
+   if((await c.query("SELECT to_regprocedure('origen_coordinator_application_command(jsonb)') AS fn")).rows[0]?.fn)data.coordinatorApplication=(await c.query(`SELECT origen_coordinator_application_command('{"action":"application-status"}'::jsonb) AS result`)).rows[0].result;
    // No invite tokens/hashes, other participants' private data or identity credentials.
    await c.query('COMMIT');return data;
   }

@@ -2,6 +2,7 @@ import {randomBytes,createHash} from 'node:crypto';
 import {invitationIdentity} from './institution-access.mjs';
 import {requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {runAsCoordinatorActor} from './account-isolation.mjs';
+import {applicationActions,applicantActions,validateApplication,runApplicationCommand} from './coordinator-applications.mjs';
 
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export const coordinatorCodeAlphabet='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -10,6 +11,7 @@ export function createCoordinatorCode(){
  return {code:`${raw.slice(0,5)}-${raw.slice(5)}`,hash:createHash('sha256').update(raw).digest('hex')};
 }
 export function validateCoordinatorInput(value){
+ if(value&&applicationActions.includes(value.action))return validateApplication(value);
  const actions=['overview','team','approve-organization','suspend-organization','enable-member','disable-member','profile','save-profile','rotate-code','revoke-code'];
  if(!value||!actions.includes(value.action))throw fail(400,'invalid_coordinator_request');
  const out={action:value.action};
@@ -42,14 +44,20 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
   try{
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'too_large'});}
    let input;try{input=validateCoordinatorInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_coordinator_request'});}
-   const review=['approve-organization','suspend-organization'].includes(input.action);
-   await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:input.action,target:input.id,env,permission:review?'manage:institutions':undefined,fresh:!['overview','team','profile'].includes(input.action)});
+   if(applicantActions.includes(input.action)){
+    const trusted=await invitationIdentity(req,env,fetcher);
+    if(trusted.email_verified!==true||typeof trusted.email!=='string'||!trusted.email.trim()||trusted.email.length>320)return send(403,{error:'verified_email_required'});
+    return send(200,await runApplicationCommand(database,{...input,verifiedEmail:trusted.email.trim().toLowerCase()}));
+   }
+   const review=['approve-organization','suspend-organization','applications','approve-application','decline-application'].includes(input.action);
+   await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:input.action,target:input.id,env,permission:review?'manage:institutions':undefined,fresh:!['overview','team','profile','applications'].includes(input.action)});
    const trusted=await invitationIdentity(req,env,fetcher);
    if(trusted.email_verified!==true||typeof trusted.email!=='string'||!trusted.email.trim())return send(403,{error:'verified_email_required'});
-   const result=await runAsCoordinatorActor(req.origenIdentity.sub,{administrator:staffPermissions(req.origenIdentity,env).includes('manage:institutions'),issuedAt:req.origenIdentity.iat},()=>runCoordinatorCommand(database,input));
+   const result=await runAsCoordinatorActor(req.origenIdentity.sub,{administrator:staffPermissions(req.origenIdentity,env).includes('manage:institutions'),issuedAt:req.origenIdentity.iat},()=>applicationActions.includes(input.action)?runApplicationCommand(database,input):runCoordinatorCommand(database,input));
    return send(200,result);
   }catch(error){
-   if(error.code==='42501')return send(403,{error:['independent_review_required','organization_verification_required'].includes(error.message)?error.message:'coordinator_access_denied'});
+   if(error.code==='40001')return send(409,{error:'application_changed'});
+   if(error.code==='42501')return send(403,{error:['independent_review_required','organization_verification_required','application_membership_required'].includes(error.message)?error.message:'coordinator_access_denied'});
    const known=[400,401,403].includes(error.status);
    // Never log request bodies, connection codes, emails or DB error details.
    return send(known?error.status:503,{error:known?error.message:'coordinator_access_unavailable'});
@@ -59,6 +67,9 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
 
 export async function assertCoordinatorProvisioningReady(database,env={}){
  if(env.ORIGEN_COORDINATOR_ACCOUNTS!=='true')return;
+ const application=(await database.query("SELECT to_regprocedure('origen_coordinator_application_command(jsonb)') AS fn")).rows[0];
+ if(!application?.fn)throw new Error('coordinator_application_migration_required');
+ if(!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_application_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_application_grant_required');
  const row=(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='051_coordinator_provisioning.sql') AS migrated, to_regprocedure('origen_coordinator_command(jsonb)') AS fn")).rows[0];
  if(!row?.migrated||!row.fn)throw new Error('coordinator_migration_required');
  if(!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_runtime_grant_required');

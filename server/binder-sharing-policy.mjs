@@ -5,6 +5,7 @@ export const BINDER_SHARING_POLICY_VERSION='coordinator-sharing-v1';
 export const sharingTopics=Object.freeze(['options','transfer','costs','applications']);
 export const coordinatorFlags=Object.freeze(['ORIGEN_COORDINATOR_ACCOUNTS','ORIGEN_COORDINATOR_LINKING','ORIGEN_BINDER_SHARING','ORIGEN_COORDINATOR_FEEDBACK','ORIGEN_COORDINATOR_VOICE_LINKING','ORIGEN_COORDINATOR_BINDER_VIEWING']);
 export const coordinatorTables=Object.freeze([
+ 'origen_coordinator_applications',
  'origen_coordinator_feedback_tombstones','origen_coordinator_outbox','origen_coordinator_operations','origen_coordinator_operation_events',
  'origen_coordinator_feedback_requests','origen_coordinator_feedback_reports','origen_coordinator_feedback_steps',
  'origen_coordinator_profiles','origen_coordinator_codes','origen_binder_connections',
@@ -42,7 +43,7 @@ const denied=reason=>({allowed:false,reason});
 export function evaluateBinderPublication(facts={},now=Date.now()){
  const {actor,student,coordinator,connection,grant,entry,lineage,preview}=facts||{};
  if(!Number.isFinite(now)||!actor?.subject||actor.accountId!==student?.accountId||student?.ownerSubject!==actor.subject||!student?.id||student.ownershipVerified!==true||student.role!=='student'||student.parentManaged!==false)return denied('student_owner_required');
- if(student.eligibility!=='adult'||student.closed!==false||!validVersion(student.permissionRevision))return denied('adult_permission_required');
+ if(!(student.eligibility==='adult'||student.eligibility==='approved'&&future(student.permissionExpiresAt,now))||student.closed!==false||!validVersion(student.permissionRevision))return denied('permission_required');
  if(!coordinator?.id||!coordinator.subject||!coordinator.organizationId||coordinator.active!==true||coordinator.membershipActive!==true||coordinator.organizationVerified!==true||coordinator.organizationEnabled!==true||coordinator.emailVerified!==true||coordinator.mfaVerified!==true||!validVersion(coordinator.revision))return denied('coordinator_unavailable');
  if(!connection?.id||connection.status!=='accepted'||connection.accountId!==student.accountId||connection.studentId!==student.id||connection.coordinatorId!==coordinator.id||!validVersion(connection.revision))return denied('connection_required');
  if(!grant?.id||grant.connectionId!==connection.id||grant.accountId!==student.accountId||grant.studentId!==student.id||grant.coordinatorId!==coordinator.id||grant.grantorSubject!==actor.subject||grant.status!=='active'||grant.revokedAt||!future(grant.expiresAt,now)||!validVersion(grant.revision)||grant.permissionRevision!==student.permissionRevision||grant.coordinatorRevision!==coordinator.revision||grant.connectionRevision!==connection.revision)return denied('grant_unavailable');

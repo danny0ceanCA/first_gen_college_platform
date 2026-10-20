@@ -135,7 +135,7 @@ test('student publication is versioned, explicit, isolated and revocable',{skip:
   await publish(await preview([id]));let state=await run('status');const current=state.grants.find(g=>g.status==='active');
   await f.owner.query("UPDATE origen_binder_share_grants SET created_at=now()-interval '2 days',expires_at=now()-interval '1 day' WHERE id=$1",[current.id]);assert.equal((await run('status')).grants.find(g=>g.id===current.id).items.length,0);
   await publish(await preview([id]));card=await preview([id]);
-  await f.owner.query('UPDATE origen_eligibility SET revision=revision+1 WHERE subject_hash=$1',[hash('other')]);await assert.rejects(publish(card),{status:403});assert.equal((await run('status')).enabled,false);
+  await f.owner.query("UPDATE origen_eligibility SET status='revoked',revision=revision+1 WHERE subject_hash=$1",[hash('other')]);await assert.rejects(publish(card),{status:403});assert.equal((await run('status')).enabled,false);
   assert.ok((await run('status')).grants.every(g=>g.items.length===0));await run('revoke-all',{},'other',false);
  });
  await t.test('HTTP kill switch preserves stop controls, rejects forged enable flags, and never logs content',async()=>{
@@ -151,7 +151,7 @@ test('student publication is versioned, explicit, isolated and revocable',{skip:
   }finally{await new Promise(r=>gateway.close(r));await app.flushLogs();}assert.ok(!JSON.stringify(logs).includes('PRIVATE_FAMILY_SENTINEL'));
  });
  await t.test('account deletion removes previews and all published copies',async()=>{
-  await f.owner.query("INSERT INTO origen_coordinator_student_pilots(account_id,student_id,permission_revision,approved_by) VALUES($1,'alex',2,'synthetic-reviewer')",[account]);
+  await f.owner.query("UPDATE origen_eligibility SET status='adult' WHERE subject_hash=$1",[hash('other')]);
   connection=await connect();const id=randomUUID();await create(id,'Account deletion test.');await publish(await preview([id]));await preview([id]);
   await f.as('other',()=>createLifecycleRepository(f.db)('other',{action:'delete',confirmation:'DELETE'}));
   for(const table of ['origen_binder_previews','origen_binder_share_grants','origen_binder_publications','origen_binder_publication_items'])assert.equal((await f.owner.query(`SELECT count(*)::int n FROM ${table} WHERE account_id=$1`,[account])).rows[0].n,0,table);

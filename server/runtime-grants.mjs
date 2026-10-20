@@ -33,6 +33,7 @@ export async function grantRuntimeAccess(pool,role,{schema='public'}={}){
   await client.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA ${base} TO ${who}`);
   for(const signature of ['origen_current_account_id()','origen_shared_profile(text)','origen_update_shared_profile(text,jsonb,boolean)','origen_family_link_command(text,text,text)'])await client.query(`GRANT EXECUTE ON FUNCTION ${base}.${signature} TO ${who}`);
   // Provisioning uses one scoped command; no raw sharing-table access is granted.
+  if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_coordinator_application_command(jsonb)`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_coordinator_application_command(jsonb) TO ${who}`);
   if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_coordinator_command(jsonb)`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_coordinator_command(jsonb) TO ${who}`);
   if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_coordinator_connection_command(jsonb)`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_coordinator_connection_command(jsonb) TO ${who}`);
   if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_binder_sharing_command(jsonb)`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_binder_sharing_command(jsonb) TO ${who}`);

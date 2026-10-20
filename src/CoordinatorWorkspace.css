@@ -17,3 +17,11 @@
 .coordinator-workspace .text-button { min-height: 44px; font-size: 14px; }
 .coordinator-workspace button:focus-visible,.coordinator-workspace a:focus-visible { outline: 3px solid #a45139; outline-offset: 4px; }
 @media(max-width:600px){.coordinator-workspace { padding: 20px 16px; }.coordinator-card .button { white-space: normal; }.coordinator-code { padding: 16px; }}
+.coordinator-registration { max-width: 960px; }
+.coordinator-registration-form,.coordinator-card form.coordinator-registration-form { display: grid; gap: 18px; }
+.coordinator-registration-form label { display: grid; gap: 8px; min-width: 0; font-weight: 600; }
+.coordinator-registration-form input,
+.coordinator-registration-form select,
+.coordinator-registration-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px; border: 1px solid #cdbba7; border-radius: 8px; background: #fffdf8; color: #30363b; font: inherit; }
+.coordinator-registration-form textarea { min-height: 100px; resize: vertical; }
+.coordinator-registration .coordinator-card { overflow-wrap: anywhere; }

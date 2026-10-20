@@ -7,7 +7,7 @@ import {coordinatorFlags} from './binder-sharing-policy.mjs';
 import {checkCoordinatorDatabase} from '../ops/coordinator-readiness.mjs';
 const enabled={skip:!process.env.DATABASE_TEST_URL};
 for(const language of ['en','es'])test(`complete ${language} pilot workflow: invitation through voice preparation, publication, guidance and revocation`,enabled,async t=>{
- const f=await coordinatorPilotFixture({language});t.after(()=>f.close());
+ const f=await coordinatorPilotFixture({language,permission:language==='es'?'approved':'adult'});t.after(()=>f.close());
  const call=(actor,path,input)=>f.call(actor,`/api/${path}`,input),student=(path,input)=>call('other',path,{studentId:'alex',...input});
  const outputs=[];const staff=async(path,input,actor='staff')=>{const r=await call(actor,path,{organizationId:f.org,...input});outputs.push(r);return r;};
  const code=(await call('staff','coordinator-access',{action:'rotate-code',id:f.org})).code;

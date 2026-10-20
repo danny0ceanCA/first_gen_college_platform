@@ -15,17 +15,17 @@ services:
       - key: MAINTENANCE_DATABASE_URL
         sync: false
       - key: ORIGEN_COORDINATOR_ACCOUNTS
-        value: "false"
+        value: "true"
       - key: ORIGEN_COORDINATOR_LINKING
-        value: "false"
+        value: "true"
       - key: ORIGEN_BINDER_SHARING
-        value: "false"
+        value: "true"
       - key: ORIGEN_COORDINATOR_BINDER_VIEWING
-        value: "false"
+        value: "true"
       - key: ORIGEN_COORDINATOR_FEEDBACK
-        value: "false"
+        value: "true"
       - key: ORIGEN_COORDINATOR_VOICE_LINKING
-        value: "false"
+        value: "true"
       - key: ORIGEN_VOICE_PREPARATION
         value: "false"
       - key: ORIGEN_BINDER_JOBS

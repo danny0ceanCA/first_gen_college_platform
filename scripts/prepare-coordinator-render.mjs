@@ -45,7 +45,7 @@ async function legacyModule(revision,name){
  return import('data:text/javascript,'+encodeURIComponent(source));
 }
 try{
- const [mode,output]=process.argv.slice(2);if(!process.env.RENDER_API_KEY||!['inspect','apply','verify'].includes(mode))fail('operator_configuration_required');
+ const [mode,output]=process.argv.slice(2);if(!process.env.RENDER_API_KEY||!['inspect','apply','apply-preserving-flags','verify'].includes(mode))fail('operator_configuration_required');
  if(output){try{await readFile(output);fail('output_already_exists');}catch(error){if(error.code!=='ENOENT')throw error;}}
  stage='target-verification';
  const [service,frontend,db,connection,recovery,deploys]=await Promise.all([api(`services/${target.service}`),api(`services/${target.frontend}`),api(`postgres/${target.database}`),api(`postgres/${target.database}/connection-info`),api(`postgres/${target.database}/recovery`),api(`services/${target.service}/deploys?limit=1`)]);
@@ -54,7 +54,8 @@ try{
  const env=await environment(),webEnv=await environment(target.frontend),admin=databaseUrl(connection.externalConnectionString),runtime=databaseUrl(env.get('DATABASE_URL')),maintenance=databaseUrl(env.get('MAINTENANCE_DATABASE_URL'));
  const roles=[admin.username,runtime.username,maintenance.username].map(decodeURIComponent);if(new Set(roles).size!==3||env.has('MIGRATION_DATABASE_URL'))fail('separate_existing_roles_required');
  if(runtime.hostname!==maintenance.hostname||runtime.port!==maintenance.port)fail('maintenance_target_mismatch');
- const candidate={...Object.fromEntries(env),NODE_ENV:'production',RENDER:'true',...Object.fromEntries(coordinatorFlags.map(k=>[k,'false']))};assertProductionConfig(candidate);
+ const preserveFlags=mode==='apply-preserving-flags';
+ const candidate={...Object.fromEntries(env),NODE_ENV:'production',RENDER:'true',...(!preserveFlags?Object.fromEntries(coordinatorFlags.map(k=>[k,'false'])):{})};assertProductionConfig(candidate);
  const webApi=webEnv.get('VITE_API_URL');if(!['https://origen-edu.onrender.com','https://api.origenedu.ai'].includes(webApi?.replace(/\/$/,''))||webEnv.get('VITE_AUTH0_DOMAIN')!==candidate.AUTH0_DOMAIN||webEnv.get('VITE_AUTH0_AUDIENCE')!==candidate.AUTH0_AUDIENCE||!webEnv.get('VITE_AUTH0_CLIENT_ID'))fail('frontend_configuration_mismatch');
  const owner=pool(admin),runtimeExternal=new URL(admin),maintenanceExternal=new URL(admin);runtimeExternal.username=runtime.username;runtimeExternal.password=runtime.password;maintenanceExternal.username=maintenance.username;maintenanceExternal.password=maintenance.password;
  const app=pool(runtimeExternal),cleanup=pool(maintenanceExternal);
@@ -66,7 +67,7 @@ try{
  if(mode==='inspect'){
   console.log(JSON.stringify({stage:'inspected',latestMigration:before.at(-1),recoveryStatus:recovery.recoveryStatus,recoveryStartsAt:recovery.startsAt,legacyRolesValid:true,frontendConfiguration:true,coordinatorFlags:Object.fromEntries(coordinatorFlags.map(k=>[k,env.get(k)==='true'?'enabled':'disabled']))}));
  }else{
-  if(mode==='apply'){
+  if(mode==='apply'||preserveFlags){
    if(recovery.recoveryStatus!=='AVAILABLE'||!Number.isFinite(Date.parse(recovery.startsAt)))fail('recovery_required');
    stage='migrations';await owner.query("SET lock_timeout='5s'; SET statement_timeout='120s'");await migrateDatabase(owner);
    stage='runtime-grants';await grantRuntimeAccess(owner,decodeURIComponent(runtime.username));
@@ -80,12 +81,12 @@ try{
    const next=new Map(current);for(const flag of coordinatorFlags)next.set(flag,'false');
    await api(`services/${target.service}/env-vars`,{method:'PUT',body:[...next].map(([key,value])=>({key,value}))});
   }
-  stage='final-verification';const saved=await environment();if(coordinatorFlags.some(k=>saved.get(k)!=='false'))fail('disabled_flags_not_saved');
+  stage='final-verification';const saved=await environment();if(coordinatorFlags.some(k=>saved.get(k)!==(preserveFlags?env.get(k):'false')))fail('flag_verification_failed');
   const unrelated=map=>new Map([...map].filter(([k])=>!coordinatorFlags.includes(k)));if(fingerprint(unrelated(saved))!==fingerprint(unrelated(env)))fail('unrelated_environment_changed');
   const finalDeploys=await api(`services/${target.service}/deploys?limit=1`),finalDeploy=finalDeploys[0]?.deploy||finalDeploys[0];if(finalDeploy?.id!==live.id||finalDeploy.status!=='live')fail('deployment_changed');
   const health=await fetch(service.serviceDetails.url+'/healthz',{redirect:'error',signal:AbortSignal.timeout(15000)}),web=await fetch(frontend.serviceDetails.url,{redirect:'error',signal:AbortSignal.timeout(15000)});if(!health.ok||!web.ok)fail('live_health_failed');await health.arrayBuffer();await web.arrayBuffer();
   const after=(await owner.query('SELECT name FROM origen_schema_migrations ORDER BY name')).rows.map(r=>r.name);
-  const report={schemaVersion:1,kind:'coordinator-production-preparation',checkedAt:new Date().toISOString(),service:target.service,database:target.database,previousMigration:before.at(-1),latestMigration:after.at(-1),migrationsApplied:after.filter(n=>!before.includes(n)),databaseReadiness:readiness,legacyRuntimeCompatible:true,legacyMaintenanceCompatible:true,productionConfiguration:true,frontendConfiguration:true,coordinatorMaintenance:lifecycle,disabledFlags:Object.fromEntries(coordinatorFlags.map(k=>[k,false])),unrelatedEnvironmentPreserved:true,existingCredentialsPreserved:true,migrationCredentialInApi:false,recoveryStatus:recovery.recoveryStatus,recoveryStartsAt:recovery.startsAt,liveDeployment:{id:live.id,commit:live.commit.id,unchanged:true},apiHealth:true,frontendHealth:true,deploymentTriggered:false,credentialFilesWritten:false};
+  const report={schemaVersion:1,kind:'coordinator-production-preparation',checkedAt:new Date().toISOString(),service:target.service,database:target.database,previousMigration:before.at(-1),latestMigration:after.at(-1),migrationsApplied:after.filter(n=>!before.includes(n)),databaseReadiness:readiness,legacyRuntimeCompatible:true,legacyMaintenanceCompatible:true,productionConfiguration:true,frontendConfiguration:true,coordinatorMaintenance:lifecycle,coordinatorFlags:Object.fromEntries(coordinatorFlags.map(k=>[k,saved.get(k)==='true'])),environmentPreserved:preserveFlags,unrelatedEnvironmentPreserved:true,existingCredentialsPreserved:true,migrationCredentialInApi:false,recoveryStatus:recovery.recoveryStatus,recoveryStartsAt:recovery.startsAt,liveDeployment:{id:live.id,commit:live.commit.id,unchanged:true},apiHealth:true,frontendHealth:true,deploymentTriggered:false,credentialFilesWritten:false};
   if(output)await writeFile(output,JSON.stringify(report,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(report));
  }
 }catch(error){console.error(JSON.stringify({stage,status:'preparation_incomplete',code:error.safeCode??(/^[A-Z0-9]{5}$/.test(error.code??'')?`postgres_${error.code}`:'verification_failed'),credentialsPrinted:false}));process.exitCode=1;}

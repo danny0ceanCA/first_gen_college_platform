@@ -52,13 +52,13 @@ test('connection challenges enforce pilot, ownership, turns, expiration and acce
  const account=(await f.owner.query("SELECT id FROM origen_accounts WHERE auth0_subject='other'")).rows[0].id;
  const run=async(action,extra={},sub='other')=>f.as(sub,()=>runConnectionCommand(f.db,{...validateConnectionInput({action,...extra}),networkHash:hash('synthetic-network'),voiceEnabled:true}));
  const staff=(action,extra={},sub='staff')=>f.as(sub,()=>runAsCoordinatorActor(sub,{},()=>runConnectionCommand(f.db,validateConnectionInput({action,organizationId:org,...extra}))));
- const seed=async()=>{await f.owner.query("INSERT INTO origen_eligibility(subject_hash,age_band,audience,status,notice_version) VALUES($1,'18plus','grade9plus','adult','synthetic') ON CONFLICT(subject_hash) DO UPDATE SET status='adult'",[hash('other')]);await f.owner.query("INSERT INTO origen_coordinator_student_pilots(account_id,student_id,permission_revision,approved_by) VALUES($1,'alex',1,'synthetic-reviewer') ON CONFLICT DO NOTHING",[account]);};
+ const seed=async()=>{await f.owner.query("INSERT INTO origen_eligibility(subject_hash,age_band,audience,status,notice_version) VALUES($1,'18plus','grade9plus','adult','synthetic') ON CONFLICT(subject_hash) DO UPDATE SET status='adult'",[hash('other')]);};
  const open=async(channel='screen')=>({...await run('open',{studentId:'alex',channel}),sequence:0});
  const prepare=async ctx=>{const found=await run('lookup',{...ctx,code});return {...ctx,...await run('prepare',{...ctx,challengeId:found.challengeId})};};
  const confirm=card=>run('confirm',{...card,confirmed:true,topics:['options']});
- await t.test('only an operator-approved adult-owned profile can connect',async()=>{
+ await t.test('current account permission allows owned student profiles without operator enrollment',async()=>{
   await assert.rejects(open(),{status:403});await seed();await run('available',{studentId:'alex'});
-  await assert.rejects(run('available',{studentId:'sam'}),{status:403});await assert.rejects(run('available',{studentId:'alex'},'reader'),{status:403});
+  await run('available',{studentId:'sam'});await assert.rejects(run('available',{studentId:'missing'}),{status:403});await assert.rejects(run('available',{studentId:'alex'},'reader'),{status:403});
   await f.owner.query("UPDATE origen_eligibility SET status='approved' WHERE subject_hash=$1",[hash('other')]);await assert.rejects(open(),{status:403});await seed();
  });
  let connection;
@@ -105,11 +105,11 @@ test('connection challenges enforce pilot, ownership, turns, expiration and acce
   await f.owner.query('INSERT INTO origen_coordinator_lookup_budgets(key,attempts) VALUES($1,100)',['n:'+hash('synthetic-network')]);
   await assert.rejects(run('lookup',{...await open(),code}),{status:429});await f.owner.query('DELETE FROM origen_coordinator_lookup_budgets');
   const card=await prepare(await open());const created=await confirm(card);await staff('accept',{connectionId:created.connectionId});
-  await f.owner.query('DELETE FROM origen_coordinator_student_pilots WHERE account_id=$1',[account]);
+  await f.owner.query("UPDATE origen_eligibility SET status='revoked',revision=revision+1 WHERE subject_hash=$1",[hash('other')]);
   assert.equal((await f.owner.query('SELECT status FROM origen_binder_connections WHERE id=$1',[created.connectionId])).rows[0].status,'revoked');
   await seed();await assert.rejects(confirm(card),{status:403});assert.equal((await staff('inbox')).connections.length,0);
   const newCard=await prepare(await open());await f.family('other',{action:'save-account',account:{firstName:'Synthetic',email:'',role:'parent'}});await f.family('other',{action:'save-account',account:{firstName:'Synthetic',email:'',role:'student'}});
-  await assert.rejects(confirm(newCard),{status:403});await assert.rejects(open(),{status:403});
+  await assert.rejects(confirm(newCard),{status:403});await open();
  });
  await t.test('HTTP separates student requests from fresh staff approval and keeps codes out of logs',async()=>{
   await seed();const now=Math.floor(Date.now()/1000);let identity={sub:'staff',iat:now,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now},verified=true;

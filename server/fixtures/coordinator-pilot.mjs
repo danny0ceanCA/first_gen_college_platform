@@ -16,7 +16,7 @@ import {MFA_TIME_CLAIM} from '../staff-access.mjs';
 import {AUTH_TIME_CLAIM} from '../recent-auth.mjs';
 import {coordinatorFlags} from '../binder-sharing-policy.mjs';
 
-export async function coordinatorPilotFixture({language='en'}={}){
+export async function coordinatorPilotFixture({language='en',permission='adult'}={}){
  const f=await retrievalFixture(),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
  const cleanup=async()=>{if(server)await new Promise(r=>{server.close(r);server.closeAllConnections();});if(maintenance){await maintenance.end();await f.owner.query(`DROP OWNED BY ${maintenanceRole}`);await f.owner.query(`DROP ROLE ${maintenanceRole}`);}await f.close();};
  try{
@@ -41,8 +41,8 @@ export async function coordinatorPilotFixture({language='en'}={}){
   await call('reviewer','/api/coordinator-access',{action:'approve-organization',id:org});
   for(const subject of ['staff','colleague'])await call('owner','/api/coordinator-access',{action:'enable-member',id:org,subject});
   await f.owner.query("INSERT INTO origen_eligibility(subject_hash,age_band,audience,status,notice_version) VALUES($1,'18plus','grade9plus','adult','synthetic')",[createHash('sha256').update('other').digest('hex')]);
-  await f.owner.query("INSERT INTO origen_coordinator_student_pilots(account_id,student_id,permission_revision,approved_by) VALUES($1,'alex',1,'synthetic-reviewer')",[account]);
-  const notes=[];
+  if(permission==='approved')await f.owner.query("UPDATE origen_eligibility SET age_band='13to17',status='approved',permission_expires_at=now()+interval '30 days' WHERE subject_hash=$1",[createHash('sha256').update('other').digest('hex')]);
+ const notes=[];
   for(const [topic,content] of [['options',language==='es'?'Comparar programas de biología.':'Compare biology programs.'],['costs',language==='es'?'Preguntar por becas locales.':'Ask about local scholarships.'],['options','UNPUBLISHED_SENTINEL'],['options','FAMILY_DERIVED_SENTINEL']]){const id=randomUUID();await f.note({action:'create',studentId:'alex',id,note:{topic,kind:'note',content,language}},'other');notes.push(id);}
   await f.owner.query("UPDATE origen_binder_source_lineage SET classification='family' WHERE source_id=$1",[notes[3]]);
   await f.save('private-family','FAMILY_CONVERSATION_SENTINEL',{studentId:null,sub:'other'});
