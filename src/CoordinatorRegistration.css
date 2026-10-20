@@ -1,0 +1,123 @@
+.coordinator-registration { max-width: 1180px; padding: 0 40px 32px; color: #303b3d; }
+.coordinator-registration *, .coordinator-registration *::before, .coordinator-registration *::after { box-sizing: border-box; }
+.coordinator-registration > .coordinator-registration-nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 28px 0; margin: 0; border-bottom: 1px solid #dfd3c4; }
+.coordinator-registration-brand { color: #a4513c; font-size: 30px; font-weight: 750; letter-spacing: -.05em; text-decoration: none; white-space: nowrap; }
+.coordinator-registration-brand > span { margin-right: 5px; font-weight: 400; }
+.coordinator-registration-nav > div { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 18px; }
+.coordinator-workspace-link { display: inline-flex; align-items: center; gap: 8px; color: #655d53; font-size: 14px; text-decoration: none; }
+.coordinator-language { border: 1px solid #d8c7b4; border-radius: 999px; padding: 9px 16px; background: transparent; color: #694b3e; font: inherit; font-size: 13px; cursor: pointer; min-height: 44px; }
+.coordinator-registration-hero { display: grid; grid-template-columns: 1.08fr .92fr; gap: 64px; align-items: center; padding: 62px 0 66px; }
+.coordinator-registration-intro .eyebrow { color: #a4513c; font-size: 10px; letter-spacing: .16em; font-weight: 700; margin-bottom: 24px; }
+.coordinator-registration-intro h1 { margin: 0 0 24px; font-size: clamp(38px,4.8vw,62px); line-height: 1.09; font-weight: 600; letter-spacing: -.045em; }
+.coordinator-registration-intro h1 em { display: block; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; color: #a4513c; letter-spacing: -.045em; }
+.coordinator-registration-lead { font-size: 17px; line-height: 1.8; color: #6b655e; margin: 0; max-width: 510px; }
+.coordinator-privacy-promise { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.65; margin: 24px 0 0; color: #596d5c; max-width: 410px; }
+.coordinator-privacy-promise svg { flex: 0 0 auto; margin-top: 2px; }
+.coordinator-binder-example { padding: 12px 10px 0 18px; min-width: 0; }
+.coordinator-example-caption { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #74664e; margin-bottom: 36px; }
+.coordinator-example-paper { position: relative; background: #fffdf7; padding: 34px 26px 20px 35px; border: 1px solid #d8c5ab; border-left: 12px solid #c4c4b8; border-radius: 5px 16px 16px 5px; box-shadow: 7px 7px 0 -1px #f4eadb, 7px 7px 0 0 #d6c6ad, 13px 13px 0 -1px #f4eadb, 13px 13px 0 0 #d6c6ad, 0 18px 38px -24px #63462966; transform: rotate(-2deg); }
+.coordinator-example-paper::before, .coordinator-example-paper::after { content: ''; position: absolute; left: -19px; width: 23px; height: 10px; border: 2px solid #e7e8df; border-radius: 5px; background: #aeb4a9; box-shadow: 0 1px 2px #7b7c6b55; }
+.coordinator-example-paper::before { top: 64px; }
+.coordinator-example-paper::after { bottom: 55px; }
+.coordinator-example-tab { position: absolute; top: -21px; left: 24px; padding: 7px 14px; border-radius: 8px 8px 0 0; background: #a4513c; color: #fff8ed; font-size: 11px; font-weight: 600; }
+.coordinator-example-label { font-size: 9px; font-weight: 700; letter-spacing: .17em; color: #87765c; margin: 3px 0 14px; }
+.coordinator-example-paper h2 { font: 400 25px/1.2 Georgia, 'Times New Roman', serif; margin: 0 0 16px; letter-spacing: -.02em; }
+.coordinator-example-student { font-size: 15px; line-height: 1.8; margin: 0 0 22px; padding-bottom: 15px; border-bottom: 1px solid #e9ddcb; color: #60685d; }
+.coordinator-example-guidance { padding: 14px 15px; border-left: 2px solid #ac5945; border-radius: 0 8px 8px 0; background: #fbf1e9; color: #994530; }
+.coordinator-example-guidance > span { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; }
+.coordinator-example-guidance p { margin: 8px 0 0; font: italic 16px/1.55 Georgia, 'Times New Roman', serif; }
+.coordinator-example-footer { display: flex; align-items: center; gap: 7px; font-size: 9px; margin: 20px 0 0; color: #6c7c68; }
+.coordinator-example-disclosure { display: block; text-align: right; font-size: 10px; margin: 25px 4px 0; color: #81776c; }
+.coordinator-journey { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 28px; list-style: none; padding: 26px 0; margin: 0; border-top: 1px solid #dfd3c4; border-bottom: 1px solid #dfd3c4; }
+.coordinator-journey li { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+.coordinator-journey-number { font: italic 26px/1.2 Georgia, 'Times New Roman', serif; color: #b57961; }
+.coordinator-journey h2 { font-size: 14px; font-weight: 600; margin: 2px 0 6px; line-height: 1.4; }
+.coordinator-journey p { font-size: 12px; color: #75695e; margin: 0; line-height: 1.6; }
+.coordinator-registration-layout { display: grid; grid-template-columns: minmax(0,1.13fr) minmax(0,.87fr); gap: 30px; align-items: start; margin: 40px 0 60px; }
+.coordinator-registration-main, .coordinator-registration-help { min-width: 0; }
+.coordinator-registration .coordinator-card { margin-top: 0; padding: 32px; border-color: #deceba; background: #fffcf7; }
+.coordinator-card-eyebrow { display: block; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: #a4513c; margin-bottom: 15px; }
+.coordinator-registration .coordinator-card h2 { font-size: 25px; line-height: 1.25; letter-spacing: -.035em; margin: 0 0 15px; }
+.coordinator-signup-card > p { font-size: 14px; line-height: 1.8; color: #75695e; margin: 0 0 24px; }
+.coordinator-registration .coordinator-signup-button { display: flex; justify-content: space-between; width: 100%; gap: 12px; font-size: 14px; min-height: 54px; border-radius: 10px; }
+.coordinator-signin-divider { display: flex; align-items: center; gap: 12px; margin-top: 25px; color: #877b6c; font-size: 11px; }
+.coordinator-signin-divider::before, .coordinator-signin-divider::after { content: ''; height: 1px; background: #e6dacc; flex: 1; }
+.coordinator-signin-button { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 15px 0; width: 100%; background: transparent; border: 0; font: inherit; font-size: 13px; color: #9c513c; cursor: pointer; min-height: 44px; }
+.coordinator-registration p.coordinator-access-caption { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.65; color: #817565; padding-top: 16px; margin: 12px 0 0; border-top: 1px solid #e7dcce; }
+.coordinator-access-caption svg { flex: 0 0 auto; margin-top: 2px; }
+.coordinator-organization-help { padding: 24px 26px; background: #e9eee4; border-radius: 16px; border: 1px solid #d7dfce; }
+.coordinator-help-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1px solid #cad4c0; border-radius: 10px; color: #5c735c; background: #f2f5ee; margin-bottom: 13px; }
+.coordinator-organization-help h2 { font-size: 18px; letter-spacing: -.02em; line-height: 1.35; margin: 0 0 12px; }
+.coordinator-organization-help > p { font-size: 13px; line-height: 1.7; color: #60705e; margin: 0 0 14px; }
+.coordinator-organization-help details { border-top: 1px solid #cfd8c6; padding: 11px 0; }
+.coordinator-organization-help summary { cursor: pointer; font-size: 12px; font-weight: 600; line-height: 1.6; color: #476047; }
+.coordinator-organization-help details p { font-size: 12px; line-height: 1.75; margin: 11px 0; color: #60705e; }
+.coordinator-organization-help details a { display: inline-flex; align-items: center; gap: 7px; color: #476047; font-size: 12px; min-height: 36px; text-underline-offset: 3px; }
+.coordinator-registration .coordinator-readiness { padding: 24px 26px; margin: 18px 0 0; background: #f4ebdc; border-color: #e0d1b9; }
+.coordinator-registration .coordinator-readiness h2 { font-size: 18px; letter-spacing: -.02em; }
+.coordinator-registration .coordinator-readiness ul { padding-left: 18px; font-size: 12px; line-height: 1.75; color: #72614c; }
+.coordinator-registration .coordinator-readiness > p { font-size: 12px; line-height: 1.75; color: #72614c; }
+.coordinator-registration .authenticator-guide { font-size: 12px; line-height: 1.75; }
+.coordinator-registration .authenticator-guide summary { font-size: 12px; }
+.coordinator-registration .coordinator-registration-form { gap: 18px; }
+.coordinator-registration-form .coordinator-card-eyebrow { margin: 0; }
+.coordinator-registration-form .coordinator-form-intro { font-size: 14px; line-height: 1.7; margin: -12px 0 0; color: #75695e; }
+.coordinator-registration .coordinator-registration-form h2 { margin-bottom: 0; }
+.coordinator-registration .coordinator-registration-form label { font-size: 12px; color: #66594a; }
+.coordinator-registration .coordinator-registration-form input { padding: 14px; font-size: 15px; background: #fffefb; border-color: #dbcebe; }
+.coordinator-application-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.coordinator-application-controls > span { font-size: 10px; letter-spacing: .13em; color: #8e6b53; font-weight: 700; }
+.coordinator-status-pill { display: inline-flex; padding: 6px 12px; margin-bottom: 19px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #f4e4c9; color: #85612b; }
+.coordinator-status-pill.approved { background: #e6eddf; color: #4d6d47; }
+.coordinator-status-pill.declined { background: #f4e4db; color: #98533e; }
+.coordinator-applicant { display: grid; gap: 5px; padding: 18px 0; margin-bottom: 14px; border-block: 1px solid #e7dccd; font-size: 12px; color: #7f705e; }
+.coordinator-applicant strong { color: #3e4943; font-size: 16px; }
+.coordinator-application-status > p { font-size: 13px; color: #75695e; line-height: 1.8; }
+.coordinator-review-message { padding: 15px; margin: 18px 0; border-radius: 8px; background: #f5ebdf; }
+.coordinator-review-message > span { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #97644b; }
+.coordinator-review-message p { font-size: 13px; line-height: 1.7; margin: 8px 0 0; }
+.coordinator-registration-footer { display: flex; align-items: center; gap: 20px; border-top: 1px solid #dfd3c4; padding: 24px 0 0; color: #8c7c69; }
+.coordinator-registration-footer .coordinator-registration-brand { font-size: 21px; color: #887761; }
+.coordinator-registration-footer p { margin: 0; flex: 1; font-size: 11px; }
+.coordinator-registration-footer > a { color: #796a57; font-size: 11px; text-underline-offset: 3px; }
+.coordinator-registration button:focus-visible, .coordinator-registration a:focus-visible, .coordinator-registration summary:focus-visible { outline: 3px solid #a4513c; outline-offset: 4px; }
+@media(max-width:900px){
+ .coordinator-registration { padding-inline: 26px; }
+ .coordinator-registration-hero { gap: 28px; padding-top: 45px; }
+ .coordinator-registration-intro h1 { font-size: 43px; }
+ .coordinator-registration-lead { font-size: 15px; }
+ .coordinator-example-paper { padding: 30px 20px 20px 25px; }
+ .coordinator-registration-layout { gap: 20px; }
+ .coordinator-registration .coordinator-card { padding: 26px; }
+ .coordinator-registration .coordinator-readiness, .coordinator-organization-help { padding: 22px; }
+}
+@media(max-width:700px){
+ .coordinator-registration { padding: 0 20px 24px; }
+ .coordinator-registration > .coordinator-registration-nav { padding: 20px 0; align-items: flex-start; }
+ .coordinator-registration-brand { font-size: 26px; }
+ .coordinator-registration-nav > div { gap: 8px 12px; }
+ .coordinator-workspace-link { font-size: 11px; }
+ .coordinator-language { font-size: 11px; padding: 6px 11px; }
+ .coordinator-registration-hero { grid-template-columns: 1fr; padding: 38px 0 30px; gap: 0; }
+ .coordinator-registration-intro .eyebrow { font-size: 9px; margin-bottom: 18px; }
+ .coordinator-registration-intro h1 { font-size: clamp(36px,8vw,48px); max-width: 550px; }
+ .coordinator-registration-lead { font-size: 15px; line-height: 1.75; }
+ .coordinator-privacy-promise { font-size: 13px; margin-top: 20px; }
+ .coordinator-binder-example { display: none; }
+ .coordinator-journey { grid-template-columns: 1fr; gap: 18px; padding: 22px 0; }
+ .coordinator-journey li { gap: 16px; }
+ .coordinator-journey-number { font-size: 23px; }
+ .coordinator-journey h2 { font-size: 15px; margin: 0 0 3px; }
+ .coordinator-journey p { font-size: 13px; }
+ .coordinator-organization-help summary, .coordinator-organization-help details p, .coordinator-organization-help details a,
+ .coordinator-registration .coordinator-readiness ul, .coordinator-registration .coordinator-readiness > p,
+ .coordinator-registration .authenticator-guide, .coordinator-registration .authenticator-guide summary { font-size: 13px; }
+ .coordinator-registration-layout { grid-template-columns: 1fr; margin: 26px 0 38px; gap: 24px; }
+ .coordinator-registration .coordinator-card { padding: 25px 23px; border-radius: 16px; }
+ .coordinator-registration .coordinator-card h2 { font-size: 23px; }
+ .coordinator-signup-card > p { font-size: 13px; }
+ .coordinator-registration .coordinator-signup-button { font-size: 13px; }
+ .coordinator-registration-footer { flex-wrap: wrap; gap: 10px 18px; }
+ .coordinator-registration-footer p { min-width: 150px; }
+}
+@media(prefers-reduced-motion:no-preference){ .coordinator-registration .button { transition: background-color 160ms ease, box-shadow 160ms ease; } .coordinator-registration .button:hover { box-shadow: 0 4px 12px -5px #6b402f55; } }

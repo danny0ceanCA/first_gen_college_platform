@@ -1,9 +1,11 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
+import {ArrowRight,BookOpen,Building2,Check,MessageCircle,ShieldCheck} from 'lucide-react';
 import {apiFetch} from './api';
 import {CoordinatorReadiness} from './AuthenticatorGuide';
 import './InstitutionPortal.css';
 import './CoordinatorWorkspace.css';
+import './CoordinatorRegistration.css';
 
 type Application={id:string;displayName:string;email:string;organizationName:string;organizationWebsite:string;jobRole:string;status:'pending'|'approved'|'declined';reviewNote:string;createdAt:string};
 type Translate=(en:string,es:string)=>string;
@@ -43,30 +45,61 @@ export default function CoordinatorRegistration(){
   finally{if(current===version.current)setBusy(false);}
  }
  return <main className="institution-shell coordinator-workspace coordinator-registration">
-  <nav className="institution-actions" aria-label={t('Navigation','Navegación')}><a href="#">{t('← Origen','← Origen')}</a><a href="#coordinators">{t('Coordinator workspace','Espacio del coordinador')}</a><button className="text-button" onClick={()=>{setEs(!es);localStorage.setItem('origen.language',es?'en':'es');}}>{es?'English':'Español'}</button>{isAuthenticated&&<button className="text-button" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>{t('Log out','Cerrar sesión')}</button>}</nav>
-  <div className="eyebrow">{t('FOR COORDINATORS','PARA COORDINADORES')}</div>
-  <h1>{t('Help students take their next step.','Ayuda a los estudiantes a dar su siguiente paso.')}</h1>
-  <p>{t('Apply to guide students through Origen. We’ll review your role and organization before enabling coordinator access.','Solicita acceso para orientar a estudiantes con Origen. Revisaremos tu función y organización antes de activar tu acceso.')}</p>
-  <p>{t('Students choose what to share. Family conversations remain private.','Los estudiantes eligen qué compartir. Las conversaciones familiares permanecen privadas.')}</p>
-  <CoordinatorReadiness es={es}/>
-  {isLoading?<p role="status">{t('Loading…','Cargando…')}</p>:!isAuthenticated?<section className="coordinator-card"><h2>{t('Start with your own account','Empieza con tu propia cuenta')}</h2><p>{t('Use the email you want associated with your coordinator work.','Usa el correo que deseas asociar con tu trabajo de coordinador.')}</p><div className="institution-actions"><button className="button primary" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'},authorizationParams:{screen_hint:'signup'}}).catch(()=>setError('signin'))}>{t('Register as a coordinator','Registrarme como coordinador')}</button><button className="button outline" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'}}).catch(()=>setError('signin'))}>{t('Already have an account? Sign in','¿Ya tienes cuenta? Inicia sesión')}</button></div></section>:<>
-   <button className="text-button" disabled={busy} onClick={()=>setRetry(n=>n+1)}>{t('Refresh status','Actualizar estado')}</button>
-   {busy&&<p role="status">{t('Checking your application…','Consultando tu solicitud…')}</p>}
-   {application?<section className="coordinator-card" aria-labelledby="application-status"><h2 id="application-status">{application.status==='pending'?t('Your application is awaiting review','Tu solicitud está pendiente de revisión'):application.status==='approved'?t('Your application was approved','Tu solicitud fue aprobada'):t('Your application was not approved','Tu solicitud no fue aprobada')}</h2><p><strong>{application.displayName}</strong> · {application.organizationName}</p><p>{application.jobRole} · {application.email}</p>
-    {application.reviewNote&&<p>{application.reviewNote}</p>}
-    {application.status==='pending'&&<p>{t('The Origen team will verify your affiliation. Your organization’s owner may send you an invitation to join its team. Return here to check your status; no approval email is sent automatically.','El equipo de Origen verificará tu afiliación. El propietario de tu organización puede enviarte una invitación para unirte a su equipo. Vuelve aquí para consultar tu estado; no se envía un correo de aprobación automáticamente.')}</p>}
-    {application.status==='approved'?<><p>{t('Open your workspace to verify your sign-in with multi-factor authentication and create your connection code. Workspace access also depends on your organization and current staff permissions.','Abre tu espacio para verificar tu inicio de sesión con autenticación multifactor y crear tu código de conexión. El acceso también depende de tu organización y tus permisos actuales.')}</p><a className="button primary" href="#coordinators">{t('Open coordinator workspace','Abrir espacio del coordinador')}</a></>:<button className="button outline" disabled={busy} onClick={()=>{if(window.confirm(t('Withdraw this application? You can submit a new one.','¿Retirar esta solicitud? Puedes enviar una nueva.')))void submit(true);}}>{t('Withdraw application','Retirar solicitud')}</button>}
-   </section>:application===null&&<form className="coordinator-card coordinator-registration-form" onSubmit={e=>{e.preventDefault();void submit();}}>
-    <h2>{t('Tell us about your work','Cuéntanos sobre tu trabajo')}</h2>
-    <label>{t('Your name','Tu nombre')}<input required autoComplete="name" maxLength={100} value={displayName} onChange={e=>setName(e.target.value)}/></label>
-    <label>{t('Organization name','Nombre de la organización')}<input required autoComplete="organization" maxLength={200} value={organizationName} onChange={e=>setOrganization(e.target.value)}/></label>
-    <label>{t('Organization website (https://)','Sitio web de la organización (https://)')}<input required type="url" placeholder="https://example.org" maxLength={2000} value={organizationWebsite} onChange={e=>setWebsite(e.target.value)}/></label>
-    <label>{t('Your role or job title','Tu función o cargo')}<input required autoComplete="organization-title" maxLength={200} value={jobRole} onChange={e=>setRole(e.target.value)}/></label>
-    <p>{t('Your verified sign-in email will be included with your application. Submitting does not give access to any student information.','Incluiremos tu correo de inicio de sesión verificado en la solicitud. Enviarla no da acceso a información de estudiantes.')}</p>
-    <button className="button primary" disabled={busy}>{t('Submit for review','Enviar para revisión')}</button>
-   </form>}
-  </>}
-  {error&&<p className="institution-error" role="alert">{applicationError(error,t)}</p>}
+  <nav className="coordinator-registration-nav" aria-label={t('Navigation','Navegación')}>
+   <a className="coordinator-registration-brand" href="#" aria-label="Origen"><span aria-hidden="true">○</span> origen.</a>
+   <div><a className="coordinator-workspace-link" href="#coordinators">{t('Coordinator workspace','Espacio del coordinador')} <ArrowRight size={15} aria-hidden="true"/></a><button className="coordinator-language" onClick={()=>{setEs(!es);localStorage.setItem('origen.language',es?'en':'es');}}>{es?'English':'Español'}</button>{isAuthenticated&&<button className="coordinator-language" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>{t('Log out','Cerrar sesión')}</button>}</div>
+  </nav>
+  <header className="coordinator-registration-hero">
+   <div className="coordinator-registration-intro">
+    <div className="eyebrow">{t('FOR THE PEOPLE GUIDING THE WAY','PARA QUIENES ACOMPAÑAN EL CAMINO')}</div>
+    <h1>{t('Help students take','Ayuda a los estudiantes a dar')} <em>{t('their next step.','su siguiente paso.')}</em></h1>
+    <p className="coordinator-registration-lead">{t('Stay connected between meetings. Review the binder pages students choose to share, leave a little guidance, and help them move forward.','Mantén el contacto entre reuniones. Revisa las páginas que los estudiantes eligen compartir, deja orientación y ayúdalos a seguir adelante.')}</p>
+    <p className="coordinator-privacy-promise"><ShieldCheck size={20} aria-hidden="true"/>{t('Shared by the student. Guided by you. Family conversations stay private.','El estudiante elige qué compartir. Tú orientas. Las conversaciones familiares siguen siendo privadas.')}</p>
+   </div>
+   <div className="coordinator-binder-example" aria-label={t('Illustrative example of a shared binder','Ejemplo ilustrativo de una carpeta compartida')}>
+    <div className="coordinator-example-caption"><BookOpen size={17} aria-hidden="true"/>{t('A little context. A better conversation.','Un poco de contexto. Una mejor conversación.')}</div>
+    <div className="coordinator-example-paper">
+     <span className="coordinator-example-tab">{t('College options','Opciones universitarias')}</span>
+     <div className="coordinator-example-label">{t('FROM MY BINDER','DE MI CARPETA')}</div>
+     <h2>{t('Making room for what’s next.','Un espacio para lo que sigue.')}</h2>
+     <p className="coordinator-example-student">{t('Compare two programs and bring my questions to our next meeting.','Comparar dos programas y llevar mis preguntas a nuestra próxima reunión.')}</p>
+     <div className="coordinator-example-guidance"><span><MessageCircle size={14} aria-hidden="true"/>{t('A note from your coordinator','Una nota de tu coordinador')}</span><p>{t('Let’s look at costs and student support together. Bring the programs you’re curious about.','Revisemos los costos y los apoyos juntos. Trae los programas que te interesan.')}</p></div>
+     <div className="coordinator-example-footer"><Check size={14} aria-hidden="true"/>{t('Only the pages the student shares','Solo las páginas que comparte el estudiante')}</div>
+    </div>
+    <span className="coordinator-example-disclosure">{t('Illustrative example','Ejemplo ilustrativo')}</span>
+   </div>
+  </header>
+  <ol className="coordinator-journey" aria-label={t('How coordinator registration works','Cómo funciona el registro de coordinadores')}>
+   {[['Create your account','Crea tu cuenta','Use your own email and tell us about your work.','Usa tu propio correo y cuéntanos sobre tu trabajo.'],['Connect with your organization','Conéctate con tu organización','We review your affiliation before enabling access.','Revisamos tu afiliación antes de activar el acceso.'],['Guide from their binder','Orienta desde su carpeta','Students decide what to share with you.','Los estudiantes deciden qué compartir contigo.']].map(([en,sp,detailEn,detailSp],i)=><li key={en}><span className="coordinator-journey-number" aria-hidden="true">0{i+1}</span><div><h2>{t(en,sp)}</h2><p>{t(detailEn,detailSp)}</p></div></li>)}
+  </ol>
+  <div className="coordinator-registration-layout">
+   <section className="coordinator-registration-main" aria-label={t('Your coordinator application','Tu solicitud como coordinador')}>
+   {isLoading?<div className="coordinator-card"><p role="status">{t('Loading…','Cargando…')}</p></div>:!isAuthenticated?<section className="coordinator-card coordinator-signup-card"><span className="coordinator-card-eyebrow">{t('YOUR NEXT STEP','TU SIGUIENTE PASO')}</span><h2>{t('Start with your own account','Empieza con tu propia cuenta')}</h2><p>{t('Use the email you want associated with your coordinator work. You can apply now and set up verification when you’re ready for staff access.','Usa el correo que deseas asociar con tu trabajo de coordinador. Puedes enviar tu solicitud ahora y configurar la verificación cuando vayas a acceder como personal.')}</p><button className="button primary coordinator-signup-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'},authorizationParams:{screen_hint:'signup'}}).catch(()=>setError('signin'))}>{t('Register as a coordinator','Registrarme como coordinador')}<ArrowRight size={18} aria-hidden="true"/></button><div className="coordinator-signin-divider"><span>{t('Already part of Origen?','¿Ya tienes cuenta en Origen?')}</span></div><button className="coordinator-signin-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'}}).catch(()=>setError('signin'))}>{t('Already have an account? Sign in','¿Ya tienes cuenta? Inicia sesión')}<ArrowRight size={15} aria-hidden="true"/></button><p className="coordinator-access-caption"><ShieldCheck size={15} aria-hidden="true"/>{t('Your application is reviewed before coordinator access is enabled.','Revisamos tu solicitud antes de activar el acceso como coordinador.')}</p></section>:<>
+    <div className="coordinator-application-controls"><span>{t('YOUR APPLICATION','TU SOLICITUD')}</span><button className="text-button" disabled={busy} onClick={()=>setRetry(n=>n+1)}>{t('Refresh status','Actualizar estado')}</button></div>
+    {busy&&<p role="status">{t('Checking your application…','Consultando tu solicitud…')}</p>}
+    {application?<section className="coordinator-card coordinator-application-status" aria-labelledby="application-status"><span className={'coordinator-status-pill '+application.status}>{application.status==='pending'?t('In review','En revisión'):application.status==='approved'?t('Approved','Aprobada'):t('Review complete','Revisión completada')}</span><h2 id="application-status">{application.status==='pending'?t('Your application is awaiting review','Tu solicitud está pendiente de revisión'):application.status==='approved'?t('Your application was approved','Tu solicitud fue aprobada'):t('Your application was not approved','Tu solicitud no fue aprobada')}</h2><div className="coordinator-applicant"><strong>{application.displayName}</strong><span>{application.organizationName} · {application.jobRole}</span><span>{application.email}</span></div>
+     {application.reviewNote&&<div className="coordinator-review-message"><span>{t('From the Origen team','Del equipo de Origen')}</span><p>{application.reviewNote}</p></div>}
+     {application.status==='pending'&&<p>{t('The Origen team will verify your affiliation. Your organization’s owner may send you an invitation to join its team. Return here to check your status; no approval email is sent automatically.','El equipo de Origen verificará tu afiliación. El propietario de tu organización puede enviarte una invitación para unirte a su equipo. Vuelve aquí para consultar tu estado; no se envía un correo de aprobación automáticamente.')}</p>}
+     {application.status==='approved'?<><p>{t('Open your workspace to verify your sign-in and create your connection code. Access also depends on your organization and current staff permissions.','Abre tu espacio para verificar tu inicio de sesión y crear tu código de conexión. El acceso también depende de tu organización y tus permisos actuales.')}</p><a className="button primary" href="#coordinators">{t('Open coordinator workspace','Abrir espacio del coordinador')}<ArrowRight size={17} aria-hidden="true"/></a></>:<button className="text-button" disabled={busy} onClick={()=>{if(window.confirm(t('Withdraw this application? You can submit a new one.','¿Retirar esta solicitud? Puedes enviar una nueva.')))void submit(true);}}>{t('Withdraw application','Retirar solicitud')}</button>}
+    </section>:application===null&&<form className="coordinator-card coordinator-registration-form" onSubmit={e=>{e.preventDefault();void submit();}}>
+     <span className="coordinator-card-eyebrow">{t('LET’S GET TO KNOW YOU','CUÉNTANOS SOBRE TI')}</span><h2>{t('Tell us about your work','Cuéntanos sobre tu trabajo')}</h2>
+     <p className="coordinator-form-intro">{t('Share a few details so we can review your role and organization.','Comparte algunos datos para que podamos revisar tu función y organización.')}</p>
+     <label>{t('Your name','Tu nombre')}<input required autoComplete="name" maxLength={100} value={displayName} onChange={e=>setName(e.target.value)}/></label>
+     <label>{t('Organization name','Nombre de la organización')}<input required autoComplete="organization" maxLength={200} value={organizationName} onChange={e=>setOrganization(e.target.value)}/></label>
+     <label>{t('Organization website (https://)','Sitio web de la organización (https://)')}<input required type="url" placeholder="https://example.org" maxLength={2000} value={organizationWebsite} onChange={e=>setWebsite(e.target.value)}/></label>
+     <label>{t('Your role or job title','Tu función o cargo')}<input required autoComplete="organization-title" maxLength={200} value={jobRole} onChange={e=>setRole(e.target.value)}/></label>
+     <p className="coordinator-access-caption">{t('Your verified sign-in email will be included. Applying does not create an organization or give access to student information.','Incluiremos tu correo de inicio de sesión verificado. Enviar la solicitud no crea una organización ni da acceso a información de estudiantes.')}</p>
+     <button className="button primary" disabled={busy}>{t('Submit for review','Enviar para revisión')}<ArrowRight size={17} aria-hidden="true"/></button>
+    </form>}
+   </>}
+   {error&&<p className="institution-error" role="alert">{applicationError(error,t)}</p>}
+   </section>
+   <aside className="coordinator-registration-help" aria-label={t('Getting ready','Prepárate')}>
+    <section className="coordinator-organization-help"><span className="coordinator-help-icon"><Building2 size={22} aria-hidden="true"/></span><h2>{t('How your organization fits in','Cómo participa tu organización')}</h2><p>{t('Your coordinator application doesn’t create an organization.','Tu solicitud como coordinador no crea una organización.')}</p><details><summary>{t('My organization is already on Origen','Mi organización ya está en Origen')}</summary><p>{t('Ask its owner to invite you to the team using your sign-in email. We review your affiliation before enabling coordinator access.','Pide al propietario que te invite al equipo con tu correo de inicio de sesión. Revisamos tu afiliación antes de activar el acceso como coordinador.')}</p></details><details><summary>{t('My organization is new to Origen','Mi organización es nueva en Origen')}</summary><p>{t('An authorized representative registers it separately through Institutions. Origen reviews the organization before coordinator access is enabled.','Una persona autorizada la registra por separado en Instituciones. Origen revisa la organización antes de activar el acceso como coordinador.')}</p><a href="#institutions" target="_blank" rel="noopener noreferrer">{t('Organization registration','Registro de organizaciones')}<ArrowRight size={15} aria-hidden="true"/></a></details></section>
+    <CoordinatorReadiness es={es}/>
+   </aside>
+  </div>
+  <footer className="coordinator-registration-footer"><span className="coordinator-registration-brand">origen.</span><p>{t('Different paths. A future that fits.','Caminos distintos. Un futuro a tu medida.')}</p><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a></footer>
  </main>;
 }
 
