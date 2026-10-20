@@ -1,5 +1,5 @@
 import LandingStory from './LandingStory';
-import LandingVideo,{LandingVideoPlaceholder} from './LandingVideo';
+import LandingVideo from './LandingVideo';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
@@ -282,14 +282,14 @@ export default function Landing(){
        <h3>{t('Make sense of unfamiliar terms','Entiende los términos que no conoces')}</h3>
        <p>{t('Ask questions about college, financial aid, transfer requirements, or applications. Origen explains unfamiliar ideas in everyday language.','Pregunta sobre la universidad, la ayuda económica, los requisitos de transferencia o las solicitudes de ingreso. Origen explica las ideas que no conoces con palabras sencillas.')}</p>
       </div>
-      <LandingVideoPlaceholder title={t('Questions demo','Demostración de preguntas')} t={t}/>
+      <LandingVideo variant="college-costs" t={t}/>
      </div>
      <div className="landing-conversation-row">
       <div className="landing-conversation-copy">
        <h3>{t('Review your notes and next steps','Revisa tus notas y próximos pasos')}</h3>
        <p>{t('Return to your binder to revisit what you discussed and keep your questions together.','Vuelve a tu carpeta para repasar lo que conversaste y reunir tus preguntas en un solo lugar.')}</p>
       </div>
-      <LandingVideoPlaceholder title={t('Binder walkthrough','Recorrido por la carpeta')} t={t}/>
+      <LandingVideo variant="binder" t={t}/>
      </div>
     </div>
     <div className="landing-conversation-footer">
