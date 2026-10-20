@@ -5,7 +5,8 @@ const origin=process.env.ORIGEN_PREVIEW_URL||'http://127.0.0.1:5173';
 const posterOnly=process.env.ORIGEN_VIDEO_POSTER_ONLY==='1';
 const videos=[
  {variant:'onboarding',file:'origen-onboarding.mp4',en:'Getting started with Origen',es:'Primeros pasos con Origen',duration:180.466667},
- {variant:'college-costs',file:'origen-college-costs.mp4',en:'College costs with Origen',es:'Costos universitarios con Origen',duration:184.9}
+ {variant:'college-costs',file:'origen-college-costs.mp4',en:'College costs with Origen',es:'Costos universitarios con Origen',duration:184.9},
+ {variant:'binder',file:'origen-binder-preview.mp4',en:'Your Origen binder',es:'Tu carpeta de Origen',duration:82.5}
 ];
 assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(origin).hostname),'Use a loopback preview');
 
@@ -26,10 +27,10 @@ assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(origin).hostname),'
     });
     await page.goto(origin+'/#college-guidance',{waitUntil:'networkidle'});
     const cards=page.locator('#college-guidance .landing-video');
-    assert.equal(await cards.count(),2,'two independent video cards');
+    assert.equal(await cards.count(),3,'three independent video cards');
     assert.equal(await page.locator('#how .landing-video').count(),0,'no duplicate in how it works');
     assert.equal(await page.locator('.landing-conversation-row').count(),3,'three content/video rows');
-    assert.equal(await page.locator('.landing-video-placeholder').count(),1,'binder remains a forthcoming video space');
+    assert.equal(await page.locator('.landing-video-placeholder').count(),0,'all three approved videos replace the placeholders');
     assert.equal(await page.locator('.landing-video-placeholder button,.landing-video-placeholder a,.landing-video-placeholder video,.landing-video-placeholder source').count(),0,'placeholder is noninteractive');
     assert.equal(await cards.locator('video,source').count(),0,'no players or sources before activation');
     assert.equal(requests.length,0,'no video requests before activation');

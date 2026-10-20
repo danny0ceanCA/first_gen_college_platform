@@ -5,16 +5,22 @@ import './LandingVideo.css';
 const posterUrl='/videos/origen-onboarding-poster.svg';
 const videos={
  onboarding:{
-  id:'onboarding-video',url:'/videos/origen-onboarding.mp4',
+  id:'onboarding-video',url:'/videos/origen-onboarding.mp4',duration:'3 min',
   title:['Getting started with Origen','Primeros pasos con Origen'],
   description:['Meet Origen, then follow along with account setup.','Conoce Origen y sigue el recorrido para configurar una cuenta.'],
   playLabel:['Play Getting started with Origen, 3 minutes','Reproducir Primeros pasos con Origen, 3 minutos']
  },
  'college-costs':{
-  id:'college-costs-video',url:'/videos/origen-college-costs.mp4',
+  id:'college-costs-video',url:'/videos/origen-college-costs.mp4',duration:'3 min',
   title:['College costs with Origen','Costos universitarios con Origen'],
   description:['Explore college costs and financial aid with Origen.','Explora los costos universitarios y la ayuda económica con Origen.'],
   playLabel:['Play College costs with Origen, 3 minutes','Reproducir Costos universitarios con Origen, 3 minutos']
+ },
+ binder:{
+  id:'binder-video',url:'/videos/origen-binder-preview.mp4',duration:'1:23',
+  title:['Your Origen binder','Tu carpeta de Origen'],
+  description:['Preview notes and next steps. Audio in English.','Conoce tus notas y próximos pasos. Audio en inglés.'],
+  playLabel:['Play Your Origen binder, 1 minute 23 seconds, audio in English','Reproducir Tu carpeta de Origen, 1 minuto y 23 segundos, audio en inglés']
  }
 } as const;
 
@@ -50,7 +56,7 @@ export default function LandingVideo({t,variant='onboarding'}:{t:(en:string,es:s
    </video>:<button type="button" className="landing-video-poster" onClick={()=>setActivated(true)} aria-label={t(content.playLabel[0],content.playLabel[1])} aria-describedby={descriptionId}>
     <img src={posterUrl} width="1280" height="720" loading="lazy" alt=""/>
     <span className="landing-video-play"><Play size={28} fill="currentColor" aria-hidden="true"/><span>{t('Watch video','Ver video')}</span></span>
-    <span className="landing-video-duration" aria-hidden="true">3 min</span>
+    <span className="landing-video-duration" aria-hidden="true">{content.duration}</span>
    </button>}
   </div>
   {activated&&<p className="landing-video-help">
