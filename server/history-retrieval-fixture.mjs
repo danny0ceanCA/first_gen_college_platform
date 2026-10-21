@@ -11,7 +11,8 @@ import {createMemoryRepository} from './student-memory.mjs';
 import {createTopicRepository,validateTopicRequest} from './topic-notes.mjs';
 import {retrieveStudentHistory} from './history-retrieval.mjs';
 
-export async function retrievalFixture({migrationDirectory}={}){
+export async function retrievalFixture({migrationDirectory,runtimePoolSize=3,productionTimeouts=false}={}){
+ if(!Number.isInteger(runtimePoolSize)||runtimePoolSize<1||runtimePoolSize>30)throw new Error('invalid_test_pool_size');
  if(!process.env.DATABASE_TEST_URL)throw new Error('DATABASE_TEST_URL required');
  const suffix=randomUUID().replaceAll('-',''),schema=`recall_${suffix}`,role=`recall_user_${suffix}`;
  const owner=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:2,options:`-c search_path=${schema}`});let runtime;
@@ -19,7 +20,7 @@ export async function retrievalFixture({migrationDirectory}={}){
  try{
   await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
   await migrateDatabase(owner,migrationDirectory);await grantRuntimeAccess(owner,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:3,options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:runtimePoolSize,...(productionTimeouts?{statement_timeout:15000,connectionTimeoutMillis:5000}:{}),options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
   const db=isolateDatabase(runtime,{schema}),as=(sub,work)=>runAsAccount({sub},work);
   const family=(sub,input)=>as(sub,()=>createFamilyRepository(db)(sub,validateFamily(input)));
   for(const sub of ['reader','other']){

@@ -16,8 +16,10 @@ import {MFA_TIME_CLAIM} from '../staff-access.mjs';
 import {AUTH_TIME_CLAIM} from '../recent-auth.mjs';
 import {coordinatorFlags} from '../binder-sharing-policy.mjs';
 
-export async function coordinatorPilotFixture({language='en',permission='adult'}={}){
- const f=await retrievalFixture(),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
+export async function coordinatorPilotFixture({language='en',permission='adult',runtimePoolSize=3,productionTimeouts=false}={}){
+ const f=await retrievalFixture({runtimePoolSize,productionTimeouts}),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
+ const actors=new Set(['other','reader','owner','staff','colleague','reviewer']);
+ const actor=sub=>{if(!/^sharing-stress-\d+$/.test(sub))throw Error('synthetic_actor_required');actors.add(sub);};
  const cleanup=async()=>{if(server)await new Promise(r=>{server.close(r);server.closeAllConnections();});if(maintenance){await maintenance.end();await f.owner.query(`DROP OWNED BY ${maintenanceRole}`);await f.owner.query(`DROP ROLE ${maintenanceRole}`);}await f.close();};
  try{
   const env={AUTH0_DOMAIN:'synthetic.example',...Object.fromEntries(coordinatorFlags.map(k=>[k,'true']))};
@@ -32,7 +34,7 @@ export async function coordinatorPilotFixture({language='en',permission='adult'}
   const handlers=[createCoordinatorHandler(f.db,env,provider),createCoordinatorConnectionsHandler(f.db,env,provider),createBinderSharingHandler(f.db,env),createCoordinatorBindersHandler(f.db,env,provider),createCoordinatorFeedbackHandler(f.db,env,provider),createCoordinatorNotificationsHandler(f.db,env,provider)];
   server=createServer((req,res)=>{
    const sub=req.headers['x-synthetic-actor'];
-   if(req.headers['x-synthetic-secret']!==transportSecret||!['other','reader','owner','staff','colleague','reviewer'].includes(sub)){res.writeHead(401);return res.end();}
+   if(req.headers['x-synthetic-secret']!==transportSecret||!actors.has(sub)){res.writeHead(401);return res.end();}
    const seconds=Math.floor(Date.now()/1000);req.origenAuthorized=true;req.origenIdentity={sub,iat:seconds,[MFA_TIME_CLAIM]:seconds,[AUTH_TIME_CLAIM]:seconds,permissions:sub==='reviewer'?['manage:institutions']:[]};req.headers.authorization=`Bearer ${sub}`;
    f.as(sub,async()=>{let i=0;const next=()=>i<handlers.length?handlers[i++](req,res,next):(res.writeHead(404),res.end());await next();}).catch(()=>{if(!res.headersSent)res.writeHead(500);res.end();});
   });await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
@@ -50,6 +52,6 @@ export async function coordinatorPilotFixture({language='en',permission='adult'}
   maintenanceRole=`pilot_maint_${randomUUID().replaceAll('-','')}`;await f.owner.query(`CREATE ROLE ${maintenanceRole} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
   const url=new URL(process.env.DATABASE_TEST_URL);url.username=maintenanceRole;url.password='';maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
   const sweep=()=>runRetentionJob(()=>maintainCoordinators(isolateDatabase(maintenance,{schema:f.schema})));
-  return {...f,org,env,notes,base,transportSecret,request,call,institution,maintenance,sweep,close:cleanup};
+  return {...f,org,env,notes,base,transportSecret,actor,request,call,institution,maintenance,sweep,close:cleanup};
  }catch(error){await cleanup();throw error;}
 }

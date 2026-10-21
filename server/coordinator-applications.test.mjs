@@ -51,7 +51,7 @@ test('applications isolate accounts and approval requires independent MFA review
  assert.equal((await coordinator('applicant',{action:'profile',id:org})).profile.displayName,submission.displayName);
  for(const table of ['origen_coordinator_codes','origen_binder_connections','origen_binder_share_grants'])assert.equal((await f.owner.query(`SELECT count(*)::int n FROM ${table}`)).rows[0].n,0);
  await assert.rejects(review('reviewer',approve),/application_changed/);
- await own('applicant',{action:'withdraw-application'});
+ await own('applicant',{action:'withdraw-application',id:application.id});
  assert.equal((await own('applicant',{action:'application-status'})).application.status,'approved');
  await coordinator('owner',{action:'disable-member',id:org,subject:'applicant'});
  await assert.rejects(coordinator('applicant',{action:'profile',id:org}),{code:'42501'});
@@ -60,7 +60,7 @@ test('applications isolate accounts and approval requires independent MFA review
  const declined=(await own('declined',{action:'application-status'})).application;
  await review('reviewer',{action:'decline-application',id:declined.id,reviewNote:'Please confirm your organization.'});
  assert.equal((await own('declined',{action:'application-status'})).application.reviewNote,'Please confirm your organization.');
- await own('declined',{action:'withdraw-application'});
+ await own('declined',{action:'withdraw-application',id:declined.id});
  assert.equal((await own('declined',{action:'application-status'})).application,null);
  await own('declined',{...submission,verifiedEmail:'declined@example.org'});
  const lifecycle=createLifecycleRepository(f.db);
@@ -69,6 +69,7 @@ test('applications isolate accounts and approval requires independent MFA review
  assert.ok(!JSON.stringify(exported).includes('synthetic@example.org'));
  await f.as('declined',()=>lifecycle('declined',{action:'delete',confirmation:'DELETE'}));
  assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_coordinator_applications WHERE auth0_subject='declined'")).rows[0].n,0,'Account erasure cascades to application');
+ assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_coordinator_application_controls WHERE auth0_subject='declined'")).rows[0].n,0,'Account erasure cascades to review controls');
  await assert.rejects(own('declined',{...submission,verifiedEmail:'declined@example.org'}),/account_closed/);
 
  await t.test('HTTP rejects forged email and permission; applicants do not need staff MFA',async()=>{
@@ -84,7 +85,13 @@ test('applications isolate accounts and approval requires independent MFA review
    verified=true;matched=false;assert.equal((await send(submission)).status,403);
    matched=true;
    const response=await send({...submission,verifiedEmail:'forged@example.org',subject:'applicant',status:'approved'});
-   assert.equal(response.status,200);assert.equal((await response.json()).application.email,'trusted@example.org');
+   assert.equal(response.status,200);const submitted=(await response.json()).application;assert.equal(submitted.email,'trusted@example.org');
+   const signupStatus=()=>fetch(`http://127.0.0.1:${server.address().port}/api/institutions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'signup-status',applicationId:submitted.id})});
+   assert.equal((await signupStatus()).status,403,'Signup recovery still requires staff MFA');
+   identity={...identity,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now};
+   const recovered=await signupStatus();assert.equal(recovered.status,200);assert.equal((await recovered.json()).organization,null);
+   env.ORIGEN_COORDINATOR_ACCOUNTS='false';assert.equal((await signupStatus()).status,503);env.ORIGEN_COORDINATOR_ACCOUNTS='true';
+   identity={sub:'http-applicant',iat:now};
    const access=await fetch(`http://127.0.0.1:${server.address().port}/api/institutions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'access'})});
    assert.equal(access.status,200);const workspace=await access.json();assert.equal(workspace.coordinatorApplicationStatus,'pending');assert.deepEqual(workspace.memberships,[]);assert.equal(workspace.hasPersonalAccount,false);
    assert.equal((await send({action:'applications',administrator:true})).status,403);

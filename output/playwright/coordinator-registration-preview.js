@@ -10,6 +10,7 @@ async page=>{
   if(input.action==='withdraw-application')application=null;
   if(['submit-application','withdraw-application','application-status'].includes(input.action))json={application};
   if(input.action==='applications')json={applications:[{id:org,displayName:'Synthetic Coordinator',email:'synthetic@example.org',organizationName:'Community Futures',organizationWebsite:'https://example.org',jobRole:'Advisor',status:'pending'}]};
+  if(input.action==='application-organizations')json={organizations:[{id:org,name:'Community Futures'}]};
   await route.fulfill({contentType:'application/json',body:JSON.stringify(json)});
  });
  await page.route('**/registration-preview*',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
@@ -17,7 +18,7 @@ async page=>{
  import Registration,{CoordinatorApplications} from '/src/CoordinatorRegistration.tsx';import '/src/styles.css';import '/src/brand.css';import {browserPrivacy} from '/src/browserPrivacy.mjs';
  const query=new URLSearchParams(location.search);localStorage.setItem('origen.language',query.get('lang')||'en');browserPrivacy.start('synthetic-coordinator',{fresh:true});
  const auth={isAuthenticated:!query.has('anonymous'),isLoading:false,user:{sub:'synthetic-coordinator'},getAccessTokenSilently:async()=>'synthetic',logout:async()=>{},loginWithRedirect:async()=>{}};
- const reviewer=React.createElement('main',{className:'institution-shell coordinator-workspace'},React.createElement(CoordinatorApplications,{t:(en,es)=>query.get('lang')==='es'?es:en,organizations:[{id:'${org}',name:'Community Futures',pilotStatus:'active',verificationStatus:'verified'}],request:async input=>{const r=await fetch('/api/coordinator-access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});return r.json();},onError:message=>{if(message)throw new Error(message);}}));
+ const reviewer=React.createElement('main',{className:'institution-shell coordinator-workspace'},React.createElement(CoordinatorApplications,{t:(en,es)=>query.get('lang')==='es'?es:en,request:async input=>{const r=await fetch('/api/coordinator-access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});return r.json();},onError:message=>{if(message)throw new Error(message);}}));
  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Auth0Context.Provider,{value:auth},query.has('reviewer')?reviewer:React.createElement(Registration)));
  </script></body></html>`}));
  const results=[];

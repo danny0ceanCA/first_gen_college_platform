@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "kind": "coordinator-production-preparation",
+  "checkedAt": "2026-10-21T05:48:59.378Z",
+  "service": "srv-db02or0u01pc738ktekg",
+  "database": "dpg-db0806hsrm7s73efcupg-a",
+  "previousMigration": "058_student_controlled_coordinator_sharing.sql",
+  "latestMigration": "060_binder_sharing_lifecycle_fixes.sql",
+  "migrationsApplied": [
+    "059_coordinator_registration_safety.sql",
+    "060_binder_sharing_lifecycle_fixes.sql"
+  ],
+  "databaseReadiness": {
+    "kind": "coordinator-database-check",
+    "schemaVersion": 1,
+    "checkedAt": "2026-10-21T05:48:50.536Z",
+    "passed": true,
+    "checks": [
+      {
+        "id": "flag-dependencies",
+        "passed": true
+      },
+      {
+        "id": "runtime-isolation",
+        "passed": true
+      },
+      {
+        "id": "maintenance-isolation",
+        "passed": true
+      },
+      {
+        "id": "same-database-separate-roles",
+        "passed": true
+      },
+      {
+        "id": "migration-checksums",
+        "passed": true
+      },
+      {
+        "id": "provisioning",
+        "passed": true
+      },
+      {
+        "id": "linking",
+        "passed": true
+      },
+      {
+        "id": "publication",
+        "passed": true
+      },
+      {
+        "id": "viewing",
+        "passed": true
+      },
+      {
+        "id": "guidance",
+        "passed": true
+      },
+      {
+        "id": "lifecycle",
+        "passed": true
+      }
+    ],
+    "flags": {
+      "ORIGEN_COORDINATOR_ACCOUNTS": true,
+      "ORIGEN_COORDINATOR_LINKING": true,
+      "ORIGEN_BINDER_SHARING": true,
+      "ORIGEN_COORDINATOR_FEEDBACK": true,
+      "ORIGEN_COORDINATOR_VOICE_LINKING": true,
+      "ORIGEN_COORDINATOR_BINDER_VIEWING": true
+    },
+    "changesApplied": false
+  },
+  "legacyRuntimeCompatible": true,
+  "legacyMaintenanceCompatible": true,
+  "productionConfiguration": true,
+  "frontendConfiguration": true,
+  "coordinatorMaintenance": {
+    "delivered": 0,
+    "suppressed": 0,
+    "expiredGrants": 0
+  },
+  "coordinatorFlags": {
+    "ORIGEN_COORDINATOR_ACCOUNTS": true,
+    "ORIGEN_COORDINATOR_LINKING": true,
+    "ORIGEN_BINDER_SHARING": true,
+    "ORIGEN_COORDINATOR_FEEDBACK": true,
+    "ORIGEN_COORDINATOR_VOICE_LINKING": true,
+    "ORIGEN_COORDINATOR_BINDER_VIEWING": true
+  },
+  "environmentPreserved": true,
+  "unrelatedEnvironmentPreserved": true,
+  "existingCredentialsPreserved": true,
+  "migrationCredentialInApi": false,
+  "recoveryStatus": "AVAILABLE",
+  "recoveryStartsAt": "2026-10-17T19:11:13Z",
+  "liveDeployment": {
+    "id": "dep-dbbrj4u7bikc73e90jb0",
+    "commit": "e481246755a9ab2dea7f0981a073c0006961d996",
+    "unchanged": true
+  },
+  "apiHealth": true,
+  "frontendHealth": true,
+  "deploymentTriggered": false,
+  "credentialFilesWritten": false
+}

@@ -1,0 +1,173 @@
+{
+  "users": 240,
+  "concurrency": 120,
+  "pool": 20,
+  "seed": 20261021,
+  "startedAt": "2026-10-21T03:13:22.499Z",
+  "syntheticAuth0": true,
+  "scenarios": [
+    {
+      "name": "duplicate applications across isolated accounts",
+      "passed": true,
+      "requests": 960,
+      "statuses": {
+        "200": 960
+      },
+      "durationMs": 1149,
+      "p50Ms": 118,
+      "p95Ms": 365,
+      "maxMs": 415
+    },
+    {
+      "name": "organization retries and response lost after commit",
+      "passed": true,
+      "requests": 1200,
+      "statuses": {
+        "200": 960,
+        "transport": 240
+      },
+      "durationMs": 2864,
+      "p50Ms": 254,
+      "p95Ms": 477,
+      "maxMs": 574
+    },
+    {
+      "name": "submissions, organization verification and independent pilot approval",
+      "passed": true,
+      "requests": 960,
+      "statuses": {
+        "200": 960
+      },
+      "durationMs": 9040,
+      "p50Ms": 238,
+      "p95Ms": 3934,
+      "maxMs": 3966
+    },
+    {
+      "name": "competing application decisions commit once",
+      "passed": true,
+      "requests": 960,
+      "statuses": {
+        "200": 240,
+        "409": 720
+      },
+      "durationMs": 1113,
+      "p50Ms": 133,
+      "p95Ms": 152,
+      "maxMs": 175
+    },
+    {
+      "name": "workspace reads, rotation contention and account isolation",
+      "passed": true,
+      "requests": 1080,
+      "statuses": {
+        "200": 840,
+        "409": 240
+      },
+      "durationMs": 1215,
+      "p50Ms": 131,
+      "p95Ms": 159,
+      "maxMs": 172
+    },
+    {
+      "name": "stale edits cannot overwrite newer organization changes",
+      "passed": true,
+      "requests": 121,
+      "statuses": {
+        "200": 2,
+        "409": 119
+      },
+      "durationMs": 226,
+      "p50Ms": 150,
+      "p95Ms": 210,
+      "maxMs": 216
+    },
+    {
+      "name": "review queue and organization pagination under concurrent reads",
+      "passed": true,
+      "requests": 126,
+      "statuses": {
+        "200": 126
+      },
+      "durationMs": 211,
+      "p50Ms": 127,
+      "p95Ms": 169,
+      "maxMs": 170
+    },
+    {
+      "name": "withdrawal, late registration and stale retries",
+      "passed": true,
+      "requests": 240,
+      "statuses": {
+        "200": 160,
+        "409": 80
+      },
+      "durationMs": 210,
+      "p50Ms": 28,
+      "p95Ms": 84,
+      "maxMs": 88
+    },
+    {
+      "name": "pending owner activation races against withdrawal and reapplication",
+      "passed": true,
+      "requests": 173,
+      "statuses": {
+        "200": 29,
+        "403": 144
+      },
+      "durationMs": 258,
+      "p50Ms": 11,
+      "p95Ms": 16,
+      "maxMs": 36
+    },
+    {
+      "name": "invalid, unverified and non-MFA requests fail closed under load",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "400": 120,
+        "403": 360
+      },
+      "durationMs": 241,
+      "p50Ms": 25,
+      "p95Ms": 143,
+      "maxMs": 174
+    },
+    {
+      "name": "invitation replays and competing review, withdrawal and membership removal",
+      "passed": true,
+      "requests": 440,
+      "statuses": {
+        "200": 200,
+        "409": 80,
+        "410": 160
+      },
+      "durationMs": 816,
+      "p50Ms": 151,
+      "p95Ms": 253,
+      "maxMs": 302
+    },
+    {
+      "name": "suspension wins over code rotation and owner reactivation",
+      "passed": true,
+      "requests": 120,
+      "statuses": {
+        "200": 84,
+        "403": 36
+      },
+      "durationMs": 183,
+      "p50Ms": 143,
+      "p95Ms": 169,
+      "maxMs": 173
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-21T03:13:41.141Z",
+  "peakHttpRequests": 120,
+  "totalRequests": 6860,
+  "latencyMs": {
+    "p50": 136,
+    "p95": 426,
+    "max": 3966
+  }
+}

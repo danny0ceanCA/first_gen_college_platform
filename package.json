@@ -41,6 +41,7 @@
     "check:logging": "node scripts/check-logging-policy.mjs",
     "coordinator:verify": "node scripts/verify-coordinator-release.mjs",
     "coordinator:readiness": "node ops/coordinator-readiness.mjs",
+    "coordinator:stress": "node ops/coordinator-registration-stress.mjs",
     "test": "node --test server/*.test.mjs",
     "eval:contracts": "node server/model-evaluation.mjs contracts",
     "eval:personalization": "node scripts/evaluate-personalization.mjs",

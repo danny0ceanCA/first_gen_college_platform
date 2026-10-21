@@ -1,0 +1,205 @@
+{
+  "syntheticAuth0": true,
+  "realOtpEnrollment": false,
+  "concurrency": 64,
+  "pool": 4,
+  "requests": 3216,
+  "peak": 64,
+  "scenarios": [
+    {
+      "name": "Action ordering: enrollment is not proof; only completed MFA grants claims",
+      "passed": true,
+      "requests": 0,
+      "statuses": {},
+      "p95Ms": 0,
+      "maxMs": 0
+    },
+    {
+      "name": "first-time applicants can save applications but interrupted MFA cannot register organizations",
+      "passed": true,
+      "requests": 432,
+      "statuses": {
+        "200": 48,
+        "403": 384
+      },
+      "p95Ms": 112,
+      "maxMs": 218
+    },
+    {
+      "name": "fresh MFA resumes duplicate organization registration once per application",
+      "passed": true,
+      "requests": 288,
+      "statuses": {
+        "200": 240,
+        "403": 48
+      },
+      "p95Ms": 285,
+      "maxMs": 328
+    },
+    {
+      "name": "expired reviewer MFA cannot approve; fresh verification recovers independent review",
+      "passed": true,
+      "requests": 240,
+      "statuses": {
+        "200": 144,
+        "403": 96
+      },
+      "p95Ms": 576,
+      "maxMs": 742
+    },
+    {
+      "name": "missing MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 51,
+      "maxMs": 55
+    },
+    {
+      "name": "missing authentication",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 55,
+      "maxMs": 60
+    },
+    {
+      "name": "future MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 44,
+      "maxMs": 48
+    },
+    {
+      "name": "future authentication",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 53,
+      "maxMs": 57
+    },
+    {
+      "name": "string MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 54,
+      "maxMs": 59
+    },
+    {
+      "name": "null MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 52,
+      "maxMs": 56
+    },
+    {
+      "name": "zero MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 43,
+      "maxMs": 47
+    },
+    {
+      "name": "fractional MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 43,
+      "maxMs": 47
+    },
+    {
+      "name": "fresh token with expired MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "200": 96,
+        "403": 48
+      },
+      "p95Ms": 92,
+      "maxMs": 97
+    },
+    {
+      "name": "fresh MFA with expired login",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "200": 96,
+        "403": 48
+      },
+      "p95Ms": 84,
+      "maxMs": 91
+    },
+    {
+      "name": "expired read MFA",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 43,
+      "maxMs": 46
+    },
+    {
+      "name": "expired read login",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 43,
+      "maxMs": 46
+    },
+    {
+      "name": "amr and user metadata cannot replace signed custom proof",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "403": 144
+      },
+      "p95Ms": 50,
+      "maxMs": 54
+    },
+    {
+      "name": "fresh completed proof",
+      "passed": true,
+      "requests": 144,
+      "statuses": {
+        "200": 144
+      },
+      "p95Ms": 84,
+      "maxMs": 87
+    },
+    {
+      "name": "blocked and revoked staff tokens stay denied after fresh MFA",
+      "passed": true,
+      "requests": 240,
+      "statuses": {
+        "200": 48,
+        "403": 192
+      },
+      "p95Ms": 59,
+      "maxMs": 65
+    }
+  ],
+  "passed": true
+}

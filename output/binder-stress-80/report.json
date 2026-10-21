@@ -1,0 +1,110 @@
+{
+  "startedAt": "2026-10-21T04:44:19.867Z",
+  "users": 24,
+  "concurrency": 80,
+  "pool": 10,
+  "rounds": 3,
+  "syntheticIdentity": true,
+  "scenarios": [
+    {
+      "name": "seed independent synthetic student accounts and private sentinels",
+      "requests": 72,
+      "statuses": {
+        "200": 72
+      },
+      "p95Ms": 12,
+      "maxMs": 45,
+      "durationMs": 1076,
+      "passed": true
+    },
+    {
+      "name": "concurrent reads, private-content boundaries and foreign grants",
+      "requests": 288,
+      "statuses": {
+        "200": 144,
+        "403:sharing_denied": 72,
+        "404:binder_unavailable": 72
+      },
+      "p95Ms": 523,
+      "maxMs": 586,
+      "durationMs": 843,
+      "passed": true
+    },
+    {
+      "name": "publication retry storms create exactly one version per preview",
+      "requests": 168,
+      "statuses": {
+        "200": 168
+      },
+      "p95Ms": 205,
+      "maxMs": 234,
+      "durationMs": 413,
+      "passed": true
+    },
+    {
+      "name": "publication versus revocation never restores a stale preview",
+      "requests": 576,
+      "statuses": {
+        "200": 355,
+        "409:sharing_changed": 5,
+        "404:binder_unavailable": 216
+      },
+      "p95Ms": 140,
+      "maxMs": 147,
+      "durationMs": 1109,
+      "passed": true
+    },
+    {
+      "name": "coordinator guidance writes compete with student publication and replies",
+      "requests": 432,
+      "statuses": {
+        "200": 432
+      },
+      "p95Ms": 425,
+      "maxMs": 451,
+      "durationMs": 1789,
+      "passed": true
+    },
+    {
+      "name": "source edits compete with publication and immediately retire obsolete copies",
+      "requests": 432,
+      "statuses": {
+        "200": 360,
+        "409:sharing_changed": 72
+      },
+      "p95Ms": 107,
+      "maxMs": 127,
+      "durationMs": 1013,
+      "passed": true
+    },
+    {
+      "name": "maintenance, help requests, reviews and notifications under publication churn",
+      "requests": 336,
+      "statuses": {
+        "200": 336
+      },
+      "p95Ms": 141,
+      "maxMs": 152,
+      "durationMs": 932,
+      "passed": true
+    },
+    {
+      "name": "organization suspension versus publication, reads and feedback",
+      "requests": 169,
+      "statuses": {
+        "200": 142,
+        "409:sharing_changed": 1,
+        "403:binder_access_denied": 26
+      },
+      "p95Ms": 174,
+      "maxMs": 1202,
+      "durationMs": 1391,
+      "passed": true
+    }
+  ],
+  "assertionFailures": [],
+  "requests": 2473,
+  "peak": 80,
+  "finishedAt": "2026-10-21T04:44:29.619Z",
+  "passed": true
+}

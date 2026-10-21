@@ -1,0 +1,6 @@
+### Result
+[{"error":"login_required","message":"We couldn’t complete this request. Please try again.","verificationButtons":0,"signinButtons":0},{"error":"mfa_required","message":"We couldn’t complete this request. Please try again.","verificationButtons":0,"signinButtons":0},{"error":"consent_required","message":"We couldn’t complete this request. Please try again.","verificationButtons":0,"signinButtons":0}]
+### Ran Playwright code
+```js
+await (async page => { const results=[]; for (const error of ['login_required','mfa_required','consent_required']) { await page.evaluate(error => window.tokenError=error,error); await page.getByRole('button',{name:'Refresh status',exact:true}).click(); await page.getByRole('alert').waitFor(); results.push({error,message:await page.getByRole('alert').innerText(),verificationButtons:await page.getByRole('button',{name:'Verify my identity',exact:true}).count(),signinButtons:await page.getByRole('button',{name:/Sign in again/}).count()}); } return results; })(page);
+```

@@ -1,0 +1,46 @@
+{
+  "scope": "Coordinator onboarding, organization registration, MFA enforcement and recovery",
+  "environment": "Disposable local PostgreSQL, restricted runtime grants, real HTTP handlers and React components; synthetic Auth0 identities and redirects",
+  "stressRequests": 10790,
+  "maximumConcurrentRequests": 120,
+  "minimumDatabasePool": 2,
+  "existingRegressionTestsPassed": 27,
+  "criticalFindings": [],
+  "findings": [
+    {
+      "priority": "P2",
+      "title": "Auth0 SDK interaction-required errors leave registration in a retry loop",
+      "locations": ["src/CoordinatorRegistration.tsx:35", "src/CoordinatorRegistration.tsx:178", "src/StaffVerification.tsx:6"],
+      "trigger": "getAccessTokenSilently rejects with login_required, mfa_required or consent_required before an API request",
+      "observed": "Refresh status clears the application and displays 'We couldn’t complete this request. Please try again.' No verification or sign-in-again button appears. Repeating Refresh status reproduces the failure.",
+      "impact": "Coordinator cannot continue registration through the displayed retry control. Logout/login remains available; saved server data is preserved. No privilege bypass or data loss was observed.",
+      "recommendation": "Recognize Auth0 SDK error codes separately from backend authorization errors and offer interactive authentication with the registration return route while preserving the draft.",
+      "fixed": true,
+      "resolution": "Coordinator signup and workspace normalize Auth0 SDK interaction errors into explicit recovery prompts. Registration returns to its own route and retains an unsubmitted form in account-scoped session storage. Ordinary network failures remain retryable errors. Backend MFA enforcement is unchanged.",
+      "evidence": ["output/playwright/coordinator-mfa-sdk-errors.log", "output/playwright/coordinator-mfa-sdk-error.png", "output/playwright/coordinator-mfa-fix.log"]
+    }
+  ],
+  "reports": [
+    "output/coordinator-mfa-registration-baseline/results.json",
+    "output/coordinator-mfa-stress-64/report.json",
+    "output/coordinator-mfa-stress-pool2/report.json",
+    "output/playwright/coordinator-mfa-registration.log"
+  ],
+  "verified": [
+    "Duplicate application and organization prevention, response-loss retry, independent approval and invitation replay",
+    "No organization creation without completed MFA; application submission before staff MFA remains permitted by design",
+    "Missing, malformed, future, stale and metadata-only MFA claims fail closed",
+    "Five-minute write freshness and twelve-hour read freshness, including exact boundaries",
+    "Fresh tokens do not renew expired authentication or MFA timestamps",
+    "Blocked and pre-revocation staff tokens are denied even with fresh MFA claims",
+    "Browser draft survives actual PrivateSession remount around a simulated MFA redirect",
+    "Expired code-creation verification recovers after fresh MFA without reapproval"
+  ],
+  "limits": [
+    "No real Auth0 phone enrollment, OTP verification, recovery-code redemption or signed-token callback was performed",
+    "No current tenant configuration was revalidated; local Action implementations were exercised",
+    "Stress HTTP fixture bypasses JWT signature verification to inject controlled identities; this is not a JWT-verifier audit",
+    "No production resources, accounts, provider traffic or deployment configuration were changed",
+    "Previously reported binder-sharing concurrency findings are separate and remain unfixed"
+  ]
+}

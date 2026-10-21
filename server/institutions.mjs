@@ -7,6 +7,7 @@ import {accessActions,validateAccess,runAccess,accessEvent,invitationIdentity} f
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {requireStaffAccess,staffPermissions} from './staff-access.mjs';
+import {recoverSignupOrganization} from './coordinator-signup-recovery.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const text=(v,max,required=false)=>{if(typeof v!=='string'||v.length>max||(required&&!v.trim()))throw fail(400,'invalid_institution');return v.trim();};
 const https=v=>{const value=text(v,2000,true);let url;try{url=new URL(value);}catch{throw fail(400,'invalid_institution');}if(url.protocol!=='https:'||url.username||url.password)throw fail(400,'invalid_institution');return url.href;};
@@ -19,10 +20,15 @@ export function validateInstitutionPage(p,complete=false){
  return {...page,...validateInstitutionExtras(p,complete)};
 }
 export function validateInstitution(input){
- if(!input||![...accessActions,'load','register','save','submit','queue','verify','publish','request-changes','archive','unpublish','restore','mark-notification'].includes(input.action))throw fail(400,'invalid_institution');
+ if(!input||![...accessActions,'load','signup-status','register','save','submit','queue','verify','publish','request-changes','archive','unpublish','restore','mark-notification'].includes(input.action))throw fail(400,'invalid_institution');
  if(accessActions.includes(input.action))return validateAccess(input);
  const action=input.action;if(['load','queue'].includes(action))return {action};
  const out={action};
+ if(action==='signup-status'||action==='register'&&input.applicationId!==undefined){
+  if(typeof input.applicationId!=='string'||!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.applicationId))throw fail(400,'invalid_institution');
+  out.applicationId=input.applicationId;
+  if(action==='signup-status')return out;
+ }
  if(action!=='register'){out.id=text(input.id,36,true);if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(out.id)||action!=='mark-notification'&&(!Number.isSafeInteger(input.revision)||input.revision<1))throw fail(400,'invalid_institution');out.revision=input.revision;}
  if(action==='mark-notification')return {action,id:out.id};
  if(['archive','unpublish','restore'].includes(action))return out;
@@ -58,16 +64,29 @@ export function createInstitutionRepository(database,reviewers=[]){return async(
    await c.query('COMMIT');return {page:row.published,slug:row.slug,publishedAt:row.published_at,parent:parent?{name:parent.published.name,slug:parent.slug}:null,units:units.map(u=>({name:u.published.name,slug:u.slug,unitType:u.unit_type}))};
   }
   await guardAccountTransaction(c,subject);
+  const signup=input.applicationId?await recoverSignupOrganization(c,subject,input.applicationId,{pending:input.action==='register'}):null;
+  if(input.action==='signup-status'){
+   const row=signup.organization;
+   const reviews=row?(await c.query('SELECT action,note,revision,created_at FROM origen_institution_reviews WHERE institution_id=$1 ORDER BY created_at DESC LIMIT 20',[row.id])).rows:[];
+   await c.query('COMMIT');return {organization:row?{...view(row),reviews}:null};
+  }
   if(input.action==='mark-notification'){await c.query('UPDATE origen_institution_notifications SET read_at=now() WHERE id=$1 AND auth0_subject=$2 AND institution_id IN (SELECT institution_id FROM origen_institution_members WHERE auth0_subject=$2)',[input.id,subject]);await c.query('COMMIT');return {ok:true};}
   if(accessActions.includes(input.action)){const result=await runAccess(c,subject,input,identity,canReview(subject));await c.query('COMMIT');return result;}
   if(['queue','verify','publish','request-changes'].includes(input.action)&&!canReview(subject))throw fail(403,'reviewer_required');
   if(input.action==='register'){
-   const key=input.registrationKey||crypto.randomUUID();
+   const key=input.applicationId||input.registrationKey||crypto.randomUUID();
+   if(signup){
+    const a=signup.application;
+    if(input.page.name!==a.organizationName||input.page.website!==a.organizationWebsite||input.representative.firstName!==a.displayName||input.representative.workEmail!==a.email||input.representative.jobRole!==a.jobRole)throw fail(409,'application_changed');
+   }
    const fingerprint=createHash('sha256').update(JSON.stringify({page:input.page,representative:input.representative,unitType:input.unitType||'institution',parentId:input.parentId||null})).digest('hex');
    const existing=(await c.query('SELECT * FROM origen_institution_registration_requests WHERE auth0_subject=$1 AND request_id=$2',[subject,key])).rows[0];
-   registeredInstitutionId=existing?.institution_id;
-   if(existing&&existing.payload_hash!==fingerprint)throw fail(409,'registration_changed');
-   if(!existing){
+   registeredInstitutionId=existing?.institution_id||signup?.organization?.id;
+   if(existing&&!signup&&existing.payload_hash!==fingerprint)throw fail(409,'registration_changed');
+   if(!existing&&signup?.organization){
+    await c.query('INSERT INTO origen_institution_registration_requests(auth0_subject,request_id,payload_hash,institution_id) VALUES($1,$2,$3,$4)',[subject,key,fingerprint,registeredInstitutionId]);
+   }
+   if(!registeredInstitutionId){
     let approval='approved';
     if(input.parentId){
      const parent=(await c.query('SELECT * FROM origen_institutions WHERE id=$1 FOR UPDATE',[input.parentId])).rows[0];
@@ -135,7 +154,7 @@ export function createInstitutionRepository(database,reviewers=[]){return async(
   const affiliationRequests=(await c.query(canReview(subject)?'SELECT a.*,r.first_name,r.work_email,r.job_role FROM origen_institution_affiliation_requests a JOIN origen_institution_representatives r ON r.auth0_subject=a.auth0_subject ORDER BY a.created_at DESC LIMIT 100':'SELECT * FROM origen_institution_affiliation_requests WHERE auth0_subject=$1 ORDER BY created_at DESC LIMIT 100',canReview(subject)?[]:[subject])).rows;const notifications=await institutionNotifications(c,subject);await c.query('COMMIT');return {registeredInstitutionId,institutions,representative,unitRequests,authorizedUnits,affiliationRequests,notifications,canReview:canReview(subject)};
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 };}
-export function createInstitutionHandler(database,env={}){
+export function createInstitutionHandler(database,env={},fetcher=fetch){
  const run=createInstitutionRepository(database,(env.INSTITUTION_REVIEWER_SUBJECTS||'').split(',').map(x=>x.trim()).filter(Boolean));
  return async(req,res,next)=>{
   const requestURL=new URL(req.url,'http://localhost');const path=requestURL.pathname,sharing=/^\/api\/institutions\/(pages|qr)\/([a-z0-9-]{1,100})$/.exec(path),directory=path==='/api/institutions/directory';const publicSlug=/^\/api\/institutions\/published\/([a-z0-9-]{1,100})$/.exec(path||'');
@@ -149,12 +168,13 @@ export function createInstitutionHandler(database,env={}){
    let input={action:'public',slug:publicSlug?.[1]||sharing?.[2]};
    if(directory){const search=requestURL.searchParams.get('q')||'',cursor=requestURL.searchParams.get('cursor')||'';if(search.length>120||cursor&&!/^[a-z0-9-]{1,100}$/.test(cursor))return send(400,{error:'invalid_directory'});input={action:'directory',search,cursor};}
    if(!publicRequest){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>1000000)return send(413,{error:'too_large'});}try{input=validateInstitution(JSON.parse(raw));}catch{return send(400,{error:'invalid_institution'});}}
+   if(input.applicationId&&env.ORIGEN_COORDINATOR_ACCOUNTS!=='true')return send(503,{error:'coordinator_sharing_unavailable'});
    if(!publicRequest&&!['access','parents','request-affiliation'].includes(input.action)){
     const review=['queue','verify','publish','request-changes','review-affiliation'].includes(input.action);
     await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:input.action,target:input.id,env,permission:review?'manage:institutions':undefined,
      fresh:['verify','publish','request-changes','review-affiliation','invite','accept-invite','revoke-invite','remove-member','set-role','transfer-owner','approve-unit','reject-unit','archive','unpublish','restore'].includes(input.action)});
    }
-   const identity=input.action==='accept-invite'?await invitationIdentity(req,env):req.origenIdentity;
+   const identity=input.action==='accept-invite'?await invitationIdentity(req,env,fetcher):req.origenIdentity;
    const result=await run(req.origenIdentity?.sub,input,identity);
    if(!publicRequest&&input.action==='access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'){
     const application=(await database.query(`SELECT origen_coordinator_application_command('{"action":"application-status"}'::jsonb) AS result`)).rows[0]?.result?.application;

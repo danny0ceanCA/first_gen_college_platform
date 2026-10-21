@@ -28,7 +28,7 @@ function Review({preview,t,busy,error,onCancel,onPublish}:{preview:Preview;t:T;b
   <p>{t('Only these entries are included. New notes and edits stay private until you review and publish again. You can stop sharing at any time.','Solo se incluyen estas notas. Las notas nuevas y los cambios permanecen privados hasta que revises y publiques de nuevo. Puedes dejar de compartir cuando quieras.')}</p>
   <div className="binder-share-preview-entries">{preview.entries.map(e=><article key={e.id}><small>{topicName(e.topic,t)}</small><p>{e.content}</p></article>)}</div>
   {error&&<p role="alert">{error}</p>}
-  <div className="binder-share-actions"><button type="button" className="button outline" onClick={onCancel}>{t('Cancel','Cancelar')}</button><button type="button" className="button primary" disabled={busy||!!error} onClick={onPublish}>{busy?t('Publishing…','Publicando…'):t('Publish these entries','Publicar estas notas')}</button></div>
+  <div className="binder-share-actions"><button type="button" className="button outline" disabled={busy} onClick={onCancel}>{error?t('Close review and check sharing','Cerrar revisión y comprobar acceso'):t('Cancel','Cancelar')}</button><button type="button" className="button primary" disabled={busy||!!error} onClick={onPublish}>{busy?t('Publishing…','Publicando…'):t('Publish these entries','Publicar estas notas')}</button></div>
  </dialog>,document.body);
 }
 export default function BinderSharing({studentId,t,openRequest=0}:{studentId:string;t:T;openRequest?:number}){
@@ -56,7 +56,15 @@ export default function BinderSharing({studentId,t,openRequest=0}:{studentId:str
   catch(e){if(v===generation.current){if((e as {status?:number}).status===403){clear();setStatus(undefined);}setError((e as Error).message==='sharing_changed'?t('Something changed. Close this review and choose your entries again.','Algo cambió. Cierra esta revisión y elige tus notas de nuevo.'):t('We could not confirm the result. Refresh sharing before trying again.','No pudimos confirmar el resultado. Actualiza el acceso antes de intentar de nuevo.'));}}
   finally{if(v===generation.current)setBusy(false);}
  }
- function cancel(){const old=preview;setPreview(undefined);setError('');if(old)void request(studentId,'cancel',{previewId:old.previewId}).catch(()=>{});}
+ function cancel(){
+  // Escape and the preview-expiry timer must respect an in-flight publication too.
+  if(busy)return;
+  const old=preview;setPreview(undefined);setError('');
+  if(old)void perform('cancel',{previewId:old.previewId},result=>{
+   if((result as {status:string}).status==='published')setNotice(t('Your entries were published. Use Stop sharing below if you want to remove access.','Tus notas se publicaron. Usa Dejar de compartir abajo si quieres eliminar el acceso.'));
+   void refresh().catch(()=>setError(t('Could not refresh sharing. Check access before trying again.','No se pudo actualizar el acceso. Compruébalo antes de intentar de nuevo.')));
+  });
+ }
  const visible=entries.filter(e=>chosenTopics.includes(e.topic));
  useEffect(()=>{if(openRequest){setOpen(true);void refresh().catch(()=>{});}},[openRequest]);
  if(!status?.available)return error?<p role="status">{error}<button type="button" className="text-button" onClick={()=>{setError('');void refresh().catch(()=>{});}}>{t('Refresh sharing','Actualizar acceso')}</button></p>:null;

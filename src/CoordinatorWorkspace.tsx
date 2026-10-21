@@ -2,7 +2,7 @@ import CoordinatorNotifications,{CoordinatorOperations,type NoticeDestination} f
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
 import {apiFetch} from './api';
-import StaffVerification,{staffVerificationErrors} from './StaffVerification';
+import StaffVerification,{staffVerificationErrors,getStaffAccessToken} from './StaffVerification';
 import CoordinatorInbox from './CoordinatorInbox';
 import CoordinatorBinders from './CoordinatorBinders';
 import InstitutionTeam from './InstitutionTeam';
@@ -24,7 +24,7 @@ export default function CoordinatorWorkspace(){
  const [noticeTarget,setNoticeTarget]=useState<(NoticeDestination & {sequence:number})>();
  const generation=useRef(0);
  const request=useCallback(async(input:unknown,institution=false,binders=false,feedback=false)=>{
-  const token=await getAccessTokenSilently();
+  const token=await getStaffAccessToken(()=>getAccessTokenSilently());
   const response=await apiFetch(feedback?'/api/coordinator-feedback':binders?'/api/coordinator-binders':institution?'/api/institutions':'/api/coordinator-access',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
   const data=await response.json();if(!response.ok)throw new Error(data.error||'coordinator_access_unavailable');return data;
  },[getAccessTokenSilently]);
@@ -88,7 +88,7 @@ export default function CoordinatorWorkspace(){
     <div className="institution-actions"><button className="button primary" disabled={busy} onClick={()=>{if(!profile.code||window.confirm(t('Replace your code? The previous code will stop working.','¿Reemplazar tu código? El anterior dejará de funcionar.')))void change('rotate-code');}}>{profile.code?t('Replace code','Reemplazar código'):t('Create code','Crear código')}</button>{profile.code&&<button className="button outline" disabled={busy} onClick={()=>void change('revoke-code')}>{t('Revoke code','Revocar código')}</button>}</div>
     {code&&<div className="coordinator-code"><label>{t('Save this code now','Guarda este código ahora')}<input readOnly value={code} onFocus={e=>e.target.select()}/></label><p>{t('Expires','Vence')} {new Date(expires).toLocaleDateString(es?'es':'en')}</p><div className="institution-actions"><button className="button outline" onClick={()=>void copy(code)}>{t('Copy code','Copiar código')}</button><button className="button outline" onClick={()=>void copy(`${window.location.origin}/#connect/${code}`)}>{t('Copy connection link','Copiar enlace')}</button></div>{qr&&<img src={qr} alt={t('Connection code QR','QR del código de conexión')} width={240} height={240}/>}</div>}
    </section>}
-   {overview.canApprove&&<><CoordinatorApplications request={request} organizations={overview.organizations} t={t} onError={setError}/><CoordinatorOperations t={t}/></>}
+   {overview.canApprove&&<><CoordinatorApplications request={request} t={t} onError={setError}/><CoordinatorOperations t={t}/></>}
    {profile&&<CoordinatorNotifications key={`updates-${selected}-${user?.sub}`} organizationId={selected} t={t} onOpen={value=>{setNoticeTarget({...value,sequence:Date.now()});requestAnimationFrame(()=>document.querySelector(value.destination==='connections'?'.coordinator-inbox':'.coordinator-binders')?.scrollIntoView({block:'start'}));}}/>}
    {profile&&<CoordinatorBinders key={`binders-${selected}-${user?.sub}`} organizationId={selected} openRequest={noticeTarget?.organizationId===selected&&['binder','guidance'].includes(noticeTarget.destination)?noticeTarget:undefined} request={input=>request(input,false,true)} feedbackRequest={input=>request(input,false,false,true)} t={t} es={es}/>}
    {profile&&<CoordinatorInbox key={selected+(noticeTarget?.destination==='connections'?noticeTarget.sequence:'')} organizationId={selected} t={t} es={es}/>}

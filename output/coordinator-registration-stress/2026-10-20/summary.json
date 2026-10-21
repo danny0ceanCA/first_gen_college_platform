@@ -1,0 +1,89 @@
+{
+  "scope": "Local HTTP handlers and disposable PostgreSQL with real migrations, RLS, and runtime grants; synthetic Auth0 identities.",
+  "productionModified": false,
+  "liveAuth0OrRenderCapacityTested": false,
+  "totalRequests": 34040,
+  "allPassed": true,
+  "runs": [
+    {
+      "run": "registration-stress-pool5-a",
+      "passed": true,
+      "requests": 3498,
+      "users": 120,
+      "concurrency": 80,
+      "databaseConnections": 5,
+      "seed": null,
+      "latencyMs": null,
+      "report": "registration-stress-pool5-a.json"
+    },
+    {
+      "run": "registration-stress-pool20-a",
+      "passed": true,
+      "requests": 6860,
+      "users": 240,
+      "concurrency": 120,
+      "databaseConnections": 20,
+      "seed": null,
+      "latencyMs": {
+        "p50": 135,
+        "p95": 375,
+        "max": 3932
+      },
+      "report": "registration-stress-pool20-a.json"
+    },
+    {
+      "run": "registration-stress-pool5-b",
+      "passed": true,
+      "requests": 8331,
+      "users": 300,
+      "concurrency": 150,
+      "databaseConnections": 5,
+      "seed": null,
+      "latencyMs": {
+        "p50": 183,
+        "p95": 456,
+        "max": 5017
+      },
+      "report": "registration-stress-pool5-b.json"
+    },
+    {
+      "run": "registration-stress-seed21",
+      "passed": true,
+      "requests": 6860,
+      "users": 240,
+      "concurrency": 120,
+      "databaseConnections": 20,
+      "seed": 20261021,
+      "latencyMs": {
+        "p50": 136,
+        "p95": 426,
+        "max": 3966
+      },
+      "report": "registration-stress-seed21.json"
+    },
+    {
+      "run": "registration-stress-final",
+      "passed": true,
+      "requests": 8491,
+      "users": 300,
+      "concurrency": 150,
+      "databaseConnections": 5,
+      "seed": 20261022,
+      "latencyMs": {
+        "p50": 173,
+        "p95": 463,
+        "max": 5016
+      },
+      "report": "registration-stress-final.json"
+    }
+  ],
+  "interpretation": "Expected 400/403/409/410 rejections and deliberately injected dropped responses/provider errors are validated outcomes. No unexpected server errors, deadlocks, duplicate registrations, or unauthorized access were observed. Bulk organization verification was the slowest tested operation, about five seconds at the largest burst. Local timings do not establish production capacity.",
+  "finalSourceHashes": {
+    "ops\\coordinator-registration-stress.mjs": "c3d34ebcdf6dbf0d7d1d37c440e5c79d47e92d8fa63df92ba99879bfb982c1ce",
+    "server\\fixtures\\coordinator-registration.mjs": "69efea2c349f59a8d33ae6ff7365877b3cb2cd3eb31676509edb6f9e22ee9339",
+    "server\\history-retrieval-fixture.mjs": "f05dab5db8fea2e5d84086b777af48aa058f609f22e2d57d42fcb0219b4c0e09",
+    "server\\migrations\\059_coordinator_registration_safety.sql": "783c6ee01923e999c98cf7cc2afb25f0988ad0863078ab21c5d805588372f7bb",
+    "server\\institutions.mjs": "05364969354da73b28666b80b08dcf8b3334d78cfe90e7de82dd481fb9aa0f31",
+    "server\\coordinator-access.mjs": "42c2943d285bfc13b7a69010f9dc2f4f912f228c8f96594be64cc466f29e75d9"
+  }
+}

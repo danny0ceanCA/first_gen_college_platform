@@ -1,0 +1,140 @@
+{
+  "users": 120,
+  "concurrency": 80,
+  "pool": 5,
+  "startedAt": "2026-10-21T03:09:31.119Z",
+  "syntheticAuth0": true,
+  "scenarios": [
+    {
+      "name": "duplicate applications across isolated accounts",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 480
+      },
+      "durationMs": 643,
+      "p50Ms": 91,
+      "p95Ms": 194,
+      "maxMs": 221
+    },
+    {
+      "name": "organization retries and response lost after commit",
+      "passed": true,
+      "requests": 600,
+      "statuses": {
+        "200": 480,
+        "transport": 120
+      },
+      "durationMs": 1708,
+      "p50Ms": 194,
+      "p95Ms": 286,
+      "maxMs": 339
+    },
+    {
+      "name": "submissions, organization verification and independent pilot approval",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 480
+      },
+      "durationMs": 4246,
+      "p50Ms": 190,
+      "p95Ms": 2366,
+      "maxMs": 2381
+    },
+    {
+      "name": "competing application decisions commit once",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 120,
+        "409": 360
+      },
+      "durationMs": 532,
+      "p50Ms": 87,
+      "p95Ms": 99,
+      "maxMs": 109
+    },
+    {
+      "name": "workspace reads, rotation contention and account isolation",
+      "passed": true,
+      "requests": 560,
+      "statuses": {
+        "200": 440,
+        "409": 120
+      },
+      "durationMs": 613,
+      "p50Ms": 84,
+      "p95Ms": 101,
+      "maxMs": 118
+    },
+    {
+      "name": "stale edits cannot overwrite newer organization changes",
+      "passed": true,
+      "requests": 81,
+      "statuses": {
+        "200": 2,
+        "409": 79
+      },
+      "durationMs": 159,
+      "p50Ms": 104,
+      "p95Ms": 147,
+      "maxMs": 150
+    },
+    {
+      "name": "review queue and organization pagination under concurrent reads",
+      "passed": true,
+      "requests": 84,
+      "statuses": {
+        "200": 84
+      },
+      "durationMs": 116,
+      "p50Ms": 70,
+      "p95Ms": 93,
+      "maxMs": 94
+    },
+    {
+      "name": "withdrawal, late registration and stale retries",
+      "passed": true,
+      "requests": 240,
+      "statuses": {
+        "200": 160,
+        "409": 80
+      },
+      "durationMs": 178,
+      "p50Ms": 25,
+      "p95Ms": 69,
+      "maxMs": 73
+    },
+    {
+      "name": "pending owner activation races against withdrawal and reapplication",
+      "passed": true,
+      "requests": 173,
+      "statuses": {
+        "200": 29,
+        "403": 144
+      },
+      "durationMs": 245,
+      "p50Ms": 11,
+      "p95Ms": 19,
+      "maxMs": 31
+    },
+    {
+      "name": "invalid, unverified and non-MFA requests fail closed under load",
+      "passed": true,
+      "requests": 320,
+      "statuses": {
+        "400": 80,
+        "403": 240
+      },
+      "durationMs": 154,
+      "p50Ms": 13,
+      "p95Ms": 104,
+      "maxMs": 118
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-21T03:09:40.725Z",
+  "peakHttpRequests": 80,
+  "totalRequests": 3498
+}

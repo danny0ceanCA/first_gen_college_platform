@@ -8,11 +8,14 @@ async page=>{
   const input=route.request().postDataJSON();calls.push({path:new URL(route.request().url()).pathname,...input});
   let json={ok:true},status=200;
   if(route.request().url().endsWith('/api/coordinator-access')){
-   if(input.action==='submit-application')application={...input,organizationWebsite:new URL(input.organizationWebsite).href,id,email:'synthetic@example.org',status:'pending',reviewNote:''};
+   if(input.action==='submit-application')application={...input,organizationWebsite:new URL(input.organizationWebsite).href,id:crypto.randomUUID(),email:'synthetic@example.org',status:'pending',reviewNote:''};
    if(input.action==='withdraw-application')application=null;
    json={application};
   }else if(!mfa){status=403;json={error:'staff_mfa_required'};}
-  else if(input.action==='register'){
+  else if(input.action==='signup-status')json={organization:organizations.get(input.applicationId)||null};
+  else if(input.action==='save'){
+   const org=[...organizations.values()].find(o=>o.id===input.id);org.page=input.page;org.revision++;org.status='draft';json={institutions:[org]};
+  }else if(input.action==='register'){
    if(!organizations.has(input.registrationKey))organizations.set(input.registrationKey,{id,revision:1,status:'draft',membershipRole:'owner',page:input.page});
    json={registeredInstitutionId:id,institutions:[organizations.get(input.registrationKey)]};
   }else if(input.action==='submit'){
@@ -42,7 +45,7 @@ async page=>{
   await reset(lang,width);
   await page.getByRole('button',{name:lang==='en'?'Submit for review':'Enviar para revisión',exact:true}).click();
   await page.getByRole('heading',{name:lang==='en'?'Your application is awaiting review':'Tu solicitud está pendiente de revisión',exact:true}).waitFor();
-  if(calls.some(c=>c.path==='/api/institutions'))throw Error('Join path registered an organization');
+  if(calls.some(c=>c.action==='register'))throw Error('Join path registered an organization');
   results.push({lang,width,path:'join',passed:true});
   await reset(lang,width);
   await page.getByRole('radio',{name:lang==='en'?'Register my organization':'Registrar mi organización',exact:true}).check();
@@ -68,9 +71,29 @@ async page=>{
   const registeredCalls=calls.filter(c=>c.action==='register').length;
   await page.reload();await page.getByRole('heading',{name:lang==='en'?'Organization registered':'Organización registrada',exact:true}).waitFor();
   if(calls.filter(c=>c.action==='register').length!==registeredCalls)throw Error('Reload performed another mutation');
+  await page.getByRole('button',{name:lang==='en'?'Log out':'Cerrar sesión',exact:true}).click();await page.reload();
+  await page.getByRole('heading',{name:lang==='en'?'Organization registered':'Organización registrada',exact:true}).waitFor();
+  if(organizations.size!==1||await page.getByText('Need to register your organization? Do it here.',{exact:true}).count())throw Error('Logout lost server registration');
+  for(const org of organizations.values()){org.status='changes-requested';org.reviews=[{action:'request-changes',revision:org.revision,note:'Please clarify your services.'}];}
+  await page.getByRole('button',{name:lang==='en'?'Refresh status':'Actualizar estado',exact:true}).click();
+  await page.getByText('Please clarify your services.',{exact:true}).waitFor();
+  await page.getByRole('textbox',{name:lang==='en'?'What does your organization do?':'¿Qué hace tu organización?',exact:true}).fill('Updated guidance services.');
+  await page.getByRole('button',{name:lang==='en'?'Save and send for review':'Guardar y enviar a revisión',exact:true}).click();
+  await page.getByRole('heading',{name:lang==='en'?'Organization registered':'Organización registrada',exact:true}).waitFor();
+  if(organizations.values().next().value.page.description!=='Updated guidance services.')throw Error('Correction was not saved');
   results.push({lang,width,path:'new',mfaReturn:true,networkRetry:true,passed:true});
  }
- await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();
+ await reset('en',390);mfa=false;
+ await page.getByRole('radio',{name:'Register my organization',exact:true}).check();
+ await page.getByLabel('What does your organization do?',{exact:false}).fill('Original organization.');await page.getByRole('checkbox').check();
+ await page.getByRole('button',{name:'Register and apply',exact:true}).click();await page.getByRole('button',{name:'Verify my identity',exact:true}).waitFor();
+ await page.evaluate(()=>{window.confirm=()=>true;});await page.getByRole('button',{name:'Withdraw application',exact:true}).click();
+ await page.getByLabel('Organization name',{exact:true}).fill('Replacement organization');
+ await page.getByRole('radio',{name:'Register my organization',exact:true}).check();await page.getByLabel('What does your organization do?',{exact:false}).fill('Replacement description.');await page.getByRole('checkbox').check();
+ mfa=true;await page.getByRole('button',{name:'Register and apply',exact:true}).click();await page.getByRole('heading',{name:'Organization registered',exact:true}).waitFor();
+ if(organizations.size!==1||organizations.values().next().value.page.name!=='Replacement organization')throw Error('Withdrawal reused stale organization');
+ results.push({path:'withdraw-reapply',passed:true});
+ await page.getByRole('button',{name:'Log out',exact:true}).click();
  if(await page.evaluate(()=>Object.keys(sessionStorage).some(k=>k.includes('coordinator-organization'))))throw Error('Logout retained private organization draft');
  for(const lang of ['en','es'])for(const width of [320,768]){
   await page.setViewportSize({width,height:900});await page.goto(origin+'/combined-preview?anonymous=1&lang='+lang);

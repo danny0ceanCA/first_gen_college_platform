@@ -1,5 +1,5 @@
 const fail=()=>Object.assign(new Error('invalid_coordinator_request'),{status:400});
-export const applicationActions=['application-status','submit-application','withdraw-application','applications','approve-application','decline-application'];
+export const applicationActions=['application-status','submit-application','withdraw-application','applications','application-organizations','approve-application','decline-application'];
 export const applicantActions=applicationActions.slice(0,3);
 export function validateApplication(input){
  const out={action:input.action};
@@ -11,7 +11,9 @@ export function validateApplication(input){
   if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash)throw fail();
   out.organizationWebsite=url.href;
  }
- if(out.action==='applications'&&input.after)uuid('after');
+ if(['applications','application-organizations'].includes(out.action)&&input.after)uuid('after');
+ if(['withdraw-application','application-organizations'].includes(out.action))uuid('id');
+ if(out.action==='application-organizations'&&input.search)text('search',200);
  if(['approve-application','decline-application'].includes(out.action)){uuid('id');text('reviewNote',1000);}
  if(out.action==='approve-application')uuid('institutionId');
  return out;

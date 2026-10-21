@@ -1,0 +1,67 @@
+// Run with playwright-cli run-code --filename against an isolated Vite preview.
+// Uses actual components with fictional API responses; no live account or data.
+async page=>{
+ const origin=new URL(page.url()).origin;
+ const assert=(value,message)=>{if(!value)throw Error(message);};
+ let release,publishStarted=false,cancelRequests=0;
+ const note={id:'11111111-1111-4111-8111-111111111111',topic:'options',kind:'note',language:'en',content:'Synthetic shared note'};
+ await page.route('**/api/binder-sharing',async route=>{
+  const input=route.request().postDataJSON();let data;
+  if(input.action==='status')data={available:true,enabled:true,connections:[{id:'22222222-2222-4222-8222-222222222222',coordinatorName:'Synthetic coordinator',organizationName:'Synthetic organization'}],grants:[]};
+  if(input.action==='entries')data={entries:[note]};
+  if(input.action==='preview')data={previewId:'33333333-3333-4333-8333-333333333333',studentName:'Synthetic student',coordinatorName:'Synthetic coordinator',organizationName:'Synthetic organization',topics:['options'],entries:[note],expiresAt:new Date(Date.now()+120000).toISOString(),shareExpiresAt:new Date(Date.now()+86400000).toISOString()};
+  if(input.action==='publish'){publishStarted=true;await new Promise(r=>release=r);data={status:'published'};}
+  if(input.action==='cancel'){cancelRequests++;data={status:'cancelled'};}
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+ });
+ await page.route('**/sharing-lifecycle-regression',route=>route.fulfill({contentType:'text/html',body:`<html><body><div id="root"></div><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
+ import Sharing from '/src/BinderSharing.tsx';import {GuidancePanel} from '/src/CoordinatorGuidance.tsx';import {browserPrivacy} from '/src/browserPrivacy.mjs';import {setAPITokenProvider} from '/src/api.ts';
+ browserPrivacy.start('synthetic',{fresh:true});setAPITokenProvider(async()=>'synthetic');window.guidanceReads=0;
+ window.guidance=[];
+ const req=async()=>{window.guidanceReads++;return {feedback:window.guidance,writesEnabled:true};};
+ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement(Sharing,{studentId:'alex',t:a=>a}),React.createElement(GuidancePanel,{studentId:'alex',topic:'options',t:a=>a,request:req})));
+ </script></body></html>`}));
+ await page.goto(origin+'/sharing-lifecycle-regression');
+ await page.getByText('No coordinator guidance here yet.').waitFor();
+ const before=await page.evaluate(()=>window.guidanceReads);
+ await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
+ await page.getByText('Loading guidance…').waitFor();
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ await page.getByText('No coordinator guidance here yet.').waitFor();
+ assert(await page.evaluate(()=>window.guidanceReads)>before,'Online must reload guidance');
+ await page.getByRole('button',{name:'People with access',exact:true}).click();
+ await page.getByRole('combobox',{name:'Coordinator',exact:true}).selectOption('22222222-2222-4222-8222-222222222222');
+ await page.getByRole('checkbox',{name:'College options',exact:true}).check();
+ await page.getByRole('checkbox',{name:'College options Synthetic shared note',exact:true}).check();
+ await page.getByRole('button',{name:'Review selected entries (1/50)',exact:true}).click();
+ await page.getByRole('button',{name:'Publish these entries',exact:true}).click();
+ await page.getByRole('button',{name:'Publishing…',exact:true}).waitFor();
+ assert(publishStarted,'Publication request must be in flight');
+ assert(await page.getByRole('button',{name:'Cancel',exact:true}).isDisabled(),'Cancel must be disabled while publishing');
+ await page.keyboard.press('Escape');
+ assert(await page.getByRole('dialog').isVisible(),'Escape must not dismiss an in-flight publication');
+ assert(cancelRequests===0,'Escape must not send cancellation');
+ release();
+ await page.getByRole('dialog').waitFor({state:'detached'});
+ await page.getByText('Your sharing selection is updated.').waitFor();
+ // An ordinary, unpublished preview remains cancellable.
+ await page.getByRole('combobox',{name:'Coordinator',exact:true}).selectOption('22222222-2222-4222-8222-222222222222');
+ await page.getByRole('checkbox',{name:'College options',exact:true}).check();
+ await page.getByRole('checkbox',{name:'College options Synthetic shared note',exact:true}).check();
+ await page.getByRole('button',{name:'Review selected entries (1/50)',exact:true}).click();
+ const cancelled=page.waitForResponse(r=>r.url().endsWith('/api/binder-sharing')&&r.request().postDataJSON()?.action==='cancel');
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.getByRole('dialog').waitFor({state:'detached'});
+ await cancelled;
+ assert(cancelRequests===1,'Unpublished preview should cancel normally');
+ await page.evaluate(()=>{window.guidance=[{id:'44444444-4444-4444-8444-444444444444',topic:'options',kind:'guidance',body:'Retained student copy',resourceUrl:'',version:1,authorName:'Synthetic coordinator',organizationName:'Synthetic organization',createdAt:new Date().toISOString(),editedAt:null,withdrawn:false,hidden:false,reviewed:false,connectionEnded:false,replyAvailable:false,publicationItemId:'11111111-1111-4111-8111-111111111111',replyCount:0}];});
+ await page.getByRole('button',{name:'Refresh',exact:true}).click();
+ await page.getByText('Retained student copy',{exact:true}).waitFor();
+ assert(await page.getByRole('button',{name:'Reply',exact:true}).isDisabled(),'Closed item must not offer a reply');
+ assert(await page.getByText('Replies are closed because', {exact:false}).isVisible(),'Explain why replies are closed');
+ await page.evaluate(()=>{window.guidance[0].replyAvailable=true;});
+ await page.getByRole('button',{name:'Refresh',exact:true}).click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Reply'&&!b.disabled));
+ return {onlineRecovery:'passed',publishCancellation:'passed',escapeGuard:'passed',normalCancellation:'passed',replyAvailability:'passed'};
+}

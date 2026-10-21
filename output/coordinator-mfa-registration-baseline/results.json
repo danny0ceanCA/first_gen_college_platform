@@ -1,0 +1,186 @@
+{
+  "users": 120,
+  "concurrency": 100,
+  "pool": 5,
+  "seed": 20261021,
+  "startedAt": "2026-10-21T04:50:27.765Z",
+  "syntheticAuth0": true,
+  "scenarios": [
+    {
+      "name": "duplicate applications across isolated accounts",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 480
+      },
+      "durationMs": 659,
+      "p50Ms": 119,
+      "p95Ms": 242,
+      "maxMs": 265
+    },
+    {
+      "name": "organization retries and response lost after commit",
+      "passed": true,
+      "requests": 600,
+      "statuses": {
+        "200": 480,
+        "transport": 120
+      },
+      "durationMs": 1476,
+      "p50Ms": 225,
+      "p95Ms": 291,
+      "maxMs": 337
+    },
+    {
+      "name": "submissions, organization verification and independent pilot approval",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 480
+      },
+      "durationMs": 4508,
+      "p50Ms": 184,
+      "p95Ms": 3217,
+      "maxMs": 3314
+    },
+    {
+      "name": "competing application decisions commit once",
+      "passed": true,
+      "requests": 480,
+      "statuses": {
+        "200": 120,
+        "409": 360
+      },
+      "durationMs": 537,
+      "p50Ms": 109,
+      "p95Ms": 131,
+      "maxMs": 145
+    },
+    {
+      "name": "workspace reads, rotation contention and account isolation",
+      "passed": true,
+      "requests": 580,
+      "statuses": {
+        "200": 460,
+        "409": 120
+      },
+      "durationMs": 643,
+      "p50Ms": 105,
+      "p95Ms": 124,
+      "maxMs": 138
+    },
+    {
+      "name": "stale edits cannot overwrite newer organization changes",
+      "passed": true,
+      "requests": 101,
+      "statuses": {
+        "200": 2,
+        "409": 99
+      },
+      "durationMs": 165,
+      "p50Ms": 102,
+      "p95Ms": 150,
+      "maxMs": 154
+    },
+    {
+      "name": "review queue and organization pagination under concurrent reads",
+      "passed": true,
+      "requests": 104,
+      "statuses": {
+        "200": 104
+      },
+      "durationMs": 133,
+      "p50Ms": 83,
+      "p95Ms": 107,
+      "maxMs": 109
+    },
+    {
+      "name": "withdrawal, late registration and stale retries",
+      "passed": true,
+      "requests": 240,
+      "statuses": {
+        "200": 160,
+        "409": 80
+      },
+      "durationMs": 164,
+      "p50Ms": 26,
+      "p95Ms": 59,
+      "maxMs": 64
+    },
+    {
+      "name": "pending owner activation races against withdrawal and reapplication",
+      "passed": true,
+      "requests": 173,
+      "statuses": {
+        "200": 29,
+        "403": 144
+      },
+      "durationMs": 234,
+      "p50Ms": 10,
+      "p95Ms": 18,
+      "maxMs": 31
+    },
+    {
+      "name": "invalid, unverified and non-MFA requests fail closed under load",
+      "passed": true,
+      "requests": 400,
+      "statuses": {
+        "400": 100,
+        "403": 300
+      },
+      "durationMs": 204,
+      "p50Ms": 16,
+      "p95Ms": 140,
+      "maxMs": 161
+    },
+    {
+      "name": "invitation replays and competing review, withdrawal and membership removal",
+      "passed": true,
+      "requests": 440,
+      "statuses": {
+        "200": 206,
+        "409": 74,
+        "410": 160
+      },
+      "durationMs": 726,
+      "p50Ms": 126,
+      "p95Ms": 195,
+      "maxMs": 216
+    },
+    {
+      "name": "suspension wins over code rotation and owner reactivation",
+      "passed": true,
+      "requests": 120,
+      "statuses": {
+        "200": 81,
+        "403": 39
+      },
+      "durationMs": 144,
+      "p50Ms": 96,
+      "p95Ms": 119,
+      "maxMs": 122
+    },
+    {
+      "name": "identity-provider outage and delayed recovery do not create partial applications",
+      "passed": true,
+      "requests": 160,
+      "statuses": {
+        "200": 120,
+        "503": 40
+      },
+      "durationMs": 373,
+      "p50Ms": 170,
+      "p95Ms": 231,
+      "maxMs": 239
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-21T04:50:38.616Z",
+  "peakHttpRequests": 100,
+  "totalRequests": 4358,
+  "latencyMs": {
+    "p50": 109,
+    "p95": 257,
+    "max": 3314
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "scope": "Local synthetic HTTP requests against real handlers and PostgreSQL through migration 060; Auth0 identity and MFA supplied by test fixture; production not tested or modified.",
+  "requests": 4821,
+  "peakConcurrency": 80,
+  "runs": [
+    {
+      "report": "output/binder-stress-12/report.json",
+      "requests": 1040,
+      "concurrency": 12,
+      "pool": 10,
+      "passed": false
+    },
+    {
+      "report": "output/binder-stress-80/report.json",
+      "requests": 2473,
+      "concurrency": 80,
+      "pool": 10,
+      "passed": true
+    },
+    {
+      "report": "output/binder-stress-pool3/report.json",
+      "requests": 1308,
+      "concurrency": 30,
+      "pool": 3,
+      "passed": false
+    }
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Student revocation can roll back when a coordinator reads the binder concurrently",
+      "evidence": "Two stress runs returned 409 sharing_changed from revoke, then a new authorized coordinator read returned 200 with both entries still accessible.",
+      "rootCause": "Student sharing locks account FOR UPDATE before grant FOR UPDATE. Coordinator read locks grant FOR SHARE before inserting an audit event whose account foreign key requires FOR KEY SHARE. The cycle produces PostgreSQL 40P01; the handler converts it to 409 and does not retry.",
+      "locations": [
+        "server/migrations/060_binder_sharing_lifecycle_fixes.sql:190",
+        "server/migrations/060_binder_sharing_lifecycle_fixes.sql:209",
+        "server/migrations/060_binder_sharing_lifecycle_fixes.sql:72",
+        "server/binder-sharing.mjs:46"
+      ],
+      "recommendedFix": "Establish one lock order for account, organization and grant operations, including audit/outbox foreign-key locks. Add bounded full-transaction retries for transient deadlocks on idempotent removal operations and test both competing lock orders."
+    },
+    {
+      "priority": "P1",
+      "title": "Organization suspension can roll back during concurrent publishing",
+      "evidence": "The 12-concurrency run returned 503 coordinator_access_unavailable for suspend-organization; all 12 grants stayed active and subsequent coordinator reads returned 200.",
+      "rootCause": "Suspension holds the organization and changes grants before enqueuing revocation notices, whose account foreign key requests a student-account lock. A concurrent publisher holds that account and waits for the organization. The suspension transaction may be the deadlock victim, rolling back all deactivation.",
+      "locations": [
+        "server/migrations/051_coordinator_provisioning.sql:90",
+        "server/migrations/051_coordinator_provisioning.sql:103",
+        "server/migrations/056_coordinator_lifecycle.sql:76",
+        "server/coordinator-access.mjs"
+      ],
+      "recommendedFix": "Include organization suspension and notification writes in the same lock-order design; retry the complete idempotent suspension transaction after 40P01 and verify the final organization/grant states."
+    }
+  ],
+  "relatedImpact": "The same lock-order family also produces coordinator read/guidance 503 responses and publication conflicts. These are not counted as independent critical privacy defects.",
+  "privacyChecks": "No family/conversation sentinel or foreign student content was returned to coordinators in the tested requests. Successful revocations blocked subsequent reads; failures returned errors, not false success.",
+  "limitations": "Bounded local testing does not measure deployed capacity, real Auth0/MFA, browser behavior, multiple API replicas, or real network failures. A passed run does not eliminate schedule-dependent deadlocks."
+}

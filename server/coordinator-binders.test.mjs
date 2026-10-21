@@ -82,7 +82,7 @@ test('coordinator workspace reads only current explicit publications',{skip:!pro
   const first=await staff('list');assert.equal(first.binders.length,10);assert.equal(first.counts.all,12);assert.ok(first.nextCursor);
   const second=await staff('list',{cursor:first.nextCursor});assert.equal(second.binders.length,2);assert.equal(second.nextCursor,null);assert.equal(new Set([...first.binders,...second.binders].map(x=>x.id)).size,12);
   const search=await staff('list',{search:'pupil-1'});assert.equal(search.counts.all,2);assert.equal(search.binders.length,2);
-  await assert.rejects(staff('list',{cursor:first.nextCursor,search:'nobody'}),{status:404});
+  assert.equal((await staff('list',{cursor:first.nextCursor,search:'nobody'})).binders.length,0);
   for(const row of others)await share(row.student,'revoke-all');assert.equal((await staff('list')).counts.all,1);
  });
  await t.test('edited and withdrawn sources disappear; no old snapshot text or private summary survives',async()=>{
@@ -94,7 +94,7 @@ test('coordinator workspace reads only current explicit publications',{skip:!pro
  await t.test('revocation orders with an active read and blocks every subsequent read/search/count',async()=>{
   const client=await f.as('staff',()=>runAsCoordinatorActor('staff',{},()=>f.db.connect()));
   try{await client.query('BEGIN');await runCoordinatorBinderCommand(client,{action:'read',organizationId:org,grantId:a.grant});let done=false;const revoke=share('alex','revoke-all').then(()=>done=true);await new Promise(r=>setTimeout(r,40));assert.equal(done,false);await client.query('COMMIT');await revoke;}finally{await client.query('ROLLBACK').catch(()=>{});client.release();}
-  await assert.rejects(staff('read',{grantId:a.grant}),{status:404});assert.equal((await staff('list')).counts.all,0);await assert.rejects(staff('list',{cursor:a.grant}),{status:404});
+  await assert.rejects(staff('read',{grantId:a.grant}),{status:404});assert.equal((await staff('list')).counts.all,0);assert.equal((await staff('list',{cursor:a.grant})).binders.length,0);
   await a.publish();const student=await f.as('other',()=>f.db.connect());
   try{await student.query('BEGIN');await runSharingCommand(student,{action:'revoke-all',studentId:'alex',enabled:true});const read=assert.rejects(staff('read',{grantId:a.grant}),{status:404});await student.query('COMMIT');await read;}finally{await student.query('ROLLBACK').catch(()=>{});student.release();}
   await a.publish();

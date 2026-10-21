@@ -1,0 +1,150 @@
+{
+  "startedAt": "2026-10-21T04:45:35.787Z",
+  "users": 12,
+  "concurrency": 30,
+  "pool": 3,
+  "rounds": 3,
+  "seed": 271828,
+  "syntheticIdentity": true,
+  "scenarios": [
+    {
+      "name": "seed independent synthetic student accounts and private sentinels",
+      "requests": 36,
+      "statuses": {
+        "200": 36
+      },
+      "p95Ms": 43,
+      "maxMs": 45,
+      "durationMs": 623,
+      "passed": true
+    },
+    {
+      "name": "concurrent reads, private-content boundaries and foreign grants",
+      "requests": 216,
+      "statuses": {
+        "200": 71,
+        "409:sharing_changed": 72,
+        "403:sharing_denied": 36,
+        "404:binder_unavailable": 36,
+        "503:binder_read_unavailable": 1
+      },
+      "p95Ms": 1135,
+      "maxMs": 1228,
+      "durationMs": 1539,
+      "passed": false
+    },
+    {
+      "name": "publication retry storms create exactly one version per preview",
+      "requests": 84,
+      "statuses": {
+        "200": 84
+      },
+      "p95Ms": 82,
+      "maxMs": 88,
+      "durationMs": 161,
+      "passed": true
+    },
+    {
+      "name": "publication versus revocation never restores a stale preview",
+      "requests": 288,
+      "statuses": {
+        "200": 160,
+        "409:sharing_changed": 23,
+        "404:binder_unavailable": 105
+      },
+      "p95Ms": 1051,
+      "maxMs": 1070,
+      "durationMs": 1601,
+      "passed": false
+    },
+    {
+      "name": "coordinator guidance writes compete with student publication and replies",
+      "requests": 215,
+      "statuses": {
+        "200": 212,
+        "409:sharing_changed": 1,
+        "409:feedback_changed": 2
+      },
+      "p95Ms": 1131,
+      "maxMs": 1148,
+      "durationMs": 1672,
+      "passed": false
+    },
+    {
+      "name": "source edits compete with publication and immediately retire obsolete copies",
+      "requests": 216,
+      "statuses": {
+        "200": 186,
+        "409:sharing_changed": 30
+      },
+      "p95Ms": 70,
+      "maxMs": 77,
+      "durationMs": 571,
+      "passed": true
+    },
+    {
+      "name": "maintenance, help requests, reviews and notifications under publication churn",
+      "requests": 168,
+      "statuses": {
+        "200": 168
+      },
+      "p95Ms": 68,
+      "maxMs": 70,
+      "durationMs": 545,
+      "passed": true
+    },
+    {
+      "name": "organization suspension versus publication, reads and feedback",
+      "requests": 85,
+      "statuses": {
+        "200": 73,
+        "403:binder_access_denied": 12
+      },
+      "p95Ms": 89,
+      "maxMs": 103,
+      "durationMs": 201,
+      "passed": true
+    }
+  ],
+  "assertionFailures": [
+    {
+      "scenario": "concurrent reads, private-content boundaries and foreign grants",
+      "count": 1,
+      "samples": [
+        "coordinator-binders/read: 503 binder_read_unavailable"
+      ]
+    },
+    {
+      "scenario": "publication versus revocation never restores a stale preview",
+      "count": 1,
+      "samples": [
+        "binder-sharing/revoke: 409 sharing_changed"
+      ]
+    },
+    {
+      "scenario": "publication versus revocation never restores a stale preview",
+      "count": 1,
+      "samples": [
+        "coordinator-binders/read: 200 "
+      ]
+    },
+    {
+      "scenario": "publication versus revocation never restores a stale preview",
+      "count": 1,
+      "samples": [
+        "Expected values to be strictly equal:\n\n2 !== 0\n"
+      ]
+    },
+    {
+      "scenario": "coordinator guidance writes compete with student publication and replies",
+      "count": 1,
+      "samples": [
+        "binder-sharing/preview: 409 sharing_changed"
+      ]
+    }
+  ],
+  "requests": 1308,
+  "peak": 30,
+  "finishedAt": "2026-10-21T04:45:43.717Z",
+  "passed": false
+}
