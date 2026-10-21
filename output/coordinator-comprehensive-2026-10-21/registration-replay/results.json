@@ -1,0 +1,59 @@
+{
+  "users": 150,
+  "concurrency": 150,
+  "pool": 5,
+  "seed": 20261021,
+  "startedAt": "2026-10-21T15:12:50.834Z",
+  "syntheticAuth0": true,
+  "scenarios": [
+    {
+      "name": "duplicate applications across isolated accounts",
+      "passed": true,
+      "requests": 600,
+      "statuses": {
+        "200": 600
+      },
+      "durationMs": 1138,
+      "p50Ms": 242,
+      "p95Ms": 443,
+      "maxMs": 490
+    },
+    {
+      "name": "organization retries and response lost after commit",
+      "passed": true,
+      "requests": 750,
+      "statuses": {
+        "200": 600,
+        "transport": 150
+      },
+      "durationMs": 3201,
+      "p50Ms": 600,
+      "p95Ms": 674,
+      "maxMs": 779
+    },
+    {
+      "name": "submissions, organization verification and independent pilot approval",
+      "passed": false,
+      "requests": 450,
+      "statuses": {
+        "200": 420,
+        "503": 30
+      },
+      "durationMs": 6254,
+      "p50Ms": 464,
+      "p95Ms": 5097,
+      "maxMs": 5273,
+      "failure": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable'\n+ ]\n- []\n"
+    }
+  ],
+  "passed": false,
+  "failure": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable',\n+   'verify: unexpected 503 institutions_unavailable'\n+ ]\n- []\n",
+  "finishedAt": "2026-10-21T15:13:03.791Z",
+  "peakHttpRequests": 150,
+  "totalRequests": 1800,
+  "latencyMs": {
+    "p50": 400,
+    "p95": 2803,
+    "max": 5273
+  }
+}

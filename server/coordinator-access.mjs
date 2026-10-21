@@ -30,7 +30,9 @@ export async function runCoordinatorCommand(database,input){
  // Hash is generated here, never trusted from JSON or model arguments.
  const generated=input.action==='rotate-code'?createCoordinatorCode():null;
  const args=generated?{...input,codeHash:generated.hash}:input;
- const result=(await database.query('SELECT origen_coordinator_command($1::jsonb) AS result',[JSON.stringify(args)])).rows[0].result;
+ const removal=['suspend-organization','disable-member','revoke-code'].includes(input.action);
+ const query=removal&&database.queryRetryable?database.queryRetryable.bind(database):database.query.bind(database);
+ const result=(await query('SELECT origen_coordinator_command($1::jsonb) AS result',[JSON.stringify(args)])).rows[0].result;
  return generated?{...result,code:generated.code}:result;
 }
 export function createCoordinatorHandler(database,env={},fetcher=fetch){

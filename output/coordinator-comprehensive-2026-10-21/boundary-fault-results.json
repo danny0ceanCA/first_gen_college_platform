@@ -1,0 +1,37 @@
+{
+  "syntheticIdentity": true,
+  "productionModified": false,
+  "requests": 93,
+  "droppedResponses": 4,
+  "checks": [
+    {
+      "name": "Lost publish response + 12 retries creates one publication",
+      "passed": true
+    },
+    {
+      "name": "Lost guidance response + 12 retries creates one attributed entry",
+      "passed": true
+    },
+    {
+      "name": "Lost reply response + 12 retries sends only one reply",
+      "passed": true
+    },
+    {
+      "name": "Every coordinator read/write rejects another coordinator and unrelated account",
+      "passed": true
+    },
+    {
+      "name": "Student IDs, preview IDs, entry IDs, and grant IDs cannot cross accounts",
+      "passed": true
+    },
+    {
+      "name": "Family provenance introduced after preview blocks publishing and erases existing copy",
+      "passed": true
+    },
+    {
+      "name": "Lost stop-sharing response + retries leaves no staff access or retained publication content",
+      "passed": true
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,17 @@
+{
+  "syntheticIdentity": true,
+  "concurrency": 150,
+  "pool": 5,
+  "statuses": {
+    "200": 150
+  },
+  "connectionFailures": [],
+  "failedRequestsPersisted": 0,
+  "retryRecovery": true,
+  "retried": 0,
+  "verifiedOrganizations": 150,
+  "queryCountRange": [
+    113,
+    113
+  ]
+}

@@ -1,0 +1,14 @@
+{"name":"duplicate applications across isolated accounts","passed":true,"requests":800,"statuses":{"200":800},"durationMs":1059,"p50Ms":161,"p95Ms":364,"maxMs":410}
+{"name":"organization retries and response lost after commit","passed":true,"requests":1000,"statuses":{"200":800,"transport":200},"durationMs":2558,"p50Ms":360,"p95Ms":457,"maxMs":574}
+{"name":"submissions, organization verification and independent pilot approval","passed":true,"requests":800,"statuses":{"200":800},"durationMs":8387,"p50Ms":314,"p95Ms":5139,"maxMs":5440}
+{"name":"competing application decisions commit once","passed":true,"requests":800,"statuses":{"200":200,"409":600},"durationMs":1168,"p50Ms":201,"p95Ms":247,"maxMs":253}
+{"name":"workspace reads, rotation contention and account isolation","passed":true,"requests":950,"statuses":{"200":750,"409":200},"durationMs":1307,"p50Ms":199,"p95Ms":223,"maxMs":251}
+{"name":"stale edits cannot overwrite newer organization changes","passed":true,"requests":151,"statuses":{"200":2,"409":149},"durationMs":388,"p50Ms":236,"p95Ms":351,"maxMs":361}
+{"name":"review queue and organization pagination under concurrent reads","passed":true,"requests":155,"statuses":{"200":155},"durationMs":218,"p50Ms":142,"p95Ms":169,"maxMs":171}
+{"name":"withdrawal, late registration and stale retries","passed":true,"requests":240,"statuses":{"200":160,"409":80},"durationMs":207,"p50Ms":30,"p95Ms":79,"maxMs":84}
+{"name":"pending owner activation races against withdrawal and reapplication","passed":true,"requests":173,"statuses":{"200":29,"403":144},"durationMs":286,"p50Ms":12,"p95Ms":22,"maxMs":38}
+{"name":"invalid, unverified and non-MFA requests fail closed under load","passed":true,"requests":600,"statuses":{"400":150,"403":450},"durationMs":377,"p50Ms":30,"p95Ms":234,"maxMs":264}
+{"name":"invitation replays and competing review, withdrawal and membership removal","passed":true,"requests":440,"statuses":{"200":200,"409":80,"410":160},"durationMs":829,"p50Ms":179,"p95Ms":280,"maxMs":298}
+{"name":"suspension wins over code rotation and owner reactivation","passed":true,"requests":120,"statuses":{"200":74,"403":46},"durationMs":171,"p50Ms":125,"p95Ms":158,"maxMs":159}
+{"name":"identity-provider outage and delayed recovery do not create partial applications","passed":true,"requests":160,"statuses":{"200":120,"503":40},"durationMs":233,"p50Ms":143,"p95Ms":205,"maxMs":208}
+{"passed":true,"totalRequests":6389,"peakHttpRequests":150,"output":"output/coordinator-comprehensive-2026-10-21/burst-trace-200"}

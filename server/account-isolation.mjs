@@ -2,6 +2,7 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {createHash} from 'node:crypto';
 import pg from 'pg';
 import {coordinatorTables,lineageTables} from './binder-sharing-policy.mjs';
+import {retryAbortedCommand} from './aborted-command-retry.mjs';
 
 const context=new AsyncLocalStorage();
 const fail=()=>Object.assign(new Error('account_scope_mismatch'),{status:403});
@@ -83,7 +84,11 @@ export function isolateDatabase(pool,{schema='public'}={}){
   };
   return client;
  }
- return {isolated:true,connect,async query(...args){const client=await connect();try{return await client.query(...args);}finally{client.release();}},end:()=>pool.end()};
+ const query=async(...args)=>{const client=await connect();try{return await client.query(...args);}finally{client.release();}};
+ // Exposed only on this transaction-owning facade, never on connect() clients.
+ // Each retry reacquires a client and reapplies the authenticated scope after
+ // the previous complete transaction has rolled back and released its locks.
+ return {isolated:true,connect,query,queryRetryable:(...args)=>retryAbortedCommand(()=>query(...args)),end:()=>pool.end()};
 }
 
 // Refuse a credential that defeats RLS or can modify policies/functions. The

@@ -23,7 +23,9 @@ export function validateSharingInput(v){
 }
 export async function runSharingCommand(database,input){
  const fn=input.action==='help'?'origen_binder_help_command':'origen_binder_sharing_command';
- const result=(await database.query(`SELECT ${fn}($1::jsonb) AS result`,[JSON.stringify(input)])).rows[0].result;
+ const removal=['revoke','revoke-all','withdraw','remove-topic'].includes(input.action);
+ const query=removal&&database.queryRetryable?database.queryRetryable.bind(database):database.query.bind(database);
+ const result=(await query(`SELECT ${fn}($1::jsonb) AS result`,[JSON.stringify(input)])).rows[0].result;
  if(result.error)throw fail(result.error==='sharing_changed'?409:result.error==='sharing_paused'?503:403,result.error);
  if(input.action==='status'&&result.grants?.length){const help=(await database.query('SELECT origen_binder_help_command($1::jsonb) AS result',[JSON.stringify({action:'status',studentId:input.studentId})])).rows[0].result;result.grants=result.grants.map(g=>({...g,helpRequested:help[g.id]===true}));}
  return result;

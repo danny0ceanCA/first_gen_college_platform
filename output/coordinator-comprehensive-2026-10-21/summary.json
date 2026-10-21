@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-21",
+  "scope": {
+    "1": "Focused registration, MFA, sharing and privacy regressions",
+    "4": "Interrupted saves, duplicate requests, expired verification and persisted-state recovery",
+    "5": "Cross-account and cross-coordinator isolation, family provenance and access revocation"
+  },
+  "target": "Local working tree including unapplied production migration 061",
+  "productionModified": false,
+  "newApplicationFixesMade": false,
+  "regression": {"tests": 175, "passed": 175, "failed": 0, "skipped": 0, "evidence": "regression.log"},
+  "stress": {
+    "totalRequests": 29198,
+    "maximumConcurrency": 150,
+    "runs": [
+      {"evidence": "mfa/report.json", "requests": 3216, "passed": true},
+      {"evidence": "registration/results.json", "requests": 1800, "passed": false, "unexpected503": 36},
+      {"evidence": "registration-replay/results.json", "requests": 1800, "passed": false, "unexpected503": 30},
+      {"evidence": "registration-bounded/results.json", "requests": 4498, "passed": true},
+      {"evidence": "sharing/report.json", "requests": 6157, "passed": true},
+      {"evidence": "burst-trace/results.json", "requests": 5338, "passed": true},
+      {"evidence": "burst-trace-200/results.json", "requests": 6389, "passed": true}
+    ]
+  },
+  "additionalFaultAndPrivacyChecks": {
+    "evidence": "boundary-fault-results.json",
+    "checks": 7,
+    "passed": 7,
+    "requests": 93,
+    "successfulBackendResponsesDeliberatelyDropped": 4,
+    "details": [
+      "Lost publication, guidance, reply and revocation responses recover under twelve duplicate retries each",
+      "Changed retry payloads rejected",
+      "Foreign coordinator and foreign student reads and writes rejected",
+      "Family classification added after preview blocks publication and erases the earlier published copy",
+      "Stale publication retry after revocation cannot restore staff access"
+    ]
+  },
+  "browser": {
+    "mfa": {"passed": true, "evidence": "browser-mfa.log"},
+    "sharingLifecycle": {"passed": true, "evidence": "browser-sharing.log"},
+    "completeRegistration": {"passed": true, "evidence": "browser-registration-replay.log", "coverage": "Mobile signup, persisted draft recovery, organization correction, independent review/approval, first code and QR, Spanish status"},
+    "droppedSaveResponses": {"passed": true, "evidence": "browser-faults.log", "checkpoints": ["submit-application", "register organization", "submit organization"]},
+    "harnessNotes": "Initial registration run reached the final Spanish navigation but timed out waiting for full page load. A fresh-fixture replay using DOM readiness for that navigation completed with zero page errors. Local Vite HMR websocket warnings were environment-only."
+  },
+  "findings": [
+    {
+      "id": "REVIEW-BURST-001",
+      "severity": "P2 reliability/performance",
+      "title": "Large simultaneous organization-review bursts intermittently return 503",
+      "observed": "Two 150-applicant, 150-concurrent-request runs with a five-connection pool returned 36 and 30 unexpected institutions_unavailable responses during verification. The same test passed at concurrency 30. Later instrumented 150-concurrency runs also passed, so the failure is timing/load-sensitive rather than deterministic.",
+      "source": "server/institutions.mjs:146",
+      "measuredCost": "The isolated reviewer transaction probe measured 113 SQL queries per verification when rebuilding a 100-item submission queue.",
+      "likelyCause": "Per-item queue queries run before COMMIT while the reviewer subject lock is held. Together with the five-second pool acquisition limit this creates avoidable queueing pressure. The failed runs did not capture the underlying pool exception, so pool exhaustion remains a strongly supported explanation, not a directly captured exception.",
+      "suggestedFix": "Bulk-fetch review-queue representatives and parent details, shorten the mutation transaction, and bound reviewer request concurrency. Preserve authorization checks and retest dropped responses before adding retries.",
+      "state": "Identified; not fixed in this testing task",
+      "evidence": ["registration/results.json", "registration-replay/results.json", "registration-bounded/results.json", "review-burst-results.json", "burst-trace/results.json", "burst-trace-200/results.json"]
+    }
+  ],
+  "criticalFindings": 0,
+  "privacyFindings": 0,
+  "limitations": [
+    "Auth0 identities and provider responses are synthetic; real phone enrollment, OTP, recovery codes and hosted redirects were not exercised.",
+    "Local machine and PostgreSQL capacity do not establish production Render capacity.",
+    "Passing tests do not establish absence of all defects.",
+    "Production remains unchanged; the previous migration 061 fixes remain uncommitted, unpushed and unapplied there."
+  ],
+  "cleanup": "Temporary browser and test services closed; disposable PostgreSQL stopped. A pre-existing browser test schema from October 20 was preserved."
+}
