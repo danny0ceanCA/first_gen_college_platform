@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import {exportDeletionManifest,replayDeletionManifest,validateDeletionManifest} from '../ops/privacy-recovery.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,9 +35,9 @@ test('student memory lifecycle under real PostgreSQL RLS',{skip:!process.env.DAT
  const suffix=randomUUID().replaceAll('-',''),schema=`mem_${suffix}`,role=`mem_user_${suffix}`;
  const owner=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1,options:`-c search_path=${schema}`});let runtime;
  try{
-  await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await owner.query(`CREATE SCHEMA ${schema}`);await createTestLogin(owner,role);
   await migrateDatabase(owner);await grantRuntimeAccess(owner,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:2,options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);runtime=new pg.Pool({connectionString:url.href,max:2,options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
   const db=isolateDatabase(runtime,{schema}),as=(sub,work)=>runAsAccount({sub},work),family=(sub,input)=>createFamilyRepository(db)(sub,validateFamily(input)),run=createMemoryRepository(db),history=createHistoryRepository(db),privacy=createPrivacyRepository(db);
   for(const sub of ['a','b'])await as(sub,async()=>{
    await family(sub,{action:'save-account',account:{firstName:sub,email:'',role:sub==='a'?'parent':'student'}});

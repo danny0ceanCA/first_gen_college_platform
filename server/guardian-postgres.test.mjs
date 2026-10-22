@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -17,9 +18,9 @@ test('PostgreSQL migration/RLS, single-use concurrency and revocation serialize 
  const suffix=randomUUID().replaceAll('-',''),schema=`guard_${suffix}`,role=`guard_user_${suffix}`;
  const owner=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1,options:`-c search_path=${schema}`});let runtime;
  try{
-  await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await owner.query(`CREATE SCHEMA ${schema}`);await createTestLogin(owner,role);
   await migrateDatabase(owner);await migrateDatabase(owner);await grantRuntimeAccess(owner,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:4,options:`-c search_path=${schema}`});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);runtime=new pg.Pool({connectionString:url.href,max:4,options:`-c search_path=${schema}`});
   await assertRuntimeIsolation(runtime,{schema});const db=isolateDatabase(runtime,{schema}),as=(subject,fn)=>runAsAccount({sub:subject},fn),mails=[];
   const repo=createPermissionRepository(db,{mailer:{async send(mail){mails.push(mail);return 'mock';}}});
   for(const sub of ['teen','other'])await as(sub,async()=>{await repo.account(sub,{action:'screen',ageBand:'13to17',audience:'grade9plus'});await repo.account(sub,{action:'request',guardianEmail:`${sub}@example.invalid`});});

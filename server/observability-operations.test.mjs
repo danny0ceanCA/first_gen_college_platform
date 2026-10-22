@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -30,10 +31,10 @@ test('PostgreSQL operation mappings enforce ownership, caps, expiry, cascades an
  const owner=await ownerPool.connect();let runtimePool,server;
  const nativeFetch=globalThis.fetch;
  try{
-  await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await owner.query(`CREATE SCHEMA ${schema}`);await createTestLogin(owner,role);
   const migration={connect:async()=>({query:(...args)=>owner.query(...args),release(){}})};
   await migrateDatabase(migration);await grantRuntimeAccess(migration,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);
   runtimePool=new pg.Pool({connectionString:url.href,max:5,options:`-c search_path=${schema}`});
   await assertRuntimeIsolation(runtimePool,{schema});await assertDiagnosticOperationsReady(runtimePool);
   const db=isolateDatabase(runtimePool,{schema}),as=(sub,work)=>runAsAccount({sub},work);

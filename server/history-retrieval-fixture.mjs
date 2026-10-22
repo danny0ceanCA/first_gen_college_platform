@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 // Synthetic PostgreSQL fixture. All objects and roles are disposable; callers
 // must supply DATABASE_TEST_URL, never the application DATABASE_URL.
 import pg from 'pg';
@@ -18,9 +19,9 @@ export async function retrievalFixture({migrationDirectory,runtimePoolSize=3,pro
  const owner=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:2,options:`-c search_path=${schema}`});let runtime;
  const close=async()=>{await runtime?.end();await owner.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await owner.query(`DROP SCHEMA IF EXISTS ${schema}_reporting CASCADE`);await owner.query(`DROP ROLE IF EXISTS ${role}`);await owner.end();};
  try{
-  await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await owner.query(`CREATE SCHEMA ${schema}`);await createTestLogin(owner,role);
   await migrateDatabase(owner,migrationDirectory);await grantRuntimeAccess(owner,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:runtimePoolSize,...(productionTimeouts?{statement_timeout:15000,connectionTimeoutMillis:5000}:{}),options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);runtime=new pg.Pool({connectionString:url.href,max:runtimePoolSize,...(productionTimeouts?{statement_timeout:15000,connectionTimeoutMillis:5000}:{}),options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
   const db=isolateDatabase(runtime,{schema}),as=(sub,work)=>runAsAccount({sub},work);
   const family=(sub,input)=>as(sub,()=>createFamilyRepository(db)(sub,validateFamily(input)));
   for(const sub of ['reader','other']){

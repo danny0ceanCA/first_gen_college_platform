@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter,once} from 'node:events';
@@ -44,8 +45,8 @@ test('real PostgreSQL maintenance grants, batches, independent-process locks and
  const suffix=randomUUID().replaceAll('-',''),schema=`jobs_${suffix}`,role=`job_user_${suffix}`;
  const owner=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1,options:`-c search_path=${schema}`});let pool,child;
  try{
-  await owner.query(`CREATE SCHEMA ${schema}`);await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);await migrateDatabase(owner);await grantMaintenanceAccess(owner,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';pool=new pg.Pool({connectionString:url.href,max:1,options:`-c search_path=${schema}`});await assertMaintenanceAccess(pool,{schema});
+  await owner.query(`CREATE SCHEMA ${schema}`);await createTestLogin(owner,role);await migrateDatabase(owner);await grantMaintenanceAccess(owner,role,{schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);pool=new pg.Pool({connectionString:url.href,max:1,options:`-c search_path=${schema}`});await assertMaintenanceAccess(pool,{schema});
   const rights=(await pool.query("SELECT has_table_privilege(current_user,'origen_conversation_summaries','INSERT') AS insert,has_table_privilege(current_user,'origen_privileged_access_audit','DELETE') AS audit")).rows[0];assert.equal(rights.insert,false);assert.equal(rights.audit,false);
   await owner.query(`GRANT INSERT ON origen_conversation_summaries TO ${role}`);await assert.rejects(assertMaintenanceAccess(pool,{schema}));await owner.query(`REVOKE INSERT ON origen_conversation_summaries FROM ${role}`);await assertMaintenanceAccess(pool,{schema});
   const events=[],runner=createJobRunner(pool,{schema,log:event=>events.push(event)});
@@ -75,9 +76,9 @@ test('actual API startup accepts the separate maintenance login and completes ev
  const suffix=randomUUID().replaceAll('-',''),name=`start_${suffix}`,apiRole=`start_api_${suffix}`,maintenanceRole=`start_job_${suffix}`;
  const admin=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1});let owner,child;
  try{
-  await admin.query(`CREATE DATABASE ${name}`);for(const role of [apiRole,maintenanceRole])await admin.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await admin.query(`CREATE DATABASE ${name}`);for(const role of [apiRole,maintenanceRole])await createTestLogin(admin,role);
   const url=new URL(process.env.DATABASE_TEST_URL);url.pathname=`/${name}`;owner=new pg.Pool({connectionString:url.href,max:1});await migrateDatabase(owner);await grantRuntimeAccess(owner,apiRole);await grantMaintenanceAccess(owner,maintenanceRole);
-  url.username=apiRole;url.password='';const apiUrl=url.href;url.username=maintenanceRole;
+  useTestLogin(url,apiRole);const apiUrl=url.href;useTestLogin(url,maintenanceRole);
   child=spawn(process.execPath,['server/index.mjs'],{env:{...process.env,NODE_ENV:'test',DATABASE_URL:apiUrl,MAINTENANCE_DATABASE_URL:url.href,AUTH0_DOMAIN:'synthetic.example',AUTH0_AUDIENCE:'synthetic',ALLOWED_ORIGINS:'https://synthetic.example',PORT:'0'},stdio:['ignore','pipe','pipe']});
   const events=[];let stderr='';child.stderr.on('data',data=>{stderr+=data;});
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('startup timed out')),10000);let lines='';child.stdout.on('data',data=>{lines+=data;const parts=lines.split('\n');lines=parts.pop();for(const line of parts)try{const event=JSON.parse(line);events.push(event);if(event.event==='service.started'){clearTimeout(timer);resolve();}}catch{}});child.once('exit',code=>{clearTimeout(timer);reject(Error(`startup exited ${code}: ${JSON.stringify(events)} ${stderr}`));});});

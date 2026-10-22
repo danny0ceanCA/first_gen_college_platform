@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -33,9 +34,9 @@ test('PostgreSQL privacy controls, delayed writes, retention and stale-backup de
  const admin=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1,options:`-c search_path=${schema}`});
  const recovery=new pg.Pool({connectionString:process.env.DATABASE_TEST_URL,max:1,options:`-c search_path=${restored}`});let runtime;
  try{
-  await admin.query(`CREATE SCHEMA ${schema}`);await admin.query(`CREATE SCHEMA ${restored}`);await admin.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await admin.query(`CREATE SCHEMA ${schema}`);await admin.query(`CREATE SCHEMA ${restored}`);await createTestLogin(admin,role);
   await migrateDatabase(admin);await migrateDatabase(recovery);await grantRuntimeAccess(admin,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';runtime=new pg.Pool({connectionString:url.href,max:2,options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);runtime=new pg.Pool({connectionString:url.href,max:2,options:`-c search_path=${schema}`});await assertRuntimeIsolation(runtime,{schema});
   const db=isolateDatabase(runtime,{schema}),as=(sub,fn)=>runAsAccount({sub},fn),family=createFamilyRepository(db),privacy=createPrivacyRepository(db),history=createHistoryRepository(db),lifecycle=createLifecycleRepository(db);
   for(const sub of ['alice','bob','closed']){
    await as(sub,()=>family(sub,validateFamily({action:'save-account',account:{firstName:sub,email:'',role:'student'}})));

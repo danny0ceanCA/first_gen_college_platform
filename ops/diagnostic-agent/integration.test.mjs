@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from '../../server/fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
@@ -14,7 +15,7 @@ async function auditFixture(){
  const suffix=randomUUID().replaceAll('-',''),name=`ag_${suffix}`,admin=new pg.Pool({connectionString:process.env.TELEMETRY_TEST_DATABASE_URL,max:1}),pools=[],roles=[];let owner;
  const close=async()=>{await Promise.all(pools.map(p=>p.end()));await owner?.end();await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);for(const role of roles)await admin.query(`DROP ROLE IF EXISTS ${role}`);await admin.end();};
  try{await admin.query(`CREATE DATABASE ${name}`);const url=new URL(process.env.TELEMETRY_TEST_DATABASE_URL);url.pathname='/'+name;owner=new pg.Pool({connectionString:url.href,max:1});await migrateAudit(owner);const result={owner,close};
-  for(const purpose of ['audit','reports','retention']){const role=`ag_${purpose}_${suffix}`;roles.push(role);await admin.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);await grantAgentRole(owner,role,purpose);const endpoint=new URL(url);endpoint.username=role;endpoint.password='';const pool=new pg.Pool({connectionString:endpoint.href,max:2});pools.push(pool);await assertAgentRole(pool,purpose);result[purpose]=pool;}
+  for(const purpose of ['audit','reports','retention']){const role=`ag_${purpose}_${suffix}`;roles.push(role);await createTestLogin(admin,role);await grantAgentRole(owner,role,purpose);const endpoint=new URL(url);useTestLogin(endpoint,role);const pool=new pg.Pool({connectionString:endpoint.href,max:2});pools.push(pool);await assertAgentRole(pool,purpose);result[purpose]=pool;}
   return result;
  }catch(error){await close();throw error;}
 }

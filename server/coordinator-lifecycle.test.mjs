@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
@@ -35,8 +36,8 @@ async function setup(t){
  const staff=(input)=>f.as('staff',()=>runAsCoordinatorActor('staff',{issuedAt:Math.floor(Date.now()/1000)},()=>runNotificationCommand(f.db,{audience:'staff',organizationId:org,...input})));
  const student=(input,sub='other')=>f.as(sub,()=>runNotificationCommand(f.db,{audience:'student',studentId:'alex',...input}));
  const operator=(input)=>f.as('reviewer',()=>runAsCoordinatorActor('reviewer',{administrator:true,issuedAt:Math.floor(Date.now()/1000)},()=>runNotificationCommand(f.db,input)));
- const maintenanceRole=`maint_${randomUUID().replaceAll('-','')}`;await f.owner.query(`CREATE ROLE ${maintenanceRole} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
- const url=new URL(process.env.DATABASE_TEST_URL);url.username=maintenanceRole;url.password='';const maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
+ const maintenanceRole=`maint_${randomUUID().replaceAll('-','')}`;await createTestLogin(f.owner,maintenanceRole);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
+ const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,maintenanceRole);const maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
  // Close this role before the fixture drops its schema and owner connection.
  const close=f.close;f.close=async()=>{await maintenance.end();await f.owner.query(`DROP OWNED BY ${maintenanceRole}`);await f.owner.query(`DROP ROLE ${maintenanceRole}`);await close();};
  const sweep=()=>runRetentionJob(()=>maintainCoordinators(isolateDatabase(maintenance,{schema:f.schema})));
