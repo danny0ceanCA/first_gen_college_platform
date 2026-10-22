@@ -10,9 +10,13 @@ export type NoticeDestination={destination:string;grantId:string;studentId:strin
 export function useNotificationRequest(){
  const {getAccessTokenSilently}=useAuth0();
  return useCallback(async(input:Record<string,unknown>)=>{
+  const lease=browserPrivacy.capture(typeof input.studentId==='string'?{studentId:input.studentId}:undefined);
+  try{
   const token=await getAccessTokenSilently();
-  const response=await apiFetch('/api/coordinator-notifications',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(input),signal:AbortSignal.timeout(10000)});
-  const data=await response.json();if(!response.ok)throw new Error(data.error||'notifications_unavailable');return data;
+  lease.assert();
+  const response=await apiFetch('/api/coordinator-notifications',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(input),signal:AbortSignal.any([lease.signal,AbortSignal.timeout(10000)])});
+  const data=await response.json();lease.assert();if(!response.ok)throw new Error(data.error||'notifications_unavailable');return data;
+  }finally{lease.release();}
  },[getAccessTokenSilently]);
 }
 export default function CoordinatorNotifications({studentId,organizationId,t,onOpen,request:provided}:{studentId?:string;organizationId?:string;t:T;onOpen:(value:NoticeDestination)=>void;request?:(input:Record<string,unknown>)=>Promise<any>}){
@@ -37,7 +41,7 @@ export default function CoordinatorNotifications({studentId,organizationId,t,onO
   catch(e){if(v===epoch.current){setItems(rows=>rows.filter(row=>row.id!==item.id));setError((e as Error).message);}}
   finally{if(v===epoch.current){working.current=false;setBusy(false);}}
  }
- const labels:Record<string,string>={requested:t('A connection request is ready to review.','Hay una solicitud de conexión para revisar.'),accepted:t('Your connection request was accepted.','Se aceptó tu solicitud de conexión.'),published:t('A shared binder has an update.','Hay una actualización en una carpeta compartida.'),feedback:t('You have new coordinator guidance.','Tienes nueva orientación de tu coordinador.'),reply:t('You have a reply to your guidance.','Tienes una respuesta a tu orientación.'),revoked:t('Shared access has ended.','El acceso compartido ha terminado.'),expiring:t('Shared access ends within seven days.','El acceso compartido termina dentro de siete días.')};
+ const labels:Record<string,string>={help:t('A student asked for help with their shared selection.','Un estudiante pidió ayuda con su selección compartida.'),requested:t('A connection request is ready to review.','Hay una solicitud de conexión para revisar.'),accepted:t('Your connection request was accepted.','Se aceptó tu solicitud de conexión.'),published:t('A shared binder has an update.','Hay una actualización en una carpeta compartida.'),feedback:t('You have new coordinator guidance.','Tienes nueva orientación de tu coordinador.'),reply:t('You have a reply to your guidance.','Tienes una respuesta a tu orientación.'),revoked:t('Shared access has ended.','El acceso compartido ha terminado.'),expiring:t('Shared access ends within seven days.','El acceso compartido termina dentro de siete días.')};
  if(!items.length&&!expanded)return null;
  return <section className="coordinator-updates" aria-label={t('Coordinator updates','Novedades del coordinador')}>
   <button type="button" className="coordinator-updates-heading" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}><span>{t('Updates','Novedades')} <span className="coordinator-updates-count">{items.filter(n=>!n.read).length}</span></span><span aria-hidden="true">{expanded?'−':'+'}</span></button>

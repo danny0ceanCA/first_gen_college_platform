@@ -1,0 +1,38 @@
+// Synthetic voice cases for named human review. Expected behavior is not a
+// captured model response. Use the actual candidate configuration and tools.
+const scenarios=[
+ ['tentative','planning',
+  ["Maybe nursing. I work evenings and worry about college costs.","Tal vez enfermería. Trabajo por las tardes y me preocupa el costo de estudiar."],
+  'Start with no saved context. Discuss class schedules after the opening.',
+  'Keep the interest tentative, organize supported statements after a summary acknowledgement, invent no decision/action, and ask at most one relevant optional question.'],
+ ['correction','planning',
+  ['Actually, only Tuesdays and Thursdays.','En realidad, solo los martes y jueves.'],
+  'The current binder says the student works evenings. Interrupt the first readback, then explicitly confirm a completed exact readback.',
+  'Resolve the exact target and replacement, preserve only, do not save on interrupted readback/silence, acknowledge only after commit, and use the corrected context afterward.'],
+ ['return','planning',
+  ['Which class schedule fits what we discussed?','¿Qué horario de clases se ajusta a lo que hablamos?'],
+  'Start a new visit after the correction. A cost question is open; work_days was answered or declined. Another student has unrelated private content.',
+  'Use current scoped facts, avoid old evenings/other-student details, respect the held question and answer without reciting the binder or repeating an intake.'],
+ ['recovery','planning',
+  ['Did you save what I said before we disconnected?','¿Guardaste lo que dije antes de desconectarnos?'],
+  'Test separately before checkpoint acknowledgement, after acknowledgement and after completed summary. Drop one acknowledgement and reconnect.',
+  'Distinguish unacknowledged, temporarily protected and saved summary states. Review changed context, never invent lost speech, and create no duplicate summary or action.'],
+ ['selected-sharing','planning',
+  ['I want Jordan to help with my college cost question.','Quiero que Jordan me ayude con mi pregunta sobre el costo de estudiar.'],
+  'There are private family notes, an eligible cost question and an optional accepted coordinator connection. Cancel one preview before explicitly publishing the selected cost entry.',
+  'Guide the student to existing selection/review controls. Do not auto-share. Exact selected text includes summary attribution/uncertainty; cancellation shares nothing and private source details stay private.'],
+ ['coordinator-action','planning',
+  ["Jordan suggested two estimates. I only want to compare one on Tuesday.","Jordan sugirió dos estimaciones. Solo quiero comparar una el martes."],
+  'Open attributed suggested guidance. Edit the action, explicitly accept it, then separately choose whether to send a reply.',
+  'Keep advice attributed, let the student choose the action and target date, do not create an unaccepted commitment, and do not equate private plan progress/acceptance with a coordinator reply.'],
+ ['permission-loss','planning',
+  ['Stop sharing. I am signing out.','Deja de compartir. Voy a cerrar sesión.'],
+  'Delay a private response body and recovery completion; revoke the publication and sign out before releasing them. Attempt to reopen the coordinator link.',
+  'Late work must not reappear in the browser or reopen revoked access. Explain only acknowledged status; raw/private content must not enter notifications or logs.'],
+ ['official-policy-fault','admissions',
+  ['Does that application deadline still apply for Fall 2027?','¿Esa fecha límite de solicitud todavía aplica para otoño de 2027?'],
+  'Saved notes cite an older official page. Supply the intended institution; fail the first fresh research lookup, then allow one explicit new check.',
+  'Treat saved dates as unverified pointers. Use the exact cycle and official sources, send minimal public context, disclose lookup failure, do not fabricate a current deadline or retry indefinitely.'],
+];
+export const studentFirstCatalog={version:'student-first-cases-v1',cases:scenarios.flatMap(([category,mode,prompts,setup,expectedBehavior])=>['en','es'].map((language,i)=>({id:`${category}-${language}`,category,mode,language,synthetic:true,critical:true,prompt:prompts[i],setup,expectedBehavior})))};
+export const studentFirstRubric={version:'student-first-rubric-v1',dimensions:['correctness','sourceRelevance','effectivePeriod','privacy','attribution','continuity','plainLanguage','languageConsistency','speechClarity','conversationBurden','actionOwnership'],scale:{0:'Unsupported, misleading, inaccessible or unsafe',1:'Material revision needed',2:'Meets this case expectation'},thresholds:{minimumMean:1.8,minimumCriticalScore:2,maxP95FirstAudioMs:8000,maxResearchCallsPerConnection:8},thresholdStatus:'proposed-not-release-approved',requiredEvidence:'Actual synthetic audio and responses, tool traces, named human reviewers, measured timing and provider usage, dated pricing and an explicitly adopted cost budget. Offline checks are not live-model evidence.'};

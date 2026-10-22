@@ -27,7 +27,7 @@ async function send(sub,path,input,{allowed=[200],drop=false}={}){
  }catch(e){if(drop&&status==='transport')return {status,body:{}};throw e;}
  finally{active--;current.samples.push(performance.now()-start);current.statuses[status]=(current.statuses[status]||0)+1;}
 }
-async function batch(tasks){tasks=[...tasks];for(let i=tasks.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[tasks[i],tasks[j]]=[tasks[j],tasks[i]];}let next=0;const failures=[];await Promise.all(Array.from({length:Math.min(concurrency,tasks.length)},async()=>{while(next<tasks.length){const i=next++;try{await tasks[i]();}catch(e){failures.push(e.message);}}}));assert.deepEqual(failures,[]);}
+async function batch(tasks,limit=concurrency){tasks=[...tasks];for(let i=tasks.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[tasks[i],tasks[j]]=[tasks[j],tasks[i]];}let next=0;const failures=[];await Promise.all(Array.from({length:Math.min(limit,tasks.length)},async()=>{while(next<tasks.length){const i=next++;try{await tasks[i]();}catch(e){failures.push(e.message);}}}));assert.deepEqual(failures,[]);}
 async function scenario(name,work){current={name,samples:[],statuses:{},passed:false};const start=performance.now();try{await work();current.passed=true;}catch(e){current.failure=e.message;throw e;}finally{const sorted=current.samples.sort((a,b)=>a-b),durationMs=performance.now()-start;timings.push(...sorted);const item={name,passed:current.passed,requests:sorted.length,statuses:current.statuses,durationMs:Math.round(durationMs),p50Ms:Math.round(sorted[Math.floor(sorted.length*.5)]||0),p95Ms:Math.round(sorted[Math.floor(sorted.length*.95)]||0),maxMs:Math.round(sorted.at(-1)||0),...(current.failure?{failure:current.failure}:{})};report.scenarios.push(item);console.log(JSON.stringify(item));}}
 const users=Array.from({length:count},(_,i)=>({sub:`stress-${i}`,application:null,org:null}));
 const submission=u=>({action:'submit-application',displayName:`Synthetic Advisor ${u.sub}`,organizationName:`Synthetic Center ${u.sub}`,organizationWebsite:'https://example.test/',jobRole:'Advisor'});
@@ -66,10 +66,10 @@ try{
   assert.equal(current.statuses[200],2); // initial read + one winning edit
   assert.equal(current.statuses[409],concurrency-1);
  });
- await scenario('review queue and organization pagination under concurrent reads',async()=>{
+ await scenario('review queue and organization pagination at admitted concurrency two',async()=>{
   const u={sub:'pagination'};f.actor(u.sub);u.application=(await cmd(u.sub,submission(u))).body.application;
   await f.owner.query("INSERT INTO origen_institution_members SELECT id,'pagination','outreach' FROM origen_institutions");
-  await batch(Array.from({length:concurrency},()=>async()=>{const r=await cmd('reviewer',{action:'application-organizations',id:u.application.id});assert.equal(r.body.organizations.length,Math.min(51,count));}));
+  await batch(Array.from({length:concurrency},()=>async()=>{const r=await cmd('reviewer',{action:'application-organizations',id:u.application.id});assert.equal(r.body.organizations.length,Math.min(51,count));}),2);
   let after='',seen=new Set();do{const list=(await cmd('reviewer',{action:'application-organizations',id:u.application.id,after})).body.organizations;for(const o of list.slice(0,50)){assert.ok(!seen.has(o.id));seen.add(o.id);}after=list.length>50?list[49].id:'';}while(after);assert.equal(seen.size,count);
  });
  await scenario('withdrawal, late registration and stale retries',async()=>{
@@ -90,7 +90,7 @@ try{
  });
  await scenario('invalid, unverified and non-MFA requests fail closed under load',async()=>{
   f.actor('no-mfa',{mfa:false});f.actor('unverified',{verified:false});
-  await batch(Array.from({length:concurrency},()=>async()=>{await cmd('no-mfa',{action:'applications'},{allowed:[403]});await cmd('unverified',submission({sub:'unverified'}),{allowed:[403]});await cmd('applicant',{action:'withdraw-application'},{allowed:[400]});await cmd('applicant',{action:'approve-application',id:randomUUID(),institutionId:users[0].org,reviewNote:'Forged',administrator:true},{allowed:[403]});}));
+  await batch(Array.from({length:concurrency},()=>async()=>{await cmd('no-mfa',{action:'applications'},{allowed:[403]});await cmd('unverified',submission({sub:'unverified'}),{allowed:[403]});await cmd('applicant',{action:'withdraw-application'},{allowed:[400]});await cmd('applicant',{action:'approve-application',id:randomUUID(),institutionId:users[0].org,reviewNote:'Forged',administrator:true},{allowed:[403]});}),2);
  });
  await scenario('invitation replays and competing review, withdrawal and membership removal',async()=>{
   const owner=users[0],racers=Array.from({length:40},(_,i)=>({sub:`invite-${i}`}));for(const u of racers)f.actor(u.sub);

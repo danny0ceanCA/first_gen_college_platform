@@ -16,13 +16,13 @@ import {MFA_TIME_CLAIM} from '../staff-access.mjs';
 import {AUTH_TIME_CLAIM} from '../recent-auth.mjs';
 import {coordinatorFlags} from '../binder-sharing-policy.mjs';
 
-export async function coordinatorPilotFixture({language='en',permission='adult',runtimePoolSize=3,productionTimeouts=false}={}){
+export async function coordinatorPilotFixture({language='en',permission='adult',runtimePoolSize=3,productionTimeouts=false,followThrough=false}={}){
  const f=await retrievalFixture({runtimePoolSize,productionTimeouts}),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
  const actors=new Set(['other','reader','owner','staff','colleague','reviewer']);
  const actor=sub=>{if(!/^sharing-stress-\d+$/.test(sub))throw Error('synthetic_actor_required');actors.add(sub);};
  const cleanup=async()=>{if(server)await new Promise(r=>{server.close(r);server.closeAllConnections();});if(maintenance){await maintenance.end();await f.owner.query(`DROP OWNED BY ${maintenanceRole}`);await f.owner.query(`DROP ROLE ${maintenanceRole}`);}await f.close();};
  try{
-  const env={AUTH0_DOMAIN:'synthetic.example',...Object.fromEntries(coordinatorFlags.map(k=>[k,'true']))};
+  const env={AUTH0_DOMAIN:'synthetic.example',...Object.fromEntries(coordinatorFlags.map(k=>[k,'true'])),...(followThrough?{ORIGEN_DERIVED_BINDER_SHARING:'true',ORIGEN_COORDINATOR_FOLLOW_THROUGH:'true'}:{})};
   const account=(await f.owner.query("SELECT id FROM origen_accounts WHERE auth0_subject='other'")).rows[0].id;
   for(const sub of ['owner','reviewer'])await f.owner.query('INSERT INTO origen_institution_representatives(auth0_subject,first_name,work_email,job_role) VALUES($1,$1,$2,$3)',[sub,`${sub}@example.test`,'Synthetic']);
   await f.owner.query("INSERT INTO origen_institutions(id,slug,draft,verification_status) VALUES($1,$2,$3,'verified')",[org,org,{name:'Synthetic Community Center'}]);

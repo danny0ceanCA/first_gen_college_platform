@@ -5,6 +5,8 @@ import {personalizationControls,personalizationPolicy} from './personalization-c
 import {adaptiveGuidanceInstructions} from './adaptive-guidance.mjs';
 import {createLiveMemoryRepository} from './live-memory.mjs';
 import {liveMemoryTools,liveMemoryInstructions} from './live-memory-tools.mjs';
+import {guidedConversationEnabled,guidedConversationTools,guidedConversationInstructions} from './guided-conversation.mjs';
+import {continuityEnabled,loadQuestionContinuity,continuitySnapshot,continuityInstructions} from './conversation-continuity.mjs';
 import {createMemoryRepository,memoryInstructions,briefMemorySelection} from './student-memory.mjs';
 import {retrieveStudentHistory,voiceHistoryQuery,retrievalInstructions} from './history-retrieval.mjs';
 import {providerOperation} from './observability/dependencies.mjs';
@@ -110,9 +112,12 @@ Never ask for passwords, application IDs, SSNs, payment information, immigration
   if(!routing||input.targetConfirmed)session.instructions+=workspaceInstructions(input.workspace,{continuing:input.continuing===true,selectedNow:input.workspaceRefreshOnly!==true});
   if(!routing||input.targetConfirmed)session.instructions+=memoryInstructions(input.studentBrief);
   if(!routing||input.targetConfirmed)session.instructions+=retrievalInstructions(input.historicalEvidence);
+  if(!routing||input.targetConfirmed)session.instructions+=continuityInstructions(input.returnContext);
   if(input.liveMemoryEnabled&&(!routing||input.targetConfirmed)){session.tools.push(...liveMemoryTools.filter(tool=>tool.name==='recall_student_context'?input.liveMemoryReadEnabled!==false:input.liveMemoryWriteEnabled!==false));session.instructions+=liveMemoryInstructions+(input.liveMemoryWriteEnabled===false?' Saving during this call is disabled. Use only the advertised recall tool; direct the user to binder controls for an explicit edit.':' These acknowledged live tools supersede earlier restrictions on saving memory and accepted next steps during the call; all other restrictions still apply.');}
   if(!routing||input.targetConfirmed)session.instructions+=input.adaptiveEnabled===false?'':adaptiveGuidanceInstructions(input);
+  if(input.guidedConversation&&input.liveMemoryEnabled&&(!routing||input.targetConfirmed)){session.tools.push(...guidedConversationTools.filter(tool=>tool.name==='get_guidance_question'?input.adaptiveEnabled!==false:input.liveMemoryWriteEnabled!==false));session.instructions+=guidedConversationInstructions;}
   if(input.coordinatorLinking){session.tools.push(...coordinatorLinkTools);session.instructions+=coordinatorLinkInstructions;}
+  session.instructions+=' APP ACTION HONESTY: You cannot sign a user out, revoke access or stop sharing through speech alone. Direct them to the existing app controls when needed. Never claim signed out, access revoked or sharing stopped merely because requested or announced by the user; require an explicit app acknowledgement of the completed action.';
   session.instructions=voiceLanguageInstructions(session.instructions,input.language);
   return session;
 }
@@ -138,8 +143,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
     try {
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
       let input; try {input=JSON.parse(raw);} catch {return send(400,{error:'invalid_request'});}
-      if(input&&typeof input==='object'){input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
+      if(input&&typeof input==='object'){input.returnContext=undefined;input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
       const policy=personalizationControls(env,req.origenAuthorized?req.origenIdentity?.sub:undefined);
+      const continuity=req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub);
       if(input&&typeof input==='object'){input.adaptiveEnabled=policy.adaptive;input.liveMemoryReadEnabled=policy.retrieval;input.liveMemoryWriteEnabled=policy.writes;}
       const updating=input?.action==='update-guide',preparing=input?.action==='prepare';
       if(!input || (input.action!==undefined&&!updating&&!preparing) || (!updating&&!preparing&&(typeof input.sdp!=='string' || !input.sdp.startsWith('v=0') || input.sdp.length>64000)) || !['en','es'].includes(input.language) || !['parent','student'].includes(input.role) || (input.mode!==undefined && !['profile','finance','admissions','planning','loans'].includes(input.mode))) return send(400,{error:'invalid_request'});
@@ -153,6 +159,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const cached=prepareEnabled&&!preparing&&input.preparedContextId?preparations.take(req.origenIdentity.sub,input.preparedContextId,preparationKey,versionBefore):undefined;
       if(cached){input={...cached.input,action:input.action,sdp:input.sdp};storedRole=cached.storedRole;}
       if(!cached){
+      const continuityVersion=continuity?await voiceContextVersion(database,req.origenIdentity.sub):undefined;
       if(req.origenAuthorized){
         // Saved context is server-owned; callers may only supply an unsaved setup draft.
         input.memory=[];input.plans=[];delete input.workspace;input.students=[];
@@ -178,9 +185,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(input.routeConversations&&!input.targetConfirmed){input.memory=[];input.plans=[];input.profile={};}
       if(req.origenAuthorized&&['planning','finance','loans','admissions'].includes(input.mode)&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
         try{
-          try{input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,focus:input.workspaceFocus,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds});}
+          try{input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,focus:input.workspaceFocus,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity});}
           catch(error){
-            if(updating&&input.workspaceRefreshOnly===true&&['workspace_item_changed','workspace_item_unavailable'].includes(error.message))input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds});
+            if(updating&&input.workspaceRefreshOnly===true&&['workspace_item_changed','workspace_item_unavailable'].includes(error.message))input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity});
             else throw error;
           }
         }catch(error){return send([400,404,409].includes(error.status)?error.status:503,{error:[400,404,409].includes(error.status)?error.message:'workspace_unavailable'});}
@@ -190,20 +197,25 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         const selectedBrief=briefMemorySelection(input.studentBrief);
         const workspaceEntries=[...(input.workspace?.notes||[]),...(input.workspace?.conversationPoints||[])];
         if(policy.retrieval)input.historicalEvidence=await retrieveStudentHistory(database,req.origenIdentity.sub,{
-          studentId:input.studentId,...voiceHistoryQuery(input),
+          studentId:input.studentId,...voiceHistoryQuery(input),continuity,
           excludeRefs:[...selectedBrief.map(m=>m.ref),...workspaceEntries.map(n=>n.evidenceRef).filter(Boolean)],
           excludeSummaryIds:[...input.memory.map(m=>m.id),...selectedBrief.map(m=>m.summaryId),...workspaceEntries.map(n=>n.sourceSummaryId)].filter(Boolean),
         });
         const check=await createMemoryRepository(database)(req.origenIdentity.sub,{action:'revision',studentId:input.studentId});
         if(check.revision!==input.studentBrief.revision)return send(409,{error:'memory_changed'});
         const suppressed=new Set(input.studentBrief.suppressedSummaryIds);input.memory=input.memory.filter(m=>!suppressed.has(m.id));
+        if(continuity)input.returnContext=continuitySnapshot(input,await loadQuestionContinuity(database,req.origenIdentity.sub,input.studentId));
       }
+      if(continuity&&continuityVersion!==await voiceContextVersion(database,req.origenIdentity.sub))return send(409,{error:'memory_changed'});
       }
+      if(continuity!==(req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub)))return send(409,{error:'memory_changed'});
+      if(input.returnContext)input.returnContext=continuitySnapshot(input,input.returnContext.recentQuestions);
       if(preparing){
         const versionAfter=await voiceContextVersion(database,req.origenIdentity.sub);
         const preparedContextId=versionBefore!==undefined&&versionBefore===versionAfter?preparations.put(req.origenIdentity.sub,preparationKey,versionAfter,{input,storedRole}):undefined;
         return send(200,{preparedContextId:preparedContextId||null});
       }
+      input.guidedConversation=guidedConversationEnabled(env);
       input.coordinatorLinking=await coordinatorVoiceAvailable(database,env,input.studentId);
       let liveMemorySession;
       if(req.origenAuthorized&&(policy.retrieval||policy.writes)&&input.enableLiveMemory===true&&input.studentBrief?.available){
@@ -217,7 +229,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.
-        const base=voiceSession({...input,studentBrief:undefined,historicalEvidence:input.historicalEvidence?{items:[]}:undefined,profile:{},students:[],memory:[],plans:[],workspace:input.workspace?.available?{available:true,selection:input.workspace.selection||null,notes:[],actions:[]}:undefined,workspaceFocus:undefined,continuity:undefined},env);
+        const base=voiceSession({...input,returnContext:input.returnContext?{policy:'continuity-v1'}:undefined,studentBrief:undefined,historicalEvidence:input.historicalEvidence?{items:[]}:undefined,profile:{},students:[],memory:[],plans:[],workspace:input.workspace?.available?{available:true,selection:input.workspace.selection||null,notes:[],actions:[]}:undefined,workspaceFocus:undefined,continuity:undefined},env);
         const version=guidanceConfig(config.model,'voice',base,env);
         const confirmed=input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true);
         tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);

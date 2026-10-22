@@ -1,8 +1,9 @@
 import {guardAccountTransaction} from './account-guard.mjs';
 import {databaseQueryOperation} from './observability/dependencies.mjs';
 import {withRequestDeadline} from '../src/requestDeadline.mjs';
+import {savedSourceEvidence} from './conversation-continuity.mjs';
 
-export const RETRIEVAL_VERSION='postgres-keyword-v1';
+export const RETRIEVAL_VERSION='postgres-keyword-v2';
 export const RETRIEVAL_BUDGET=6500;
 const stop=new Set(('a about an and are around as at be been but by can could did do does fit for from had has have how i if in is it its me my of on or our s say said should so some tell that the their them there these they this to us was we were what when where which who why will with would you your '+
  'a al algo como con cual cuando de del donde el ella en era es esa ese eso esta este fue ha hay la las le lo los me mi mis nos o para pero podría por que qué quien se si sin sobre son su sus te tiene tu tus un una unos unas y ya yo').split(/\s+/));
@@ -11,7 +12,10 @@ const stop=new Set(('a about an and are around as at be been but by can could di
 const equivalents=[['job','jobs','work','working','employment','trabajo','trabajar','empleo'],['schedule','schedules','horario','horarios']];
 const expand=word=>{const group=equivalents.find(words=>words.includes(word));return group?group.join(' | '):word;};
 // Keep words only: input never becomes SQL, a tsquery operator, or instructions.
-export function retrievalTerms(query){return [...new Set(String(query||'').toLowerCase().normalize('NFC').match(/[\p{L}\p{N}]+/gu)||[])].filter(w=>w.length>1&&!stop.has(w)).slice(0,24);}
+const filler=new Set(['problem','concern','problema']);
+const folded=word=>word.normalize('NFD').replace(/\p{M}/gu,'');
+const foldedStop=new Set([...stop].map(folded));
+export function retrievalTerms(query){return [...new Set(String(query||'').toLowerCase().normalize('NFC').match(/[\p{L}\p{N}]+/gu)||[])].filter(w=>w.length>1&&!foldedStop.has(folded(w))&&!filler.has(w)).slice(0,24);}
 const document=column=>`(to_tsvector('english',${column}) || to_tsvector('spanish',${column}) || to_tsvector('simple',${column}))`;
 const parsed=value=>`(to_tsquery('english',${value}) || to_tsquery('spanish',${value}) || to_tsquery('simple',${value}))`;
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -21,25 +25,26 @@ const date=value=>new Date(value).toISOString();
 // Private SQL candidates always require both the account and exact student/family
 // scope. RLS is an additional boundary. Fresh source rows supply all text; there
 // is no stale derived document to resurrect after deletion or correction.
-function candidateSql(studentId){
+function candidateSql(studentId,continuity){
  const scope=alias=>studentId===null?`${alias}.student_id IS NULL`:`${alias}.student_id=$2`;
  const suppressed=summary=>`NOT EXISTS(SELECT 1 FROM origen_memory_batches b WHERE b.account_id=$1 AND b.summary_id=${summary} AND b.suppressed)`;
  const sourceScope=(alias)=>`(${alias}.source_summary_id IS NULL OR EXISTS(SELECT 1 FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=${alias}.source_summary_id AND ${scope('source')}))`;
+ const sources=alias=>continuity?`coalesce((SELECT source.sources FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=${alias}.source_summary_id AND ${scope('source')} AND ${suppressed('source.id')}),'[]'::jsonb)`:`'[]'::jsonb`;
  return `WITH search AS (SELECT ${parsed('$3')} AS query,$2::text AS scope), candidates AS (
   SELECT 'summary'::text AS kind,s.id,s.student_id,s.summary AS content,'und'::text AS language,
    encode(sha256(convert_to(s.summary,'UTF8')),'hex') AS version,s.id AS summary_id,s.conversation_at AS recorded_at,
-   'unreviewed'::text AS status,'unknown'::text AS speaker,'unknown'::text AS reported_by,s.mode AS topic,${document('s.summary')} AS document
+   'unreviewed'::text AS status,'unknown'::text AS speaker,'unknown'::text AS reported_by,s.mode AS topic,${document('s.summary')} AS document,${continuity?'s.sources':"'[]'::jsonb"} AS sources,NULL::text AS note_kind
   FROM origen_conversation_summaries s,search WHERE s.account_id=$1 AND ${scope('s')} AND ${suppressed('s.id')} AND ${document('s.summary')} @@ search.query
   UNION ALL
   SELECT 'memory',m.id::text,m.student_id,m.content,m.language,m.version::text,m.source_summary_id,m.updated_at,
-   m.status,m.speaker,m.reported_by,m.category,${document('m.content')}
+   m.status,m.speaker,m.reported_by,m.category,${document('m.content')},${sources('m')},NULL::text
   FROM origen_student_memories m,search WHERE m.account_id=$1 AND ${scope('m')} AND m.status IN ('proposed','confirmed') AND ${sourceScope('m')}
-   AND (m.status='confirmed' OR ${suppressed('m.source_summary_id')}) AND ${document('m.content')} @@ search.query
+   AND (m.status='confirmed' OR coalesce((to_jsonb(m)->>'context_current')::boolean,false) OR ${suppressed('m.source_summary_id')}) AND ${document('m.content')} @@ search.query
   UNION ALL
   SELECT 'note',n.id::text,n.student_id,n.content,n.language,n.version::text,n.source_summary_id,n.updated_at,
-   'saved','unknown','unknown',n.topic,${document('n.content')}
+   'saved','unknown','unknown',n.topic,${document('n.content')},${sources('n')},n.kind
   FROM origen_topic_notes n,search
-  WHERE n.account_id=$1 AND ${scope('n')} AND n.status='saved' AND ${sourceScope('n')} AND ${suppressed('n.source_summary_id')} AND ${document('n.content')} @@ search.query
+  WHERE n.account_id=$1 AND ${scope('n')} AND n.status='saved' AND ${sourceScope('n')} AND (coalesce((to_jsonb(n)->>'context_current')::boolean,false) OR ${suppressed('n.source_summary_id')}) AND ${document('n.content')} @@ search.query
  ), scored AS (
   SELECT c.*,encode(sha256(convert_to(content,'UTF8')),'hex') AS content_hash,
    (SELECT count(*)::float FROM unnest($4::text[]) term WHERE c.document @@ ${parsed('term')}) / cardinality($4::text[]) AS coverage,
@@ -59,7 +64,7 @@ export function retrievalExcerpt(content,terms,max=950){
  const at=positions.length?Math.min(...positions):0,start=Math.max(0,at-160),end=Math.min(content.length,start+max-70);
  return `${start?'[Excerpt; earlier text omitted.] ':''}${content.slice(start,end)}${end<content.length?' [Later text omitted.]':''}`;
 }
-function selectItems(rows,terms){
+function selectItems(rows,terms,continuity){
  const items=[],seen=new Set(),sources=new Set();
  for(const row of rows){
   const normalized=row.content.trim().toLowerCase().replace(/\s+/g,' ');
@@ -67,14 +72,15 @@ function selectItems(rows,terms){
   const entry={kind:row.kind,id:row.id,studentId:row.student_id,version:row.version,contentHash:row.content_hash,
    content:retrievalExcerpt(row.content,terms),language:row.language,recordedAt:date(row.recorded_at),
    status:row.status,speaker:row.speaker,reportedBy:row.reported_by,topic:row.topic,sourceSummaryId:row.summary_id,
-   evidenceRef:`${row.kind}:${row.id}@${row.version}`};
+   evidenceRef:`${row.kind}:${row.id}@${row.version}`,
+   ...(continuity?{noteKind:row.note_kind,sources:savedSourceEvidence(row.sources).map(s=>({url:s.url,checkedAt:s.recordedCheckedAt})),policyVerification:'requires_fresh_lookup'}:{})};
   if(JSON.stringify([...items,entry]).length>RETRIEVAL_BUDGET)continue;
   items.push(entry);seen.add(normalized);if(row.summary_id)sources.add(row.summary_id);if(items.length===5)break;
  }
  return items;
 }
 
-export async function retrieveStudentHistory(database,subject,{studentId,query,excludeRefs=[],excludeSummaryIds=[],minCoverage=0.34,timeoutMs=900}={}){
+export async function retrieveStudentHistory(database,subject,{studentId,query,excludeRefs=[],excludeSummaryIds=[],minCoverage=0.34,timeoutMs=900,continuity=false}={}){
  if(studentId!==null&&(typeof studentId!=='string'||!studentId||studentId.length>128))throw fail(400,'memory_scope_required');
  const terms=retrievalTerms(query);if(!terms.length)return empty('no_query');if(!database)return empty('unavailable');
  const concepts=[...new Set(terms.map(expand))];
@@ -92,8 +98,8 @@ export async function retrieveStudentHistory(database,subject,{studentId,query,e
    if(studentId!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account.id,studentId])).rows.length)throw fail(404,'student_not_found');
    check();const ready=(await c.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql') AS ready")).rows[0]?.ready;
    if(!ready){await c.query('COMMIT');transaction=false;return empty('migration_pending');}
-   check();const rows=(await c.query(candidateSql(studentId),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
-   const items=selectItems(rows,retrievalTerms(concepts.join(' ')));await c.query('COMMIT');transaction=false;check();
+   check();const rows=(await c.query(candidateSql(studentId,continuity),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
+   const items=selectItems(rows,retrievalTerms(concepts.join(' ')),continuity);await c.query('COMMIT');transaction=false;check();
    return {available:true,method:RETRIEVAL_VERSION,reason:items.length?'matched':'no_relevant_history',items};
   }finally{if(transaction)await c.query('ROLLBACK').catch(()=>{});c.release();}
  },{timeoutMs:deadline}));}

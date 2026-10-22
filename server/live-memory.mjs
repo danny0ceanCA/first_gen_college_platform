@@ -5,8 +5,13 @@ import {guardAccountTransaction} from './account-guard.mjs';
 import {createMemoryRepository,validateMemoryRequest} from './student-memory.mjs';
 import {createPlanRepository,validatePlan} from './plans.mjs';
 import {retrieveStudentHistory,retrievalInstructions} from './history-retrieval.mjs';
+import {continuityEnabled,loadQuestionContinuity,continuitySnapshot,continuityInstructions} from './conversation-continuity.mjs';
+import {voiceContextVersion} from './voice-preparation.mjs';
 import {memoryIntent,acceptsProposal,normalizeIntent} from './live-memory-intent.mjs';
 import {allowedRequest} from './origin.mjs';
+import {createCorrectionService,correctionSnapshot} from './binder-corrections.mjs';
+import {correctionsEnabled} from './binder-corrections-policy.mjs';
+import {guidedConversationEnabled,guidanceAction,guidanceTurn,spokenCorrectionIntent,guidanceQuestions} from './guided-conversation.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
@@ -14,15 +19,16 @@ const text=(value,max)=>typeof value==='string'&&value.trim().length>0&&value.le
 export function validateLiveChange(value){
  if(!value||!['create','update','delete','next-step'].includes(value.kind))throw fail(400,'invalid_memory_change');
  const out={kind:value.kind};
+ if(value.store!==undefined){if(!['memory','note'].includes(value.store)||!['update','delete'].includes(value.kind))throw fail(400,'invalid_memory_change');out.store=value.store;}
  if(['update','delete'].includes(value.kind)){if(!uuid(value.id)||!Number.isSafeInteger(value.version)||value.version<1)throw fail(400,'invalid_memory_change');out.id=value.id;out.version=value.version;}
  if(value.kind!=='delete'){
-  if(!text(value.content,value.kind==='next-step'?2000:1000)||!(value.kind==='next-step'?['education','courses','transfer','degree','career','financial','applications','other']:['goal','constraint','preference','question']).includes(value.category))throw fail(400,'invalid_memory_change');
-  if(redactCoordinatorCodes(value.content)!==value.content)throw fail(400,'invalid_memory_change');out.content=value.content.trim();out.category=value.category;
+  if(!text(value.content,out.store==='note'?4000:value.kind==='next-step'?2000:1000)||!out.store&&!(value.kind==='next-step'?['education','courses','transfer','degree','career','financial','applications','other']:['goal','constraint','preference','question']).includes(value.category))throw fail(400,'invalid_memory_change');
+  if(redactCoordinatorCodes(value.content)!==value.content)throw fail(400,'invalid_memory_change');out.content=value.content.trim();if(!out.store)out.category=value.category;
  }
  return out;
 }
 export function validateLiveMemoryRequest(input){
- if(!input||!['turn','read','write','present','close'].includes(input.action)||!uuid(input.sessionId)||input.studentId!==undefined||input.accountId!==undefined)throw fail(400,'invalid_live_memory');
+ if(!input||!['turn','read','write','present','close','question','question-present'].includes(input.action)||!uuid(input.sessionId)||input.studentId!==undefined||input.accountId!==undefined)throw fail(400,'invalid_live_memory');
  const out={action:input.action,sessionId:input.sessionId};if(out.action==='close')return out;
  if(!Number.isSafeInteger(input.sequence)||input.sequence<1||!text(input.turnId,128)||typeof input.transcript!=='string'||input.transcript.length>8000)throw fail(400,'invalid_live_memory');
  Object.assign(out,{sequence:input.sequence,turnId:input.turnId,transcript:input.transcript});
@@ -30,12 +36,17 @@ export function validateLiveMemoryRequest(input){
  if(out.action==='read'){if(!text(input.query,1000))throw fail(400,'invalid_live_memory');out.query=input.query;}
  if(out.action==='write'){if(!uuid(input.requestId))throw fail(400,'invalid_live_memory');out.requestId=input.requestId;out.change=validateLiveChange(input.change);}
  if(out.action==='present'){if(!text(input.presentation,8000))throw fail(400,'invalid_live_memory');out.presentation=input.presentation;out.change=validateLiveChange(input.change);}
+ if(out.action==='question'){if(!['options','transfer','costs','applications'].includes(input.topic))throw fail(400,'invalid_live_memory');out.topic=input.topic;}
+ if(out.action==='question-present'){if(!Object.hasOwn(guidanceQuestions,input.key)||!text(input.presentation,8000))throw fail(400,'invalid_live_memory');out.key=input.key;out.presentation=input.presentation;}
  return out;
 }
 const saved=receipt=>({status:'saved',kind:receipt.kind,id:receipt.record_id,version:receipt.record_version,revision:receipt.revision,reconnect:true,instruction:'The database committed this change. The app will acknowledge it and reconnect with fresh context. Do not save it again.'});
 
 export function createLiveMemoryRepository(database,env={}){return async(subject,input,{signal}={})=>{
  requireLiveCapability(env,subject,input.action);
+ const guided=guidedConversationEnabled(env);
+ const corrections=correctionsEnabled(env);
+ if((input.action.startsWith('question')||input.change?.store)&&!guided)throw fail(503,'guided_conversation_disabled');
  if(!database)throw fail(503,'live_memory_unavailable');
  const c=await database.connect();let committed=false;
  try{
@@ -63,6 +74,7 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
    // Speech-start fences the old turn; completed transcription fills that same
    // sequence. Preserve a pending proposal only for the immediately next turn.
    const preserve=session.proposal_turn===input.sequence-1||input.sequence===session.turn_sequence&&session.transcript_hash===proof;
+   if(guided)await guidanceTurn(c,owner,session,input);
    await c.query('UPDATE origen_live_memory_sessions SET turn_sequence=$3,turn_id=$4,transcript_hash=$5,turn_language=$6,proposal_hash=CASE WHEN $7 THEN proposal_hash ELSE NULL END,proposal_turn=CASE WHEN $7 THEN proposal_turn ELSE NULL END WHERE account_id=$1 AND id=$2',[owner,session.id,input.sequence,input.turnId,proof,input.language,preserve]);
    signal?.throwIfAborted();await c.query('COMMIT');committed=true;return {status:'registered'};
   }
@@ -77,22 +89,33 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
    await c.query('COMMIT');committed=true;return saved(receipt);
   }
   if(await revision(session.student_id)!==session.revision)throw fail(409,'memory_changed');
+  if(input.action==='question'||input.action==='question-present'){
+   const result=await guidanceAction(c,owner,session,input);signal?.throwIfAborted();requireLiveCapability(env,subject,input.action);if(!guidedConversationEnabled(env))throw fail(503,'guided_conversation_disabled');await guardAccountTransaction(c,subject);await c.query('COMMIT');committed=true;return result;
+  }
   if(input.action==='inspect'){await c.query('COMMIT');committed=true;return {studentId:session.student_id,revision:session.revision};}
   if(!['write','present'].includes(input.action))throw fail(400,'invalid_live_memory');
   const change=input.change;let old;
   if(['update','delete'].includes(change.kind)){
-   old=(await c.query("SELECT * FROM origen_student_memories WHERE account_id=$1 AND id=$2 AND status IN ('proposed','confirmed')",[owner,change.id])).rows[0];
+   const note=change.store==='note';
+   old=(await c.query(`SELECT * FROM ${note?'origen_topic_notes':'origen_student_memories'} WHERE account_id=$1 AND id=$2${note?'':" AND status IN ('proposed','confirmed')"}`,[owner,change.id])).rows[0];
    if(!old||old.student_id!==session.student_id)throw fail(404,'memory_not_found');if(old.version!==change.version)throw fail(409,'memory_changed');
+   if(guided){
+    const siblings=(await c.query(`SELECT content FROM ${note?'origen_topic_notes':'origen_student_memories'} WHERE account_id=$1 AND student_id IS NOT DISTINCT FROM $2${note?'':" AND status IN ('proposed','confirmed')"}`,[owner,session.student_id])).rows;
+    if(siblings.filter(row=>normalizeIntent(row.content)===normalizeIntent(old.content)).length>1){
+     await c.query('COMMIT');committed=true;return {status:'target_ambiguous',instruction:'More than one current item has this wording. Nothing was saved. Ask the person to identify and edit the intended item in the binder; do not guess an ID.'};
+    }
+   }
   }
   if(input.action==='present'){
    const spoken=normalizeIntent(input.presentation),includes=value=>spoken.includes(normalizeIntent(value));
    const question=input.presentation.includes('?')||/^(would|should|shall|can|do you want|quieres|deseas|debo|puedo|te gustaria)\b/.test(spoken);
-   const valid=question&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence&&/\b(save|saved|guardar|guarde|guarda|guardemos|guardarlo|guardamos|borre|borrar|delete|remove|forget)\b/.test(spoken)&&(change.kind==='delete'||includes(change.content))&&(!old||includes(old.content));
-   if(valid)await c.query('UPDATE origen_live_memory_sessions SET proposal_presented=true WHERE account_id=$1 AND id=$2',[owner,session.id]);
+   const negated=guided&&/\b(not|don t|never|no|nunca) (?:save|delete|remove|forget|guardar|guardes|guarde|borrar|borres|eliminar|elimines)\b/.test(spoken);
+   const valid=!negated&&question&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence&&/\b(save|saved|guardar|guarde|guarda|guardemos|guardarlo|guardamos|borre|borrar|delete|remove|forget)\b/.test(spoken)&&(change.kind==='delete'||includes(change.content))&&(!old||includes(old.content));
+   await c.query('UPDATE origen_live_memory_sessions SET proposal_presented=$3 WHERE account_id=$1 AND id=$2 AND proposal_hash=$4 AND proposal_turn=$5',[owner,session.id,valid,fingerprint,input.sequence]);
    await c.query('COMMIT');committed=true;return {status:valid?'presented':'not_presented'};
   }
   const confirmed=acceptsProposal(input.transcript)&&session.proposal_presented&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence-1&&Date.now()-Date.parse(session.proposal_at)<120000;
-  const intent=memoryIntent(input.transcript,change,old?.content);
+  const intent=guided&&old?spokenCorrectionIntent(input.transcript,change,old):memoryIntent(input.transcript,change,old?.content);
   if(!confirmed&&intent!=='authorized'){
    if(intent==='clarify'&&session.proposal_turn===input.sequence&&session.proposal_hash!==fingerprint)throw fail(409,'memory_request_changed');
    if(intent==='clarify')await c.query('UPDATE origen_live_memory_sessions SET proposal_hash=$3,proposal_turn=$4,proposal_at=now(),proposal_presented=false WHERE account_id=$1 AND id=$2',[owner,session.id,fingerprint,input.sequence]);
@@ -106,6 +129,11 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
    const row=(await c.query('SELECT plan_id FROM origen_plan_creations WHERE account_id=$1 AND request_id=$2',[owner,input.requestId])).rows[0];recordId=row.plan_id;recordVersion=1;
    // New plans must refresh other active live scopes too.
    await c.query('INSERT INTO origen_memory_scopes(account_id,scope_key,student_id) VALUES($1,$2,$3) ON CONFLICT(account_id,scope_key) DO UPDATE SET revision=origen_memory_scopes.revision+1',[owner,session.student_id??'',session.student_id]);newRevision=await revision(session.student_id);
+  }else if(corrections&&old){
+   const store=change.store||'memory';
+   const value=store==='note'?{topic:old.topic,kind:old.kind,content:change.content,language:session.turn_language,decisionConfirmed:old.kind==='decision'}:{category:old.category,content:change.content,language:session.turn_language,speaker:old.speaker};
+   const result=await createCorrectionService(database,env)(subject,{operationId:input.requestId,store,studentId:session.student_id,action:change.kind,id:old.id,version:old.version,before:correctionSnapshot(old,store),...(change.kind==='update'?{value}:{})},{client:c,signal});
+   recordId=result.id;recordVersion=result.version;newRevision=await revision(session.student_id);
   }else{
    recordId=change.kind==='create'?input.requestId:change.id;
    const memory=validateMemoryRequest({action:change.kind,studentId:session.student_id,id:recordId,version:change.version,memory:{category:change.category,content:change.content,language:session.turn_language,speaker:['parent','student'].includes(account.role)?account.role:'unknown'}});
@@ -113,15 +141,20 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
   }
   await c.query('INSERT INTO origen_live_memory_receipts(account_id,session_id,turn_sequence,request_id,fingerprint,kind,record_id,record_version,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[owner,session.id,input.sequence,input.requestId,fingerprint,change.kind,recordId,recordVersion,newRevision]);
   await c.query('UPDATE origen_live_memory_sessions SET revision=$3,proposal_hash=NULL,proposal_turn=NULL WHERE account_id=$1 AND id=$2',[owner,session.id,newRevision]);
-  signal?.throwIfAborted();requireLiveCapability(env,subject,input.action);await c.query('COMMIT');committed=true;return saved({kind:change.kind,record_id:recordId,record_version:recordVersion,revision:newRevision});
+  signal?.throwIfAborted();requireLiveCapability(env,subject,input.action);if(guided&&!guidedConversationEnabled(env)||corrections&&!correctionsEnabled(env))throw fail(503,'guided_conversation_disabled');await guardAccountTransaction(c,subject);await c.query('COMMIT');committed=true;return saved({kind:change.kind,record_id:recordId,record_version:recordVersion,revision:newRevision});
  }catch(error){if(!committed)await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 };}
 export function createLiveMemoryService(database,env={}){const run=createLiveMemoryRepository(database,env);return async(subject,input,options={})=>{
  if(input.action!=='read')return run(subject,input,options);
  const scope=await run(subject,{...input,action:'inspect'},options);
- const evidence=await retrieveStudentHistory(database,subject,{studentId:scope.studentId,query:input.query});options.signal?.throwIfAborted();
+ const continuity=continuityEnabled(env,subject);
+ const contextVersion=continuity?await voiceContextVersion(database,subject):undefined;
+ const evidence=await retrieveStudentHistory(database,subject,{studentId:scope.studentId,query:input.query,continuity});options.signal?.throwIfAborted();
+ const context=continuity?continuitySnapshot({historicalEvidence:evidence},await loadQuestionContinuity(database,subject,scope.studentId)):undefined;
  const current=await run(subject,{...input,action:'inspect'},options);if(current.revision!==scope.revision)throw fail(409,'memory_changed');
- return {status:evidence.available?'retrieved':'unavailable',revision:current.revision,items:evidence.items,instruction:retrievalInstructions(evidence,{includeItems:false})};
+ if(continuity!==continuityEnabled(env,subject))throw fail(409,'memory_changed');
+ if(continuity&&contextVersion!==await voiceContextVersion(database,subject))throw fail(409,'memory_changed');
+ return {status:evidence.available?'retrieved':'unavailable',revision:current.revision,items:evidence.items,...(context?{continuity:context}:{}),instruction:retrievalInstructions(evidence,{includeItems:false})+continuityInstructions(context)};
 };}
 export function createLiveMemoryHandler(database,env={}){const run=createLiveMemoryService(database,env);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/live-memory')return next();

@@ -53,7 +53,7 @@ async function output(page,id){await page.waitForFunction(id=>window.sent.some(e
    await userTurn(page,'proposal',language==='es'?'Guarda mi horario':'Please save my schedule');await tool(page,'propose-schedule','save_student_memory',proposal);
    assert.equal((await output(page,'propose-schedule')).status,'clarification_required');
    assert.ok(!(await f.memory({action:'load',studentId})).memories.some(m=>m.content===schedule));
-   await page.evaluate(text=>window.emit({type:'response.output_audio_transcript.done',item_id:'schedule-question',transcript:text}),language==='es'?`¿Quieres guardar: ${schedule}?`:`Should I save: ${schedule}?`);
+   await page.evaluate(text=>{const id='schedule-readback';window.emit({type:'response.created',response:{id}});window.emit({type:'output_audio_buffer.started',response_id:id});window.emit({type:'response.output_audio_transcript.done',response_id:id,item_id:id,transcript:text});window.emit({type:'response.done',response:{id,status:'completed',output:[]}});window.emit({type:'output_audio_buffer.stopped',response_id:id});},language==='es'?`¿Quieres guardar: ${schedule}?`:`Should I save: ${schedule}?`);
    await userTurn(page,'accept-proposal',language==='es'?'Sí, guárdalo':'Yes, save it');await tool(page,'confirm-schedule','save_student_memory',proposal);
    await page.waitForFunction(()=>window.connections.length===5&&window.connections[4].connectionState==='connected');
    assert.equal((await f.memory({action:'load',studentId})).memories.filter(m=>m.content===schedule).length,1);
@@ -75,7 +75,12 @@ async function output(page,id){await page.waitForFunction(id=>window.sent.some(e
    assert.deepEqual(await f.memory({action:'load',studentId}),storedBefore);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(ui.state.errors,[]);
    count++;console.log(`PASS ${width}/${language}: live recall, failed save, duplicate delivery, correction/fresh provider, accepted next step, spoken confirmation, interrupted save, late result suppression, remote deletion and active-call policy rollback.`);
-  }finally{await page?.close();if(server)await new Promise(r=>server.close(r));await f.close();}
+  }finally{
+   // Let active local API routes finish before disposing their request context.
+   // Revision polling can still be in flight after the last assertion.
+   await page?.unrouteAll({behavior:'wait'});
+   await page?.close();if(server)await new Promise(r=>server.close(r));await f.close();
+  }
  }
  console.log(`Passed ${count} live-memory browser journeys.`);
  }finally{await browser.close();}

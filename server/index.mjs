@@ -3,6 +3,12 @@ import {createCoordinatorFeedbackHandler,assertCoordinatorFeedbackReady} from '.
 import {createCoordinatorBindersHandler,assertCoordinatorViewingReady,coordinatorViewingEnabled} from './coordinator-binders.mjs';
 import {createBinderSharingHandler,assertBinderSharingReady} from './binder-sharing.mjs';
 import {binderJobsEnabled,binderJobsReady,startBinderWorker} from './binder-jobs.mjs';
+import {assertOrganizationReady} from './binder-organization-policy.mjs';
+import {assertCorrectionsReady} from './binder-corrections-policy.mjs';
+import {assertGuidedConversationReady} from './guided-conversation.mjs';
+import {assertContinuityReady} from './conversation-continuity.mjs';
+import {createRecoveryHandler,assertRecoveryReady,recoveryReady,claimRecoveryJob} from './conversation-recovery.mjs';
+import {createCorrectionsHandler} from './binder-corrections.mjs';
 import {isCoordinatorRoute} from './binder-sharing-policy.mjs';
 import {createCoordinatorConnectionsHandler,assertCoordinatorLinkingReady,linkingEnabled} from './coordinator-connections.mjs';
 import {createCoordinatorHandler,assertCoordinatorProvisioningReady} from './coordinator-access.mjs';
@@ -74,6 +80,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
  const handlers=[createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ handlers.unshift(createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
  const privacyMonitor=createPrivacyMonitor(database,log);
@@ -135,7 +142,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   req.origenPreview=false;
   req.origenIdentity=identity;
   if(req.url==='/api/eligibility')return permission.handle(req,res);
-  const exempt=new Set(['/api/coordinator-notifications','/api/coordinator-feedback','/api/coordinator-binders','/api/binder-sharing','/api/coordinator-connections','/api/coordinator-access','/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
+  const exempt=new Set(['/api/conversation-recovery','/api/coordinator-notifications','/api/coordinator-feedback','/api/coordinator-binders','/api/binder-sharing','/api/coordinator-connections','/api/coordinator-access','/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
   const protectedRequest=!exempt.has(req.url?.split('?')[0]);
   let eligibility;
   if(protectedRequest){
@@ -180,7 +187,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(database)await assertCoordinatorLifecycleReady(database,process.env,maintenancePool);
   jobs=maintenancePool?createJobRunner(maintenancePool):null;
   const cleanupTasks=[
-   ['permission-data',purgePermissionData],['diagnostic-maps',purgeDiagnosticOperations],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
+   ['conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}],['permission-data',purgePermissionData],['diagnostic-maps',purgeDiagnosticOperations],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
    ['private-summaries',purgePrivateSummaries],['privacy-events',purgePrivacyEvents],['inquiries',purgeInstitutionInquiries],['outreach',purgeInstitutionOutreach],
    ['guidance',purgeGuidanceHistory],['progress',purgeProgressHistory],['report-snapshots',purgeAdminReportSnapshots],['quality',purgeConversationQuality],
    ['onboarding',db=>purgeOnboardingEvents(db,new Date(),process.env)],['admin-reviews',db=>purgeAdminReviews(db,new Date(),process.env)],
@@ -188,6 +195,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   let cleanupBusy=false;
   const cleanup=async()=>{if(!jobs||cleanupBusy)return;cleanupBusy=true;try{for(const [name,work] of cleanupTasks)await jobs.run(name,work);}finally{cleanupBusy=false;}};
   await cleanup();
+  let checkpointSweepBusy=false;
+  const checkpointCleanup=setInterval(()=>{if(!jobs||checkpointSweepBusy)return;checkpointSweepBusy=true;void jobs.run('conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}).finally(()=>{checkpointSweepBusy=false;});},60000);checkpointCleanup.unref();
   const metricsCleanup=setInterval(()=>{void cleanup().catch(()=>runtimeLog({event:'retention.failed',code:'operation_failed'}));},60*60*1000);metricsCleanup.unref();
   let coordinatorBusy=false;
   const coordinatorSweep=async()=>{if(!jobs||coordinatorBusy)return;coordinatorBusy=true;try{await jobs.run('coordinator-lifecycle',maintainCoordinators);}finally{coordinatorBusy=false;}};
@@ -195,6 +204,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const coordinatorTimer=setInterval(()=>{void coordinatorSweep();},30000);coordinatorTimer.unref();
   const application=createApp(process.env,undefined,database),server=createServer(application);
   if(binderJobsEnabled(process.env)&&(!database||!maintenancePool||!await binderJobsReady(database)))throw new Error('binder_jobs_configuration_required');
+   await assertOrganizationReady(database,process.env);
+   await assertCorrectionsReady(database,process.env);
+   await assertGuidedConversationReady(database,process.env);
+   await assertContinuityReady(database,process.env);
+   await assertRecoveryReady(database,process.env);
   stopBinderWorker=binderJobsEnabled(process.env)?startBinderWorker({application:database,maintenance:maintenancePool,env:process.env}):async()=>{};
   const stopRuntimeMetrics=startRuntimeMetrics(rawDatabase);
   const stopPermissionSupervisor=jobs?startPermissionSupervisor(null,process.env,fetch,jobs):()=>{};
@@ -206,7 +220,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   let stopping=false;
   const shutdown=()=>{
    if(stopping)return;stopping=true;runtimeLog({event:'service.stopping'});
-   clearInterval(coordinatorTimer);clearInterval(metricsCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
+   clearInterval(coordinatorTimer);clearInterval(metricsCleanup);clearInterval(checkpointCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
    server.close(async()=>{try{await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
   };

@@ -2,7 +2,7 @@ import {endpoints} from './event-catalog.mjs';
 export const latencyBuckets=Object.freeze([50,100,250,500,1000,2500,5000,15000,45000,90000]);
 export const providerLatencyBuckets=Object.freeze(latencyBuckets.slice(4));
 export const dependencyOperations=Object.freeze(['memory.generate','memory.read','memory.retrieve','memory.save','summary.generate','summary.overview','summary.review','notes.generate','voice.negotiate','finance.lookup','admissions.lookup','chat.respond','history.read','history.save','history.delete','notes.list','notes.save','permission.read','permission.hangup']);
-export const jobNames=Object.freeze(['permission-data','diagnostic-maps','metrics','invites','private-summaries','privacy-events','inquiries','outreach','guidance','progress','report-snapshots','quality','onboarding','admin-reviews','privacy-alerts','permission-supervisor','binder-processing','coordinator-lifecycle']);
+export const jobNames=Object.freeze(['permission-data','diagnostic-maps','metrics','invites','private-summaries','privacy-events','inquiries','outreach','guidance','progress','report-snapshots','quality','onboarding','admin-reviews','privacy-alerts','permission-supervisor','binder-processing','coordinator-lifecycle','conversation-recovery','conversation-checkpoints']);
 const outcomes=new Set(['completed','failed','cancelled','unknown','skipped-lock']);
 export function createMetrics(){
  const series=new Map(),gauges=new Map();

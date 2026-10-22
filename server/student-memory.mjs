@@ -1,4 +1,7 @@
 import {redactCoordinatorCodes} from '../src/coordinatorCodes.mjs';
+import {organizationEnabled} from './binder-organization-policy.mjs';
+import {correctionsEnabled} from './binder-corrections-policy.mjs';
+import {binderJobStatus} from './binder-jobs.mjs';
 import {personalizationControls,personalizationPolicy} from './personalization-controls.mjs';
 import {databaseOperation,providerOperation} from './observability/dependencies.mjs';
 import {createHash,randomUUID} from 'node:crypto';
@@ -26,7 +29,7 @@ export function validateMemoryRequest(input){
  }
  return out;
 }
-const present=r=>({id:r.id,version:r.version,studentId:r.student_id,category:r.category,content:r.content,language:r.language,speaker:r.speaker,reportedBy:r.reported_by,status:r.status,summaryId:r.source_summary_id,sourceVersion:r.source_version,conversationAt:r.source_at,quote:r.source_quote,createdAt:r.created_at,updatedAt:r.updated_at});
+const present=r=>({id:r.id,version:r.version,studentId:r.student_id,category:r.category,content:r.content,language:r.language,speaker:r.speaker,reportedBy:r.reported_by,status:r.status,summaryId:r.source_summary_id,sourceVersion:r.source_version,conversationAt:r.source_at,quote:r.source_quote,createdAt:r.created_at,updatedAt:r.updated_at,...(r.organization?{organization:r.organization}:{})});
 export async function memoryAvailable(c){return (await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_student_memories'")).rows.length>0;}
 export function createMemoryRepository(database){return async(subject,input,{client:transactionClient,beforeCommit}={})=>{
  if(!database)throw fail(503,'memory_unavailable');
@@ -109,7 +112,14 @@ export function createMemoryService(database,env={},request=fetch){
  request=providerOperation('memory.generate',request,{model:env.OPENAI_MODEL_SUMMARY||'gpt-4.1-mini'});
  const run=createMemoryRepository(database),jobs=new Map(),budgets=new Map();
  return async(subject,input)=>{
-  if(input.action!=='sync')return {...await run(subject,input),memoryPolicy:personalizationPolicy(env,subject),extractionEnabled:personalizationControls(env,subject).extraction};
+  if(correctionsEnabled(env)&&['update','delete','confirm'].includes(input.action))throw fail(409,'correction_operation_required');
+  if(organizationEnabled(env,subject)&&['load','sync'].includes(input.action)){
+   // The existing durable binder job owns extraction in unified mode. A UI
+   // memory sync may enqueue work but never launches a second provider pass.
+   const background=await binderJobStatus(database,subject,{...input,language:'en'});
+   return {...await run(subject,{...input,action:'load'}),correctionsEnabled:correctionsEnabled(env),memoryPolicy:personalizationPolicy(env,subject),extractionEnabled:true,organizationManaged:true,background,pendingCount:background.pending};
+  }
+  if(input.action!=='sync')return {...await run(subject,input),correctionsEnabled:correctionsEnabled(env),memoryPolicy:personalizationPolicy(env,subject),extractionEnabled:personalizationControls(env,subject).extraction};
   if(!personalizationControls(env,subject).extraction)return {...await run(subject,{...input,action:'load'}),extractionEnabled:false};
   if(!env.OPENAI_API_KEY)throw fail(503,'memory_extraction_unavailable');
   const key=JSON.stringify([subject,input.studentId]);if(jobs.has(key))return jobs.get(key);
@@ -126,7 +136,8 @@ export function createMemoryService(database,env={},request=fetch){
    if(data.status&&data.status!=='completed')throw fail(503,'memory_extraction_unavailable');
    let proposals;try{proposals=JSON.parse((data.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text).join('')).memories;}catch{throw fail(503,'memory_extraction_unavailable');}
    if(!personalizationControls(env,subject).extraction)return {...await run(subject,{...input,action:'load'}),extractionEnabled:false};
-   return run(subject,{...input,action:'store-proposals',summaryId:source.summary.id,sourceVersion:hash(source.summary.summary),revision:source.revision,proposals},{beforeCommit:()=>{if(!personalizationControls(env,subject).extraction)throw fail(503,'memory_extraction_disabled');}});
+   if(organizationEnabled(env,subject))throw fail(503,'binder_organization_changed');
+   return run(subject,{...input,action:'store-proposals',summaryId:source.summary.id,sourceVersion:hash(source.summary.summary),revision:source.revision,proposals},{beforeCommit:()=>{if(!personalizationControls(env,subject).extraction)throw fail(503,'memory_extraction_disabled');if(organizationEnabled(env,subject))throw fail(503,'binder_organization_changed');}});
   })();jobs.set(key,job);try{return await job;}finally{jobs.delete(key);}
  };
 }
@@ -146,6 +157,6 @@ export function createMemoryHandler(database,env,request){const run=createMemory
  if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
  if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
- try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8000)return send(413,{error:'too_large'});}let input;try{input=validateMemoryRequest(JSON.parse(raw));}catch{return send(400,{error:'invalid_memory'});}return send(200,await run(req.origenIdentity.sub,input));}
+ try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8000)return send(413,{error:'too_large'});}let input;try{input=validateMemoryRequest(JSON.parse(raw));}catch{return send(400,{error:'invalid_memory'});}return send(200,{...await run(req.origenIdentity.sub,input),correctionsEnabled:correctionsEnabled(env)});}
  catch(error){const known=[400,403,404,409,429].includes(error.status);if(!known)req.log?.({event:'api_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'memory_unavailable'});}
 };}

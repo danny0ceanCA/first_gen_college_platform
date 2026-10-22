@@ -1,5 +1,15 @@
 // Reviewed finite compatibility vocabulary. Never populated from request/error text at runtime.
 export const responseCodes=Object.freeze([
+ "coordinator_review_busy",
+ "invalid_checkpoint","checkpoint_limit","checkpoint_changed","checkpoint_conflict","checkpoint_closed","checkpoint_not_found","checkpoint_scope_changed","checkpoint_review_changed","checkpoint_review_required","recovery_session_ended","recovery_managed_summary","recovery_unavailable","recovery_disabled",
+ "invalid_correction",
+ "correction_unavailable",
+ "correction_limit",
+ "correction_operation_required",
+ "operation_changed",
+ "item_changed",
+ "item_not_found",
+ "undo_unavailable",
  "invalid_notification_request",
  "notification_denied",
  "notification_unavailable",

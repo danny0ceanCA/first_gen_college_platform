@@ -3,6 +3,7 @@ import {invitationIdentity} from './institution-access.mjs';
 import {requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {runAsCoordinatorActor} from './account-isolation.mjs';
 import {applicationActions,applicantActions,validateApplication,runApplicationCommand} from './coordinator-applications.mjs';
+import {createReviewAdmission,isReviewDiscovery} from './coordinator-review-admission.mjs';
 
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export const coordinatorCodeAlphabet='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -36,6 +37,7 @@ export async function runCoordinatorCommand(database,input){
  return generated?{...result,code:generated.code}:result;
 }
 export function createCoordinatorHandler(database,env={},fetcher=fetch){
+ const reviews=createReviewAdmission();
  return async(req,res,next)=>{
   if(req.url!=='/api/coordinator-access')return next();
   const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -43,9 +45,14 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
   if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
   if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
+  let releaseReview;
   try{
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'too_large'});}
    let input;try{input=validateCoordinatorInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_coordinator_request'});}
+   if(isReviewDiscovery(input.action)){
+    releaseReview=reviews.acquire();
+    if(!releaseReview){res.setHeader('Retry-After','2');return send(429,{error:'coordinator_review_busy'});}
+   }
    if(applicantActions.includes(input.action)){
     const trusted=await invitationIdentity(req,env,fetcher);
     if(trusted.email_verified!==true||typeof trusted.email!=='string'||!trusted.email.trim()||trusted.email.length>320)return send(403,{error:'verified_email_required'});
@@ -63,7 +70,7 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
    const known=[400,401,403].includes(error.status);
    // Never log request bodies, connection codes, emails or DB error details.
    return send(known?error.status:503,{error:known?error.message:'coordinator_access_unavailable'});
-  }
+  }finally{releaseReview?.();}
  };
 }
 

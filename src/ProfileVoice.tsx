@@ -1,3 +1,5 @@
+import {conversationCheckpoint,type CheckpointState} from './conversationCheckpoint.mjs';
+import {recoveryChoice,recoveryRequest,activeCheckpoints} from './conversationRecovery';
 import {coordinatorVoiceTools} from './coordinatorVoiceTools.mjs';
 import {CoordinatorConfirm,connectionRequest,type ConnectionCard} from './CoordinatorConnection';
 import {redactCoordinatorCodes,redactCoordinatorTurns} from './coordinatorCodes.mjs';
@@ -106,6 +108,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const sessionTurns=useRef<{role:'user'|'assistant';text:string;topic?:string;language?:'en'|'es';expectedLanguage?:'en'|'es'}[]>([]);
   const sessionSources=useRef<{title:string;url:string;checkedAt:string}[]>([]);
   const memorySaved=useRef(true);
+  const checkpoint=useRef<ReturnType<typeof conversationCheckpoint>|undefined>(undefined);
+  const [recoveryState,setRecoveryState]=useState<CheckpointState>();
   const [savingSummary,setSavingSummary]=useState(false);
   const summaryQueue=useRef(shared?.queue||summarySaveQueue());
   const [summaryFailed,setSummaryFailed]=useState(false);
@@ -122,12 +126,26 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     const store=privateRecovery(`origen.onboarding-summaries.${history.cloud?user?.sub:'preview'}`);
     const records=store.read<Record<string,unknown>>({});
     records[summaryId.current]={id:summaryId.current,studentId:summaryScope.current.id,scopeName:summaryScope.current.name,mode:liveMode.current,language:spokenLanguage.current,date:new Date().toISOString(),turns:sessionTurns.current,qualitySessionId:logSession.current,qualityComplete:false,sources:sessionSources.current,guidance:guidance.current.attribution()};
+    if(history.cloud&&summaryScope.current.confirmed&&memoryRevisionRef.current!==null&&(summaryScope.current.id===null||family.students.some(s=>s.id===summaryScope.current.id))&&(checkpoint.current||recoveryChoice.enabled&&recoveryChoice.available&&!recoveryChoice.stopping)){
+      if(!checkpoint.current){checkpoint.current=conversationCheckpoint({epoch:recoveryChoice.epoch,contextRevision:memoryRevisionRef.current,post:recoveryRequest,onState:setRecoveryState});activeCheckpoints.add(summaryId.current);}
+      checkpoint.current.update(records[summaryId.current]);
+      // The durable transport owns this ID. Never let the old in-memory summary
+      // retry path independently finalize a different version of the discussion.
+      store.removeEntry(summaryId.current);return;
+    }
     if(!store.write(records))setNotice(t('Keep this page open until the summary saves.','Mantén esta página abierta hasta guardar el resumen.'));
   }
   async function saveSummary(){
     if(!privacyLease.valid()||memorySaved.current||!summaryScope.current.confirmed||!sessionTurns.current.some(t=>t.role==='user'))return;
     const studentId=summaryScope.current.id,scopeName=summaryScope.current.name;
     checkpointSummary();
+    if(checkpoint.current){
+      const stream=checkpoint.current,id=summaryId.current;checkpoint.current=undefined;memorySaved.current=true;
+      const lease=browserPrivacy.capture({id,studentId,mode:liveMode.current});
+      lease.signal.addEventListener('abort',()=>{stream.stop();activeCheckpoints.delete(id);summaryQueue.current.remove(id);lease.release();},{once:true});
+      summaryQueue.current.add(id,async()=>{lease.assert();await stream.finish();lease.assert();activeCheckpoints.delete(id);stream.stop();privateRecovery(`origen.onboarding-summaries.${user?.sub||'preview'}`).removeEntry(id);lease.release();});
+      await retrySummaries();return;
+    }
     memorySaved.current=true;const turns=[...sessionTurns.current];const sources=[...sessionSources.current];const id=summaryId.current||crypto.randomUUID();setSavingSummary(true);
     const body=JSON.stringify({turns,qualitySessionId:logSession.current,qualityComplete:true,language:spokenLanguage.current,id,scopeName,defer:studentId!==null&&history.cloud&&!family.students.some(student=>student.id===studentId),studentId,date:new Date().toISOString(),mode:liveMode.current,sources,guidance:guidance.current.attribution()});
     const savedMode=liveMode.current;
@@ -158,6 +176,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [audioBlocked,setAudioBlocked]=useState(false);
+  const invalidateMemoryPlayback=useRef<()=>void>(()=>{});
   const [wakeStatus,setWakeStatus]=useState<VoiceWakeLockStatus>('hidden');
   const [draftRecovery]=useState(()=>recoveryKey?privateRecovery(recoveryKey):null);
   const [draftSuggestions]=useState(()=>voiceDraft<Suggestions>(draftRecovery,!!onDraft));
@@ -223,11 +242,15 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       if(!browserPrivacy.matches(event.target!,{id:summaryId.current,studentId:summaryScope.current.id,mode:liveMode.current}))return;
       summaryQueue.current.remove(summaryId.current);
     }else summaryQueue.current.clear();
+    checkpoint.current?.stop();checkpoint.current=undefined;activeCheckpoints.delete(summaryId.current);setRecoveryState(undefined);
     memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
     cleanup();setLatestAnswer('');setChanges({});setSources([]);setState('idle');onActive(false);shared?.claim(ownerId,false);
   }),[]);
   function invalidateRememberedContext(unavailable=false){
     if(!resources.current.pc)return;
+    // Keep an acknowledged checkpoint for explicit review; never automatically
+    // summarize stale assistant context after an external edit or deletion.
+    checkpoint.current?.stop();checkpoint.current=undefined;activeCheckpoints.delete(summaryId.current);
     // Do not summarize an assistant reply containing information just removed.
     memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
     summaryQueue.current.remove(summaryId.current);
@@ -303,7 +326,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     binderSource.current=crypto.randomUUID();
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
-    const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version,
+    const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version,canHear:()=>onboardingVoice.current?.ready()===true,
       post:async(body,signal)=>{const response=await apiFetch('/api/live-memory',{method:'POST',headers:{'Content-Type':'application/json',...(summaryToken.current?{Authorization:`Bearer ${summaryToken.current}`}:{})},body:JSON.stringify(body),signal});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'live_memory_unavailable'),{status:response.status});return data;},
       onWriting:value=>{liveMemorySaving.current=value;setCheckingMemorySave(value);},
       onConflict:()=>invalidateRememberedContext(),
@@ -311,7 +334,10 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       onSaved:async result=>{
         if(generation.current!==version)return;
         const nextScope={id:summaryScope.current.id,confirmed:true},nextLanguage=spokenLanguage.current;
-        memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];summaryQueue.current.remove(summaryId.current);
+        const hasRecovery=!!checkpoint.current;
+        if(hasRecovery)await saveSummary();
+        memorySaved.current=true;sessionTurns.current=[];sessionSources.current=[];
+        if(!hasRecovery)summaryQueue.current.remove(summaryId.current);
         privateRecovery(`origen.onboarding-summaries.${user?.sub||'preview'}`).removeEntry(summaryId.current);
         end();if(user?.sub)notifyMemoryContext(user.sub,nextScope.id);
         setNotice(t('Saved. Reconnecting with your updated information…','Guardado. Reconectando con tu información actualizada…'));
@@ -321,6 +347,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     });
     const linkTools=coordinatorVoiceTools({post:connectionRequest,studentId:scope.id,onPrepared:card=>setConnectionCard(card),onClear:()=>setConnectionCard(undefined),onCode:()=>{const last=[...sessionTurns.current].reverse().find(turn=>turn.role==='user');if(last)last.text='[Connection code omitted]';checkpointSummary();}});connectionController.current=linkTools;
     resources.current.stopMemory=()=>{memoryTools.stop();linkTools.stop();};
+    invalidateMemoryPlayback.current=()=>memoryTools.event({type:'output_audio_buffer.cleared'});
     const memoryResponseTurns=new Map<string,number>();
     const linkResponseTurns=new Map<string,number>();
     const research=voiceResearchRequest({signal:abort.signal});
@@ -494,6 +521,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         if(e.type==='input_audio_buffer.speech_stopped')setActivity('thinking');
         // Status audio is outside the conversation: never save it as an answer.
         if(turns.progressEvent(e))return;
+        memoryTools.event(e);
         if(['output_audio_buffer.started','output_audio_buffer.stopped','output_audio_buffer.cleared','error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
@@ -529,7 +557,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             if(userTurn)onboardingVoice.current?.transcript(e.item_id,valid?'accepted':'empty');
             if(valid&&userTurn){replyRecoveryUsed=false;setNotice('');}
             if(valid&&!scopePending.current){sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:userTurn?'user':'assistant',text:redactCoordinatorCodes(e.transcript),topic:liveMode.current,...(userTurn?{language:spokenLanguage.current}:{expectedLanguage:spokenLanguage.current})});checkpointSummary();}
-            if(valid&&!userTurn&&!scopePending.current){setLatestAnswer(e.transcript);memoryTools.assistant(e.transcript);}
+            if(valid&&!userTurn&&!scopePending.current){setLatestAnswer(e.transcript);}
           }finally{release();}
         }
         if(e.type==='error'){
@@ -754,7 +782,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     </div>
     {error&&<p role="alert" className="error">{error} <ErrorReference reference={errorReference||diagnosticId} language={language}/></p>}
     {notice&&<p className="voice-notice" role="status">{notice}</p>}
-    <audio ref={audio} autoPlay controls onPlaying={event=>{setAudioBlocked(false);onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0?'silent':'playing');}} onPause={()=>onboardingVoice.current?.playback('paused')} onVolumeChange={event=>onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0||event.currentTarget.paused?'silent':'playing')} onError={()=>onboardingVoice.current?.playback('blocked')} hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
+    {recoveryState&&<p className="voice-notice" role="status">{recoveryState==='protected'?t('Recovery copy acknowledged. New words may still be uploading.','Copia de recuperación confirmada. Las palabras nuevas pueden estar subiendo.'):recoveryState==='failed'?t('Recent words are not protected yet. Keep this page open and retry saving before leaving.','Las palabras recientes aún no están protegidas. Mantén esta página abierta y reintenta guardar antes de salir.'):recoveryState==='review'?t('Your earlier discussion is kept for review because your binder changed.','Tu conversación anterior se conserva para revisar porque tu carpeta cambió.'):recoveryState==='pending'?t('Conversation received. Your summary is being prepared.','Conversación recibida. Se está preparando tu resumen.'):recoveryState==='complete'?t('Conversation summary saved.','Resumen de conversación guardado.'):t('Updating your temporary recovery copy.','Actualizando tu copia temporal de recuperación.')}</p>}
+    <audio ref={audio} autoPlay controls onPlaying={event=>{setAudioBlocked(false);const silent=event.currentTarget.muted||event.currentTarget.volume===0;if(silent)invalidateMemoryPlayback.current();onboardingVoice.current?.playback(silent?'silent':'playing');}} onPause={()=>{invalidateMemoryPlayback.current();onboardingVoice.current?.playback('paused');}} onVolumeChange={event=>{invalidateMemoryPlayback.current();onboardingVoice.current?.playback(event.currentTarget.muted||event.currentTarget.volume===0||event.currentTarget.paused?'silent':'playing');}} onError={()=>{invalidateMemoryPlayback.current();onboardingVoice.current?.playback('blocked');}} hidden={state!=='live'||(onboarding&&!audioBlocked)} aria-label={t('Origen voice playback','Reproducción de voz de Origen')}/>
     {checkingMemorySave&&<p className="voice-save-status" role="status">{t('Checking your save request…','Revisando tu solicitud para guardar…')}</p>}
     <div className="voice-session-details" hidden={ownerId==='shared'&&!detailsOpen}>
     {ownerId==='shared'&&<div className="voice-details-heading"><h3>{t('Conversation details','Detalles de la conversación')}</h3><button type="button" className="button outline" onClick={onCloseDetails}>{t('Close','Cerrar')}</button></div>}

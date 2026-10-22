@@ -1,0 +1,65 @@
+# Phase 6 — recover interrupted conversations
+
+Implemented locally on 2026-10-21 over the uncommitted student-first Phases 2–5. Baseline HEAD remains `d0fe03e80b6b106d4ff57f9ec005efc122ede891`. No production migration, configuration change, commit, push or deployment is part of this work.
+
+## Student experience and scope
+
+The student can opt into a private temporary recovery copy beside the binder. Consent is held only in the current signed-in browser session and resets on reload/sign-out. It is not a new required intake step. The default is off, and the entire feature is server-gated off in `render.yaml`.
+
+While an eligible, confirmed student/family conversation is underway, completed transcriptions are coalesced into a bounded checkpoint. The screen distinguishes uploading, an acknowledged recovery copy, a queued summary, a saved summary, a failed upload, and a discussion needing review. A recovery acknowledgement does **not** mean a binder summary or extracted note has saved. Untranscribed audio and text not yet acknowledged cannot be recovered after browser loss.
+
+At normal call completion, the last snapshot is acknowledged and queued for the existing worker. The student can leave once the server has accepted it; there is no dependency on a live browser to generate the summary or enqueue its binder processing. After a hard browser interruption, the acknowledged copy is offered for review on the next visit to the binder. The student can remove individual turns, explicitly approve the remaining discussion for summarization, or discard it. Recovery does not reconnect an old microphone session or play earlier audio.
+
+After a spoken correction saves, the voice reconnects with the current corrected context. With recovery selected, the earlier discussion is preserved instead of being thrown away. A changed memory/correction revision puts that copy into review; no background summary or extraction can silently reintroduce its older claims. The student must remove outdated details and approve what remains. That approval is a new, explicit request to summarize the reviewed discussion; it is not a claim that every earlier statement was accurate.
+
+The initial scope is signed-in conversations for already-saved, owned students or family scope, with a known memory revision. Preview, an unconfirmed routing target, a not-yet-saved onboarding student, and conversations without that revision retain their existing behavior. Without temporary-recovery consent, browser loss remains unrecoverable and the pre-existing spoken-write reconnect behavior is unchanged. Do not market universal or lossless recovery.
+
+## Implementation
+
+| Responsibility | Files |
+| --- | --- |
+| Authenticated checkpoint API, validation, bounded retention, ownership and revision proofs, dispatch and processing | `server/conversation-recovery.mjs` |
+| Additive schema, RLS, content deletion and permission/lifecycle triggers | `server/migrations/066_conversation_recovery.sql` |
+| Coalescing, serialized snapshots, stable retry versions and explicit acknowledgements | `src/conversationCheckpoint.mjs`, its `.d.mts` contract |
+| Session-only choice, cleanup-only sign-out request, API transport | `src/conversationRecovery.ts`, `src/PrivateSession.tsx` |
+| Opt-in, scoped pending copies, turn removal, reviewed save and discard | `src/ConversationRecoveryPanel.tsx`, `src/TopicNotebook.tsx`, `src/SharedVoice.css` |
+| Live transcript checkpoints, durable finish handoff, corrected-context reconnect | `src/ProfileVoice.tsx` |
+| Shared narrative generation; atomic guarded summary commit | `server/summary-generation.mjs`, `server/conversation-summary.mjs`, `server/history.mjs` |
+| Existing worker scheduling, restricted maintenance grants, startup and cleanup | `server/binder-jobs.mjs`, `server/maintenance-database.mjs`, `server/index.mjs` |
+| Erasure preview and fences, export, restore cleanup, privacy explanation | `server/privacy-controls.mjs`, `server/account-lifecycle.mjs`, `ops/privacy-recovery.mjs`, `src/PrivacyCenter.tsx` |
+| Finite endpoint/error/job telemetry and configuration validation | `server/api-logging.mjs`, `server/observability/{event-catalog,metrics,response-codes}.mjs`, `server/production-config.mjs` |
+
+`POST /api/conversation-recovery` accepts `status`, `checkpoint`, `read`, `review`, `finalize`, `discard`, and `stop`. Ownership comes from verified authentication and account-scoped PostgreSQL RLS. A model has no recovery tool and cannot choose an account, consent, review or retention period. The endpoint deliberately handles permission-expired cleanup itself: authorized `stop`/`discard` can remove copies, while private reads/writes require current eligibility under the account transaction lock. Provider work runs under the original permission revision using the existing permission context/fetch adapter.
+
+The first checkpoint reserves the existing conversation lifecycle ID. Each full snapshot has a monotonically increasing sequence and canonical payload hash. Identical retries return an acknowledgement; a changed payload under the same sequence, backward sequence, different student/mode, terminal ID or stale account generation is rejected. The first mode remains the summary's mode even when the conversation changes guides; the discussion itself can still cover multiple topics. A summary ID managed by recovery cannot be independently finalized through the old summary/history endpoints.
+
+Migration 066 separates `origen_conversation_checkpoints` (dispatch metadata) from `origen_checkpoint_text` (private JSON). `origen_recovery_epochs` supplies the logout/erasure barrier. The restricted maintenance role can claim metadata, but cannot read checkpoint text. Application processing acquires an account-scoped connection and reads the body only after proving the lease and permission. Server-generated expiry and account scope are never accepted from the client.
+
+The existing binder worker alternates opportunities for recovery and binder jobs. No broker, second worker deployment, or vector store was added. A recovery job calls the same narrative summary generator as an interactive save. Its final transaction rechecks feature flags, permission, the exact lease token/deadline, expiry, and memory/correction revision, inserts the summary, triggers the existing binder job, marks recovery complete, and deletes raw checkpoint text. These commit together. A process failure before commit leaves a retryable lease; after commit there is one durable summary and no raw copy. More than one provider call is possible after a crash, but not more than one summary for the reserved ID.
+
+## Bounds and privacy
+
+- Fixed availability window: 24 hours from the first accepted snapshot; retries and reviews do not extend it. Expired copies cannot be read or finalized. Deletion runs during recovery dispatch, account requests and the registered bounded maintenance sweep (up to 250 rows per pass); when the recovery worker is disabled, the startup/minute sweep still performs cleanup. Physical cleanup can lag expiry during a service outage. Hosting backups have their own retention and are not claimed to vanish at the 24-hour mark.
+- At most 10 checkpoint reservations per account in the 24-hour window, including completed/cancelled reservations. At most 200 turns, 12,000 characters per turn and an 80,000-byte canonical payload, with a separate 100,000-byte HTTP/database bound. Oversize input is rejected, never silently truncated. Existing source/URL validation and coordinator-code redaction are reused.
+- Five automatic attempts, exponential backoff capped at 300 seconds, 90-second leases and a limit of 10 recovery attempts per account/hour. A failed copy can receive at most two explicitly reviewed retries before its original expiry. The rate window can delay those retries.
+- Raw text is not placed in localStorage/sessionStorage, telemetry, diagnostic maps, coordinator views, or notifications. No audio recording is added. Temporary text is a deliberate change to the previous memory-only boundary, disclosed by the opt-in and Privacy Center. The existing coordinator-code heuristic still has its documented false-positive limitation.
+- Discard, acknowledged sign-out, permission revision changes, relevant conversation deletion, student/account deletion and Privacy Center erasure remove/fence pending copies. Sign-out rotates the account generation and cancels all pending recovery copies across its scopes. A delayed first checkpoint with the old generation cannot recreate them. Saved summaries remain governed by existing saved-record controls.
+- Sign-out waits for the cleanup acknowledgement. If it fails, the app explains that it could not clear copies and permits retry instead of claiming logout cleanup succeeded. Browser/process termination or an identity-provider sign-out outside this app is not an acknowledged Origen logout; the copy remains subject to expiry and permission checks.
+- Cleanup after an already-completed account deletion acknowledges success because its cascading deletion has removed the copies. A successful HTTP status without an explicit `stopped: true` is insufficient. Client response handling retains a privacy lease through JSON decoding and rejects late responses after session changes or erasure, even when a transport ignores cancellation.
+- Privacy deletion preview includes pending-copy counts and versions, so new text invalidates a stale deletion confirmation. Scoped privacy erasure also removes pending copies in that scope. Exports include active temporary copies; downloaded exports follow the user's custody. Backup restoration discards all restored temporary text, cancels unfinished checkpoints and rotates epochs before service resumes. It never resumes an old recovery job from a backup.
+
+## Why these choices
+
+Consent avoids silently turning all spoken conversations into stored transcripts. Fixed expiry, size/cost bounds, restricted dispatch metadata and existing privacy barriers keep this feature smaller than a general transcription archive. Full bounded snapshots are easier to retry and audit than a new event-replay system; coalescing limits request volume. Reusing summary generation and the binder worker preserves the established organization contract and deployment topology.
+
+The deliberate tradeoff is extra review after a correction or context change. Automatically summarizing an older assistant reply could undo the student's deletion/correction through a new source. A visible review is safer than either silently restoring old facts or silently dropping the entire conversation. Ordinary uninterrupted calls keep automatic summary-to-binder processing.
+
+## Verification and release
+
+The regression suite is `server/conversation-recovery.test.mjs`; browser verification is `scripts/conversation-recovery-smoke.cjs`. `scripts/conversation-recovery-privacy-smoke.cjs` exercises delayed response-body completion across erasure, logout and account switching. Tests use disposable local PostgreSQL with separate restricted application/maintenance roles. Browser journeys use a separate headless local Chrome on Daniel's PC, synthetic auth/media/provider responses, and the real local recovery/live-memory APIs. These are not tests of actual speech recognition or model summarization quality.
+
+Final verification results, source fingerprint and limitations are recorded in `output/student-first-phase6-2026-10-21/README.md`: 828 server tests and 35 operations tests passed with no failures/skips/cancellations; TypeScript, build, logging policy and the unchanged-source check passed. Six English/Spanish end-to-end browser journeys and four delayed-response privacy cases passed. Keep the complete server/operations/logging/type/build verification alongside the browser evidence. Phase 9 still needs actual-provider quality, latency, cost, accessibility and pilot evaluation; recovered interrupted conversations are not falsely counted here as fully observed or quality-reviewed sessions.
+
+For a later authorized release: apply migration 066 after the existing migrations; reprovision both restricted-role grants; check startup readiness; keep `ORIGEN_CONVERSATION_RECOVERY=false` initially. Recovery requires `ORIGEN_BINDER_JOBS=true` and the existing application/maintenance database configuration. Verify expiry, rollback and sign-out in staging before enabling. No broad pilot enablement is part of Phase 6.
+
+Rollback disables new checkpoint/review/finalization work and fences in-flight recovery commits. Owned reads, discard, cleanup and export remain available. Already committed summaries remain saved; pending copies expire normally. Do not drop migration 066, revert to a server without its cleanup path, or remove maintenance grants while temporary data remains. Re-enabling can resume pending work within its original permission/expiry/revision constraints. An opted-in call spanning rollback may show an unconfirmed save and require review/retry after re-enable; there is no silent bypass through the old summary path.

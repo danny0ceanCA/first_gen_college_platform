@@ -1,6 +1,8 @@
-// Reference policy for trusted repository facts only. Request bodies and model
+// Manual-note reference policy for trusted repository facts only. Request bodies and model
 // outputs cannot supply these facts. Phase 4 enforces the narrower manual-note
 // subset transactionally in migration 053; migration 054 adds separately gated coordinator reads.
+// Student-first Phase 7's separate derived-excerpt policy is enforced by migration
+// 067. It never certifies whole summaries or changes this manual-note serializer.
 export const BINDER_SHARING_POLICY_VERSION='coordinator-sharing-v1';
 export const sharingTopics=Object.freeze(['options','transfer','costs','applications']);
 export const coordinatorFlags=Object.freeze(['ORIGEN_COORDINATOR_ACCOUNTS','ORIGEN_COORDINATOR_LINKING','ORIGEN_BINDER_SHARING','ORIGEN_COORDINATOR_FEEDBACK','ORIGEN_COORDINATOR_VOICE_LINKING','ORIGEN_COORDINATOR_BINDER_VIEWING']);
@@ -16,6 +18,11 @@ export const coordinatorTables=Object.freeze([
 ]);
 export const lineageTables=Object.freeze(['origen_binder_source_lineage','origen_binder_source_edges']);
 export function coordinatorConfigurationIssues(env={}){
+ const derivedIssues=[];
+ if(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH&&!['true','false'].includes(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH))derivedIssues.push('ORIGEN_COORDINATOR_FOLLOW_THROUGH: use true or false');
+ if(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true'&&env.ORIGEN_COORDINATOR_FEEDBACK!=='true')derivedIssues.push('ORIGEN_COORDINATOR_FOLLOW_THROUGH: requires coordinator feedback');
+ if(env.ORIGEN_DERIVED_BINDER_SHARING&&!['true','false'].includes(env.ORIGEN_DERIVED_BINDER_SHARING))derivedIssues.push('ORIGEN_DERIVED_BINDER_SHARING: use true or false');
+ if(env.ORIGEN_DERIVED_BINDER_SHARING==='true'&&env.ORIGEN_BINDER_SHARING!=='true')derivedIssues.push('ORIGEN_DERIVED_BINDER_SHARING: requires binder sharing');
  const available=['ORIGEN_COORDINATOR_FEEDBACK','ORIGEN_BINDER_SHARING','ORIGEN_COORDINATOR_ACCOUNTS','ORIGEN_COORDINATOR_LINKING','ORIGEN_COORDINATOR_VOICE_LINKING','ORIGEN_COORDINATOR_BINDER_VIEWING'];
  const issues=coordinatorFlags.flatMap(key=>!env[key]||env[key]==='false'||available.includes(key)&&env[key]==='true'?[]:[`${key}: unsupported setting`]);
  if(env.ORIGEN_COORDINATOR_LINKING==='true'&&env.ORIGEN_COORDINATOR_ACCOUNTS!=='true')issues.push('ORIGEN_COORDINATOR_LINKING: requires coordinator accounts');
@@ -23,7 +30,7 @@ export function coordinatorConfigurationIssues(env={}){
  if(env.ORIGEN_BINDER_SHARING==='true'&&env.ORIGEN_COORDINATOR_LINKING!=='true')issues.push('ORIGEN_BINDER_SHARING: requires coordinator linking');
  if(env.ORIGEN_COORDINATOR_BINDER_VIEWING==='true'&&env.ORIGEN_BINDER_SHARING!=='true')issues.push('ORIGEN_COORDINATOR_BINDER_VIEWING: requires binder sharing');
  if(env.ORIGEN_COORDINATOR_FEEDBACK==='true'&&env.ORIGEN_COORDINATOR_BINDER_VIEWING!=='true')issues.push('ORIGEN_COORDINATOR_FEEDBACK: requires coordinator binder viewing');
- return issues;
+ return [...issues,...derivedIssues];
 }
 const classifications=new Set(['student_only','unknown','family','parent','mixed']);
 export function inheritSharingClassification(values){

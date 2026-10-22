@@ -1,6 +1,7 @@
 import {runFeedbackCommand} from './coordinator-feedback.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {planTopic} from '../src/voiceWorkspace.mjs';
+import {savedSourceEvidence} from './conversation-continuity.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const topics=['options','transfer','costs','applications'];
 export function binderInstructions(){
@@ -24,7 +25,7 @@ const excerpt=(text,max)=>{const s=String(text||'');return s.length>max?`${s.sli
 const date=value=>value?new Date(value).toISOString():null;
 const byRecent=(a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at)||String(a.id).localeCompare(String(b.id));
 
-export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus,suppressedSummaryIds=[]}){
+export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus,suppressedSummaryIds=[],continuity=false}){
  if(!database)throw fail(503,'workspace_unavailable');
  const c=await database.connect();
  try{
@@ -36,7 +37,7 @@ export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus,
   const ready=(await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_topic_notes'")).rows.length>0;
   if(!ready&&focus)throw fail(503,'workspace_unavailable');
   const scope=studentId===null?'student_id IS NULL':'student_id=$2',args=studentId===null?[owner]:[owner,studentId];
-  const notes=ready?(await c.query(`SELECT id,topic,kind,content,language,status,origin,source_summary_id,version,updated_at FROM origen_topic_notes WHERE account_id=$1 AND ${scope} AND status='saved' ORDER BY updated_at DESC,id LIMIT 120`,args)).rows:[];
+  const notes=ready?(await c.query(`SELECT * FROM origen_topic_notes WHERE account_id=$1 AND ${scope} AND status='saved' ORDER BY updated_at DESC,id LIMIT 120`,args)).rows:[];
   const actions=(await c.query(`SELECT p.id AS plan_id,p.student_id,p.title AS plan_title,p.category,p.version,p.updated_at,s.id,s.title,s.action,s.notes,s.status,to_char(s.due_date,'YYYY-MM-DD') AS due_date FROM origen_plans p JOIN origen_plan_steps s ON s.account_id=p.account_id AND s.plan_id=p.id WHERE p.account_id=$1 AND ${studentId===null?'p.student_id IS NULL':'p.student_id=$2'} AND p.status='active' ORDER BY p.updated_at DESC,p.id,s.position LIMIT 120`,args)).rows;
   let selected,linkedSummary,coordinatorGuidance;
   if(focus?.kind==='coordinator-guidance'){
@@ -62,22 +63,28 @@ export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus,
   }
   const relevant=focus?[focus.topic]:mode==='finance'||mode==='loans'?['costs']:mode==='admissions'?['applications']:['options','transfer'];
   const suppressed=new Set(suppressedSummaryIds);
-  if(selected?.source_summary_id&&suppressed.has(selected.source_summary_id))throw fail(409,'workspace_item_changed');
-  const chosenNotes=notes.filter(n=>!suppressed.has(n.source_summary_id)&&relevant.includes(n.topic)).sort((a,b)=>Number(b.id===focus?.noteId)-Number(a.id===focus?.noteId)||(['decision','question'].includes(b.kind)?1:0)-(['decision','question'].includes(a.kind)?1:0)||byRecent(a,b)).slice(0,6);
+  if(selected?.source_summary_id&&suppressed.has(selected.source_summary_id)&&!selected.context_current)throw fail(409,'workspace_item_changed');
+  if(selected?.source_summary_id&&suppressed.has(selected.source_summary_id))linkedSummary=undefined;
+  const chosenNotes=notes.filter(n=>(n.context_current||!suppressed.has(n.source_summary_id))&&relevant.includes(n.topic)).sort((a,b)=>Number(b.id===focus?.noteId)-Number(a.id===focus?.noteId)||(['decision','question'].includes(b.kind)?1:0)-(['decision','question'].includes(a.kind)?1:0)||byRecent(a,b)).slice(0,6);
   const chosenActions=actions.filter(a=>relevant.includes(planTopic(a.category))).sort((a,b)=>Number(b.id===focus?.stepId&&b.plan_id===focus?.planId)-Number(a.id===focus?.stepId&&a.plan_id===focus?.planId)||Number(['complete','deferred'].includes(a.status))-Number(['complete','deferred'].includes(b.status))||byRecent(a,b)).slice(0,5);
   // Evidence-linked recaps are separate from user-owned notes and decisions.
   // Require the extraction receipt and owned source; never load arbitrary suggestions.
-  const points=ready?(await c.query(`SELECT n.id,n.source_summary_id,n.topic,n.kind,n.content,n.language,n.source_quote,s.summary,s.conversation_at FROM origen_topic_notes n JOIN origen_topic_note_batches b ON b.account_id=n.account_id AND b.summary_id=n.source_summary_id JOIN origen_conversation_summaries s ON s.account_id=n.account_id AND s.id=n.source_summary_id WHERE n.account_id=$1 AND ${studentId===null?'n.student_id IS NULL AND s.student_id IS NULL':'n.student_id=$2 AND s.student_id=$2'} AND n.status='suggested' AND n.origin='conversation' ORDER BY s.conversation_at DESC,n.id LIMIT 120`,args)).rows:[];
-  if(focus?.kind==='point'){const index=points.findIndex(p=>p.id===selected.id);if(index>=0)points.splice(index,1);points.unshift({...selected,summary:linkedSummary.summary,conversation_at:linkedSummary.conversation_at});}
+  const points=ready?(await c.query(`SELECT n.*,s.summary,s.conversation_at FROM origen_topic_notes n JOIN origen_topic_note_batches b ON b.account_id=n.account_id AND b.summary_id=n.source_summary_id JOIN origen_conversation_summaries s ON s.account_id=n.account_id AND s.id=n.source_summary_id WHERE n.account_id=$1 AND ${studentId===null?'n.student_id IS NULL AND s.student_id IS NULL':'n.student_id=$2 AND s.student_id=$2'} AND n.status='suggested' AND n.origin='conversation' ORDER BY s.conversation_at DESC,n.id LIMIT 120`,args)).rows:[];
+  if(focus?.kind==='point'){const index=points.findIndex(p=>p.id===selected.id);if(index>=0)points.splice(index,1);points.unshift({...selected,summary:linkedSummary?.summary||selected.source_quote,conversation_at:linkedSummary?.conversation_at||selected.updated_at});}
   const seen=new Set();
   const conversationPoints=points.filter(p=>{
    const key=String(p.content).trim().toLocaleLowerCase();
-   if(suppressed.has(p.source_summary_id)||!relevant.includes(p.topic)||!p.source_quote||!p.summary.includes(p.source_quote)||seen.has(key))return false;
+   if(suppressed.has(p.source_summary_id)&&!p.context_current||!relevant.includes(p.topic)||!p.source_quote||!p.summary.includes(p.source_quote)||seen.has(key))return false;
    seen.add(key);return true;
   }).slice(0,6).map(p=>({selected:p.id===focus?.noteId,evidenceRef:`note:${p.id}`,sourceSummaryId:p.source_summary_id,topic:p.topic,kind:p.kind,content:excerpt(p.content,700),language:p.language,date:date(p.conversation_at),reviewedByUser:false}));
   const result={available:true,notesAvailable:ready,topic:focus?.topic||null,selection:focus?.kind||null,notes:chosenNotes.map(n=>({evidenceRef:`note:${n.id}`,sourceSummaryId:n.source_summary_id,selected:n.id===focus?.noteId,kind:n.kind,content:excerpt(n.content,n.id===focus?.noteId?2000:700),language:n.language,origin:n.origin,updatedAt:date(n.updated_at)})),actions:chosenActions.map(a=>({selected:a.id===focus?.stepId&&a.plan_id===focus?.planId,plan:excerpt(a.plan_title,200),title:excerpt(a.title,200),action:excerpt(a.action,a.id===focus?.stepId?1200:400),notes:excerpt(a.notes,350),status:a.status,personalTargetDate:a.due_date||null,updatedAt:date(a.updated_at)})),...(linkedSummary?{sourceSummary:{date:date(linkedSummary.conversation_at),summary:excerpt(linkedSummary.summary,1200)}}:{})};
   // Bound input cost even for long saved text. Always keep the explicitly selected item.
   result.conversationPoints=conversationPoints;
+  if(continuity){
+   const refs=[...new Set([...result.notes,...result.conversationPoints].map(n=>n.sourceSummaryId).filter(ref=>ref&&!suppressed.has(ref)))];
+   const sources=refs.length?(await c.query(`SELECT id,sources FROM origen_conversation_summaries WHERE account_id=$1 AND id=ANY($2::text[]) AND student_id IS NOT DISTINCT FROM $3`,[owner,refs,studentId])).rows:[];
+   for(const item of [...result.notes,...result.conversationPoints])item.sources=savedSourceEvidence(sources.find(s=>s.id===item.sourceSummaryId)?.sources).map(s=>({url:s.url,checkedAt:s.recordedCheckedAt}));
+  }
   if(coordinatorGuidance)result.coordinatorGuidance={...coordinatorGuidance,untrusted:true};
   while(JSON.stringify(result).length>10000){const list=[result.conversationPoints,result.actions,result.notes].find(items=>items.some(item=>!item.selected));if(!list)break;list.splice(list.findLastIndex(item=>!item.selected),1);}
   await c.query('COMMIT');return result;

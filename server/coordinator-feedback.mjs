@@ -1,4 +1,5 @@
 import {coordinatorViewingEnabled} from './coordinator-binders.mjs';
+import {derivedSharingEnabled} from './binder-sharing.mjs';
 import {invitationIdentity} from './institution-access.mjs';
 import {requireStaffAccess} from './staff-access.mjs';
 import {runAsCoordinatorActor} from './account-isolation.mjs';
@@ -41,6 +42,7 @@ export function createCoordinatorFeedbackHandler(database,env={},fetcher=fetch){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16384)return send(413,{error:'too_large'});}
   let input;try{input=validateFeedbackInput(JSON.parse(raw));}catch(error){return send(400,{error:error.message==='invalid_feedback_link'?error.message:'invalid_feedback_request'});}
   input.enabled=coordinatorFeedbackEnabled(env);
+  input.derivedEnabled=derivedSharingEnabled(env);
   if(!input.enabled&&['staff-create','staff-edit','student-reply'].includes(input.action))return send(503,{error:'feedback_paused'});
   const execute=async()=>({...await runFeedbackCommand(database,input),writesEnabled:input.enabled});
   if(input.action.startsWith('staff-')){
@@ -54,6 +56,8 @@ export function createCoordinatorFeedbackHandler(database,env={},fetcher=fetch){
 };}
 export async function assertCoordinatorFeedbackReady(database,env){
  if(!coordinatorFeedbackEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='071_preserve_coordinator_lock_order.sql'")).rows.length)throw new Error('coordinator_lock_order_migration_required');
+ if((derivedSharingEnabled(env)||env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true')&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='068_coordinator_follow_through.sql'")).rows.length)throw new Error('coordinator_follow_through_migration_required');
  const fn='origen_coordinator_feedback_command(jsonb)';
  if(!(await database.query('SELECT to_regprocedure($1) AS fn',[fn])).rows[0]?.fn||!(await database.query("SELECT has_function_privilege(current_user,$1,'EXECUTE') AS allowed",[fn])).rows[0]?.allowed)throw new Error('coordinator_feedback_migration_or_grant_required');
 }

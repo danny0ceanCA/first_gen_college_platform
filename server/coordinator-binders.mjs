@@ -1,4 +1,4 @@
-import {binderSharingEnabled} from './binder-sharing.mjs';
+import {binderSharingEnabled,derivedSharingEnabled} from './binder-sharing.mjs';
 import {invitationIdentity} from './institution-access.mjs';
 import {requireStaffAccess} from './staff-access.mjs';
 import {runAsCoordinatorActor} from './account-isolation.mjs';
@@ -33,7 +33,7 @@ export function createCoordinatorBindersHandler(database,env={},fetcher=fetch){r
   await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:`binder-${input.action}`,target:input.grantId||input.organizationId,env});
   const trusted=await invitationIdentity(req,env,fetcher);
   if(trusted.email_verified!==true||typeof trusted.email!=='string'||!trusted.email.trim())return send(403,{error:'verified_email_required'});
-  return send(200,await runAsCoordinatorActor(req.origenIdentity.sub,{issuedAt:req.origenIdentity.iat},()=>runCoordinatorBinderCommand(database,input)));
+  return send(200,await runAsCoordinatorActor(req.origenIdentity.sub,{issuedAt:req.origenIdentity.iat},()=>runCoordinatorBinderCommand(database,{...input,derivedEnabled:derivedSharingEnabled(env)})));
  }catch(error){
   const known=[400,401,403,404,409,503].includes(error.status);
   return send(known?error.status:503,{error:known?error.message:'binder_read_unavailable'});

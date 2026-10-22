@@ -20,6 +20,8 @@ mobile/web-build/
 
 # Synthetic live evaluation captures and local release evidence
 /output/personalization-*/
+/output/student-first-*/
+/output/playwright/student-first-*/
 
 # Disposable databases, operator scratch files, and browser session captures
 /tmp/

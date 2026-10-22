@@ -208,6 +208,7 @@
 .topic-notebook .notebook-note-new{isolation:isolate}
 .topic-notebook .notebook-note-new::after{content:"";position:absolute;inset:3px -8px;border-radius:10px;pointer-events:none;border:1px solid rgba(var(--topic-glow),.45);background:linear-gradient(100deg,rgba(var(--topic-glow),.09),transparent 75%);box-shadow:0 0 16px rgba(var(--topic-glow),.16);z-index:-1;animation:binder-note-arrive 2.2s ease-in-out 3}
 .notebook-live-announcement{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.organization-evidence{display:block;font-size:12px;line-height:1.5;color:#655948;overflow-wrap:anywhere}
 @keyframes binder-topic-breathe{0%,100%{opacity:.55}50%{opacity:1}}
 @keyframes binder-note-arrive{0%,100%{opacity:.65}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.topic-notebook .is-discussing::after,.topic-notebook .notebook-note-new::after{animation:none;opacity:.9}}

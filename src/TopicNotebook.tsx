@@ -1,9 +1,12 @@
+import ConversationRecovery from './ConversationRecoveryPanel';
 import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNotifications';
 import StudentGuidance,{useGuidanceRequest} from './CoordinatorGuidance';
 import BinderSharing from './BinderSharing';
 import {notifyMemoryContext} from './memoryContext.mjs';
 import CoordinatorConnection from './CoordinatorConnection';
 import StudentMemory from './StudentMemory';
+import OrganizationEvidence,{type OrganizationInfo} from './OrganizationEvidence';
+import useBinderCorrections from './useBinderCorrections';
 import type {ActionSeed} from './ActionPlan';
 import PersonalBinder from './PersonalBinder';
 import WorkspaceTalkButton from './WorkspaceTalkButton';
@@ -27,9 +30,9 @@ type Topic='options'|'transfer'|'costs'|'applications';
 type NotebookPage=Topic|'summary';
 type Kind='note'|'explanation'|'question'|'decision';
 type Language='en'|'es';
-type Note={id:string;studentId:string|null;topic:Topic;kind:Kind;content:string;language:Language;status:'saved'|'suggested';origin:'user'|'conversation';summaryId:string|null;quote:string;translations:Partial<Record<Language,string>>;version:number;updatedAt:string;sources:{title:string;url:string;checkedAt:string}[];conversationAt:string|null};
+type Note={id:string;studentId:string|null;topic:Topic;kind:Kind;content:string;language:Language;status:'saved'|'suggested';origin:'user'|'conversation';summaryId:string|null;quote:string;translations:Partial<Record<Language,string>>;version:number;updatedAt:string;sources:{title:string;url:string;checkedAt:string}[];conversationAt:string|null;organization?:OrganizationInfo;excludedFromGuidance?:boolean};
 type Draft={decisionConfirmed?:boolean;id:string;version?:number;topic:Topic;kind:Kind;content:string;language:Language};
-type Data={scope:string;notes:Note[];generatedSummaryIds:string[];pendingCount?:number;background?:{enabled:boolean;pending:number;failed:number;canRetry?:boolean;retryAfterMs:number}};
+type Data={scope:string;correctionsEnabled?:boolean;notes:Note[];generatedSummaryIds:string[];pendingCount?:number;background?:{enabled:boolean;pending:number;failed:number;canRetry?:boolean;retryAfterMs:number}};
 type Props={initiallyOpen?:boolean;onAction?:(seed:ActionSeed)=>void;renderNextSteps?:(studentId:string|null)=>ReactNode;renderGuide?:(topic:Topic)=>ReactNode;renderSummary?:(studentId:string|null,flowing:boolean)=>ReactNode;studentId:string;name:string;role:'parent'|'student';language:Language;t:(en:string,es:string)=>string;navigate:(page:'explore'|'planning'|'costs'|'applications')=>void};
 
 const mobileBinderQuery='(max-width: 760px)';
@@ -45,6 +48,7 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  const {user,getAccessTokenSilently}=useAuth0();
  const [familyFor,setFamilyFor]=useState<string|null>(null);
  const target=role==='parent'&&familyFor===studentId?null:studentId;
+ const corrections=useBinderCorrections('note',target);
  const scope=JSON.stringify([user?.sub,target]);
  const latestScope=useRef(scope);latestScope.current=scope;
  const liveBinder=useSyncExternalStore(binderActivity.subscribe,binderActivity.snapshot,()=>null);
@@ -183,6 +187,8 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  },[drafts]);
  const date=(value:string)=>new Date(value).toLocaleDateString(language==='es'?'es-US':'en-US',{dateStyle:'medium'});
  function errorText(code:string){
+  if(code==='undo_unavailable')return t('Undo is no longer available. Reload to see the current information.','Ya no se puede deshacer. Recarga para ver la información actual.');
+  if(['item_changed','operation_changed','correction_operation_required'].includes(code))code='note_changed';
   if(code==='note_changed')return t('This note changed in another window. Your draft is still here. Reload the notebook and review the latest note before saving again.','Esta nota cambió en otra ventana. Tu borrador sigue aquí. Recarga el cuaderno y revisa la versión más reciente antes de guardar de nuevo.');
   if(code==='notes_ai_limit')return t('You’ve reached the hourly limit for suggestions and translations. You can still write and edit your notes. Try again later.','Alcanzaste el límite por hora de sugerencias y traducciones. Aún puedes escribir y editar tus notas. Inténtalo más tarde.');
   if(code==='note_limit')return t('Your notebook is full. Delete a note you no longer need before adding another.','Tu cuaderno está lleno. Elimina una nota que ya no necesites antes de agregar otra.');
@@ -191,9 +197,14 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  }
  async function act(body:Record<string,unknown>,success:string,clearDraft=false){
   if(inFlight.current)return;inFlight.current=true;setBusy(true);setMessage(null);
-  const actionScope=scope,actionDraftKey=draftKey;
+  const actionScope=scope,actionDraftKey=draftKey;let acknowledged=false;
   try{
-   const result=await request({...body,studentId:target});
+   let result:Omit<Data,'scope'>;
+   if(data?.correctionsEnabled&&['update','delete','undo'].includes(String(body.action))){
+    if(body.action==='undo')await corrections.restore();else await corrections.change(body,notes.find(n=>n.id===body.id));
+    acknowledged=true;if(clearDraft)setDrafts(prev=>({...prev,[actionDraftKey]:undefined}));
+    result=await request({action:'load',studentId:target});
+   }else result=await request({...body,studentId:target});
    if(user?.sub&&['update','delete'].includes(String(body.action)))notifyMemoryContext(user.sub,target);
    if(latestScope.current===actionScope){
     mutationVersion.current++;setData({scope:actionScope,...result});setLoadError(false);setMessage({scope:actionScope,text:success,error:false});
@@ -208,7 +219,7 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
    }
    if(clearDraft)setDrafts(prev=>({...prev,[actionDraftKey]:undefined}));
   }
-  catch(error){if(latestScope.current===actionScope)setMessage({scope:actionScope,text:errorText(error instanceof Error?error.message:''),error:true,reference:(error as {errorReference?:string})?.errorReference});}
+  catch(error){if(latestScope.current===actionScope)setMessage({scope:actionScope,text:acknowledged?t('Your change was saved. Reload the notebook to display it.','Tu cambio se guardó. Recarga el cuaderno para verlo.'):errorText(error instanceof Error?error.message:''),error:true,reference:(error as {errorReference?:string})?.errorReference});}
   finally{inFlight.current=false;setBusy(false);}
  }
  function edit(note?:Note,kind?:Kind){
@@ -222,7 +233,10 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
   const translated=note.language!==language&&note.translations[language]&&!originals[note.id];
   return <BinderNoteHighlight key={note.id} id={note.id} topic={note.topic} fresh={freshIds.has(note.id)} suggested={note.status==='suggested'} onRead={()=>noteUpdates.read(scope,note.id)}>
    <div className="notebook-note-origin">{freshIds.has(note.id)&&<span className="notebook-new-label">{t('New','Nuevo')}</span>}<time dateTime={note.conversationAt||note.updatedAt}>{date(note.conversationAt||note.updatedAt)}</time></div>
-   <NotebookWriting key={`${note.id}-${note.version}-${translated?language:note.language}`} content={(translated?note.translations[language]:note.content)||''} language={translated?language:note.language} t={t}/>
+    {note.status==='suggested'&&<OrganizationEvidence value={note.organization} t={t}/>}
+    {note.excludedFromGuidance&&<p className="organization-evidence">{t('Kept for reference. Excluded from future guidance after a correction or removal.','Se conserva como referencia. No se usará en futuras conversaciones después de una corrección o eliminación.')}</p>}
+    <NotebookWriting key={`${note.id}-${note.version}-${translated?language:note.language}`} content={(translated?note.translations[language]:note.content)||''} language={translated?language:note.language} t={t}/>
+    {note.organization&&<details className="memory-evidence"><summary>{t('See source','Ver fuente')}</summary><blockquote lang={note.language}>{note.quote}</blockquote><p>{t('From a saved conversation summary, not a verbatim transcript or a verified policy.','De un resumen guardado, no de una transcripción literal ni de una política verificada.')}</p></details>}
    {note.language!==language&&<div className="notebook-translation">{translated?<><span>{t('AI translation · Original preserved','Traducción con IA · Original conservado')}</span><button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:true}))}>{t('Show original','Ver original')}</button></>:note.translations[language]?<button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:false}))}>{t('Show translation','Ver traducción')}</button>:<button type="button" className="text-button" disabled={busy} onClick={()=>void act({action:'translate',id:note.id,version:note.version,language},t('Translation ready. The original is unchanged.','Traducción lista. El original no cambió.'))}><Languages size={15} aria-hidden="true"/>{t('Read in English','Leer en español')}</button>}</div>}
    <div className="notebook-note-actions"><button type="button" className="text-button" disabled={busy} onClick={()=>edit(note)}>{note.language===language?t('Edit','Editar'):t('Edit original','Editar original')}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{if(window.confirm(t('Delete this note? Your original conversation summary will remain.','¿Eliminar esta nota? Se conservará el resumen original de la conversación.')))void act({action:'delete',id:note.id,version:note.version},t('Note deleted.','Nota eliminada.'));}}><Trash2 size={14} aria-hidden="true"/>{note.status==='suggested'?t('Remove','Quitar'):t('Delete','Eliminar')}</button></div>
   </BinderNoteHighlight>;
@@ -290,13 +304,13 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  function freshCount(id:NotebookPage){return notes.filter(note=>note.topic===id&&freshIds.has(note.id)).length;}
  function dividerGlow(id:NotebookPage){return `${id!=='summary'&&discussing.includes(id)?' is-discussing':''}${freshCount(id)?' has-new-notes':''}`;}
  function dividerSignal(id:NotebookPage){return <span className="notebook-divider-signals">{id!=='summary'&&discussing.includes(id)&&<span className="notebook-discussing-label"><i aria-hidden="true"/>{t('Discussing now','Conversando ahora')}</span>}{freshCount(id)>0&&(id==='summary'||!discussing.includes(id))&&<span className="notebook-new-label">{freshCount(id)} {t('new','nuevos')}</span>}</span>;}
- return <PersonalBinder initiallyOpen={initiallyOpen} name={name} t={t} onOpen={()=>setMobilePage(false)}><section className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
+ return <><ConversationRecovery studentId={target} t={t}/><PersonalBinder initiallyOpen={initiallyOpen} name={name} t={t} onOpen={()=>setMobilePage(false)}><section className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
   {(!mobile||!mobilePage)&&<><div className="home-section-heading"><span className="home-kicker">{mobile?t('IN YOUR BINDER','EN TU CARPETA'):t('MAKE IT YOURS','HAZLO TUYO')}</span><h2 id="notebook-heading">{mobile?t('Choose a topic','Elige un tema'):t('My topics & notes','Mis temas y notas')}</h2></div>
   {role==='parent'&&<div className="home-summary-switch" role="group" aria-label={t('Notebook belongs to','Este cuaderno pertenece a')}><button type="button" aria-pressed={target!==null} onClick={()=>setFamilyFor(null)}>{name}</button><button type="button" aria-pressed={target===null} onClick={()=>setFamilyFor(studentId)}>{t('Family notes','Notas familiares')}</button></div>}
   {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/><CoordinatorConnection key={target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/><BinderSharing key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0}/></>}
   <p className="notebook-scope">{t('Notebook for: ','Cuaderno de: ')}<strong>{scopeLabel}</strong></p></>}
   {!history.cloud?<p>{t('Sign in to save topic notes to your account.','Inicia sesión para guardar notas en tu cuenta.')}</p>:<>
-   <StudentMemory key={scope} studentId={target} language={language} t={t} historyKey={JSON.stringify(history.items.filter(item=>item.studentId===target).map(item=>item.id))}/>
+   <StudentMemory key={scope} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>
    {loading&&<p role="status">{t('Loading your notebook…','Cargando tu cuaderno…')}</p>}
    {loadError&&<p role="alert">{t('Your notebook could not be loaded. Your saved notes have not been replaced.','No se pudo cargar tu cuaderno. Tus notas guardadas no se han reemplazado.')} <button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
    {indexing&&discussions.length>0&&<p className="notebook-sync-status" role="status">{data?.background?.enabled?t('Your conversation is saved. Key points will appear here when ready.','Tu conversación está guardada. Los puntos clave aparecerán aquí cuando estén listos.'):t('Organizing conversation key points into your topics…','Organizando los puntos clave de tus conversaciones por tema…')}</p>}
@@ -312,6 +326,8 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
    {showingPage&&selected&&<section className={`notebook-panel divider-${selected.id}`} id="notebook-panel" role={mobile?'region':'tabpanel'} ref={panel} tabIndex={0} aria-label={mobile?selected.title:undefined} aria-labelledby={mobile?undefined:`notebook-tab-${selected.id}`}><div className="notebook-panel-heading"><div><span className="home-kicker">{scopeLabel}</span><h3 id="notebook-topic-heading">{selected.title}</h3>{dividerSignal(selected.id)}<p className="notebook-topic-description">{selected.detail}</p></div></div>
     <div className="notebook-toolbar"><WorkspaceTalkButton t={t} disabled={busy||loading||loadError} focus={{kind:'topic',studentId:target,topic:selected.id}}/><button type="button" className="button primary" disabled={busy||loading||loadError} onClick={()=>edit()}><Plus size={16} aria-hidden="true"/>{t('Add a note','Agregar una nota')}</button>{exportButton(selected.id)}</div>
     {role==='student'&&target&&<StudentGuidance studentId={target} topic={selected.id} t={t} onAction={onAction?seed=>{openTopic('summary');onAction(seed);}:undefined}/>}
+      {data?.correctionsEnabled&&corrections.undo&&<div className="memory-actions"><button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'undo'},t('The selected note was restored. Sharing remains unchanged.','Se restauró la nota seleccionada. Lo compartido no cambia.'))}>{t('Undo last change','Deshacer último cambio')}</button><span>{t('Available here for 10 minutes. Restores only this note.','Disponible aquí durante 10 minutos. Solo restaura esta nota.')}</span></div>}
+      {corrections.withdrawn>0&&<p role="status">{t('Related unreviewed details were withdrawn so old information is not used again. Undo restores only the selected note.','Se retiraron los datos relacionados sin revisar para no volver a usar información anterior. Deshacer solo restaura la nota seleccionada.')}</p>}
     {message?.scope===scope&&<div className="notebook-message" role={message.error?'alert':'status'}>{message.text}{message.error&&<ErrorReference reference={message.reference} language={language}/>}{message.error&&<button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Reload notebook','Recargar cuaderno')}</button>}</div>}
     {busy&&<p role="status">{t('Working on your request…','Procesando tu solicitud…')}</p>}
     {draft&&<form className="notebook-editor" onSubmit={e=>{e.preventDefault();void act({action:draft.version?'update':'create',id:draft.id,...(draft.version?{version:draft.version}:{}),note:{topic:draft.topic,kind:draft.kind,content:draft.content,language:draft.language,decisionConfirmed:draft.decisionConfirmed}},t('Note saved to your account.','Nota guardada en tu cuenta.'),true);}}>
@@ -334,7 +350,7 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
    </section>}
    </div>
   </>}
- </section></PersonalBinder>;
+ </section></PersonalBinder></>;
 }
 
 function NotebookWriting({content,language,t}:{content:string;language:Language;t:(en:string,es:string)=>string}){
