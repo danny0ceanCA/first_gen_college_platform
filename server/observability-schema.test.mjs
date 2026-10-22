@@ -46,7 +46,9 @@ test('metadata is validated configuration and severity belongs to the catalog',(
  const out=diagnosticRecord({event:'database_error',level:'info'},{metadata});assert.equal(out.release,'a'.repeat(40));assert.equal(out.environment,'test');assert.equal(out.level,'error');
  const bad=createMetadata({NODE_ENV:'private-user',APPLICATION_REVISION:'password=private'});assert.equal(bad.release,'unknown');assert.equal(bad.environment,'development');
  assert.equal(diagnosticRecord({event:'api_request',level:'info',httpStatus:503}).level,'error');
- assert.equal(diagnosticRecord({event:'database_error'},{metadata:{release:'private'}}).release,'unknown');
+ // A forged metadata object must fall back to trusted environment metadata.
+ // CI supplies GITHUB_SHA, so that trusted default need not be "unknown".
+ assert.equal(diagnosticRecord({event:'database_error'},{metadata:{release:'private'}}).release,createMetadata().release);
 });
 
 test('CI rejects console aliases and raw error serialization in HTTP code',async()=>{
