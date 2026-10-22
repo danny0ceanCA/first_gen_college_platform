@@ -1,4 +1,5 @@
 import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
+import {closeTestPool} from './fixtures/postgres-test-pool.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter,once} from 'node:events';
@@ -84,6 +85,6 @@ test('actual API startup accepts the separate maintenance login and completes ev
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('startup timed out')),10000);let lines='';child.stdout.on('data',data=>{lines+=data;const parts=lines.split('\n');lines=parts.pop();for(const line of parts)try{const event=JSON.parse(line);events.push(event);if(event.event==='service.started'){clearTimeout(timer);resolve();}}catch{}});child.once('exit',code=>{clearTimeout(timer);reject(Error(`startup exited ${code}: ${JSON.stringify(events)} ${stderr}`));});});
   assert.equal(events.filter(e=>e.event==='job.finished'&&e.outcome==='completed').length,16);for(const job of ['coordinator-lifecycle','conversation-checkpoints'])assert.ok(events.some(e=>e.event==='job.finished'&&e.job===job&&e.outcome==='completed'));assert.ok(!events.some(e=>e.outcome==='failed'));
  }finally{
-  if(child&&child.exitCode===null){const exited=once(child,'exit');child.kill();await exited;}await owner?.end();await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);for(const role of [apiRole,maintenanceRole])await admin.query(`DROP ROLE IF EXISTS ${role}`);await admin.end();
+  if(child&&child.exitCode===null){const exited=once(child,'exit');child.kill();await exited;}await closeTestPool(owner);await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);for(const role of [apiRole,maintenanceRole])await admin.query(`DROP ROLE IF EXISTS ${role}`);await admin.end();
  }
 });
