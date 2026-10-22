@@ -1,3 +1,4 @@
+import {recoveryEnabled,recoveryReady,claimRecoveryJob,createRecoveryProcessor} from './conversation-recovery.mjs';
 import {runtimeLog} from './observability/logger.mjs';
 import {metrics} from './observability/metrics.mjs';
 import {safeErrorCode} from './observability/error-codes.mjs';
@@ -70,7 +71,10 @@ export function createBinderProcessor(database,env,request=fetch){
    await finish('complete');return 'complete';
   }catch(error){
    // Permission/closure failures cannot use a fresh approval to revive this job.
-   const cancel=!signal.aborted&&[403,404,409,410].includes(error.status),terminal=job.attempts>=5;
+   // A full binder is recoverable after the student removes items. Surface it
+   // as failed/retryable immediately rather than cancelling or spending AI retries.
+   const capacity=['memory_limit','note_limit'].includes(error.message);
+   const cancel=!capacity&&!signal.aborted&&[403,404,409,410].includes(error.status),terminal=capacity||job.attempts>=5;
    const c=await database.connect();try{
     await c.query('BEGIN');await c.setAccountScope?.(job.auth0_subject);
     await c.query("UPDATE origen_binder_jobs SET status=$4,available_at=now()+($5::int*interval '1 second'),lease_until=NULL,lease_token=NULL WHERE account_id=$1 AND summary_id=$2 AND lease_token=$3",[job.account_id,job.summary_id,job.lease_token,cancel?'cancelled':terminal?'failed':'pending',Math.min(300,2**job.attempts*5)]);
@@ -83,13 +87,17 @@ export function createBinderProcessor(database,env,request=fetch){
 
 export function startBinderWorker({application,maintenance,env,request=fetch,intervalMs=3000,schema='public'}){
  let stopped=false,running;const abort=new AbortController(),dispatch=isolateDatabase(maintenance,{schema}),process=createBinderProcessor(application,env,request);
+ const recover=createRecoveryProcessor(application,env,request);let recoveryTurn=true;
  const tick=()=>{
   if(stopped||running||!binderJobsEnabled(env))return;
   running=runDiagnosticJob(async()=>{
-   const job=await runRetentionJob(()=>claimBinderJob(dispatch));if(!job||stopped)return;
-   const started=performance.now();runtimeLog({event:'job.started',job:'binder-processing'});
-   const status=await process(job,{signal:abort.signal}),outcome=status==='complete'?'completed':status==='cancelled'?'cancelled':'failed',durationMs=performance.now()-started;
-   metrics.observe('job','binder-processing',outcome,durationMs);runtimeLog({event:'job.finished',job:'binder-processing',outcome,durationMs,sourceCount:1});
+   let recoveryJob=null;
+   if(recoveryEnabled(env)&&recoveryTurn&&await recoveryReady(application))recoveryJob=await runRetentionJob(()=>claimRecoveryJob(dispatch));
+   recoveryTurn=!recoveryTurn;
+   const job=recoveryJob||await runRetentionJob(()=>claimBinderJob(dispatch));if(!job||stopped)return;
+   const started=performance.now(),jobName=recoveryJob?'conversation-recovery':'binder-processing';runtimeLog({event:'job.started',job:jobName});
+   const status=await (recoveryJob?recover:process)(job,{signal:abort.signal}),outcome=status==='complete'?'completed':status==='cancelled'?'cancelled':'failed',durationMs=performance.now()-started;
+   metrics.observe('job',jobName,outcome,durationMs);runtimeLog({event:'job.finished',job:jobName,outcome,durationMs,sourceCount:1});
   }).catch(error=>runtimeLog({event:'job.finished',job:'binder-processing',outcome:'failed',code:safeErrorCode(error)})).finally(()=>{running=undefined;});
  };
  const timer=setInterval(tick,intervalMs);timer.unref();tick();

@@ -55,8 +55,11 @@ export async function checkOnboarding({browser=false,npmCli=process.env.npm_exec
  if(!npmCli)throw Error('Run with npm run check:onboarding.');
  const startedAt=new Date().toISOString(),before=await sourceFingerprint();
  const files=(await readdir(path.join(root,'server'))).filter(name=>name.endsWith('.test.mjs')).sort().map(name=>'server/'+name);
- console.log('Checking server tests…');const tests=await command(['--test','--test-reporter=tap',...files]),counts=testCounts(tests.output);
+ console.log('Checking server tests…');const tests=await command(['--test','--test-concurrency=2','--test-reporter=tap',...files]),counts=testCounts(tests.output);
  const testStatus=tests.exitCode===0&&!tests.timedOut&&counts&&counts.fail===0&&counts.cancelled===0?'passed':'failed';
+ await mkdir(path.join(root,'output'),{recursive:true});
+ await writeFile(path.join(root,'output/onboarding-server-tests.tap'),tests.output);
+ if(testStatus==='failed')console.error(tests.output.split('\n').filter(line=>/^\s*(?:not ok |failureType:|location:|error:)/.test(line)).slice(0,60).join('\n'));
  console.log(`Server tests: ${testStatus}${counts?` (${counts.pass} passed, ${counts.skipped} skipped)`:''}`);
  console.log('Checking production build…');const build=await command([npmCli,'run','build']),buildStatus=build.exitCode===0&&!build.timedOut?'passed':'failed';console.log(`Production build: ${buildStatus}`);
  let scenarios=[],browserStatus=browser?'failed':'not-run';if(browser){try{scenarios=await browserChecks(npmCli);browserStatus=scenarios.length===browserFiles.length&&scenarios.every(s=>s.status==='passed')?'passed':'failed';}catch{/* Report unavailable browser setup without credentials, paths or raw errors. */}}

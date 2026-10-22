@@ -51,6 +51,17 @@ export async function replayDeletionManifest(pool,manifest){
   // Serialize operator replays. Traffic must remain disabled: an exclusive
   // advisory lock alone cannot stop applications that do not take this lock.
   await c.query('SELECT pg_advisory_xact_lock(728419,5)');
+  // Restored cooldowns and pending voice confirmations are not reliable current
+  // consent/context. Discard this bounded metadata rather than resurrect it.
+  if((await c.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_guidance_questions'")).rows.length){
+   await c.query('DELETE FROM origen_guidance_questions');
+   await c.query('DELETE FROM origen_live_memory_sessions');
+  }
+  if((await c.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_checkpoint_text'")).rows.length){
+   await c.query("UPDATE origen_conversation_checkpoints SET status='cancelled',lease_token=NULL,lease_until=NULL WHERE status NOT IN ('complete','cancelled')");
+   await c.query('DELETE FROM origen_checkpoint_text');
+   await c.query('UPDATE origen_recovery_epochs SET epoch=epoch+1');
+  }
   // Fail closed after every restore, even if revocation evidence was newer than
   // the last exported manifest. No old recipient, code or publication survives.
   // A new pilot approval, recipient connection and student publication are required.

@@ -1,3 +1,4 @@
+import {recoveryReady,cancelRecovery} from './conversation-recovery.mjs';
 import {createHash} from 'node:crypto';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {recentlyAuthenticated} from './recent-auth.mjs';
@@ -42,9 +43,11 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
    all[key]=(await c.query(`SELECT id,${key==='summaries'?'created_at':'version'},${['notes','memories'].includes(key)?'source_summary_id':'student_id'} FROM ${table} WHERE account_id=$1${scope}${key==='memories'?" AND status IN ('proposed','confirmed')":''} ORDER BY id`,args)).rows;
    selected[key]=(input.categories||[]).includes(key)?all[key]:[];
   }
+  const hasRecovery=await recoveryReady(c);
+  const recoveryRows=hasRecovery?(await c.query(`SELECT id,sequence,status FROM origen_conversation_checkpoints WHERE account_id=$1${scope} AND status NOT IN ('complete','cancelled') ORDER BY id`,args)).rows:[];
   if(input.action==='status'){
    const students=(await c.query('SELECT id,name FROM origen_students WHERE account_id=$1 ORDER BY name,id',[owner])).rows;
-   const result={counts:Object.fromEntries(Object.entries(all).map(([k,v])=>[k,v.length])),days:await prefs(),students};await c.query('COMMIT');return result;
+   const result={recoveryCopies:recoveryRows.length,counts:Object.fromEntries(Object.entries(all).map(([k,v])=>[k,v.length])),days:await prefs(),students};await c.query('COMMIT');return result;
   }
   const summaryIds=new Set(selected.summaries.map(r=>r.id));
   const derived=all.notes.filter(r=>summaryIds.has(r.source_summary_id));
@@ -52,9 +55,14 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
   const derivedMemories=all.memories.filter(r=>summaryIds.has(r.source_summary_id));
   selected.memories=[...new Map([...selected.memories,...derivedMemories].map(r=>[r.id,r])).values()].sort((a,b)=>a.id.localeCompare(b.id));
   const counts=Object.fromEntries(Object.entries(selected).map(([k,v])=>[k,v.length]));
-  const revision=createHash('sha256').update(JSON.stringify({owner,studentId:input.studentId,categories:[...input.categories].sort(),selected})).digest('hex');
+  const revision=createHash('sha256').update(JSON.stringify({owner,studentId:input.studentId,categories:[...input.categories].sort(),selected,recoveryRows})).digest('hex');
   if(input.action==='erase'){
    if(input.revision!==revision)throw fail(409,'privacy_selection_changed');
+   if(hasRecovery)await cancelRecovery(c,owner,input.studentId);
+    if(input.categories.some(key=>['memories','notes','summaries'].includes(key))&&(await c.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_guidance_questions'")).rows.length){
+     await c.query(`DELETE FROM origen_guidance_questions WHERE account_id=$1${scope}`,args);
+     await c.query(`UPDATE origen_live_memory_sessions SET closed=true,gap_key=NULL,gap_turn=NULL,gap_presented=false WHERE account_id=$1${scope}`,args);
+    }
    if(input.categories.includes('memories')){
     const sources=(await c.query(`SELECT id,student_id FROM origen_conversation_summaries WHERE account_id=$1${scope}`,args)).rows;
     for(const source of sources)await c.query("INSERT INTO origen_memory_batches(account_id,summary_id,source_version,suppressed) VALUES($1,$2,'privacy-erased',true) ON CONFLICT(account_id,summary_id) DO UPDATE SET suppressed=true",[owner,source.id]);
@@ -70,7 +78,7 @@ export function createPrivacyRepository(database){return async(subject,input)=>{
    // Receipts/tombstones are written by DB triggers, including normal UI deletes.
    for(const key of ['summaries','notes','plans','sheets','memories'])for(const row of selected[key])await c.query(`DELETE FROM ${tables[key]} WHERE account_id=$1 AND id=$2`,[owner,row.id]);
   }
-  await c.query('COMMIT');return {counts,derivedNotes:derived.length,derivedMemories:derivedMemories.length,revision,deleted:input.action==='erase'};
+  await c.query('COMMIT');return {counts,recoveryCopies:recoveryRows.length,derivedNotes:derived.length,derivedMemories:derivedMemories.length,revision,deleted:input.action==='erase'};
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 };}
 // Called only by the scheduled retention job. The repository rechecks the

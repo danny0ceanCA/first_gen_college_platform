@@ -22,7 +22,7 @@ async function reserveConversation(client,owner,item){
  if(!existing)await client.query('INSERT INTO origen_conversation_lifecycle(account_id,id,student_id,mode) VALUES($1,$2,$3,$4)',[owner,item.id,item.studentId,item.mode]);
 }
 export function createHistoryRepository(database){
- return async(subject,input)=>{
+ return async(subject,input,{beforeSave,afterSave}={})=>{
   if(input.action==='context'&&(input.studentId===undefined||input.studentId!==null&&!identifier(input.studentId)))throw fail(400,'memory_scope_required');
   if(!database)throw fail(503,'database_unavailable');
   const client=await databaseOperation(database,['save','import','reserve','defer'].includes(input.action)?'history.save':['delete','clear'].includes(input.action)?'history.delete':'history.read');
@@ -40,6 +40,11 @@ export function createHistoryRepository(database){
     await reserveConversation(client,owner,item);await client.query('COMMIT');return {items:[]};
    }
    if(input.action==='save'||input.action==='import'){
+    await beforeSave?.(client);
+    if(!beforeSave&&(await client.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_conversation_checkpoints'")).rows.length){
+     const ids=input.action==='save'?[input.item?.id]:input.items?.map(i=>i.id)||[];
+     if((await client.query('SELECT 1 FROM origen_conversation_checkpoints WHERE account_id=$1 AND id=ANY($2::text[])',[owner,ids])).rows.length)throw fail(409,'recovery_managed_summary');
+    }
     let values=input.action==='save'?[validateMemory(input.item)]:input.items.map(validateMemory);
     if(input.action==='import'){
      const receipt=await client.query('SELECT account_id FROM origen_history_imports WHERE account_id=$1',[owner]);
@@ -60,6 +65,7 @@ export function createHistoryRepository(database){
      const organizationLanguage=input.language||item.language;
      if(['en','es'].includes(organizationLanguage)&&(await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_binder_jobs'")).rows.length)await client.query("UPDATE origen_binder_jobs SET language=$3 WHERE account_id=$1 AND summary_id=$2 AND status='pending' AND attempts=0",[owner,item.id,organizationLanguage]);
     }
+    await afterSave?.(client);
    }
    if(input.action==='delete'){
     const known=(await client.query('SELECT id FROM origen_conversation_lifecycle WHERE account_id=$1 AND id=$2',[owner,input.id])).rows.length;
@@ -68,6 +74,10 @@ export function createHistoryRepository(database){
     await client.query('DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND id=$2',[owner,input.id]);
    }
    if(input.action==='clear'){
+    if((await client.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_conversation_checkpoints'")).rows.length){
+     await client.query('INSERT INTO origen_recovery_epochs(account_id,epoch) VALUES($1,2) ON CONFLICT(account_id) DO UPDATE SET epoch=origen_recovery_epochs.epoch+1',[owner]);
+     await client.query("UPDATE origen_conversation_checkpoints SET status='cancelled',lease_token=NULL,lease_until=NULL WHERE account_id=$1 AND student_id IS NOT DISTINCT FROM $2 AND status NOT IN ('complete','cancelled')",[owner,input.studentId]);
+    }
     await client.query(`UPDATE origen_conversation_lifecycle SET deleted_at=now(),student_id=NULL,mode=NULL WHERE account_id=$1 AND ${input.studentId===null?'student_id IS NULL':'student_id=$2'}${input.mode?` AND mode=$${input.studentId===null?2:3}`:''} AND deleted_at IS NULL`,[owner,...(input.studentId===null?[]:[input.studentId]),...(input.mode?[input.mode]:[])]);
     await client.query(`DELETE FROM origen_conversation_summaries WHERE account_id=$1 AND ${input.studentId===null?'student_id IS NULL':'student_id=$2'}${input.mode?` AND mode=$${input.studentId===null?2:3}`:''}`,[owner,...(input.studentId===null?[]:[input.studentId]),...(input.mode?[input.mode]:[])]);
    }

@@ -14,6 +14,7 @@ type Application={id:string;displayName:string;email:string;organizationName:str
 type Translate=(en:string,es:string)=>string;
 export function applicationError(error:string,t:Translate){
  const messages:Record<string,string>={
+  coordinator_review_busy:t('Review is busy. Wait a moment, then refresh applications or search organizations again. Your review has not been submitted.','La revisión está ocupada. Espera un momento y actualiza las solicitudes o busca organizaciones de nuevo. No se ha enviado tu revisión.'),
   coordinator_sharing_unavailable:t('Coordinator registration is not open yet. Please check back with the Origen team.','El registro de coordinadores aún no está abierto. Consulta con el equipo de Origen.'),
   verified_email_required:t('Verify your sign-in email, then select Refresh status.','Verifica tu correo de inicio de sesión y selecciona Actualizar estado.'),
   invitation_email_required:t('Sign in again so we can verify your email.','Inicia sesión de nuevo para verificar tu correo.'),
@@ -230,6 +231,7 @@ export function CoordinatorApplications({request,t,onError}:{request:Request;t:T
  const [items,setItems]=useState<Application[]>([]),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[after,setAfter]=useState(''),[next,setNext]=useState('');
  const [selected,setSelected]=useState(''),[note,setNote]=useState(''),[institution,setInstitution]=useState('');
  const [organizations,setOrganizations]=useState<{id:string;name:string}[]>([]),[orgBusy,setOrgBusy]=useState(false),[search,setSearch]=useState(''),[orgAfter,setOrgAfter]=useState(''),[orgNext,setOrgNext]=useState('');
+ const [orgFailed,setOrgFailed]=useState(false);
  const orgVersion=useRef(0);useEffect(()=>()=>{orgVersion.current++;},[]);
  const version=useRef(0);useEffect(()=>()=>{version.current++;},[]);
  async function load(cursor=''){
@@ -238,9 +240,9 @@ export function CoordinatorApplications({request,t,onError}:{request:Request;t:T
   catch(e){if(current===version.current)onError(e instanceof Error?e.message:'unavailable');}finally{if(current===version.current)setBusy(false);}
  }
  async function loadOrganizations(id:string,query='',cursor=''){
-  const current=++orgVersion.current;setOrgBusy(true);setInstitution('');setOrganizations([]);setOrgNext('');onError('');
+  const current=++orgVersion.current;setOrgBusy(true);setOrgFailed(false);setInstitution('');setOrganizations([]);setOrgNext('');onError('');
   try{const data=await request({action:'application-organizations',id,search:query.trim(),after:cursor});if(current!==orgVersion.current)return;const list=data.organizations||[];setOrganizations(list.slice(0,50));setOrgNext(list.length>50?list[49].id:'');setOrgAfter(cursor);}
-  catch(e){if(current===orgVersion.current)onError(e instanceof Error?e.message:'unavailable');}finally{if(current===orgVersion.current)setOrgBusy(false);}
+  catch(e){if(current===orgVersion.current){setOrgFailed(true);onError(e instanceof Error?e.message:'unavailable');}}finally{if(current===orgVersion.current)setOrgBusy(false);}
  }
  async function review(approve:boolean){
   const current=version.current;setBusy(true);onError('');
@@ -256,7 +258,7 @@ export function CoordinatorApplications({request,t,onError}:{request:Request;t:T
    <label>{t('Find an organization','Buscar una organización')}<input maxLength={200} value={search} onChange={e=>setSearch(e.target.value)}/></label>
    <button type="button" className="button outline" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search)}>{t('Search organizations','Buscar organizaciones')}</button>
    <label>{t('Verified organization','Organización verificada')}<select required disabled={busy||orgBusy} value={institution} onChange={e=>setInstitution(e.target.value)}><option value="">{t('Choose an organization','Elige una organización')}</option>{organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
-   {!orgBusy&&!organizations.length&&<p role="status">{t('No eligible organizations found. The applicant must belong to a verified organization with an active pilot.','No se encontraron organizaciones elegibles. La persona debe pertenecer a una organización verificada con un piloto activo.')}</p>}
+   {!orgBusy&&!orgFailed&&!organizations.length&&<p role="status">{t('No eligible organizations found. The applicant must belong to a verified organization with an active pilot.','No se encontraron organizaciones elegibles. La persona debe pertenecer a una organización verificada con un piloto activo.')}</p>}
    <div className="institution-actions">{orgAfter&&<button type="button" className="text-button" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search)}>{t('First organizations','Primeras organizaciones')}</button>}{orgNext&&<button type="button" className="text-button" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search,orgNext)}>{t('More organizations','Más organizaciones')}</button>}</div>
    <label>{t('Message the applicant will see','Mensaje que verá la persona')}<textarea required maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
    <div className="institution-actions"><button className="button primary" disabled={busy||orgBusy||!institution||!note.trim()}>{t('Approve coordinator access','Aprobar acceso de coordinador')}</button><button type="button" className="button outline" disabled={busy||!note.trim()} onClick={()=>void review(false)}>{t('Decline application','Rechazar solicitud')}</button></div>

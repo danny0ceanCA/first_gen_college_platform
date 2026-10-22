@@ -20,6 +20,12 @@ services:
         value: "true"
       - key: ORIGEN_BINDER_SHARING
         value: "true"
+      # Student-first Phase 7: migration 067; explicit selection and preview only.
+      - key: ORIGEN_DERIVED_BINDER_SHARING
+        value: "false"
+      # Student-first Phase 8: migration 068; student-requested help notices.
+      - key: ORIGEN_COORDINATOR_FOLLOW_THROUGH
+        value: "false"
       - key: ORIGEN_COORDINATOR_BINDER_VIEWING
         value: "true"
       - key: ORIGEN_COORDINATOR_FEEDBACK
@@ -29,6 +35,20 @@ services:
       - key: ORIGEN_VOICE_PREPARATION
         value: "false"
       - key: ORIGEN_BINDER_JOBS
+        value: "false"
+      # Enable only after migration 062 and the existing background worker are ready.
+      - key: ORIGEN_BINDER_ORGANIZATION
+        value: "false"
+      # Requires migration 063; recent undo keeps prior text in browser memory only.
+      - key: ORIGEN_BINDER_CORRECTIONS
+        value: "false"
+      # Requires migrations 063/064 and enabled binder corrections.
+      - key: ORIGEN_GUIDED_CONVERSATION
+        value: "false"
+      # Requires migrations through 065 and enabled binder corrections.
+      - key: ORIGEN_CONVERSATION_RECOVERY
+        value: "false"
+      - key: ORIGEN_CONVERSATION_CONTINUITY
         value: "false"
       - key: ORIGEN_PERSONALIZATION_MODE
         value: "on"

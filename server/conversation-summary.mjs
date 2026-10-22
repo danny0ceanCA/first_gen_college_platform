@@ -1,5 +1,5 @@
 import {redactCoordinatorTurns} from '../src/coordinatorCodes.mjs';
-import {providerOperation} from './observability/dependencies.mjs';
+import {generateNarrativeSummary} from './summary-generation.mjs';
 import {createSummaryReviewer} from './summary-quality.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {recordConversationQuality} from './conversation-quality-store.mjs';
@@ -8,7 +8,7 @@ import {allowedRequest} from './origin.mjs';
 import {narrativeSummaryInstructions} from './summary-style.mjs';
 import {createConversationOverview} from './conversation-overview.mjs';
 import {guidanceEnabled,guidanceConfig,validateSummarySegments,deferSummaryAttribution,createGuidanceRepository} from './guidance-history.mjs';
-export function createSummaryHandler(env,request=fetch,database=null){const overview=createConversationOverview(env,request,database);const reviewSummary=createSummaryReviewer(env,request);request=providerOperation('summary.generate',request,{model:env.OPENAI_MODEL_SUMMARY||env.OPENAI_MODEL_CONVERSATION||'gpt-4.1-mini'});return async(req,res,next)=>{
+export function createSummaryHandler(env,request=fetch,database=null){const overview=createConversationOverview(env,request,database);const reviewSummary=createSummaryReviewer(env,request);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/conversation-summary')return next();
  let generationStarted=0,generationFinished=false,saveStarted=false,saveFinished=false;
  const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -28,6 +28,7 @@ export function createSummaryHandler(env,request=fetch,database=null){const over
   metadata=validateMemory({...input,summary:'pending'});
   await req.bindDiagnosticOperation?.('summary',metadata.studentId);
   await createHistoryRepository(database)(req.origenIdentity.sub,{action:'reserve-summary',item:metadata,deferred:input.defer===true});
+  if((await database.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_conversation_checkpoints'")).rows.length&&(await database.query('SELECT 1 FROM origen_conversation_checkpoints WHERE id=$1',[metadata.id])).rows.length)return send(409,{error:'recovery_managed_summary'});
   if(guidanceEnabled(env)&&input.guidance){
    attribution={...input.guidance,language:input.language,configuration:guidanceConfig(env.OPENAI_MODEL_SUMMARY||env.OPENAI_MODEL_CONVERSATION||'gpt-4.1-mini','summary',{instructions:narrativeSummaryInstructions({...input,scopeName:'selected student'})},env)};
    try{await validateSummarySegments(database,req.origenIdentity.sub,metadata,attribution);}catch(error){if(error.status===404&&Date.parse(metadata.date)<Date.now()-90*86400000)attribution=undefined;else throw error;}
@@ -38,14 +39,12 @@ export function createSummaryHandler(env,request=fetch,database=null){const over
  if(!env.OPENAI_API_KEY)return send(503,{error:'missing_api_key'});
  if(attribution)execution=await createGuidanceRepository(database).startExecution(req.origenIdentity.sub,{sessionId:attribution.sessionId,segmentId:attribution.segmentIds.at(-1)},attribution.configuration,'summary');
  generationStarted=Date.now();
- const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL_SUMMARY||env.OPENAI_MODEL_CONVERSATION||'gpt-4.1-mini',store:false,max_output_tokens:900,instructions:narrativeSummaryInstructions(input),input:JSON.stringify(input.turns)}),signal:AbortSignal.timeout(45000)});
- req.log?.({event:'upstream_response',operation:'conversation_summary',httpStatus:response.status,upstreamRequestId:response.headers?.get('x-request-id')||undefined});
- if(!response.ok)return send(502,{error:'summary_unavailable'});const data=await response.json();if(data.status&&data.status!=='completed')return send(502,{error:'incomplete_summary'});const summary=(data.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');if(!summary.trim())return send(502,{error:'empty_summary'});generationFinished=true;req.log?.({event:'summary.generate.finished',outcome:'completed',durationMs:Date.now()-generationStarted});const item=metadata?{...metadata,summary:summary.slice(0,4000)}:undefined;
+ const {summary,data,response}=await generateNarrativeSummary(env,input,request,req.log);generationFinished=true;const item=metadata?{...metadata,summary}:undefined;
  if(item&&(input.defer!==true||item.studentId===null)){failureStage='summary_storage_failed';saveStarted=true;await createHistoryRepository(database)(req.origenIdentity.sub,{action:'save',item,attribution,language:input.language});saveFinished=true;req.log?.({event:'summary.save.finished',outcome:'completed'});}
  failureStage='summary_postprocessing_failed';
  if(item&&input.defer===true&&item.studentId!==null){await createHistoryRepository(database)(req.origenIdentity.sub,{action:'reserve-summary',item,deferred:true});if(attribution)await deferSummaryAttribution(database,req.origenIdentity.sub,item,attribution);req.log?.({event:'summary.save.finished',outcome:'deferred'});}
  if(item)await analyze(item,input);
  if(execution){await createGuidanceRepository(database).finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-executionStarted,upstreamRequestId:response.headers?.get('x-request-id'),usage:data.usage,resolvedModel:data.model});completed=true;}
  return send(200,{summary:summary.slice(0,4000),item});
- }catch(error){if(![400,404,409,410].includes(error.status))req.log?.({event:'summary_error',level:'error',code:safeErrorCode(error)});const status=[400,404,409,410,503].includes(error.status)?error.status:502;return send(status,{error:status===502?'summary_unavailable':status===503?'history_unavailable':error.message});}finally{if(generationStarted&&!generationFinished)req.log?.({event:'summary.generate.finished',outcome:'failed',durationMs:Date.now()-generationStarted});if(saveStarted&&!saveFinished)req.log?.({event:'summary.save.finished',outcome:'failed'});if(execution&&!completed)await createGuidanceRepository(database).finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-executionStarted,errorCode:failureStage}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
+ }catch(error){if(![400,404,409,410].includes(error.status))req.log?.({event:'summary_error',level:'error',code:safeErrorCode(error)});const status=[400,404,409,410,503].includes(error.status)?error.status:502;return send(status,{error:status===502?(['incomplete_summary','empty_summary'].includes(error.message)?error.message:'summary_unavailable'):status===503?'history_unavailable':error.message});}finally{if(generationStarted&&!generationFinished)req.log?.({event:'summary.generate.finished',outcome:'failed',durationMs:Date.now()-generationStarted});if(saveStarted&&!saveFinished)req.log?.({event:'summary.save.finished',outcome:'failed'});if(execution&&!completed)await createGuidanceRepository(database).finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-executionStarted,errorCode:failureStage}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
 };}

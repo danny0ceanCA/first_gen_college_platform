@@ -3,6 +3,7 @@ import {sharingTopics} from './binder-sharing-policy.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
 export const binderSharingEnabled=env=>linkingEnabled(env)&&env.ORIGEN_BINDER_SHARING==='true';
+export const derivedSharingEnabled=env=>binderSharingEnabled(env)&&env.ORIGEN_DERIVED_BINDER_SHARING==='true';
 export function validateSharingInput(v){
  if(!v||!['status','entries','preview','publish','cancel','withdraw','remove-topic','revoke','revoke-all','help'].includes(v.action)||typeof v.studentId!=='string'||!v.studentId.trim()||v.studentId.length>128)throw fail(400,'invalid_sharing_request');
  const out={action:v.action,studentId:v.studentId};
@@ -41,6 +42,8 @@ export function createBinderSharingHandler(database,env={}){return async(req,res
   let input;try{input=validateSharingInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_sharing_request'});}
   // Stop-sharing actions remain available even when every rollout flag is off.
   input.enabled=binderSharingEnabled(env);
+  input.derivedEnabled=derivedSharingEnabled(env);
+  input.followThroughEnabled=input.enabled&&env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true';
   if(!input.enabled&&['entries','preview','publish'].includes(input.action))return send(503,{error:'sharing_paused'});
   return send(200,await runSharingCommand(database,input));
  }catch(error){
@@ -51,6 +54,11 @@ export function createBinderSharingHandler(database,env={}){return async(req,res
 };}
 export async function assertBinderSharingReady(database,env){
  if(!binderSharingEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='071_preserve_coordinator_lock_order.sql'")).rows.length)throw new Error('coordinator_lock_order_migration_required');
+ if(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true'&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='068_coordinator_follow_through.sql'")).rows.length)throw new Error('coordinator_follow_through_migration_required');
+ if(derivedSharingEnabled(env)&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='067_derived_binder_sharing.sql'")).rows.length)throw new Error('derived_binder_sharing_migration_required');
+ if(derivedSharingEnabled(env)&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='069_binder_publication_source_lock.sql'")).rows.length)throw new Error('derived_binder_sharing_validation_migration_required');
+ if((derivedSharingEnabled(env)||env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true')&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='070_current_publication_revalidation.sql'")).rows.length)throw new Error('coordinator_current_publication_migration_required');
  for(const fn of ['origen_binder_sharing_command(jsonb)','origen_binder_help_command(jsonb)']){
   const row=(await database.query('SELECT to_regprocedure($1) AS fn',[fn])).rows[0];
   if(!row?.fn||!(await database.query("SELECT has_function_privilege(current_user,$1,'EXECUTE') AS allowed",[fn])).rows[0]?.allowed)throw new Error('binder_sharing_migration_or_grant_required');

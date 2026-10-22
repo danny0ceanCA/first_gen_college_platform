@@ -1,0 +1,81 @@
+// One synthetic bilingual journey through real services and restricted PostgreSQL
+// roles. It cannot replace real speech/provider, human or browser evaluation.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {Readable} from 'node:stream';
+import {coordinatorPilotFixture} from './fixtures/coordinator-pilot.mjs';
+import {createOrganizationService} from './binder-organization.mjs';
+import {createCorrectionService,correctionSnapshot} from './binder-corrections.mjs';
+import {createLiveMemoryService} from './live-memory.mjs';
+import {createProfileVoiceHandler} from './profile-voice.mjs';
+import {createRecoveryRepository,createRecoveryProcessor,claimRecoveryJob} from './conversation-recovery.mjs';
+import {runRetentionJob,isolateDatabase} from './account-isolation.mjs';
+import {createPlanRepository,validatePlan} from './plans.mjs';
+
+const output=text=>new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text}]}]}));
+for(const language of ['en','es'])test(`student-first integrated journey (${language}): correction, return, recovery, selected sharing, private action and revocation`,{skip:!process.env.DATABASE_TEST_URL,timeout:90000},async t=>{
+ const f=await coordinatorPilotFixture({language,followThrough:true});t.after(()=>f.close());
+ const tr=(en,es)=>language==='es'?es:en,subject='other',studentId='alex';
+ const env={...f.env,OPENAI_API_KEY:'synthetic',ORIGEN_PERSONALIZATION_MODE:'on',ORIGEN_PERSONALIZATION_EXTRACTION:'true',ORIGEN_BINDER_JOBS:'true',ORIGEN_BINDER_ORGANIZATION:'true',ORIGEN_BINDER_CORRECTIONS:'true',ORIGEN_GUIDED_CONVERSATION:'true',ORIGEN_CONVERSATION_CONTINUITY:'true',ORIGEN_CONVERSATION_RECOVERY:'true'};
+ const as=work=>f.as(subject,work),memory=()=>f.memory({action:'load',studentId},subject),rev=async()=>(await f.memory({action:'revision',studentId},subject)).revision;
+ const student=(path,input)=>f.call(subject,'/api/'+path,{studentId,...input}),staff=(path,input,actor='staff')=>f.call(actor,'/api/'+path,{organizationId:f.org,...input});
+ const account=(await f.owner.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0].id;
+ const old=tr('The student works evenings.','La estudiante trabaja por las tardes.'),goal=tr('The student is considering nursing.','La estudiante quizá estudie enfermería.'),corrected=tr('I work only Tuesdays and Thursdays.','Trabajo solo los martes y jueves.');
+ const initialId=randomUUID();await f.save(initialId,`${goal} ${old}`,{sub:subject});let organizationCalls=0;
+ const organize=async(summaryId,items)=>as(()=>createOrganizationService(f.db,env,async()=>{organizationCalls++;return output(JSON.stringify({items}));})(subject,{studentId,summaryId}));
+ await organize(initialId,[{topic:'options',category:'goal',certainty:'tentative',language,quote:goal},{topic:'transfer',category:'constraint',certainty:'stated',language,quote:old}]);
+ await organize(initialId,[]);assert.equal(organizationCalls,1,'reprocessing does not call the provider again');
+ const original=(await memory()).memories;assert.equal(original.find(m=>m.category==='goal').organization.certainty,'tentative');
+ assert.equal((await student('binder-sharing',{action:'status'})).grants.length,0,'organization alone shares nothing');
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_plans WHERE account_id=$1',[account])).rows[0].n,0,'a tentative interest creates no commitment');
+
+ const live=input=>as(()=>createLiveMemoryService(f.db,env)(subject,input));
+ const session=await live({action:'open',studentId,revision:await rev()});
+ const turn={sessionId:session.id,sequence:1,turnId:'schedule',transcript:tr('Which classes fit my work schedule?','¿Qué clases se ajustan a mi horario de trabajo?')};
+ await live({...turn,action:'turn',language});const question=await live({...turn,action:'question',topic:'transfer'});assert.equal(question.key,'work_days');
+ await live({...turn,action:'question-present',key:question.key,presentation:question.question});
+ const next={sessionId:session.id,sequence:2,turnId:'correction',transcript:corrected};await live({...next,action:'turn',language});
+ assert.equal((await live({...next,action:'question',topic:'transfer'})).status,'no_question');
+ const oldItem=original.find(m=>m.category==='constraint');
+ const change={operationId:randomUUID(),studentId,store:'memory',id:oldItem.id,version:oldItem.version,action:'update',before:correctionSnapshot(oldItem,'memory'),value:{category:'constraint',content:corrected,language,speaker:'student'}};
+ const correction=createCorrectionService(f.db,env);await as(()=>correction(subject,change));assert.equal((await as(()=>correction(subject,change))).replayed,true);
+ const current=(await memory()).memories;assert.ok(current.some(m=>m.content===corrected));assert.ok(!current.some(m=>m.content===old));
+ await f.save('other-student-secret','OTHER_STUDENT_SENTINEL',{sub:subject,studentId:'sam'});
+ let config;const voice=createProfileVoiceHandler(env,async(_url,options)=>{config=JSON.parse(options.body.get('session'));return new Response('v=0\r\n');},()=>{},f.db);
+ const req=Object.assign(Readable.from([JSON.stringify({sdp:'v=0\r\n',mode:'planning',studentId,language,role:'student',targetConfirmed:true,routeConversations:true})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json',host:'localhost'},origenAuthorized:true,origenIdentity:{sub:subject}});
+ let status;await as(()=>voice(req,{writeHead:s=>status=s,end:()=>{}},()=>assert.fail('unexpected route')));assert.equal(status,200);
+ assert.ok(config.instructions.includes(corrected));assert.ok(!config.instructions.includes(old)&&!config.instructions.includes('OTHER_STUDENT_SENTINEL'));assert.match(config.instructions,/RETURN CONVERSATION/);
+ assert.ok(config.instructions.includes('work_days')&&config.instructions.includes('answered'));
+
+ // A new cost conversation is protected, then recovered without an open browser.
+ const cost=tr('I need help comparing college costs.','Necesito ayuda para comparar los costos de estudiar.'),id=randomUUID();
+ const recovery=input=>as(()=>createRecoveryRepository(f.db,env)(subject,input)),epoch=(await recovery({action:'status'})).epoch;
+ const checkpoint={action:'checkpoint',id,epoch,contextRevision:await rev(),sequence:1,body:{id,studentId,mode:'finance',date:new Date().toISOString(),language,sources:[],turns:[{role:'user',text:cost}]}};
+ assert.equal((await recovery(checkpoint)).acknowledged,true);await recovery({action:'finalize',id,sequence:1});
+ const claim=()=>runRetentionJob(()=>claimRecoveryJob(isolateDatabase(f.maintenance,{schema:f.schema}))),job=await claim();assert.ok(job);
+ assert.equal(await createRecoveryProcessor(f.db,env,async()=>output(cost))(job),'complete');
+ assert.equal((await recovery({action:'finalize',id,sequence:1})).status,'complete');
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_checkpoint_text WHERE account_id=$1',[account])).rows[0].n,0);
+ await organize(id,[{topic:'costs',category:'question',certainty:'unresolved',language,quote:cost}]);
+ const entry=(await student('binder-sharing',{action:'entries'})).entries.find(e=>e.content.includes(cost));assert.ok(entry);
+ assert.ok(!entry.content.includes(corrected),'correction does not recertify a suppressed derivation');
+ const connectionId=randomUUID();await f.owner.query("INSERT INTO origen_binder_connections(id,account_id,student_id,coordinator_id,status,request_id,expires_at,accepted_at,display_name) SELECT $1,$2,'alex',id,'accepted',$3,now()+interval '7 days',now(),'Alex' FROM origen_coordinator_profiles WHERE auth0_subject='staff' AND institution_id=$4",[connectionId,account,randomUUID(),f.org]);
+ const preview=await student('binder-sharing',{action:'preview',connectionId,topics:['costs'],entryIds:[entry.id]});
+ const published=await student('binder-sharing',{action:'publish',previewId:preview.previewId,confirmed:true}),grantId=(await student('binder-sharing',{action:'status'})).grants[0].id;
+ const view=await staff('coordinator-binders',{action:'read',grantId});assert.deepEqual(view.entries.map(e=>e.content),preview.entries.map(e=>e.content));assert.equal(view.entries.length,1);
+ assert.ok(!JSON.stringify(view).includes(corrected)&&!JSON.stringify(view).includes('SENTINEL'));
+ await assert.rejects(staff('coordinator-binders',{action:'read',grantId},'colleague'));
+ await student('binder-sharing',{action:'help',grantId,requested:true});await f.sweep();
+ const notices=await staff('coordinator-notifications',{action:'list',audience:'staff'});assert.ok(notices.notifications.some(n=>n.kind==='help'));assert.ok(!JSON.stringify(notices).includes(cost));
+ const feedback=await staff('coordinator-feedback',{action:'staff-create',grantId,publicationId:published.publicationId,publicationItemId:view.entries[0].id,topic:'costs',kind:'suggested-step',body:tr('Compare two aid estimates together.','Comparar juntos dos estimaciones de ayuda.'),requestId:randomUUID()});
+ const stepId=randomUUID(),requestId=randomUUID(),plan=validatePlan({action:'create',requestId,fromFeedback:{id:feedback.id,version:feedback.version,stepId},plan:{studentId,title:tr('My next step','Mi próximo paso'),goal:'',category:'financial',status:'active',summaryIds:[],steps:[{id:stepId,title:'Compare with Jordan',action:'Compare one estimate on Tuesday.',notes:'PRIVATE_ACTION_SENTINEL',status:'not-started',dueDate:null,sources:[]}]}});
+ const save=()=>as(()=>createPlanRepository(f.db,env)(subject,plan));await save();await save();
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_plans WHERE account_id=$1',[account])).rows[0].n,1);
+ const list=()=>staff('coordinator-feedback',{action:'staff-list',grantId});assert.equal((await list()).feedback[0].replyCount,0,'acceptance alone sends no reply');assert.ok(!JSON.stringify(await list()).includes('PRIVATE_ACTION_SENTINEL'));
+ await student('coordinator-feedback',{action:'student-reply',feedbackId:feedback.id,version:feedback.version,body:tr('Could we compare them together?','¿Podemos compararlas juntos?'),requestId:randomUUID()});
+ assert.equal((await list()).feedback[0].replyCount,1);
+ await student('binder-sharing',{action:'revoke',grantId});await assert.rejects(staff('coordinator-binders',{action:'read',grantId}));
+ const remaining=await staff('coordinator-notifications',{action:'list',audience:'staff'});assert.ok(!remaining.notifications.some(n=>['help','reply','published'].includes(n.kind)));
+ await recovery({action:'stop'});const lateId=randomUUID();await assert.rejects(recovery({...checkpoint,id:lateId,contextRevision:await rev(),body:{...checkpoint.body,id:lateId}}),{status:409});
+});

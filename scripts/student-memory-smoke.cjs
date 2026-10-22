@@ -18,8 +18,27 @@ async function setup(browser,{width=1280,language='en',reducedMotion='reduce',na
   if(url.pathname.startsWith('/api/')){
    const body=route.request().postDataJSON()||{};state.requests.push({path:url.pathname,action:body.action});
    if(url.pathname==='/api/eligibility')return route.fulfill({json:{subject,allowed:true,status:'adult',ageBand:'18plus'}});
+   if(url.pathname==='/api/conversation-recovery')return route.fulfill({json:body.action==='stop'?{stopped:true}:{enabled:false,items:[]}});
    if(url.pathname==='/api/admin')return route.fulfill({status:403,json:{error:'admin_required'}});
    if(url.pathname==='/api/institutions')return route.fulfill({json:{memberships:[],hasPersonalAccount:false}});
+   // The student home mounts coordinator updates even with no shared binder.
+   // Match the list contract; the generic fallback lacks notifications and crashes it.
+   if(url.pathname==='/api/coordinator-notifications'){
+    assert.equal(body.action,'list','This fixture only supports an empty notification list.');
+    return route.fulfill({json:{notifications:[]}});
+   }
+   if(url.pathname==='/api/coordinator-feedback'){
+    assert.equal(body.action,'student-list','This fixture has no coordinator guidance.');
+    return route.fulfill({json:{feedback:[],writesEnabled:false}});
+   }
+   if(url.pathname==='/api/coordinator-connections'){
+    assert.ok(['available','list'].includes(body.action),'This fixture has no coordinator connections.');
+    return route.fulfill({json:body.action==='available'?{available:false}:{connections:[],sharingEnabled:false}});
+   }
+   if(url.pathname==='/api/binder-sharing'){
+    assert.equal(body.action,'status','This fixture has no shared binder.');
+    return route.fulfill({json:{available:false,enabled:false,connections:[],grants:[]}});
+   }
    if(url.pathname==='/api/family')return route.fulfill({json:{account:{firstName:'Alex',email:'alex@example.test',role:'student',welcomeHeard:true,usedVoice:true},students:[{id:studentId,name:'Alex Rivera',stage:'High school',interest:'Nursing and community health',gpa:'3.6',color:'peach',goals:'Explore a college path that lets me care for my community.'}]}});
    if(url.pathname==='/api/conversation-history')return route.fulfill({json:{items:[{id:'conversation-1',studentId,date,mode:'planning',summary:'We discussed majors, college costs, and preparing applications.',sources:[]}]}});
    if(url.pathname==='/api/conversation-summary')return route.fulfill({json:{summary:state.summary,sources:[],date}});

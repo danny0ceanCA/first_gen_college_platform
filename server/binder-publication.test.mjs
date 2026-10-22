@@ -9,6 +9,7 @@ import {runConnectionCommand,validateConnectionInput} from './coordinator-connec
 import {runSharingCommand,validateSharingInput,createBinderSharingHandler,assertBinderSharingReady,binderSharingEnabled} from './binder-sharing.mjs';
 import {createApp} from './index.mjs';
 import {createLifecycleRepository} from './account-lifecycle.mjs';
+import {createCorrectionService,correctionSnapshot} from './binder-corrections.mjs';
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const env={ORIGEN_COORDINATOR_ACCOUNTS:'true',ORIGEN_COORDINATOR_LINKING:'true',ORIGEN_BINDER_SHARING:'true'};
 test('publication arguments cannot supply contents, ownership, provenance or a feature flag',()=>{
@@ -127,6 +128,18 @@ test('student publication is versioned, explicit, isolated and revocable',{skip:
   assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_binder_publication_items WHERE content<>''")).rows[0].n,0);
   await provision('reviewer','approve-organization',{},true);await provision('owner','enable-member',{subject:'staff'});
   assert.ok((await run('status')).grants.every(g=>g.status!=='active'));connection=await connect();
+ });
+ await t.test('undo after a correction and revoked sharing restores only a private note',async()=>{
+  const id=randomUUID();await create(id,'Original private restoration example.');await publish(await preview([id]));
+  const old=(await f.note({action:'load',studentId:'alex'},'other')).notes.find(n=>n.id===id);
+  const change=input=>f.as('other',()=>createCorrectionService(f.db,{ORIGEN_BINDER_CORRECTIONS:'true'})('other',input));
+  const result=await change({operationId:randomUUID(),action:'update',store:'note',studentId:'alex',id,version:1,before:correctionSnapshot(old,'note'),value:{topic:'options',kind:'note',content:'Revised private restoration example.',language:'en'}});
+  assert.ok((await run('status')).grants.every(g=>g.items.length===0));
+  await run('revoke-all');
+  await change({operationId:randomUUID(),action:'undo',store:'note',studentId:'alex',id,version:result.version,before:result.undo.before,undoOf:result.undo.operationId});
+  assert.equal((await f.note({action:'load',studentId:'alex'},'other')).notes.find(n=>n.id===id).content,old.content);
+  assert.ok((await run('status')).grants.every(g=>g.status!=='active'&&g.items.length===0));
+  assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_binder_publication_items WHERE content<>''")).rows[0].n,0);
  });
  await t.test('expiry, recipient identity changes and permission withdrawal fail closed',async()=>{
   const id=randomUUID();await create(id,'Permission test.');let card=await preview([id]);

@@ -16,11 +16,11 @@ export function personalizationControls(env={},subject){
 export function requireLiveCapability(env,subject,action){
  if(action==='close')return;
  const policy=personalizationControls(env,subject);
- const allowed=['write','present'].includes(action)?policy.writes:action==='inspect'?policy.retrieval:policy.retrieval||policy.writes;
+ const allowed=action.startsWith('question')?policy.adaptive&&(policy.retrieval||policy.writes):['write','present'].includes(action)?policy.writes:action==='inspect'?policy.retrieval:policy.retrieval||policy.writes;
  if(!allowed)throw Object.assign(new Error('live_memory_disabled'),{status:503});
 }
 
 export function personalizationPolicy(env,subject){
  const policy=personalizationControls(env,subject);
- return 'v1:'+['enabled','retrieval','writes','adaptive'].map(key=>policy[key]?'1':'0').join('');
+ return 'v1:'+['enabled','retrieval','writes','adaptive'].map(key=>policy[key]?'1':'0').join('')+(env.ORIGEN_GUIDED_CONVERSATION==='true'?':guided1':'')+(env.ORIGEN_CONVERSATION_CONTINUITY==='true'?':continuity1':'');
 }

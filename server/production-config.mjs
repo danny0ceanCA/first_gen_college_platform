@@ -2,11 +2,15 @@ import {pathToFileURL} from 'node:url';
 import {onboardingConfigIssues} from './onboarding-settings.mjs';
 import {exportConfiguration} from './observability/exporter.mjs';
 import {coordinatorConfigurationIssues} from './binder-sharing-policy.mjs';
+import {organizationConfigurationIssues} from './binder-organization-policy.mjs';
 
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
- const issues=[...coordinatorConfigurationIssues(env)];
- for(const key of ['ORIGEN_VOICE_PREPARATION','ORIGEN_BINDER_JOBS'])if(env[key]&&!['true','false'].includes(env[key]))issues.push(`${key}: use true or false`);
+ const issues=[...coordinatorConfigurationIssues(env),...organizationConfigurationIssues(env)];
+ for(const key of ['ORIGEN_VOICE_PREPARATION','ORIGEN_BINDER_JOBS','ORIGEN_BINDER_CORRECTIONS','ORIGEN_GUIDED_CONVERSATION','ORIGEN_CONVERSATION_CONTINUITY','ORIGEN_CONVERSATION_RECOVERY'])if(env[key]&&!['true','false'].includes(env[key]))issues.push(`${key}: use true or false`);
+ if(env.ORIGEN_CONVERSATION_CONTINUITY==='true'&&env.ORIGEN_BINDER_CORRECTIONS!=='true')issues.push('ORIGEN_BINDER_CORRECTIONS: required for conversation continuity');
+ if(env.ORIGEN_GUIDED_CONVERSATION==='true'&&env.ORIGEN_BINDER_CORRECTIONS!=='true')issues.push('ORIGEN_BINDER_CORRECTIONS: required for guided conversation');
+ if(env.ORIGEN_CONVERSATION_RECOVERY==='true'&&env.ORIGEN_BINDER_JOBS!=='true')issues.push('ORIGEN_BINDER_JOBS: required for conversation recovery');
  if(env.ORIGEN_BINDER_JOBS==='true'&&!env.MAINTENANCE_DATABASE_URL)issues.push('MAINTENANCE_DATABASE_URL: required for binder background processing');
  if(env.OBSERVABILITY_EXPORT&&!['true','false'].includes(env.OBSERVABILITY_EXPORT))issues.push('OBSERVABILITY_EXPORT: use true or false');
  try{exportConfiguration(env);}catch{issues.push('OBSERVABILITY_EXPORT: verified HTTPS, lifecycle readiness, deployment record and backup horizon required');}
