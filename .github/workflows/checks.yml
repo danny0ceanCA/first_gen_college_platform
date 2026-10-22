@@ -97,7 +97,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: onboarding-release-check
-          path: output/onboarding-release-check.json
+          path: |
+            output/onboarding-release-check.json
+            output/onboarding-server-tests.tap
           if-no-files-found: warn
       - name: Check production dependency advisories
         run: npm audit --omit=dev --audit-level=high
