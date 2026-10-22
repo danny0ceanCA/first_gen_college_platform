@@ -2,6 +2,8 @@
 
 Observed on October 21, 2026, in Daniel's confirmed Render **My Workspace** (`tea-ctn17nbv2p9s73ffqo5g`). This is a release checklist and observed state, not a claim that production was updated.
 
+**Subsequent authorized work:** migrations 061–071 and current restricted-role grants have now been applied and verified, and matching API/frontend deployments are live. See [the production migration record](PRODUCTION_MIGRATIONS_2026-10-21.md) for current results. The observations and blocked-read account below are preserved as the earlier pre-migration state; the denied read was retried only after Daniel's fresh authorization. New student-first flags remain disabled pending voice validation.
+
 ## Verified production state
 
 - Repository: `danny0ceanCA/first_gen_college_platform`, branch `main`.
