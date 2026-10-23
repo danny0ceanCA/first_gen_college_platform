@@ -7,7 +7,7 @@ sign-in with the required API permissions. The administrator dashboard does not
 require an authenticator enrollment or MFA timestamp and does not display the
 two-step verification banner. Permission checks, suspension, auditing, database
 isolation and exclusion of private conversation text remain enforced. Admin write
-actions still require login proof within five minutes; token issuance is not proof
+actions still require login proof within 12 hours; token issuance is not proof
 of a new login. Institutional staff routes retain their existing MFA policy.
 The earlier MFA statements below apply to institutional access, not admin reports.
 
@@ -20,7 +20,7 @@ No production database, Auth0 tenant, or staff assignment was changed.
 Only permissions in the verified Origen API access token are authoritative.
 Browser roles, form fields, `scope`, and user-editable metadata do not grant access.
 All staff data access requires completed MFA and primary authentication within
-12 hours. Actions marked **fresh** require both within five minutes.
+12 hours. Actions marked **fresh** require both within 12 hours.
 
 | Permission | Allowed admin actions | Content boundary |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ automatic access to a department's inquiry contents.
    an already-issued JWT immediately; use the local suspension control below
    when immediate staff revocation is needed.
 7. Before production rollout, verify a real synthetic staff login, OTP enrollment,
-   challenge, returned claims, five-minute expiry, refresh without renewing the
+   challenge, returned claims, 12-hour expiry, refresh without renewing the
    proof timestamps, and access denial for a normal account. Automated tests mock
    the Auth0 Action API; live tenant enrollment and plan availability are not verified.
 
@@ -103,6 +103,21 @@ Auth0 documents [the challenge/enrollment APIs](https://auth0.com/blog/using-act
 and [why the completed MFA method must be read by a subsequent Action](https://support.auth0.com/center/s/article/using-actions-mfa-authentication-method-is-missing-on-first-login).
 The two-Action order is required; calling `multifactor.enable()` and immediately
 claiming completion can misrepresent what the user actually completed.
+
+The proof Action must also work without Enterprise session fields. Auth0 only
+provides `event.session.authenticated_at` on Enterprise plans. When it is absent,
+`recent-auth-action.cjs` uses the recorded `pwd`, `federated`, or `passkey`
+first-factor timestamps from `event.authentication.methods`. It preserves the
+original time on SSO/refresh; neither issuance time nor MFA completion alone
+renews first-factor freshness. MFA proof still requires the separate completed
+`mfa` method. See [Auth0's session-context guidance](https://support.auth0.com/center/s/article/differentiate-user-logins-from-session-reuse-sso-in-post-login-actions).
+
+Regression check: `node --test server/staff-access.test.mjs server/recent-auth.test.mjs`.
+After deploying an Action change, obtain a newly issued access token before
+checking the registration screen; already-issued tokens retain their old claims.
+On October 23, 2026, the synthetic coordinator account's completed OTP enrollment
+was recognized after this fix and a resumed sign-in, without another OTP challenge.
+The application remained pending review, with organization registration available.
 
 ## Immediate staff suspension
 

@@ -42,7 +42,7 @@ try{
   await proof.onExecutePostLogin({session:{authenticated_at:time},authentication:{methods:[{name:'mfa',timestamp:time}]}},api);assert.equal(claims[MFA],Math.floor(Date.parse(time)/1000));
   const old=new Date(Date.now()-3600000).toISOString();await proof.onExecutePostLogin({transaction:{protocol:'oauth2-refresh-token'},session:{authenticated_at:old},authentication:{methods:[{name:'mfa',timestamp:old}]}},api);assert.equal(claims[MFA],Math.floor(Date.parse(old)/1000));
   const now=1800000000000,n=now/1000;
-  for(const [age,fresh,expected] of [[300,true,null],[301,true,'staff_mfa_required'],[43200,false,null],[43201,false,'staff_mfa_required']])assert.equal(staffAuthenticationError({[MFA]:n-age,[AUTH]:n-age},{now,fresh}),expected);
+  for(const [age,fresh,expected] of [[300,true,null],[301,true,null],[43200,true,null],[43201,true,'staff_mfa_required'],[43200,false,null],[43201,false,'staff_mfa_required']])assert.equal(staffAuthenticationError({[MFA]:n-age,[AUTH]:n-age},{now,fresh}),expected);
  });
  await scenario('first-time applicants can save applications but interrupted MFA cannot register organizations',async()=>{
   for(const u of users)f.actor(u.sub,{mfa:false});
@@ -61,12 +61,12 @@ try{
   await batch(users.map(u=>async()=>{const org=(await inst(u.sub,{action:'signup-status',applicationId:u.application.id})).organization;assert.equal(org.id,u.id);assert.equal(org.status,'submitted');}));
  });
  await scenario('expired reviewer MFA cannot approve; fresh verification recovers independent review',async()=>{
-  f.actor('reviewer',{claims:n=>({[MFA]:n-301})});
+  f.actor('reviewer',{claims:n=>({[MFA]:n-43201})});
   await batch(users.map(u=>()=>inst('reviewer',{action:'verify',id:u.id,revision:1,note:'Synthetic.'},403,'staff_mfa_required')));
   f.actor('reviewer');
   await batch(users.map(u=>()=>inst('reviewer',{action:'verify',id:u.id,revision:1,note:'Synthetic independent review.'})));
   await batch(users.map(u=>()=>cmd('reviewer',{action:'approve-organization',id:u.id})));
-  f.actor('reviewer',{claims:n=>({[AUTH]:n-301})});
+  f.actor('reviewer',{claims:n=>({[AUTH]:n-43201})});
   await batch(users.map(u=>()=>cmd('reviewer',{action:'approve-application',id:u.application.id,institutionId:u.id,reviewNote:'Synthetic.'},403,'reauthentication_required')));
   assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_coordinator_applications WHERE status='approved'")).rows[0].n,0);
   f.actor('reviewer');
@@ -81,11 +81,12 @@ try{
   ['null MFA',n=>({[MFA]:null}),'staff_mfa_required','staff_mfa_required'],
   ['zero MFA',n=>({[MFA]:0}),'staff_mfa_required','staff_mfa_required'],
   ['fractional MFA',n=>({[MFA]:n-.5}),'staff_mfa_required','staff_mfa_required'],
-  ['fresh token with expired MFA',n=>({[MFA]:n-301}),null,'staff_mfa_required'],
-  ['fresh MFA with expired login',n=>({[AUTH]:n-301}),null,'reauthentication_required'],
+  ['fresh token with expired MFA',n=>({[MFA]:n-43201}),'staff_mfa_required','staff_mfa_required'],
+  ['fresh MFA with expired login',n=>({[AUTH]:n-43201}),'reauthentication_required','reauthentication_required'],
   ['expired read MFA',n=>({[MFA]:n-43201}),'staff_mfa_required','staff_mfa_required'],
   ['expired read login',n=>({[AUTH]:n-43201}),'reauthentication_required','reauthentication_required'],
   ['amr and user metadata cannot replace signed custom proof',n=>({[MFA]:undefined,amr:['mfa'],user_metadata:{[MFA]:n}}),'staff_mfa_required','staff_mfa_required'],
+  ['verification older than five minutes remains valid',n=>({[MFA]:n-3600,[AUTH]:n-3600}),null,null],
   ['fresh completed proof',n=>({}),null,null],
  ];
  for(const [name,claims,readError,writeError] of cases)await scenario(name,async()=>{

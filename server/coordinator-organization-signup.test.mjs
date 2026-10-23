@@ -1,11 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {signupOrganization,signupMatchesApplication,registerSignupOrganization} from '../src/coordinatorOrganizationSignup.mjs';
-import {validateInstitution,createInstitutionRepository} from './institutions.mjs';
+import {signupOrganization,signupMatchesApplication,registerSignupOrganization,savedOrganizationSignup,resumeOrganizationSignup} from '../src/coordinatorOrganizationSignup.mjs';
+import {validateInstitution,createInstitutionRepository,validateInstitutionPage} from './institutions.mjs';
 import {retrievalFixture} from './history-retrieval-fixture.mjs';
 import {runApplicationCommand} from './coordinator-applications.mjs';
 const application={displayName:'Synthetic Coordinator',email:'synthetic@example.org',jobRole:'Advisor',organizationName:'Community Futures',organizationWebsite:'https://example.org/'};
 const registration=signupOrganization(application,' College and transfer support. ','00000000-0000-4000-8000-000000000001',true);
+
+test('website-free organization signup can enter review while public publication still validates its website',()=>{
+ const without=signupOrganization({...application,organizationWebsite:''},'College support.','00000000-0000-4000-8000-000000000001',true);
+ assert.equal(validateInstitution(without).page.website,'');
+ assert.equal(validateInstitutionPage(without.page,true,{requireWebsite:false}).website,'');
+ assert.throws(()=>validateInstitutionPage(without.page,true));
+ assert.throws(()=>validateInstitutionPage({...without.page,website:'javascript:alert(1)'},true,{requireWebsite:false}));
+});
+
+test('PostgreSQL persists a website-free application and registers its organization for review',{skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const f=await retrievalFixture();t.after(()=>f.close());
+ const repository=createInstitutionRepository(f.db);
+ const app=(await f.as('website-free',()=>runApplicationCommand(f.db,{action:'submit-application',...application,organizationWebsite:'',verifiedEmail:application.email}))).application;
+ assert.equal(app.organizationWebsite,'');
+ const signup=signupOrganization(app,'College support.',app.id,true);
+ const run=input=>f.as('website-free',()=>repository('website-free',validateInstitution(input)));
+ await registerSignupOrganization(run,signup);
+ const saved=(await run({action:'signup-status',applicationId:app.id})).organization;
+ assert.equal(saved.page.website,'');assert.equal(saved.status,'submitted');
+});
 test('signup uses the existing organization contract without public contact details or approval powers',()=>{
  assert.deepEqual(validateInstitution(registration),{...registration,parentId:null});
  assert.equal(registration.page.description,'College and transfer support.');
@@ -102,4 +122,48 @@ test('missing ownership, archived organizations and unfinished submission cannot
   await assert.rejects(registerSignupOrganization(async()=>({registeredInstitutionId:'organization',institutions:organization?[organization]:[]}),registration),/organization_registration_incomplete/);
  }
  await assert.rejects(registerSignupOrganization(async input=>input.action==='register'?{registeredInstitutionId:'organization',institutions:[{id:'organization',revision:1,status:'draft',membershipRole:'owner'}]}:{institutions:[]},registration),/organization_registration_incomplete/);
+});
+
+
+test('account draft survives MFA interruption, empty new-tab storage and concurrent resumes',{skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const {coordinatorRegistrationFixture}=await import('./fixtures/coordinator-registration.mjs');
+ const f=await coordinatorRegistrationFixture();t.after(()=>f.close());
+ const api='/api/coordinator-access',institutions='/api/institutions';
+ const description='College guidance.\nStudent support.';
+ f.actor('durable',{mfa:false});f.actor('unrelated',{mfa:false});
+ const submitted=await f.call('durable',api,{action:'submit-application',...application,organizationRegistration:{description,authorized:true,administrator:true}});
+ const id=submitted.application.id;
+ assert.deepEqual(submitted.application.organizationRegistration,{description,authorized:true});
+ // An independent read models a new tab: the only input is the signed-in account.
+ const recovered=(await f.call('durable',api,{action:'application-status'})).application;
+ assert.deepEqual(savedOrganizationSignup(recovered).registration.page.description,description);
+ assert.equal((await f.call('unrelated',api,{action:'application-status'})).application,null);
+ assert.equal((await f.request('unrelated',api,{action:'save-organization-registration',id,organizationRegistration:{description,authorized:true}})).status,409);
+ await assert.rejects(resumeOrganizationSignup(input=>f.call('durable',institutions,input),recovered),/staff_mfa_required/);
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_institutions')).rows[0].n,0);
+ // Retrying the application cannot replace an already-saved signup intent.
+ await f.call('durable',api,{action:'submit-application',...application,organizationRegistration:{description:'Changed retry',authorized:true}});
+ assert.equal((await f.call('durable',api,{action:'application-status'})).application.organizationRegistration.description,description);
+ f.actor('durable');
+ const resumed=await Promise.all(Array.from({length:4},()=>resumeOrganizationSignup(input=>f.call('durable',institutions,input),recovered)));
+ assert.equal(new Set(resumed.map(org=>org.id)).size,1);assert.equal(resumed[0].status,'submitted');
+ assert.equal(resumed[0].page.description,description);
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_institutions')).rows[0].n,1);
+ for(const table of ['origen_coordinator_profiles','origen_coordinator_codes','origen_binder_share_grants'])assert.equal((await f.owner.query(`SELECT count(*)::int n FROM ${table}`)).rows[0].n,0);
+ const run=input=>f.call('durable',institutions,input);
+ const org=resumed[0];
+ await f.call('reviewer',institutions,{action:'request-changes',id:org.id,revision:org.revision,note:'Clarify services.'});
+ assert.equal((await resumeOrganizationSignup(run,recovered)).status,'changes-requested');
+ await f.call('durable',api,{action:'withdraw-application',id});
+ assert.equal((await f.call('durable',api,{action:'application-status'})).application,null);
+ const replacement=(await f.call('durable',api,{action:'submit-application',...application})).application;
+ assert.equal(replacement.organizationRegistration,null);
+ await assert.rejects(resumeOrganizationSignup(run,recovered),/application_changed/);
+ // Existing incomplete applicants can save their details once before another redirect.
+ const intent={description:'Legacy interrupted registration.',authorized:true};
+ const saved=await f.call('durable',api,{action:'save-organization-registration',id:replacement.id,organizationRegistration:intent});
+ assert.deepEqual(saved.application.organizationRegistration,intent);
+ await f.call('durable',api,{action:'save-organization-registration',id:replacement.id,organizationRegistration:intent});
+ assert.equal((await f.request('durable',api,{action:'save-organization-registration',id:replacement.id,organizationRegistration:{...intent,description:'Conflicting tab'}})).status,409);
+ await assert.rejects(f.as('durable',()=>f.db.query('SELECT organization_registration FROM origen_coordinator_applications')),{code:'42501'});
 });

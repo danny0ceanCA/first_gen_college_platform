@@ -14,7 +14,16 @@ import {createInstitutionHandler} from './institutions.mjs';
 const submission={action:'submit-application',displayName:'Synthetic Coordinator',organizationName:'Community Organization',organizationWebsite:'https://example.org',jobRole:'Advisor'};
 test('application input drops identity, email, status and privileges and bounds fields',()=>{
  assert.deepEqual(validateCoordinatorInput({...submission,subject:'other',verifiedEmail:'forged@example.org',status:'approved',administrator:true}),{...submission,organizationWebsite:'https://example.org/'});
+ for(const website of ['', '  ', undefined])assert.equal(validateCoordinatorInput({...submission,organizationWebsite:website}).organizationWebsite,'');
+ for(const website of [null,123,{},'http://example.org','https://example.org/#secret'])assert.throws(()=>validateCoordinatorInput({...submission,organizationWebsite:website}));
  for(const input of [{...submission,organizationWebsite:'javascript:alert(1)'},{...submission,organizationWebsite:'https://user:pass@example.org'},{...submission,displayName:' '},{...submission,jobRole:'x'.repeat(201)},{...submission,organizationWebsite:'https://example.org?secret=a'},{action:'approve-application',id:randomUUID(),institutionId:'invalid',reviewNote:'Checked'}])assert.throws(()=>validateCoordinatorInput(input));
+});
+
+test('durable signup intent accepts only bounded description and explicit organization authority',()=>{
+ const draft={description:' College guidance. ',authorized:true,approved:true,subject:'other'};
+ assert.deepEqual(validateCoordinatorInput({...submission,organizationRegistration:draft}).organizationRegistration,{description:'College guidance.',authorized:true});
+ for(const organizationRegistration of [null,{}, {description:'x',authorized:false},{description:' ',authorized:true},{description:'x'.repeat(5001),authorized:true},{description:'x\0',authorized:true}])assert.throws(()=>validateCoordinatorInput({...submission,organizationRegistration}));
+ assert.throws(()=>validateCoordinatorInput({action:'save-organization-registration',id:'invalid',organizationRegistration:draft}));
 });
 test('applications isolate accounts and approval requires independent MFA reviewer, verified pilot and membership',{skip:!process.env.DATABASE_TEST_URL},async t=>{
  const f=await retrievalFixture();t.after(()=>f.close());

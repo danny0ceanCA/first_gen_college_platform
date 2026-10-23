@@ -12,11 +12,11 @@ const fail=(status,message)=>Object.assign(new Error(message),{status});
 const text=(v,max,required=false)=>{if(typeof v!=='string'||v.length>max||(required&&!v.trim()))throw fail(400,'invalid_institution');return v.trim();};
 const https=v=>{const value=text(v,2000,true);let url;try{url=new URL(value);}catch{throw fail(400,'invalid_institution');}if(url.protocol!=='https:'||url.username||url.password)throw fail(400,'invalid_institution');return url.href;};
 const email=v=>{const value=text(v,320,true);if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))throw fail(400,'invalid_institution');return value;};
-export function validateInstitutionPage(p,complete=false){
+export function validateInstitutionPage(p,complete=false,{requireWebsite=true}={}){
  if(!p||!Array.isArray(p.links)||p.links.length>12)throw fail(400,'invalid_institution');
  const field=(value,max)=>{if(typeof value!=='string'||value.length>max)throw fail(400,'invalid_institution');return value;};
  const page={name:field(p.name,200),website:field(p.website,2000),description:field(p.description,5000),programs:field(p.programs,5000),admissions:field(p.admissions,5000),financialAid:field(p.financialAid,5000),events:field(p.events,5000),publicEmail:field(p.publicEmail||'',320),links:p.links.map(l=>({title:field(l.title,200),url:field(l.url,2000)}))};
- if(complete){text(page.name,200,true);text(page.description,5000,true);https(page.website);if(page.publicEmail)email(page.publicEmail);for(const link of page.links){text(link.title,200,true);https(link.url);}}
+ if(complete){text(page.name,200,true);text(page.description,5000,true);if(requireWebsite||page.website.trim())https(page.website);if(page.publicEmail)email(page.publicEmail);for(const link of page.links){text(link.title,200,true);https(link.url);}}
  return {...page,...validateInstitutionExtras(p,complete)};
 }
 export function validateInstitution(input){
@@ -119,7 +119,7 @@ export function createInstitutionRepository(database,reviewers=[]){return async(
    if(!['save','archive','unpublish','restore'].includes(input.action)&&row.parent_approval!=='approved')throw fail(409,'parent_approval_required');
    if(input.action==='publish'&&row.parent_institution_id){const parent=(await c.query('SELECT published,verification_status,archived_at FROM origen_institutions WHERE id=$1',[row.parent_institution_id])).rows[0];if(!parent?.published||parent.archived_at||parent.verification_status!=='verified')throw fail(409,'parent_publication_required');}
    if(row.revision!==input.revision)throw fail(409,'institution_changed');
-   if(['submit','publish'].includes(input.action)){try{validateInstitutionPage(row.draft,true);}catch{throw fail(400,'draft_incomplete');}}
+   if(['submit','publish'].includes(input.action)){try{validateInstitutionPage(row.draft,true,{requireWebsite:input.action==='publish'});}catch{throw fail(400,'draft_incomplete');}}
    if(lifecycle){
     if(['archive','unpublish'].includes(input.action)&&(await c.query('SELECT id FROM origen_institutions WHERE parent_institution_id=$1 AND published IS NOT NULL',[row.id])).rows.length)throw fail(409,'published_departments_exist');
     if(input.action==='restore'){if(!row.archived_at)throw fail(409,'institution_not_archived');await c.query("UPDATE origen_institutions SET archived_at=NULL,revision=revision+1,status='draft',updated_at=now() WHERE id=$1",[row.id]);}

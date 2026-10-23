@@ -24,11 +24,14 @@ test('complete staff action matrix defaults to denial and accepts only its expli
  const caps=adminCapabilities({sub:'reader',permissions:['read:activity']},{});
  for(const action of ['users','review-decision','institution-snapshot-save','conversation-review'])assert.equal(caps.actions.includes(action),false);
 });
-test('MFA and authentication ages fail closed; fresh writes expire after five minutes',()=>{
+test('MFA and authentication use twelve hours for reads and writes and fail closed',()=>{
  assert.equal(staffAuthenticationError(identity,{now}),null);
  for(const v of [undefined,null,'123',seconds+1,0,seconds-43201])assert.equal(staffAuthenticationError({...identity,[MFA_TIME_CLAIM]:v},{now}),'staff_mfa_required');
- assert.equal(staffAuthenticationError({...identity,[MFA_TIME_CLAIM]:seconds-301},{now,fresh:true}),'staff_mfa_required');
- assert.equal(staffAuthenticationError({...identity,[AUTH_TIME_CLAIM]:seconds-301},{now,fresh:true}),'reauthentication_required');
+ for(const fresh of [false,true]){
+  for(const age of [301,43199,43200])assert.equal(staffAuthenticationError({...identity,[MFA_TIME_CLAIM]:seconds-age,[AUTH_TIME_CLAIM]:seconds-age},{now,fresh}),null);
+  assert.equal(staffAuthenticationError({...identity,[MFA_TIME_CLAIM]:seconds-43201},{now,fresh}),'staff_mfa_required');
+  assert.equal(staffAuthenticationError({...identity,[AUTH_TIME_CLAIM]:seconds-43201},{now,fresh}),'reauthentication_required');
+ }
  assert.equal(staffAuthenticationError({...identity,[AUTH_TIME_CLAIM]:seconds-301},{now}),null);
  assert.equal(staffAuthenticationError({sub:'x',amr:['mfa'],auth_time:seconds,user_metadata:{[MFA_TIME_CLAIM]:seconds}},{now}),'staff_mfa_required');
 });
@@ -65,7 +68,8 @@ test('regular admin access does not require MFA claims, but fresh mutations need
  const normal={sub:'auth0|admin',iat:seconds,permissions:['read:activity','write:reviews']};
  assert.equal(adminCapabilities(normal,{}).authenticationRequired,null);
  assert.equal(staffAuthenticationError(normal,{now,requireMfa:false}),null);
- for(const value of [undefined,null,'123',0,seconds+1,seconds-301])assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:value},{now,fresh:true,requireMfa:false}),'reauthentication_required');
+ for(const value of [undefined,null,'123',0,seconds+1,seconds-43201])assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:value},{now,fresh:true,requireMfa:false}),'reauthentication_required');
+ assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:seconds-43200},{now,fresh:true,requireMfa:false}),null);
  assert.equal(staffAuthenticationError({...normal,[AUTH_TIME_CLAIM]:seconds},{now,fresh:true,requireMfa:false}),null);
  await requireStaffAccess(database(),{...normal,[AUTH_TIME_CLAIM]:seconds},{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true});
  await assert.rejects(requireStaffAccess(database(),normal,{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true}),{message:'reauthentication_required'});
@@ -81,4 +85,26 @@ test('Auth0 challenge and proof Actions distinguish enrollment, completed MFA, a
  await proof.onExecutePostLogin({session:{authenticated_at:new Date(now-600000).toISOString()},authentication:{methods:[{name:'pwd',timestamp:new Date(now).toISOString()}]}},api);assert.equal(claims[MFA_TIME_CLAIM],undefined);
  await proof.onExecutePostLogin({session:{authenticated_at:new Date(now-600000).toISOString()},authentication:{methods:[{name:'mfa',timestamp:new Date(now-600000).toISOString()}]}},api);
  assert.equal(claims[MFA_TIME_CLAIM],seconds-600);assert.equal(claims[AUTH_TIME_CLAIM],seconds-600);
+});
+
+test('non-Enterprise Auth0 login proof recognizes completed first factors without renewing them',async()=>{
+ const proof=createRequire(import.meta.url)('../auth0/recent-auth-action.cjs');
+ const old=new Date(now-600000).toISOString(),recent=new Date(now).toISOString();
+ async function issue(event){const claims={};await proof.onExecutePostLogin(event,{accessToken:{setCustomClaim:(key,value)=>claims[key]=value}});return claims;}
+ for(const name of ['pwd','federated','passkey']){
+  const claims=await issue({authentication:{methods:[{name,timestamp:recent},{name:'mfa',timestamp:recent}]}});
+  assert.equal(staffAuthenticationError(claims,{now,fresh:true}),null);
+ }
+ const refreshed=await issue({transaction:{protocol:'oauth2-refresh-token'},authentication:{methods:[{name:'pwd',timestamp:old},{name:'mfa',timestamp:old}]}});
+ assert.equal(refreshed[AUTH_TIME_CLAIM],seconds-600);
+ assert.equal(refreshed[MFA_TIME_CLAIM],seconds-600);
+ assert.equal(staffAuthenticationError(refreshed,{now,fresh:true}),null);
+ const expired=new Date(now-43201000).toISOString();
+ const expiredRefresh=await issue({transaction:{protocol:'oauth2-refresh-token'},authentication:{methods:[{name:'pwd',timestamp:expired},{name:'mfa',timestamp:expired}]}});
+ assert.equal(staffAuthenticationError(expiredRefresh,{now,fresh:true}),'staff_mfa_required');
+ assert.equal((await issue({authentication:{methods:[{name:'pwd',timestamp:old},{name:'mfa',timestamp:recent}]}}))[AUTH_TIME_CLAIM],seconds-600);
+ for(const methods of [undefined,{},[],[{name:'mfa',timestamp:recent}],[{name:'https://untrusted.example/method',timestamp:recent}],[{name:'pwd',timestamp:'invalid'}]]){
+  assert.equal((await issue({authentication:{methods}}))[AUTH_TIME_CLAIM],undefined);
+ }
+ assert.equal((await issue({authentication:{methods:[{name:'pwd',timestamp:recent}]}}))[MFA_TIME_CLAIM],undefined);
 });

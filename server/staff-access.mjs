@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {AUTH_TIME_CLAIM} from './recent-auth.mjs';
+import {AUTH_TIME_CLAIM,VERIFICATION_MAX_AGE_SECONDS} from './recent-auth.mjs';
 
 export const MFA_TIME_CLAIM='https://origenedu.ai/mfa_time';
 export const ADMIN_ACTIONS=Object.freeze({
@@ -21,7 +21,8 @@ export function staffPermissions(identity,env={}){
 }
 export function staffAuthenticationError(identity,{fresh=false,requireMfa=true,now=Date.now()}={}){
  if(!requireMfa&&!fresh)return null;
- const seconds=Math.floor(now/1000),maximum=fresh?300:43200;
+ // Reads and mutations share the same fixed verification window.
+ const seconds=Math.floor(now/1000),maximum=VERIFICATION_MAX_AGE_SECONDS;
  const valid=time=>Number.isSafeInteger(time)&&time>0&&time<=seconds&&seconds-time<=maximum;
  if(requireMfa&&!valid(identity?.[MFA_TIME_CLAIM]))return 'staff_mfa_required';
  if(!valid(identity?.[AUTH_TIME_CLAIM]))return 'reauthentication_required';

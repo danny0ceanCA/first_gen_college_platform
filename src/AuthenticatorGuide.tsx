@@ -13,12 +13,12 @@ export function AuthenticatorGuide({es=false}:{es?:boolean}){
  </details>;
 }
 
-export function CoordinatorReadiness({es=false}:{es?:boolean}){
+export function CoordinatorReadiness({es=false,compact=false}:{es?:boolean;compact?:boolean}){
  const t=(en:string,sp:string)=>es?sp:en;
  return <section className="coordinator-readiness" aria-label={t('What to have ready','Qué necesitas tener a mano')}>
   <h2>{t('What to have ready','Qué necesitas tener a mano')}</h2>
   <ul><li>{t('An email address you can verify.','Una dirección de correo que puedas verificar.')}</li><li>{t('For workspace access: a phone with a free authenticator app.','Para acceder al espacio de trabajo: un teléfono con una app de autenticación gratuita.')}</li></ul>
-  <p>{t('You can apply first. You’ll set up two-step verification when you’re asked to verify your identity for staff access. This helps protect the binder pages students choose to share.','Puedes enviar tu solicitud primero. Configurarás la verificación en dos pasos cuando se te pida verificar tu identidad para acceder como personal. Esto ayuda a proteger las páginas que los estudiantes eligen compartir.')}</p>
+  <p>{compact?t('Apply now. Set up two-step verification before accessing student binders.','Solicita acceso ahora. Configura la verificación en dos pasos antes de acceder a las carpetas de estudiantes.'):t('You can apply first. You’ll set up two-step verification when you’re asked to verify your identity for staff access. This helps protect the binder pages students choose to share.','Puedes enviar tu solicitud primero. Configurarás la verificación en dos pasos cuando se te pida verificar tu identidad para acceder como personal. Esto ayuda a proteger las páginas que los estudiantes eligen compartir.')}</p>
   <AuthenticatorGuide es={es}/>
  </section>;
 }

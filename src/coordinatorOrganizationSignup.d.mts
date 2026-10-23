@@ -5,3 +5,6 @@ export type SignupInstitutionResult={registeredInstitutionId?:string;institution
 export function signupOrganization(application:{id?:string;displayName:string;email:string;jobRole:string;organizationName:string;organizationWebsite:string},description:string,registrationKey:string,authorized:boolean):OrganizationRegistration;
 export function registerSignupOrganization(request:(input:unknown)=>Promise<SignupInstitutionResult>,registration:OrganizationRegistration):Promise<{id:string}>;
 export function signupMatchesApplication(signup:unknown,application:unknown):boolean;
+export type SignupApplication={id:string;status:string;displayName:string;email:string;jobRole:string;organizationName:string;organizationWebsite:string;organizationRegistration?:{description:string;authorized:true}|null};
+export function savedOrganizationSignup(application:SignupApplication):{registration:OrganizationRegistration}|null;
+export function resumeOrganizationSignup(request:(input:unknown)=>Promise<SignupInstitutionResult&{organization?:SignupOrganization|null}>,application:SignupApplication):Promise<SignupOrganization|null|undefined>;

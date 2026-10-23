@@ -17,7 +17,7 @@ An approved application is a historical decision, not permanent authorization. S
 
 ## Reviewer process
 
-Use `/#coordinators` with `manage:institutions` and verified email/MFA. The existing institution reviewer allowlist also maps to this permission. Staff reads require authentication/MFA within 12 hours; approval or decline requires both within 5 minutes.
+Use `/#coordinators` with `manage:institutions` and verified email/MFA. The existing institution reviewer allowlist also maps to this permission. Staff reads require authentication/MFA within 12 hours; approval or decline requires both within 12 hours.
 
 1. Select **Refresh applications** under **Coordinator applications**. The queue is paginated, 50 pending applications per page.
 2. Independently verify the person's affiliation using the supplied organization information. Applicant-entered text is a claim, not verification.
@@ -77,6 +77,27 @@ Organization recovery itself uses existing tables. The registration safety fixes
 
 
 ## Registration safety fixes (migration 059)
+
+### Durable organization signup (migration 073)
+
+When **Register my organization** is selected, the application and organization
+description/authorization acknowledgement are saved atomically to the account
+before any MFA challenge. Only the signed-in applicant can read that pending
+intent. A fresh tab loads it from `application-status`, checks MFA through the
+existing institution API, and automatically completes registration/submission.
+The application ID remains the idempotency key across tabs and lost responses.
+This never approves coordinator access or shares student information.
+
+Already submitted organizations and reviewer change requests are displayed rather
+than resubmitted. Withdrawal deletes the intent with the application; stale tabs
+cannot attach it to a replacement application. Old tab-only drafts are migrated
+to the account when available. Previously lost tab-only details cannot be recovered.
+Pending signup data follows existing application export/erasure behavior and is
+excluded from diagnostic logs.
+
+Deploy migrations **072 and 073** before the API and frontend. Existing function
+execute grants remain in place; no new environment variable or Auth0 change is
+required. Coordinator readiness now requires migration 073.
 
 - Independent review remains required after withdrawal and reapplication. Organization owners cannot enable pending, declined, or withdrawn applicants. Submission by previously enabled staff disables their coordinator profiles and revokes existing codes/connections/grants until approval. Repeated submission after approval preserves access.
 - A restricted review-control row records only that the account entered the application flow. It survives application withdrawal and cascades on account erasure. Migration 059 backfills existing applications and disables active profiles belonging to unapproved applicants. Applications deleted before this migration cannot be reconstructed; previously withdrawn applicants without retained records are indistinguishable from legacy staff who never applied.

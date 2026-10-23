@@ -1,19 +1,23 @@
+import {normalizeCoordinatorWebsite} from './coordinatorWebsite.mjs';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
-import {ArrowRight,BookOpen,Building2,Check,MessageCircle,ShieldCheck} from 'lucide-react';
+import {ArrowLeft,ArrowRight,BookOpen,Building2,Check,MessageCircle,ShieldCheck} from 'lucide-react';
 import {apiFetch} from './api';
 import {CoordinatorReadiness} from './AuthenticatorGuide';
 import StaffVerification,{staffVerificationErrors,getStaffAccessToken} from './StaffVerification';
 import {browserPrivacy} from './browserPrivacy.mjs';
-import {signupOrganization,signupMatchesApplication,registerSignupOrganization,type OrganizationRegistration,type SignupOrganization} from './coordinatorOrganizationSignup.mjs';
+import {signupMatchesApplication,registerSignupOrganization,savedOrganizationSignup,resumeOrganizationSignup,type OrganizationRegistration,type SignupOrganization} from './coordinatorOrganizationSignup.mjs';
 import './InstitutionPortal.css';
 import './CoordinatorWorkspace.css';
 import './CoordinatorRegistration.css';
 
-type Application={id:string;displayName:string;email:string;organizationName:string;organizationWebsite:string;jobRole:string;status:'pending'|'approved'|'declined';reviewNote:string;createdAt:string};
+type Application={id:string;displayName:string;email:string;organizationName:string;organizationWebsite:string;jobRole:string;status:'pending'|'approved'|'declined';reviewNote:string;createdAt:string;organizationRegistration?:{description:string;authorized:true}|null};
 type Translate=(en:string,es:string)=>string;
 export function applicationError(error:string,t:Translate){
  const messages:Record<string,string>={
+  invalid_organization_website:t('Enter a website such as example.org or https://example.org.','Escribe un sitio web como ejemplo.org o https://ejemplo.org.'),
+  name_required:t('Enter your first and last name.','Escribe tu nombre y apellido.'),
+  name_too_long:t('Use a first and last name totaling 100 characters or fewer.','Usa un nombre y apellido de hasta 100 caracteres en total.'),
   coordinator_review_busy:t('Review is busy. Wait a moment, then refresh applications or search organizations again. Your review has not been submitted.','La revisión está ocupada. Espera un momento y actualiza las solicitudes o busca organizaciones de nuevo. No se ha enviado tu revisión.'),
   coordinator_sharing_unavailable:t('Coordinator registration is not open yet. Please check back with the Origen team.','El registro de coordinadores aún no está abierto. Consulta con el equipo de Origen.'),
   verified_email_required:t('Verify your sign-in email, then select Refresh status.','Verifica tu correo de inicio de sesión y selecciona Actualizar estado.'),
@@ -31,7 +35,9 @@ export default function CoordinatorRegistration(){
  const [es,setEs]=useState(localStorage.getItem('origen.language')==='es');
  const t:Translate=(en,sp)=>es?sp:en;
  const [application,setApplication]=useState<Application|null>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
- const [displayName,setName]=useState(''),[organizationName,setOrganization]=useState(''),[organizationWebsite,setWebsite]=useState(''),[jobRole,setRole]=useState('');
+ const [firstName,setFirstName]=useState(''),[lastName,setLastName]=useState('');
+ const displayName=[firstName.trim(),lastName.trim()].filter(Boolean).join(' ');
+ const [organizationName,setOrganization]=useState(''),[organizationWebsite,setWebsite]=useState(''),[jobRole,setRole]=useState('');
  const [organizationMode,setOrganizationMode]=useState('join'),[description,setDescription]=useState(''),[authorized,setAuthorized]=useState(false);
  const organizationKey=`origen.user.${user?.sub}.coordinator-organization.v1`;
  const organizationStorage=useMemo(()=>browserPrivacy.storage(organizationKey),[organizationKey]);
@@ -63,16 +69,25 @@ export default function CoordinatorRegistration(){
     try{
      const draft=JSON.parse(organizationStorage.getItem(draftKey)||'null');
      if(draft&&typeof draft.displayName==='string'&&typeof draft.organizationName==='string'&&typeof draft.organizationWebsite==='string'&&typeof draft.jobRole==='string'&&typeof draft.description==='string'){
-      setName(draft.displayName);setOrganization(draft.organizationName);setWebsite(draft.organizationWebsite);setRole(draft.jobRole);setDescription(draft.description);setOrganizationMode(draft.organizationMode==='new'?'new':'join');setAuthorized(draft.authorized===true);
+      const parts=draft.displayName.trim().split(/\s+/);setFirstName(typeof draft.firstName==='string'?draft.firstName:parts.shift()||'');setLastName(typeof draft.lastName==='string'?draft.lastName:parts.join(' '));setOrganization(draft.organizationName);setWebsite(draft.organizationWebsite);setRole(draft.jobRole);setDescription(draft.description);setOrganizationMode(draft.organizationMode==='new'?'new':'join');setAuthorized(draft.authorized===true);
      }
     }catch{/* An unavailable draft never blocks server recovery. */}
     return;
    }
    try{organizationStorage.removeItem(draftKey);}catch{/* Server state is authoritative. */}
-   try{const saved=JSON.parse(organizationStorage.getItem(organizationKey)||'null');if(signupMatchesApplication(saved,data.application))setOrganizationSignup(saved);}catch{/* Server recovery is available without browser storage. */}
+   let recovered=data.application as Application;
+   let signup=savedOrganizationSignup(recovered);
+   if(!signup)try{const saved=JSON.parse(organizationStorage.getItem(organizationKey)||'null');if(signupMatchesApplication(saved,recovered))signup=saved;}catch{/* Server recovery is available without browser storage. */}
+   if(signup)setOrganizationSignup(signup);
    try{
-    const result=await organizationRequest({action:'signup-status',applicationId:data.application.id});
-    if(current===version.current)setSavedOrganization(result.organization);
+    // Migrate an interrupted legacy tab draft before any MFA redirect.
+    if(signup&&!recovered.organizationRegistration&&recovered.status==='pending'){
+     const result=await request({action:'save-organization-registration',id:recovered.id,organizationRegistration:{description:signup.registration.page.description,authorized:true}});
+     if(current!==version.current)return;
+     recovered=result.application;setApplication(recovered);
+    }
+    const organization=await resumeOrganizationSignup(input=>{if(current!==version.current)throw new Error('privacy_session_ended');return organizationRequest(input);},recovered);
+    if(current===version.current){setSavedOrganization(organization);if(organization){setOrganizationSignup(null);try{organizationStorage.removeItem(organizationKey);}catch{/* Account state is authoritative. */}}}
    }catch(e){if(current===version.current)setOrganizationError(e instanceof Error?e.message:'unavailable');}
   }).catch(e=>{if(current===version.current)setError(e.message);}).finally(()=>{if(current===version.current)setBusy(false);});}
   return()=>{version.current++;};
@@ -80,7 +95,7 @@ export default function CoordinatorRegistration(){
  function preserveApplicationDraft(){
   // Account-scoped, tab-only storage survives the redirect and is purged on logout.
   // Do not leave the page if saving an unfinished form fails.
-  if(!application)organizationStorage.setItem(draftKey,JSON.stringify({displayName,organizationName,organizationWebsite,jobRole,organizationMode,description,authorized}));
+  if(!application)organizationStorage.setItem(draftKey,JSON.stringify({displayName,firstName,lastName,organizationName,organizationWebsite,jobRole,organizationMode,description,authorized}));
  }
  async function finishOrganization(signup=organizationSignup,saved=application){
   if(!signup||!signupMatchesApplication(signup,saved)||organizationBusy)return;
@@ -93,24 +108,35 @@ export default function CoordinatorRegistration(){
   finally{if(current===version.current)setOrganizationBusy(false);}
  }
  async function startOrganization(saved:Application){
+  const current=version.current;
   setOrganizationError('');
   try{
-   const signup={registration:signupOrganization(saved,description,saved.id,authorized)};
+   if(!saved.organizationRegistration){
+    const result=await request({action:'save-organization-registration',id:saved.id,organizationRegistration:{description,authorized}});
+    if(current!==version.current)return;
+    saved=result.application;setApplication(saved);
+   }
+   const signup=savedOrganizationSignup(saved);
+   if(!signup)throw new Error('organization_details_required');
    try{organizationStorage.setItem(organizationKey,JSON.stringify(signup));}catch{/* The server retry key is the application ID. */}
    setOrganizationSignup(signup);
    await finishOrganization(signup,saved);
   }catch{setOrganizationError('organization_recovery_unavailable');}
  }
  async function submit(withdraw=false){
+  if(!withdraw&&(!firstName.trim()||!lastName.trim())){setError('name_required');return;}
+  if(!withdraw&&displayName.length>100){setError('name_too_long');return;}
   const current=version.current;setBusy(true);setError('');
   try{
-   const data=await request(withdraw?{action:'withdraw-application',id:application?.id}:{action:'submit-application',displayName,organizationName,organizationWebsite,jobRole});
+   const website=withdraw?'':normalizeCoordinatorWebsite(organizationWebsite);
+   if(!withdraw)setWebsite(website);
+   const data=await request(withdraw?{action:'withdraw-application',id:application?.id}:{action:'submit-application',displayName,organizationName,organizationWebsite:website,jobRole,...(organizationMode==='new'?{organizationRegistration:{description,authorized}}:{})});
    if(current!==version.current)return;
    setApplication(data.application);
    try{organizationStorage.removeItem(draftKey);}catch{/* The submitted application is already saved. */}
    if(withdraw){setOrganizationMode('join');setOrganizationSignup(null);setSavedOrganization(undefined);setDescription('');setAuthorized(false);setOrganizationError('');try{organizationStorage.removeItem(organizationKey);}catch{/* Server state remains authoritative. */}}
    if(!withdraw&&organizationMode==='new'&&!organizationSignup){
-    if(data.application?.status!=='pending'||data.application.organizationName!==organizationName.trim()||data.application.organizationWebsite!==new URL(organizationWebsite).href||data.application.displayName!==displayName.trim()||data.application.jobRole!==jobRole.trim())throw new Error('application_changed');
+    if(data.application?.status!=='pending'||data.application.organizationName!==organizationName.trim()||data.application.organizationWebsite!==website||data.application.displayName!==displayName.trim()||data.application.jobRole!==jobRole.trim())throw new Error('application_changed');
     // Use the saved application's verified email, never a separate contact field.
     await startOrganization(data.application);
    }
@@ -122,7 +148,7 @@ export default function CoordinatorRegistration(){
   if(!organization||organizationBusy)return;
   const current=version.current;setOrganizationBusy(true);setOrganizationError('');
   try{
-   const result=await organizationRequest({action:'save',id:organization.id,revision:organization.revision,page});
+   const result=await organizationRequest({action:'save',id:organization.id,revision:organization.revision,page:{...page,website:normalizeCoordinatorWebsite(page.website)}});
    const saved=result.institutions?.find((item:SignupOrganization)=>item.id===organization.id);
    if(current!==version.current)return;
    if(!saved)throw new Error('organization_registration_incomplete');
@@ -137,11 +163,17 @@ export default function CoordinatorRegistration(){
   <label>{t('What does your organization do?','¿Qué hace tu organización?')}<textarea required maxLength={5000} rows={3} value={description} onChange={e=>setDescription(e.target.value)}/><span>{t('This description can appear on your organization’s page after approval.','Esta descripción puede aparecer en la página de tu organización después de aprobarse.')}</span></label>
   <label className="coordinator-organization-consent"><input required type="checkbox" checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/><span>{t('I’m authorized to register this organization and manage its team.','Tengo autorización para registrar esta organización y gestionar su equipo.')}</span></label>
  </>;
- return <main className="institution-shell coordinator-workspace coordinator-registration">
+ const signupCard=(<section className="coordinator-card coordinator-signup-card"><h2>{t('Start with your own account','Empieza con tu propia cuenta')}</h2><p>{t('Use the email you want associated with your coordinator work. You can apply now and set up verification when you’re ready for staff access.','Usa el correo que deseas asociar con tu trabajo de coordinador. Puedes enviar tu solicitud ahora y configurar la verificación cuando vayas a acceder como personal.')}</p><button className="button primary coordinator-signup-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'},authorizationParams:{screen_hint:'signup'}}).catch(()=>setError('signin'))}>{t('Register as a coordinator','Registrarme como coordinador')}<ArrowRight size={18} aria-hidden="true"/></button><div className="coordinator-signin-divider"><span>{t('Already part of Origen?','¿Ya tienes cuenta en Origen?')}</span></div><button className="coordinator-signin-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'}}).catch(()=>setError('signin'))}>{t('Already have an account? Sign in','¿Ya tienes cuenta? Inicia sesión')}<ArrowRight size={15} aria-hidden="true"/></button><p className="coordinator-access-caption"><ShieldCheck size={15} aria-hidden="true"/>{t('Your application is reviewed before coordinator access is enabled.','Revisamos tu solicitud antes de activar el acceso como coordinador.')}</p></section>);
+ return <main className={`institution-shell coordinator-workspace coordinator-registration${isAuthenticated?' coordinator-registration-signed-in':''}`}>
   <nav className="coordinator-registration-nav" aria-label={t('Navigation','Navegación')}>
-   <a className="coordinator-registration-brand" href="#" aria-label="Origen"><span aria-hidden="true">○</span> origen.</a>
+   <span className="coordinator-brand-group"><a className="coordinator-registration-brand" href="#" aria-label={t('Origen home','Inicio de Origen')}><span aria-hidden="true">○</span> origen.</a><a className="coordinator-home-link" href="#"><ArrowLeft size={14} aria-hidden="true"/>{t('Back to home','Volver al inicio')}</a></span>
    <div><a className="coordinator-workspace-link" href="#coordinators">{t('Coordinator workspace','Espacio del coordinador')} <ArrowRight size={15} aria-hidden="true"/></a><button className="coordinator-language" onClick={()=>{setEs(!es);localStorage.setItem('origen.language',es?'en':'es');}}>{es?'English':'Español'}</button>{isAuthenticated&&<button className="coordinator-language" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>{t('Log out','Cerrar sesión')}</button>}</div>
   </nav>
+  {!isLoading&&!isAuthenticated&&<div className="coordinator-signup-top">{signupCard}<aside className="coordinator-registration-help" aria-label={t('Getting ready','Prepárate')}>
+    <section className="coordinator-organization-help"><span className="coordinator-help-icon"><Building2 size={22} aria-hidden="true"/></span><h2>{t('How your organization fits in','Cómo participa tu organización')}</h2><p>{t('Join your team or register your organization during signup.','Únete a tu equipo o registra tu organización durante el registro.')}</p><details><summary>{t('My organization is already on Origen','Mi organización ya está en Origen')}</summary><p>{t('Ask its owner to invite you to the team using your sign-in email. We review your affiliation before enabling coordinator access.','Pide al propietario que te invite al equipo con tu correo de inicio de sesión. Revisamos tu afiliación antes de activar el acceso como coordinador.')}</p></details><details><summary>{t('My organization is new to Origen','Mi organización es nueva en Origen')}</summary><p>{t('Choose Register my organization on the signup form. Confirm you’re authorized, add a short description, and complete two-step verification. We’ll register it and send it for review from this page.','Elige Registrar mi organización en el formulario. Confirma que tienes autorización, agrega una breve descripción y completa la verificación en dos pasos. La registraremos y enviaremos a revisión desde esta página.')}</p></details></section>
+    <CoordinatorReadiness es={es} compact/>
+   </aside></div>}
+  {!isAuthenticated&&<>
   <header className="coordinator-registration-hero">
    <div className="coordinator-registration-intro">
     <div className="eyebrow">{t('FOR THE PEOPLE GUIDING THE WAY','PARA QUIENES ACOMPAÑAN EL CAMINO')}</div>
@@ -165,9 +197,10 @@ export default function CoordinatorRegistration(){
   <ol className="coordinator-journey" aria-label={t('How coordinator registration works','Cómo funciona el registro de coordinadores')}>
    {[['Create your account','Crea tu cuenta','Use your own email and tell us about your work.','Usa tu propio correo y cuéntanos sobre tu trabajo.'],['Connect with your organization','Conéctate con tu organización','We review your affiliation before enabling access.','Revisamos tu afiliación antes de activar el acceso.'],['Guide from their binder','Orienta desde su carpeta','Students decide what to share with you.','Los estudiantes deciden qué compartir contigo.']].map(([en,sp,detailEn,detailSp],i)=><li key={en}><span className="coordinator-journey-number" aria-hidden="true">0{i+1}</span><div><h2>{t(en,sp)}</h2><p>{t(detailEn,detailSp)}</p></div></li>)}
   </ol>
-  <div className="coordinator-registration-layout">
-   <section className="coordinator-registration-main" aria-label={t('Your coordinator application','Tu solicitud como coordinador')}>
-   {isLoading?<div className="coordinator-card"><p role="status">{t('Loading…','Cargando…')}</p></div>:!isAuthenticated?<section className="coordinator-card coordinator-signup-card"><span className="coordinator-card-eyebrow">{t('YOUR NEXT STEP','TU SIGUIENTE PASO')}</span><h2>{t('Start with your own account','Empieza con tu propia cuenta')}</h2><p>{t('Use the email you want associated with your coordinator work. You can apply now and set up verification when you’re ready for staff access.','Usa el correo que deseas asociar con tu trabajo de coordinador. Puedes enviar tu solicitud ahora y configurar la verificación cuando vayas a acceder como personal.')}</p><button className="button primary coordinator-signup-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'},authorizationParams:{screen_hint:'signup'}}).catch(()=>setError('signin'))}>{t('Register as a coordinator','Registrarme como coordinador')}<ArrowRight size={18} aria-hidden="true"/></button><div className="coordinator-signin-divider"><span>{t('Already part of Origen?','¿Ya tienes cuenta en Origen?')}</span></div><button className="coordinator-signin-button" onClick={()=>void loginWithRedirect({appState:{returnTo:'#coordinator-register'}}).catch(()=>setError('signin'))}>{t('Already have an account? Sign in','¿Ya tienes cuenta? Inicia sesión')}<ArrowRight size={15} aria-hidden="true"/></button><p className="coordinator-access-caption"><ShieldCheck size={15} aria-hidden="true"/>{t('Your application is reviewed before coordinator access is enabled.','Revisamos tu solicitud antes de activar el acceso como coordinador.')}</p></section>:<>
+  </>}
+  <div hidden={!isAuthenticated&&!isLoading&&!error} className={`coordinator-registration-layout${!isAuthenticated?' coordinator-public-details':''}`}>
+   <section className="coordinator-registration-main" hidden={!isLoading&&!isAuthenticated&&!error} aria-label={t('Your coordinator application','Tu solicitud como coordinador')}>
+   {isLoading?<div className="coordinator-card"><p role="status">{t('Loading…','Cargando…')}</p></div>:!isAuthenticated?null:<>
     <div className="coordinator-application-controls"><span>{t('YOUR APPLICATION','TU SOLICITUD')}</span><button className="text-button" disabled={busy||organizationBusy} onClick={()=>setRetry(n=>n+1)}>{t('Refresh status','Actualizar estado')}</button></div>
     {busy&&<p role="status">{t('Checking your application…','Consultando tu solicitud…')}</p>}
     {application?<section className="coordinator-card coordinator-application-status" aria-labelledby="application-status"><span className={'coordinator-status-pill '+application.status}>{application.status==='pending'?t('In review','En revisión'):application.status==='approved'?t('Approved','Aprobada'):t('Review complete','Revisión completada')}</span><h2 id="application-status">{application.status==='pending'?t('Your application is awaiting review','Tu solicitud está pendiente de revisión'):application.status==='approved'?t('Your application was approved','Tu solicitud fue aprobada'):t('Your application was not approved','Tu solicitud no fue aprobada')}</h2><div className="coordinator-applicant"><strong>{application.displayName}</strong><span>{application.organizationName} · {application.jobRole}</span><span>{application.email}</span></div>
@@ -175,11 +208,11 @@ export default function CoordinatorRegistration(){
      {application.status==='pending'&&<p>{organization||organizationSignup?t('We’ll review your organization and coordinator application before enabling access. Return here to check your status.','Revisaremos tu organización y tu solicitud como coordinador antes de activar el acceso. Vuelve aquí para consultar tu estado.'):t('The Origen team will verify your affiliation. If you’re joining an existing organization, ask its owner to invite you using your sign-in email. Return here to check your status.','El equipo de Origen verificará tu afiliación. Si te unes a una organización existente, pide al propietario una invitación con tu correo de inicio de sesión. Vuelve aquí para consultar tu estado.')}</p>}
      {application.status==='approved'?<><p>{t('Open your workspace to verify your sign-in and create your connection code. Access also depends on your organization and current staff permissions.','Abre tu espacio para verificar tu inicio de sesión y crear tu código de conexión. El acceso también depende de tu organización y tus permisos actuales.')}</p><a className="button primary" href="#coordinators">{t('Open coordinator workspace','Abrir espacio del coordinador')}<ArrowRight size={17} aria-hidden="true"/></a></>:<button className="text-button" disabled={busy||organizationBusy} onClick={()=>{if(window.confirm(t('Withdraw this application? This does not remove an organization you registered.','¿Retirar esta solicitud? Esto no elimina una organización que hayas registrado.')))void submit(true);}}>{t('Withdraw application','Retirar solicitud')}</button>}
     </section>:application===null&&<form className="coordinator-card coordinator-registration-form" onSubmit={e=>{e.preventDefault();void submit();}}>
-     <span className="coordinator-card-eyebrow">{t('LET’S GET TO KNOW YOU','CUÉNTANOS SOBRE TI')}</span><h2>{t('Tell us about your work','Cuéntanos sobre tu trabajo')}</h2>
+     <span className="coordinator-card-eyebrow">{t('LET’S GET TO KNOW YOU','CUÉNTANOS SOBRE TI')}</span><h1>{t('Tell us about your work','Cuéntanos sobre tu trabajo')}</h1>
      <p className="coordinator-form-intro">{t('Share a few details so we can review your role and organization.','Comparte algunos datos para que podamos revisar tu función y organización.')}</p>
-     <label>{t('Your name','Tu nombre')}<input required autoComplete="name" maxLength={100} value={displayName} onChange={e=>setName(e.target.value)}/></label>
+     <div className="coordinator-name-fields"><label>{t('First name','Nombre')}<input required autoComplete="given-name" maxLength={100} value={firstName} onChange={e=>setFirstName(e.target.value)} aria-describedby="coordinator-name-visibility"/></label><label>{t('Last name','Apellido')}<input required autoComplete="family-name" maxLength={100} value={lastName} onChange={e=>setLastName(e.target.value)} aria-describedby="coordinator-name-visibility"/></label></div><p id="coordinator-name-visibility" className="coordinator-name-hint">{t('Students will see your first and last name when connecting with you and reading your guidance.','Los estudiantes verán tu nombre y apellido al conectarse contigo y leer tu orientación.')}</p>
      <label>{t('Organization name','Nombre de la organización')}<input required autoComplete="organization" maxLength={200} value={organizationName} onChange={e=>setOrganization(e.target.value)}/></label>
-     <label>{t('Organization website (https://)','Sitio web de la organización (https://)')}<input required type="url" placeholder="https://example.org" maxLength={2000} value={organizationWebsite} onChange={e=>setWebsite(e.target.value)}/></label>
+     <label>{t('Organization website (optional)','Sitio web de la organización (opcional)')}<input type="text" inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="example.org" maxLength={2000} value={organizationWebsite} onChange={e=>setWebsite(e.target.value)}/></label>
      <label>{t('Your role or job title','Tu función o cargo')}<input required autoComplete="organization-title" maxLength={200} value={jobRole} onChange={e=>setRole(e.target.value)}/></label>
      <fieldset className="coordinator-organization-choice" disabled={busy}><legend>{t('Your organization','Tu organización')}</legend><label><input type="radio" name="organization-mode" value="join" checked={organizationMode==='join'} onChange={()=>setOrganizationMode('join')}/><span>{t('Join an existing organization','Unirme a una organización existente')}</span></label>{!organizationSignup&&<label><input type="radio" name="organization-mode" value="new" checked={organizationMode==='new'} onChange={()=>setOrganizationMode('new')}/><span>{t('Register my organization','Registrar mi organización')}</span></label>}</fieldset>
      {organizationMode==='new'?<div className="coordinator-new-organization">{organizationFields}</div>:<p className="coordinator-form-intro">{t('Ask your organization’s owner to invite you using your sign-in email.','Pide al propietario de tu organización una invitación con tu correo de inicio de sesión.')}</p>}
@@ -189,7 +222,7 @@ export default function CoordinatorRegistration(){
     {application&&organization&&<SignupOrganizationStatus key={organization.id+':'+organization.revision} organization={organization} busy={busy||organizationBusy} t={t} onSubmit={page=>void resubmitOrganization(page)}/>}
     {application?.status==='pending'&&!organization&&organizationSignup&&<section className="coordinator-card coordinator-organization-progress" aria-label={t('Organization registration','Registro de organización')}>
      <h2>{t('Finish registering your organization','Termina de registrar tu organización')}</h2><p>{organizationSignup.registration.page.name}</p>
-     <p>{t('Your application is saved. Complete organization registration when your identity is verified.','Tu solicitud está guardada. Completa el registro cuando hayas verificado tu identidad.')}</p>
+     <p>{t('Your application and organization details are saved to your account. Registration resumes after verification, even in a new tab.','Tu solicitud y los datos de tu organización están guardados en tu cuenta. El registro continúa después de verificarte, incluso en otra pestaña.')}</p>
      {!staffVerificationErrors.includes(organizationError)&&<button className="button primary" disabled={busy||organizationBusy} onClick={()=>void finishOrganization()}>{organizationBusy?t('Registering…','Registrando…'):t('Complete organization registration','Completar registro de organización')}</button>}
     </section>}
     {application&&staffVerificationErrors.includes(organizationError)&&<StaffVerification es={es} returnTo="#coordinator-register"/>}
@@ -199,12 +232,9 @@ export default function CoordinatorRegistration(){
    </>}
    {isAuthenticated&&staffVerificationErrors.includes(error)?<StaffVerification es={es} returnTo="#coordinator-register" requireMfa={error==='mfa_required'||error==='staff_mfa_required'} beforeVerify={preserveApplicationDraft}/>:error&&<p className="institution-error" role="alert">{applicationError(error,t)}</p>}
    </section>
-   <aside className="coordinator-registration-help" aria-label={t('Getting ready','Prepárate')}>
-    <section className="coordinator-organization-help"><span className="coordinator-help-icon"><Building2 size={22} aria-hidden="true"/></span><h2>{t('How your organization fits in','Cómo participa tu organización')}</h2><p>{t('Join your team or register your organization during signup.','Únete a tu equipo o registra tu organización durante el registro.')}</p><details><summary>{t('My organization is already on Origen','Mi organización ya está en Origen')}</summary><p>{t('Ask its owner to invite you to the team using your sign-in email. We review your affiliation before enabling coordinator access.','Pide al propietario que te invite al equipo con tu correo de inicio de sesión. Revisamos tu afiliación antes de activar el acceso como coordinador.')}</p></details><details><summary>{t('My organization is new to Origen','Mi organización es nueva en Origen')}</summary><p>{t('Choose Register my organization on the signup form. Confirm you’re authorized, add a short description, and complete two-step verification. We’ll register it and send it for review from this page.','Elige Registrar mi organización en el formulario. Confirma que tienes autorización, agrega una breve descripción y completa la verificación en dos pasos. La registraremos y enviaremos a revisión desde esta página.')}</p></details></section>
-    <CoordinatorReadiness es={es}/>
-   </aside>
+
   </div>
-  <footer className="coordinator-registration-footer"><span className="coordinator-registration-brand">origen.</span><p>{t('Different paths. A future that fits.','Caminos distintos. Un futuro a tu medida.')}</p><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a></footer>
+  {!isAuthenticated&&<footer className="coordinator-registration-footer"><span className="coordinator-registration-brand">origen.</span><p>{t('Different paths. A future that fits.','Caminos distintos. Un futuro a tu medida.')}</p><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a></footer>}
  </main>;
 }
 
@@ -218,7 +248,7 @@ function SignupOrganizationStatus({organization,busy,t,onSubmit}:{organization:S
   {organization.reviews?.filter(review=>review.action==='request-changes'&&review.revision===organization.revision).map((review,index)=><div className="coordinator-review-message" key={index}><strong>{t('From the Origen team','Del equipo de Origen')}</strong><p>{review.note}</p></div>)}
   {editable&&<form className="coordinator-registration-form" onSubmit={e=>{e.preventDefault();onSubmit(page);}}>
    <label>{t('Organization name','Nombre de la organización')}<input required maxLength={200} value={page.name} onChange={e=>setPage({...page,name:e.target.value})}/></label>
-   <label>{t('Organization website (https://)','Sitio web de la organización (https://)')}<input required type="url" maxLength={2000} value={page.website} onChange={e=>setPage({...page,website:e.target.value})}/></label>
+   <label>{t('Organization website (optional)','Sitio web de la organización (opcional)')}<input type="text" inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="example.org" maxLength={2000} value={page.website} onChange={e=>setPage({...page,website:e.target.value})}/></label>
    <label>{t('What does your organization do?','¿Qué hace tu organización?')}<textarea required maxLength={5000} rows={3} value={page.description} onChange={e=>setPage({...page,description:e.target.value})}/></label>
    <button className="button primary" disabled={busy}>{t('Save and send for review','Guardar y enviar a revisión')}</button>
   </form>}

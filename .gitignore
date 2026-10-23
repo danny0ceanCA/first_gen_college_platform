@@ -26,3 +26,9 @@ mobile/web-build/
 # Disposable databases, operator scratch files, and browser session captures
 /tmp/
 /.playwright-cli/
+
+# Operator authentication and disposable browser/PDF evidence
+/.config/auth0/
+/output/playwright/*.png
+/output/playwright/*-result.txt
+/output/pdf/*-sample.pdf

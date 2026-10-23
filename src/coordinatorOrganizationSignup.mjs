@@ -24,3 +24,22 @@ export function signupMatchesApplication(signup,application){
  const r=signup?.registration;
  return !!(r&&application&&r.applicationId===application.id&&r.page.name===application.organizationName&&r.page.website===application.organizationWebsite&&r.representative.firstName===application.displayName&&r.representative.workEmail===application.email&&r.representative.jobRole===application.jobRole);
 }
+
+export function savedOrganizationSignup(application){
+ const saved=application?.organizationRegistration;
+ if(!saved||saved.authorized!==true||typeof saved.description!=='string'||!saved.description.trim())return null;
+ return {registration:signupOrganization(application,saved.description,application.id,true)};
+}
+
+// Called after each authenticated return, including a new tab with no draft storage.
+// The server rechecks MFA/ownership on every operation; no approval is granted here.
+export async function resumeOrganizationSignup(request,application){
+ const status={action:'signup-status',applicationId:application.id};
+ const result=await request(status);
+ const signup=savedOrganizationSignup(application);
+ if(application.status==='pending'&&signup&&(!result.organization||result.organization.status==='draft')){
+  await registerSignupOrganization(request,signup.registration);
+  return (await request(status)).organization;
+ }
+ return result.organization;
+}

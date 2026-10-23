@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import {createMemoryRepository} from './student-memory.mjs';
 import {createPermissionRepository} from './guardian-permission.mjs';
 import test from 'node:test';
@@ -40,11 +41,11 @@ test('PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and
  const owner=await ownerPool.connect();let runtimePool,server;
  try{
   await owner.query(`CREATE SCHEMA ${schema}`);
-  await owner.query(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);
+  await createTestLogin(owner,role);
   const migration={connect:async()=>({query:(...args)=>owner.query(...args),release(){}})};
   await migrateDatabase(migration);await migrateDatabase(migration);
   await grantRuntimeAccess(migration,role,{schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=role;url.password='';
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,role);
   runtimePool=new pg.Pool({connectionString:url.href,max:1,options:`-c search_path=${schema}`});
   await assertRuntimeIsolation(runtimePool,{schema});
   await owner.query('ALTER TABLE origen_workspace_sheets DISABLE ROW LEVEL SECURITY');

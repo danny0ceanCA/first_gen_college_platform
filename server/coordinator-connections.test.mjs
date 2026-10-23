@@ -120,7 +120,7 @@ test('connection challenges enforce pilot, ownership, turns, expiration and acce
    assert.equal((await send({action:'inbox',organizationId:org})).status,200);
    delete identity[MFA_TIME_CLAIM];assert.equal((await(await send({action:'inbox',organizationId:org,mfa:true})).json()).error,'staff_mfa_required');identity[MFA_TIME_CLAIM]=now;
    verified=false;assert.equal((await send({action:'inbox',organizationId:org})).status,403);verified=true;
-   identity[AUTH_TIME_CLAIM]=now-301;assert.equal((await(await send({action:'accept',organizationId:org,connectionId:randomUUID()})).json()).error,'reauthentication_required');
+   identity[AUTH_TIME_CLAIM]=now-43201;assert.equal((await(await send({action:'accept',organizationId:org,connectionId:randomUUID()})).json()).error,'reauthentication_required');
    identity={sub:'other',iat:now};assert.equal((await send({action:'open',studentId:'alex',channel:'voice',voiceEnabled:true})).status,403);
    assert.equal((await send({action:'open',studentId:'alex',channel:'screen'})).status,200);
   }finally{await new Promise(r=>server.close(r));}

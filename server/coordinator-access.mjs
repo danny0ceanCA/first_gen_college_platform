@@ -47,7 +47,7 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
   if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
   let releaseReview;
   try{
-   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'too_large'});}
+   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>32768)return send(413,{error:'too_large'});}
    let input;try{input=validateCoordinatorInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_coordinator_request'});}
    if(isReviewDiscovery(input.action)){
     releaseReview=reviews.acquire();
@@ -79,7 +79,7 @@ export async function assertCoordinatorProvisioningReady(database,env={}){
  const application=(await database.query("SELECT to_regprocedure('origen_coordinator_application_command(jsonb)') AS fn")).rows[0];
  if(!application?.fn)throw new Error('coordinator_application_migration_required');
  if(!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_application_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_application_grant_required');
- const row=(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='059_coordinator_registration_safety.sql') AS migrated, to_regprocedure('origen_coordinator_command(jsonb)') AS fn")).rows[0];
+ const row=(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='059_coordinator_registration_safety.sql') AND EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='073_durable_coordinator_signup.sql') AS migrated, to_regprocedure('origen_coordinator_command(jsonb)') AS fn")).rows[0];
  if(!row?.migrated||!row.fn)throw new Error('coordinator_migration_required');
  if(!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_runtime_grant_required');
 }

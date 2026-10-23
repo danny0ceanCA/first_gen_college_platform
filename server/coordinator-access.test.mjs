@@ -102,7 +102,7 @@ test('coordinator provisioning enforces permissions, code lifecycle and family i
    assert.equal((await send()).status,200);
    delete identity[MFA_TIME_CLAIM];assert.equal((await(await send()).json()).error,'staff_mfa_required');identity[MFA_TIME_CLAIM]=now;
    identity[MFA_TIME_CLAIM]=now+100;assert.equal((await send()).status,403);identity[MFA_TIME_CLAIM]=now;
-   identity[AUTH_TIME_CLAIM]=now-301;assert.equal((await(await send({action:'rotate-code'})).json()).error,'reauthentication_required');identity[AUTH_TIME_CLAIM]=now;
+   identity[AUTH_TIME_CLAIM]=now-43201;assert.equal((await(await send({action:'rotate-code'})).json()).error,'reauthentication_required');identity[AUTH_TIME_CLAIM]=now;
    emailVerified=false;assert.equal((await(await send()).json()).error,'verified_email_required');emailVerified=true;
    matched=false;assert.equal((await send()).status,403);matched=true;
    identity={...identity,sub:'viewer'};assert.equal((await send()).status,403);

@@ -1,3 +1,4 @@
+import {createTestLogin,useTestLogin} from './postgres-test-login.mjs';
 // Disposable test transport only. Never mount this identity shim in the app.
 import {randomUUID,createHash} from 'node:crypto';
 import {createServer} from 'node:http';
@@ -49,8 +50,8 @@ export async function coordinatorPilotFixture({language='en',permission='adult',
   await f.owner.query("UPDATE origen_binder_source_lineage SET classification='family' WHERE source_id=$1",[notes[3]]);
   await f.save('private-family','FAMILY_CONVERSATION_SENTINEL',{studentId:null,sub:'other'});
   await f.save('private-global','GLOBAL_SUMMARY_SENTINEL',{studentId:'alex',sub:'other'});
-  maintenanceRole=`pilot_maint_${randomUUID().replaceAll('-','')}`;await f.owner.query(`CREATE ROLE ${maintenanceRole} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
-  const url=new URL(process.env.DATABASE_TEST_URL);url.username=maintenanceRole;url.password='';maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
+  maintenanceRole=`pilot_maint_${randomUUID().replaceAll('-','')}`;await createTestLogin(f.owner,maintenanceRole);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
+  const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,maintenanceRole);maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
   const sweep=()=>runRetentionJob(()=>maintainCoordinators(isolateDatabase(maintenance,{schema:f.schema})));
   return {...f,org,env,notes,base,transportSecret,actor,request,call,institution,maintenance,sweep,close:cleanup};
  }catch(error){await cleanup();throw error;}

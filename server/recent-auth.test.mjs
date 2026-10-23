@@ -12,10 +12,10 @@ import {createInstitutionRepository} from './institutions.mjs';
 const {onExecutePostLogin}=createRequire(import.meta.url)('../auth0/recent-auth-action.cjs');
 test('fresh authentication uses only the trusted authentication timestamp, never token issuance or request data',()=>{
  const now=1800000000000,time=now/1000;
- for(const value of [undefined,'1800000000',time+1,time-301,0,NaN])assert.equal(recentlyAuthenticated({[AUTH_TIME_CLAIM]:value,iat:time},now),false);
- assert.equal(recentlyAuthenticated({[AUTH_TIME_CLAIM]:time-300},now),true);assert.equal(recentlyAuthenticated({[AUTH_TIME_CLAIM]:time},now),true);
+ for(const value of [undefined,'1800000000',time+1,time-43201,0,NaN])assert.equal(recentlyAuthenticated({[AUTH_TIME_CLAIM]:value,iat:time},now),false);
+ for(const age of [0,301,43199,43200])assert.equal(recentlyAuthenticated({[AUTH_TIME_CLAIM]:time-age},now),true);
 });
-test('Auth0 action retains the provider authentication time and omits missing session timestamps',async()=>{
+test('Auth0 action retains the provider authentication time and omits absent authentication evidence',async()=>{
  const claims=[];const api={accessToken:{setCustomClaim:(...args)=>claims.push(args)}};
  await onExecutePostLogin({session:{authenticated_at:'2026-10-03T00:00:00Z'}},api);assert.deepEqual(claims,[[AUTH_TIME_CLAIM,Date.parse('2026-10-03T00:00:00Z')/1000]]);
  await onExecutePostLogin({refresh_token:{},session:{}},api);assert.equal(claims.length,1);
