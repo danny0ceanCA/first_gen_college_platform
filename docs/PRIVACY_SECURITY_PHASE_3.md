@@ -1,5 +1,19 @@
 # Phase 3 — Staff, institution, and family access
 
+## Admin registration reviews — 2026-10-23
+
+At the owner's request, administrative institution/coordinator access does not
+require MFA. This exemption requires server-verified `manage:institutions` plus
+an admin dashboard permission; an email address, role label, browser flag, or
+ordinary coordinator membership is insufficient. Normal coordinator accounts
+retain MFA. Review mutations retain the 12-hour primary-authentication check,
+permission checks, independent-review rules, suspension checks and audit gate.
+The institution UI prompts for verification only after an authentication error;
+it no longer displays an unconditional MFA banner to signed-in admins.
+
+This policy requires API/frontend deployment; it does not disable the Auth0 OTP
+factor or alter coordinator enrollment/challenge Actions.
+
 ## Administrator sign-in update — 2026-10-10
 
 At the owner's request, administrative reports now accept regular, verified Auth0

@@ -167,3 +167,27 @@ test('account draft survives MFA interruption, empty new-tab storage and concurr
  assert.equal((await f.request('durable',api,{action:'save-organization-registration',id:replacement.id,organizationRegistration:{...intent,description:'Conflicting tab'}})).status,409);
  await assert.rejects(f.as('durable',()=>f.db.query('SELECT organization_registration FROM origen_coordinator_applications')),{code:'42501'});
 });
+
+
+test('full admin can review organizations and approve coordinator applications without MFA',{skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const {coordinatorRegistrationFixture}=await import('./fixtures/coordinator-registration.mjs');
+ const {AUTH_TIME_CLAIM}=await import('./recent-auth.mjs');
+ const f=await coordinatorRegistrationFixture();t.after(()=>f.close());
+ const api='/api/coordinator-access',institutions='/api/institutions';
+ f.actor('no-mfa-admin',{mfa:false,reviewer:true,claims:n=>({permissions:['read:activity','manage:institutions'],[AUTH_TIME_CLAIM]:n})});
+ f.actor('ordinary-reviewer',{mfa:false,reviewer:true});
+ const a=(await f.call('applicant',api,{action:'submit-application',...application})).application;
+ await registerSignupOrganization(input=>f.call('applicant',institutions,input),signupOrganization(a,'Student college guidance.',a.id,true));
+ const owner=(await f.call('applicant',institutions,{action:'signup-status',applicationId:a.id})).organization;
+ const loaded=await f.call('no-mfa-admin',institutions,{action:'load'});
+ assert.equal(loaded.adminReview,true);assert.equal(loaded.canReview,true);
+ const queue=await f.call('no-mfa-admin',institutions,{action:'queue'});assert.equal(queue.submissions[0].id,owner.id);
+ assert.equal((await f.request('ordinary-reviewer',institutions,{action:'queue'})).body.error,'staff_mfa_required');
+ assert.equal((await f.request('ordinary-reviewer',api,{action:'applications'})).body.error,'staff_mfa_required');
+ await f.call('no-mfa-admin',institutions,{action:'verify',id:owner.id,revision:owner.revision,note:'Affiliation independently checked.'});
+ await f.call('no-mfa-admin',api,{action:'approve-organization',id:owner.id});
+ assert.equal((await f.call('no-mfa-admin',api,{action:'applications'})).applications[0].id,a.id);
+ await f.call('no-mfa-admin',api,{action:'approve-application',id:a.id,institutionId:owner.id,reviewNote:'Affiliation checked.'});
+ assert.equal((await f.call('applicant',api,{action:'application-status'})).application.status,'approved');
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_binder_share_grants')).rows[0].n,0);
+});

@@ -34,6 +34,12 @@ export function adminCapabilities(identity,env){
   actions:Object.entries(ADMIN_ACTIONS).filter(([,p])=>permissions.includes(p)).map(([a])=>a),
   authenticationRequired:staffAuthenticationError(identity,{requireMfa:false})};
 }
+// Administrative institution/coordinator work uses normal admin sign-in.
+// A coordinator role, email address, or browser-supplied flag cannot opt in.
+export function adminInstitutionAccess(identity,env={}){
+ const permissions=staffPermissions(identity,env);
+ return permissions.includes('manage:institutions')&&Object.values(ADMIN_ACTIONS).some(p=>permissions.includes(p));
+}
 
 // No arbitrary payloads, names, email addresses, notes, tokens, or conversation
 // contents can enter this log. "authorized" records a gate decision, not success.
@@ -43,7 +49,8 @@ export async function auditStaffDecision(database,identity,{scope,action,target,
   [randomUUID(),staffHash(identity.sub),scope,action,typeof target==='string'&&target?staffHash(target):null,outcome]);
 }
 export async function requireStaffAccess(database,identity,{scope,action,target,permission,env={},fresh=false}){
- let error=permission&&!staffPermissions(identity,env).includes(permission)?'staff_permission_required':staffAuthenticationError(identity,{fresh,requireMfa:scope!=='admin'});
+ const requireMfa=scope!=='admin'&&!(scope==='institution'&&adminInstitutionAccess(identity,env));
+ let error=permission&&!staffPermissions(identity,env).includes(permission)?'staff_permission_required':staffAuthenticationError(identity,{fresh,requireMfa});
  if(!error){
   const control=(await database.query('SELECT blocked,token_valid_after FROM origen_staff_access_controls WHERE subject_hash=$1',[staffHash(identity.sub)])).rows[0];
   if(control&&(control.blocked||!Number.isSafeInteger(identity.iat)||identity.iat*1000<=new Date(control.token_valid_after).getTime()))error='staff_access_revoked';

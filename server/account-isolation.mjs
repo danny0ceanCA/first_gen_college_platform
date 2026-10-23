@@ -15,7 +15,7 @@ export function runAsAccount(identity,work){
  if(!validSubject(identity?.sub))throw fail();
  return context.run(Object.freeze({subject:identity.sub,purpose:'account'}),work);
 }
-// Called only after the coordinator HTTP gate verifies MFA, email and staff
+// Called only after the coordinator HTTP gate verifies its authentication policy, email and staff
 // controls. Never accept this capability or administrator flag from a body.
 export function runAsCoordinatorActor(subject,{administrator=false,issuedAt=0}={},work){
  const current=context.getStore();

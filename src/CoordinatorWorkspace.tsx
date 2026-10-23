@@ -76,7 +76,7 @@ export default function CoordinatorWorkspace(){
   <h1>{t('Your coordinator workspace','Tu espacio como coordinador')}</h1>
   <a href="#coordinator-register">{t('Apply or check your application','Solicitar acceso o consultar tu solicitud')}</a>
   <p>{t('Review the pages students choose to share, respond to connection requests, and manage your profile.','Revisa las páginas que los estudiantes eligen compartir, responde a solicitudes de conexión y administra tu perfil.')}</p>
-  {error&&(staffVerificationErrors.includes(error)?<StaffVerification es={es} returnTo="#coordinators"/>:<p className="institution-error" role="alert">{messages[error]||applicationError(error,t)}</p>)}
+  {error&&(staffVerificationErrors.includes(error)?<StaffVerification es={es} returnTo="#coordinators" requireMfa={error==='staff_mfa_required'||error==='mfa_required'}/>:<p className="institution-error" role="alert">{messages[error]||applicationError(error,t)}</p>)}
   <button className="text-button" disabled={busy} onClick={()=>void load(selected)}>{t('Refresh workspace','Actualizar espacio')}</button>
   {overview&&<><label className="coordinator-selector">{t('Organization','Organización')}<select value={selected} disabled={busy} onChange={e=>{setTeam(false);setNotice('');void load(e.target.value);}}>{overview.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
    {org&&<section className="coordinator-card"><h2>{org.name}</h2><p>{org.pilotStatus==='active'?t('Coordinator pilot approved','Piloto de coordinadores aprobado'):org.pilotStatus==='suspended'?t('Coordinator pilot suspended','Piloto de coordinadores suspendido'):t('Awaiting coordinator pilot approval','Esperando aprobación del piloto')}</p>

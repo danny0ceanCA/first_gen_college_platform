@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {createRequire} from 'node:module';
-import {ADMIN_ACTIONS,MFA_TIME_CLAIM,adminCapabilities,staffPermissions,staffAuthenticationError,requireStaffAccess} from './staff-access.mjs';
+import {ADMIN_ACTIONS,MFA_TIME_CLAIM,adminCapabilities,adminInstitutionAccess,staffPermissions,staffAuthenticationError,requireStaffAccess} from './staff-access.mjs';
 import {AUTH_TIME_CLAIM} from './recent-auth.mjs';
 import {createAdminHandler} from './admin.mjs';
 import {createInstitutionHandler} from './institutions.mjs';
@@ -74,6 +74,20 @@ test('regular admin access does not require MFA claims, but fresh mutations need
  await requireStaffAccess(database(),{...normal,[AUTH_TIME_CLAIM]:seconds},{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true});
  await assert.rejects(requireStaffAccess(database(),normal,{scope:'admin',action:'review-decision',permission:'write:reviews',fresh:true}),{message:'reauthentication_required'});
  await assert.rejects(requireStaffAccess(database(),normal,{scope:'admin',action:'users',permission:'read:users'}),{message:'staff_permission_required'});
+});
+
+test('admin institution access omits MFA while retaining permission, sign-in, audit and suspension gates',async()=>{
+ const admin={sub:'auth0|admin',iat:seconds,permissions:['read:activity','manage:institutions'],[AUTH_TIME_CLAIM]:seconds};
+ assert.equal(adminInstitutionAccess(admin),true);
+ for(const who of [{sub:'x',permissions:['manage:institutions']},{sub:'x',permissions:['read:activity']},{sub:'x',email:'daniel@origenedu.ai',roles:['admin'],user_metadata:{permissions:admin.permissions}}]){
+  assert.equal(adminInstitutionAccess(who),false);
+  await assert.rejects(requireStaffAccess(database(),who,{scope:'institution',action:'load'}),{message:'staff_mfa_required'});
+ }
+ for(const action of ['load','queue','applications','verify','approve-application','approve-organization'])await requireStaffAccess(database(),admin,{scope:'institution',action,permission:'manage:institutions',fresh:action.startsWith('approve')||action==='verify'});
+ await assert.rejects(requireStaffAccess(database(),{...admin,[AUTH_TIME_CLAIM]:seconds-43201},{scope:'institution',action:'verify',permission:'manage:institutions',fresh:true}),{message:'reauthentication_required'});
+ await assert.rejects(requireStaffAccess(database({blocked:true}),admin,{scope:'institution',action:'queue',permission:'manage:institutions'}),{message:'staff_access_revoked'});
+ await assert.rejects(requireStaffAccess(database(),admin,{scope:'institution',action:'queue',permission:'write:reviews'}),{message:'staff_permission_required'});
+ await assert.rejects(requireStaffAccess({query:async sql=>{if(sql.startsWith('SELECT blocked'))return {rows:[]};throw Error('offline');}},admin,{scope:'institution',action:'queue'}),{message:'staff_audit_unavailable'});
 });
 test('Auth0 challenge and proof Actions distinguish enrollment, completed MFA, and refresh',async()=>{
  const require=createRequire(import.meta.url),challenge=require('../auth0/staff-mfa-action.cjs'),proof=require('../auth0/recent-auth-action.cjs');
