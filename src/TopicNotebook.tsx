@@ -3,7 +3,6 @@ import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNoti
 import StudentGuidance,{useGuidanceRequest} from './CoordinatorGuidance';
 import BinderSharing from './BinderSharing';
 import {notifyMemoryContext} from './memoryContext.mjs';
-import CoordinatorConnection from './CoordinatorConnection';
 import StudentMemory from './StudentMemory';
 import OrganizationEvidence,{type OrganizationInfo} from './OrganizationEvidence';
 import useBinderCorrections from './useBinderCorrections';
@@ -293,7 +292,7 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  }
  function exportButton(topic?:Topic){return <><button type="button" className="notebook-pdf-button" disabled={exporting||loading||loadError||busy||history.loading||history.error} onClick={()=>void downloadPdf(topic)}><Download size={16} aria-hidden="true"/>{exporting?t('Preparing PDF…','Preparando PDF…'):topic?t('Save topic as PDF','Guardar tema en PDF'):t('Save binder as PDF','Guardar carpeta en PDF')}</button>{role==='student'&&target&&<label><input type="checkbox" checked={includeGuidance} onChange={e=>setIncludeGuidance(e.target.checked)}/>{t('Include coordinator guidance in PDF','Incluir orientación del coordinador en el PDF')}</label>}</>;}
  const [noticeTarget,setNoticeTarget]=useState<(NoticeDestination & {sequence:number})>();
- function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':value.destination==='connections'?'.coordinator-connection':'.binder-sharing')?.scrollIntoView({block:'start'})));}
+ function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':'.binder-sharing')?.scrollIntoView({block:'start'})));}
  function dividerDetail(id:NotebookPage){
   if(id==='summary')return t('What we talked about','Lo que conversamos');
   if(loading||loadError)return '—';
@@ -304,10 +303,10 @@ export default function TopicNotebook({initiallyOpen,onAction,renderNextSteps,re
  function freshCount(id:NotebookPage){return notes.filter(note=>note.topic===id&&freshIds.has(note.id)).length;}
  function dividerGlow(id:NotebookPage){return `${id!=='summary'&&discussing.includes(id)?' is-discussing':''}${freshCount(id)?' has-new-notes':''}`;}
  function dividerSignal(id:NotebookPage){return <span className="notebook-divider-signals">{id!=='summary'&&discussing.includes(id)&&<span className="notebook-discussing-label"><i aria-hidden="true"/>{t('Discussing now','Conversando ahora')}</span>}{freshCount(id)>0&&(id==='summary'||!discussing.includes(id))&&<span className="notebook-new-label">{freshCount(id)} {t('new','nuevos')}</span>}</span>;}
- return <><ConversationRecovery studentId={target} t={t}/><PersonalBinder initiallyOpen={initiallyOpen} name={name} t={t} onOpen={()=>setMobilePage(false)}><section className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
+ return <><ConversationRecovery studentId={target} t={t}/>{role==='student'&&target&&<BinderSharing key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0} connectionOpenRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/>}<PersonalBinder initiallyOpen={initiallyOpen} name={name} t={t} onOpen={()=>setMobilePage(false)}><section className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
   {(!mobile||!mobilePage)&&<><div className="home-section-heading"><span className="home-kicker">{mobile?t('IN YOUR BINDER','EN TU CARPETA'):t('MAKE IT YOURS','HAZLO TUYO')}</span><h2 id="notebook-heading">{mobile?t('Choose a topic','Elige un tema'):t('My topics & notes','Mis temas y notas')}</h2></div>
   {role==='parent'&&<div className="home-summary-switch" role="group" aria-label={t('Notebook belongs to','Este cuaderno pertenece a')}><button type="button" aria-pressed={target!==null} onClick={()=>setFamilyFor(null)}>{name}</button><button type="button" aria-pressed={target===null} onClick={()=>setFamilyFor(studentId)}>{t('Family notes','Notas familiares')}</button></div>}
-  {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/><CoordinatorConnection key={target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/><BinderSharing key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0}/></>}
+  {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/></>}
   <p className="notebook-scope">{t('Notebook for: ','Cuaderno de: ')}<strong>{scopeLabel}</strong></p></>}
   {!history.cloud?<p>{t('Sign in to save topic notes to your account.','Inicia sesión para guardar notas en tu cuenta.')}</p>:<>
    <StudentMemory key={scope} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>

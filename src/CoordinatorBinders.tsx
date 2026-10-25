@@ -8,8 +8,8 @@ type Binder={id:string;studentName:string;publicationId:string;version:number;pu
 type Listing={binders:Binder[];counts:{all:number;new:number;help:number};nextCursor:string|null};
 type T=(en:string,es:string)=>string;
 const topics=[['summary','Summary','Resumen'],['options','College options','Opciones universitarias'],['transfer','Transfer & courses','Transferencia y cursos'],['costs','Paying for college','Pagar la universidad'],['applications','Applications','Solicitudes']];
-export default function CoordinatorBinders({organizationId,request,feedbackRequest,t,es,openRequest}:{organizationId:string;openRequest?:{grantId:string;sequence:number};request:(input:Record<string,unknown>)=>Promise<any>;feedbackRequest?:(input:Record<string,unknown>)=>Promise<any>;t:T;es:boolean}){
- const [listing,setListing]=useState<Listing>(),[binder,setBinder]=useState<Binder>(),[view,setView]=useState('all'),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[cursor,setCursor]=useState<string|null>(null),[topic,setTopic]=useState('summary'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+export default function CoordinatorBinders({organizationId,request,feedbackRequest,t,es,openRequest,initialView='all'}:{organizationId:string;openRequest?:{grantId:string;sequence:number};initialView?:'all'|'new'|'help';request:(input:Record<string,unknown>)=>Promise<any>;feedbackRequest?:(input:Record<string,unknown>)=>Promise<any>;t:T;es:boolean}){
+ const [listing,setListing]=useState<Listing>(),[binder,setBinder]=useState<Binder>(),[view,setView]=useState<string>(initialView),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[cursor,setCursor]=useState<string|null>(null),[topic,setTopic]=useState('summary'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const version=useRef(0),activeId=useRef<string|undefined>(undefined),requestRef=useRef(request);requestRef.current=request;
  const clear=()=>{version.current++;setListing(undefined);setBinder(undefined);setBusy(false);};
  async function load(id=activeId.current,nextCursor=cursor,background=false){

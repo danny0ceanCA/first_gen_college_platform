@@ -9,6 +9,7 @@ export const ADMIN_ACTIONS=Object.freeze({
  'onboarding-timeline':'read:users','onboarding-attempt':'read:users','onboarding-metrics':'read:activity','onboarding-alerts':'read:activity',
  'voice-quality':'read:quality','conversation-quality':'read:quality','review-queue':'read:quality','review-history':'read:quality','review-evidence':'read:quality',
  'conversation-review':'write:reviews','review-decision':'write:reviews',
+ 'approved-directory':'read:institutions','coordinator-overview':'read:institutions',
  'institution-report':'read:institutions','organization-overview':'read:institutions','institution-snapshots':'read:institutions','institution-snapshot':'read:institutions','institution-snapshot-save':'write:reports',
 });
 export const staffHash=value=>createHash('sha256').update(value).digest('hex');

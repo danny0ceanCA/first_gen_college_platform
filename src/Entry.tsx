@@ -8,7 +8,7 @@ import InstitutionInvite from './InstitutionInvite';
 import AdminDashboard from './AdminDashboard';
 import {apiFetch} from './api';
 import {withRequestDeadline} from './requestDeadline.mjs';
-import {adminAccessDecision} from './accountAccess.mjs';
+import {adminAccessDecision,defaultWorkspace} from './accountAccess.mjs';
 import InstitutionPortal,{InstitutionPublic,InstitutionDirectory} from './InstitutionPortal';
 import {setAPITokenProvider} from './api';
 import {useAuth0} from '@auth0/auth0-react';
@@ -56,7 +56,9 @@ export default function Entry(){
  if(inside&&route!=='#personal'&&isAuthenticated&&adminAccess?.status==='denied'){
   if((!workspace||workspace.subject!==user?.sub)&&!workspaceError)return <AccountOpening/>;
   if(!workspace||workspace.subject!==user?.sub)return <main className="institution-shell"><p role={workspaceError?'alert':'status'}>{workspaceError?'Could not open your workspace. / No se pudo abrir tu espacio.':'Opening your workspace… / Abriendo tu espacio…'}</p>{workspaceError&&<button className="button primary" onClick={()=>setWorkspaceRetry(x=>x+1)}>Try again / Intentar de nuevo</button>}<button className="button outline" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></main>;
-  if(workspace.coordinatorAccountsEnabled&&workspace.coordinatorApplicationStatus&&(workspace.coordinatorApplicationStatus!=='approved'||!workspace.memberships.length))return <CoordinatorRegistration key={user?.sub}/>;
+  const destination=defaultWorkspace(workspace);
+  if(destination==='coordinator')return <CoordinatorWorkspace key={user?.sub}/>;
+  if(destination==='registration')return <CoordinatorRegistration key={user?.sub}/>;
   if(workspace.memberships.length){if(!workspace.hasPersonalAccount&&!workspace.coordinatorAccountsEnabled)return <InstitutionPortal key={user?.sub}/>;return <main className="institution-shell"><h1>Choose your workspace / Elige tu espacio</h1><p>Choose where you want to work today. / Elige dónde quieres trabajar hoy.</p><div className="institution-actions"><a className="button primary" href="#institutions">Institutions / Instituciones</a>{workspace.coordinatorAccountsEnabled&&<a className="button outline" href="#coordinators">Coordinators / Coordinadores</a>}<a className="button outline" href="#personal">Personal / Personal</a><button className="text-button" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></div></main>;}
  }
  if(/^#institution-invite\/[A-Za-z0-9_-]{43}$/.test(route))return <InstitutionInvite key={route} token={route.slice(20)}/>;

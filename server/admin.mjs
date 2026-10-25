@@ -14,6 +14,7 @@ import {adminVoiceQuality} from './voice-quality.mjs';
 import {adminConversationQuality} from './conversation-quality-store.mjs';
 import {adminInstitutionReport} from './admin-institutions.mjs';
 import {adminOrganizationOverview} from './admin-organization-overview.mjs';
+import {adminApprovedDirectory} from './admin-approved-directory.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {ADMIN_ACTIONS,adminCapabilities,requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {runAsAnalytics} from './account-isolation.mjs';
@@ -39,6 +40,10 @@ export function createAdminHandler(database,env){
    try{await requireStaffAccess(database,req.origenIdentity,{scope:'admin',action:data.action,permission,env,fresh:permission.startsWith('write:'),target:data.accountId||data.id||data.organizationId});}
    catch(error){return send(error.status||503,{error:error.status?error.message:'staff_access_unavailable'});}
    const execute=async()=>{
+   if(['approved-directory','coordinator-overview'].includes(data.action)){
+    try{return send(200,await adminApprovedDirectory(database,data));}
+    catch(error){const known=[400,404].includes(error.status);return send(known?error.status:503,{error:known?error.message:'approved_directory_unavailable'});}
+   }
    if(data.action==='organization-overview'){
     try{return send(200,await adminOrganizationOverview(database,data));}
     catch(error){const known=[400,404].includes(error.status);return send(known?error.status:503,{error:known?error.message:'organization_overview_unavailable'});}

@@ -12,3 +12,5 @@
 @media(max-width:650px){.admin-approvals .org-review-workspace{grid-template-columns:1fr}.approval-tabs{gap:4px}.approval-tabs button{padding:10px;font-size:12px}.approval-section-intro{align-items:flex-start;flex-direction:column}.admin-approvals .org-review-detail{padding:20px}.admin-approvals .org-review-info dl{grid-template-columns:1fr 1fr}}
 
 .admin-approvals .org-review-list .org-review-rows{max-height:55vh;overflow-y:auto;margin-top:12px;overscroll-behavior:contain}
+
+.approval-view-tabs{display:flex;gap:6px;margin:0 0 22px;padding:4px;width:fit-content;border:1px solid #dfcdbb;border-radius:10px;background:#f4eadd}.approval-view-tabs button{padding:9px 17px;border:0;border-radius:7px;background:transparent;font-size:13px;color:#76695d}.approval-view-tabs button[aria-pressed=true]{background:#fffdf8;color:#94472f;box-shadow:0 1px 4px #68452b18;font-weight:600}.org-review-detail dd{overflow-wrap:anywhere}

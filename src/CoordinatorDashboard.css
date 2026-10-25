@@ -1,0 +1,70 @@
+.coordinator-dashboard .admin-sidebar { width: 238px; }
+.coordinator-dashboard .admin-sidebar nav { overflow-x: hidden; }
+.coordinator-dashboard .admin-sidebar nav svg,.coordinator-dashboard .admin-sidebar-bottom svg { flex-shrink: 0; }
+.coordinator-dashboard .admin-sidebar-bottom { gap: 18px; }
+.coordinator-dashboard-main { max-width: 1400px; padding-bottom: 48px; }
+.coordinator-dashboard .coordinator-card { background: var(--admin-surface); border-color: var(--brand-border); border-radius: 16px; margin-top: 24px; }
+.coordinator-dashboard .coordinator-card h2 { font-size: 23px; letter-spacing: -.5px; }
+.coordinator-dashboard .coordinator-card p { color: var(--brand-muted); line-height: 1.7; }
+.coordinator-dashboard .institution-actions { flex-wrap: wrap; }
+.coordinator-dashboard .button { min-height: 44px; text-decoration: none; }
+.coordinator-dashboard .button.primary { background: var(--brand-clay); color: #fff; border-color: var(--brand-clay); }
+.coordinator-dashboard .button.outline { background: var(--admin-surface); border-color: var(--brand-border); color: var(--brand-clay-dark); }
+.coordinator-dashboard .text-button { min-height: 44px; }
+.coordinator-dashboard .eyebrow { font-size: 10px; color: var(--brand-clay); letter-spacing: 1.7px; }
+.coordinator-dashboard .coordinator-updates { margin: 20px 0; }
+.coordinator-organization-bar { display: flex; align-items: center; gap: 12px; padding: 0 0 22px; margin-bottom: 26px; border-bottom: 1px solid var(--brand-border); }
+.coordinator-organization-bar > svg { color: var(--brand-clay); flex-shrink: 0; }
+.coordinator-organization-bar strong { font-weight: 550; overflow-wrap: anywhere; }
+.coordinator-organization-bar > span { margin-left: auto; font-size: 11px; color: #516b60; background: #e7ede5; border-radius: 6px; padding: 6px 9px; }
+.coordinator-organization-bar label { display: flex; align-items: center; gap: 12px; color: var(--brand-muted); font-size: 12px; min-width: 0; }
+.coordinator-organization-bar select { padding: 9px; border: 1px solid var(--brand-border); border-radius: 8px; background: var(--admin-surface); color: var(--brand-ink); max-width: 100%; }
+.coordinator-welcome { display: flex; justify-content: space-between; align-items: center; gap: 36px; padding: clamp(24px,3vw,38px); background: #f0dfd0; border: 1px solid #e6c9b6; border-radius: 16px; }
+.coordinator-welcome h2 { font-size: clamp(24px,2.5vw,34px); font-weight: 600; letter-spacing: -.9px; line-height: 1.25; margin: 14px 0 12px; overflow-wrap: anywhere; }
+.coordinator-welcome p { color: #6e6056; max-width: 530px; line-height: 1.7; margin: 0 0 24px; }
+.coordinator-welcome-icon { flex-shrink: 0; color: #ac6146; margin-right: 10px; }
+.coordinator-home-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin: 22px 0; }
+.coordinator-home-stats button { text-align: left; padding: 24px 22px; border: 1px solid var(--brand-border); border-radius: 14px; background: var(--admin-surface); color: var(--brand-ink); }
+.coordinator-home-stats button:hover,.coordinator-home-actions button:hover { border-color: var(--brand-clay); background: #fff9f2; }
+.coordinator-home-stats button > span { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--brand-muted); }
+.coordinator-home-stats button > span svg:first-child { color: var(--brand-clay); flex-shrink: 0; }
+.coordinator-home-stats button > span svg:last-child { margin-left: auto; flex-shrink: 0; }
+.coordinator-home-stats strong { display: block; font-size: 42px; font-weight: 500; line-height: 1.3; margin: 15px 0 8px; }
+.coordinator-home-stats small { display: block; font-size: 11px; color: var(--brand-muted); }
+.coordinator-home-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 22px 0; }
+.coordinator-home-actions button { display: flex; align-items: center; gap: 16px; padding: 23px; border: 1px solid var(--brand-border); background: var(--admin-surface); border-radius: 14px; text-align: left; color: var(--brand-clay); }
+.coordinator-home-actions button > svg { flex-shrink: 0; }
+.coordinator-home-actions button > svg:last-child { margin-left: auto; }
+.coordinator-home-actions strong { display: block; color: var(--brand-ink); font-weight: 600; }
+.coordinator-home-actions small { display: block; margin-top: 5px; color: var(--brand-muted); line-height: 1.5; }
+.coordinator-sharing-note { display: flex; align-items: center; gap: 10px; color: var(--brand-muted); font-size: 12px; margin: 28px 0; }
+.coordinator-sharing-note svg { color: #65796b; flex-shrink: 0; }
+.coordinator-dashboard-status { padding: 12px 16px; border-radius: 8px; background: #f0e7dc; color: var(--brand-clay-dark); }
+.coordinator-dashboard .coordinator-code { max-width: 540px; }
+@media(max-width:1100px){
+ .coordinator-dashboard .admin-sidebar { width: 212px; }
+ .coordinator-welcome-icon { display: none; }
+ .coordinator-home-stats button { padding: 20px 16px; }
+ .coordinator-home-actions { grid-template-columns: 1fr; }
+}
+@media(max-width:760px){
+ .coordinator-dashboard .admin-sidebar { width: 100%; gap: 16px; }
+ .coordinator-dashboard .admin-sidebar nav { overflow-x: auto; padding-bottom: 2px; }
+ .coordinator-dashboard .admin-sidebar nav button { flex-shrink: 0; white-space: nowrap; }
+ .coordinator-dashboard .admin-sidebar-bottom { position: static; grid-column: 1/-1; display: flex; flex-wrap: wrap; gap: 12px 18px; padding: 0 0 16px; }
+ .coordinator-dashboard .admin-sidebar-bottom a,.coordinator-dashboard .admin-sidebar-bottom button { display: inline-flex; font-size: 11px; min-height: 32px; height: auto; }
+ .coordinator-dashboard .admin-sidebar-bottom button { margin-left: auto; }
+ .coordinator-dashboard .admin-header { flex-wrap: wrap; }
+ .coordinator-organization-bar { flex-wrap: wrap; gap: 8px; }
+ .coordinator-organization-bar > span { font-size: 10px; }
+ .coordinator-organization-bar label { flex-wrap: wrap; flex: 1; }
+ .coordinator-home-stats { gap: 10px; }
+ .coordinator-home-stats button { padding: 18px 12px; }
+ .coordinator-home-stats button > span { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 52px; font-size: 11px; }
+ .coordinator-home-stats button > span svg:last-child { display: none; }
+ .coordinator-home-stats strong { font-size: 32px; }
+ .coordinator-home-stats small { font-size: 10px; }
+ .coordinator-home-actions button { padding: 20px; }
+ .coordinator-dashboard .coordinator-card { padding: 22px 18px; }
+ .coordinator-dashboard .coordinator-card .button { white-space: normal; }
+}
