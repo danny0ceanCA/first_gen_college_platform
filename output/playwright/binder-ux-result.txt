@@ -1,0 +1,48 @@
+### Result
+{"passed":true,"results":[{"width":1280,"passed":true},{"width":390,"passed":true}],"checks":["full onboarding","new student ID","original student preserved","failed save retained","cancel does not save","account unchanged","hidden recovery opt-in","hidden privacy center"]}
+### Ran Playwright code
+```js
+await (async page=>{
+ page.on('dialog',dialog=>dialog.accept());const origin='http://127.0.0.1:5179';page.setDefaultTimeout(15000);const errors=[],results=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*',route=>{const u=new URL(route.request().url());if(u.hostname==='fonts.googleapis.com'||u.hostname==='fonts.gstatic.com')return route.fulfill({contentType:'text/css',body:''});if(u.origin===origin||['data:','blob:','about:'].includes(u.protocol))return route.continue();return route.abort();});
+ let family;const operations=[];
+ await page.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname,b=route.request().postDataJSON();let data={enabled:false,items:[],connections:[],guidance:[],notifications:[],unread:0};
+ if(path==='/api/family'){operations.push(b);if(b.action==='save-student')family.students=[...family.students.filter(s=>s.id!==b.student.id),b.student];data=family;}
+ if(path==='/api/account-links')data={links:[],invites:[]};if(path==='/api/conversation-history')data={items:[]};
+ if(path==='/api/conversation-recovery')data={enabled:true,epoch:1,items:[]};
+ if(path==='/api/privacy')data={revision:'a'.repeat(64),summaryDays:null,counts:{}};
+ await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});});
+ const source=await(await page.request.get(origin+'/src/App.tsx')).text(),auth=source.match(/\/node_modules\/\.vite\/deps\/@auth0_auth0-react\.js\?v=[a-z0-9]+/)[0];
+ await page.route('**/binder-ux-harness',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
+ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import {Auth0Context} from '${auth}';import App from '/src/App.tsx';import {setAPITokenProvider} from '/src/api.ts';import '/src/styles.css';import '/src/brand.css';import '/src/overview.css';
+ const token=async()=>'test.'+btoa(JSON.stringify({sub:'auth0|binder-ux'}))+'.test';setAPITokenProvider(token);const {browserPrivacy}=await import('/src/browserPrivacy.mjs');browserPrivacy.start('auth0|binder-ux',{fresh:true});ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Auth0Context.Provider,{value:{isLoading:false,isAuthenticated:true,user:{sub:'auth0|binder-ux',email:'fictional@example.org'},getAccessTokenSilently:token,logout:async()=>{}}},React.createElement(App)));
+ </script></body></html>`}));
+ for(const width of [1280,390]){
+ const addStudent=async()=>{if(width===390)await page.getByRole('button',{name:'Open navigation',exact:true}).click();await page.getByRole('button',{name:'Add a student',exact:true}).last().click();};family={account:{firstName:'Avery',email:'fictional@example.org',role:'parent',welcomeHeard:true,usedVoice:true},students:[{id:'existing-student',name:'Original Student',stage:'11th grade',interest:'Art',gpa:'',color:'lilac'}]};operations.length=0;
+ await page.setViewportSize({width,height:900});await page.goto(origin+'/binder-ux-harness');await page.getByRole('heading',{name:'Hi, Avery.'}).waitFor();
+ if(await page.getByText('Keep a private recovery copy',{exact:false}).count())throw Error('Recovery opt-in visible');
+ await addStudent();await page.getByRole('heading',{name:'Add another student',exact:true}).waitFor();
+ if(await page.getByRole('dialog').count())throw Error('Old student modal still opens');
+ await page.getByRole('button',{name:'Edit details',exact:true}).click();await page.getByLabel('Student name',{exact:true}).fill('New Student');await page.locator('#welcome-profile-form select').selectOption('Community college');
+ // A failed save must keep the draft and must not discard the existing student.
+ if(width===1280){await page.route('**/api/family',route=>{const b=route.request().postDataJSON();if(b.action==='save-student')return route.fulfill({status:503,contentType:'application/json',body:'{"error":"synthetic_failure"}'});return route.fallback();});await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByRole('alert').filter({hasText:'Could not save'}).waitFor();if(await page.getByLabel('Student name',{exact:true}).inputValue()!=='New Student')throw Error('Failed save lost draft');await page.unroute('**/api/family');}
+ await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByRole('heading',{name:'Hi, Avery.'}).waitFor();
+ if(family.students.length!==2||family.students[0].id!=='existing-student'||family.students[1].id==='existing-student')throw Error('Existing student replaced');
+ if(operations.some(b=>b.action==='complete-onboarding'||b.action==='save-account'))throw Error('Add flow changed account');
+ if(family.account.role!=='parent'||family.account.firstName!=='Avery')throw Error('Account identity changed');
+ await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('heading',{name:'Account',exact:true}).waitFor();if(await page.getByRole('heading',{name:'Privacy Center',exact:true}).count())throw Error('Privacy center visible');await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+ await addStudent();await page.getByRole('heading',{name:'Add another student',exact:true}).waitFor();await page.getByRole('button',{name:'Edit details',exact:true}).click();if(await page.getByLabel('Student name',{exact:true}).inputValue()!=='')throw Error('Prior saved profile reused');
+ await page.getByRole('button',{name:'Back to my binder',exact:true}).click();await page.getByRole('heading',{name:'Hi, Avery.'}).waitFor();if(family.students.length!==2)throw Error('Cancel added a student');
+ await page.screenshot({path:`output/playwright/binder-ux-${width}.png`});results.push({width,passed:true});
+ }
+ if(errors.length)throw Error(errors.join('\n'));return {passed:true,results,checks:['full onboarding','new student ID','original student preserved','failed save retained','cancel does not save','account unchanged','hidden recovery opt-in','hidden privacy center']};
+}
+
+
+
+
+
+)(page);
+```
+### Events
+- New console entries: .playwright-cli\console-2026-10-22T05-11-10-181Z.log#L18-L34
