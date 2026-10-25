@@ -13,6 +13,7 @@ import {adminOnboardingAlerts} from './onboarding-alerts.mjs';
 import {adminVoiceQuality} from './voice-quality.mjs';
 import {adminConversationQuality} from './conversation-quality-store.mjs';
 import {adminInstitutionReport} from './admin-institutions.mjs';
+import {adminOrganizationOverview} from './admin-organization-overview.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {ADMIN_ACTIONS,adminCapabilities,requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {runAsAnalytics} from './account-isolation.mjs';
@@ -35,9 +36,13 @@ export function createAdminHandler(database,env){
    if(data.action==='access')return send(200,adminCapabilities(req.origenIdentity,env));
    const permission=Object.hasOwn(ADMIN_ACTIONS,data.action)?ADMIN_ACTIONS[data.action]:null;
    if(!permission)return send(400,{error:'invalid_action'});
-   try{await requireStaffAccess(database,req.origenIdentity,{scope:'admin',action:data.action,permission,env,fresh:permission.startsWith('write:'),target:data.accountId||data.id});}
+   try{await requireStaffAccess(database,req.origenIdentity,{scope:'admin',action:data.action,permission,env,fresh:permission.startsWith('write:'),target:data.accountId||data.id||data.organizationId});}
    catch(error){return send(error.status||503,{error:error.status?error.message:'staff_access_unavailable'});}
    const execute=async()=>{
+   if(data.action==='organization-overview'){
+    try{return send(200,await adminOrganizationOverview(database,data));}
+    catch(error){const known=[400,404].includes(error.status);return send(known?error.status:503,{error:known?error.message:'organization_overview_unavailable'});}
+   }
    if(['progress-report','institution-snapshot-save','institution-snapshots','institution-snapshot'].includes(data.action)){
     if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
     try{return send(200,await (data.action==='progress-report'?adminProgress(database,data,new Date(),env):adminReportSnapshots(database,req.origenIdentity.sub,data)));}
@@ -99,6 +104,7 @@ export function createAdminHandler(database,env){
   }
   if(!uuid.test(data.id||'')||!['login','voice_start','voice_heartbeat','voice_end'].includes(data.action))return send(400,{error:'invalid_activity'});
   if(data.action==='voice_start'&&!['profile','finance','admissions','planning','loans'].includes(data.topic))return send(400,{error:'invalid_topic'});
+  if(data.action==='voice_start'&&data.segmentId!=null&&(typeof data.segmentId!=='string'||!uuid.test(data.segmentId)))return send(400,{error:'invalid_activity'});
   const client=await database.connect();
   try{
    await client.query('BEGIN');
@@ -108,7 +114,7 @@ export function createAdminHandler(database,env){
    await client.query('INSERT INTO origen_accounts(auth0_subject) VALUES($1) ON CONFLICT(auth0_subject) DO NOTHING',[req.origenIdentity.sub]);
    const owner=(await client.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1',[req.origenIdentity.sub])).rows[0].id;
    if(data.action==='login')await client.query('INSERT INTO origen_login_activity(id,account_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',[data.id,owner]);
-   else if(data.action==='voice_start')await client.query('INSERT INTO origen_voice_activity(id,account_id,topic) VALUES($1,$2,$3) ON CONFLICT(id) DO NOTHING',[data.id,owner,data.topic]);
+   else if(data.action==='voice_start')await client.query('INSERT INTO origen_voice_activity(id,account_id,topic,guidance_segment_id) VALUES($1,$2,$3,(SELECT id FROM origen_guidance_segments WHERE account_id=$2 AND id=$4)) ON CONFLICT(id) DO NOTHING',[data.id,owner,data.topic,data.segmentId??null]);
    else await client.query(`UPDATE origen_voice_activity SET seconds=least(600,seconds+greatest(0,least(30,extract(epoch FROM now()-last_seen_at),600-extract(epoch FROM last_seen_at-started_at)))),last_seen_at=now(),ended_at=CASE WHEN $3 THEN now() ELSE NULL END WHERE id=$1 AND account_id=$2 AND ended_at IS NULL`,[data.id,owner,data.action==='voice_end']);
    await client.query('COMMIT');return send(204,{});
   }catch(error){await client.query('ROLLBACK');if(error.status===403)return send(403,{error:'account_closed'});throw error;}finally{client.release();}

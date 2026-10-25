@@ -81,7 +81,7 @@ test('coordinator provisioning enforces permissions, code lifecycle and family i
  await t.test('organization suspension, archival and staff security controls invalidate access',async()=>{
   await command('staff','rotate-code');await command('reviewer','suspend-organization',{},true);
   await assert.rejects(command('staff','profile'),{code:'42501'});
-  await command('reviewer','approve-organization',{},true);await assert.rejects(command('staff','profile'),{code:'42501'});
+  await command('reviewer','approve-organization',{revision:(await f.owner.query('SELECT revision FROM origen_coordinator_organizations WHERE institution_id=$1',[org])).rows[0].revision},true);await assert.rejects(command('staff','profile'),{code:'42501'});
   await command('owner','enable-member',{subject:'staff'});assert.equal((await command('staff','profile')).profile.code,null);
   await f.owner.query('INSERT INTO origen_staff_access_controls(subject_hash,blocked,token_valid_after) VALUES($1,true,now())',[staffHash('staff')]);
   await assert.rejects(command('staff','profile'),{code:'42501'});await assert.rejects(command('owner','enable-member',{subject:'staff'}),{code:'42501'});
@@ -89,7 +89,7 @@ test('coordinator provisioning enforces permissions, code lifecycle and family i
   await assert.rejects(command('staff','profile'),{code:'42501'});await command('owner','enable-member',{subject:'staff'});
   await f.owner.query('DELETE FROM origen_staff_access_controls WHERE subject_hash=$1',[staffHash('staff')]);
   await f.owner.query('UPDATE origen_institutions SET archived_at=now() WHERE id=$1',[org]);await assert.rejects(command('staff','profile'),{code:'42501'});
-  await f.owner.query('UPDATE origen_institutions SET archived_at=NULL WHERE id=$1',[org]);await command('reviewer','approve-organization',{},true);
+  await f.owner.query('UPDATE origen_institutions SET archived_at=NULL WHERE id=$1',[org]);await command('reviewer','approve-organization',{revision:(await f.owner.query('SELECT revision FROM origen_coordinator_organizations WHERE institution_id=$1',[org])).rows[0].revision},true);
   await command('owner','enable-member',{subject:'staff'});
  });
  await t.test('HTTP requires verified email and fresh server MFA; client flags cannot substitute',async()=>{

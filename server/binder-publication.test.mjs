@@ -126,7 +126,7 @@ test('student publication is versioned, explicit, isolated and revocable',{skip:
   await provision('reviewer','suspend-organization',{},true);await assert.rejects(publish(card),{status:409});
   assert.ok((await run('status')).grants.every(g=>g.items.length===0));
   assert.equal((await f.owner.query("SELECT count(*)::int n FROM origen_binder_publication_items WHERE content<>''")).rows[0].n,0);
-  await provision('reviewer','approve-organization',{},true);await provision('owner','enable-member',{subject:'staff'});
+  await provision('reviewer','approve-organization',{revision:(await f.owner.query('SELECT revision FROM origen_coordinator_organizations WHERE institution_id=$1',[org])).rows[0].revision},true);await provision('owner','enable-member',{subject:'staff'});
   assert.ok((await run('status')).grants.every(g=>g.status!=='active'));connection=await connect();
  });
  await t.test('undo after a correction and revoked sharing restores only a private note',async()=>{

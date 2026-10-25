@@ -46,7 +46,10 @@ test('registration HTTP lifecycle preserves independent approval across retries,
  assert.equal((await cmd('applicant',{action:'application-status'})).application.id,replacement.id);
  assert.equal((await f.request('applicant',api,{action:'application-organizations',id:replacement.id})).status,403);
  assert.equal((await cmd('reviewer',{action:'application-organizations',id:replacement.id})).organizations[0].id,id);
- await cmd('reviewer',{action:'approve-application',id:replacement.id,institutionId:id,reviewNote:'Affiliation confirmed.'});
+ const reviewNote='Welcome to Origen EDU.\n\nThank you for supporting students in your community.';
+ await cmd('reviewer',{action:'approve-application',id:replacement.id,institutionId:id,reviewNote});
+ const approved=(await cmd('applicant',{action:'application-status'})).application;
+ assert.equal(approved.status,'approved');assert.equal(approved.reviewNote,reviewNote);
  assert.equal((await cmd('applicant',{action:'profile',id})).profile.status,'active');
  const code=(await cmd('applicant',{action:'rotate-code',id})).code;assert.match(code,/^[A-Z2-9]{5}-[A-Z2-9]{5}$/);
  await cmd('applicant',submission);

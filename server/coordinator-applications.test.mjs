@@ -25,6 +25,19 @@ test('durable signup intent accepts only bounded description and explicit organi
  for(const organizationRegistration of [null,{}, {description:'x',authorized:false},{description:' ',authorized:true},{description:'x'.repeat(5001),authorized:true},{description:'x\0',authorized:true}])assert.throws(()=>validateCoordinatorInput({...submission,organizationRegistration}));
  assert.throws(()=>validateCoordinatorInput({action:'save-organization-registration',id:'invalid',organizationRegistration:draft}));
 });
+
+test('approval and decline messages accept paragraphs but still reject unsafe control characters and overlong notes',()=>{
+ const reviewNote='Welcome to Origen EDU.\n\nThank you for supporting students in your community.';
+ for(const action of ['approve-application','decline-application']){
+  const input={action,id:randomUUID(),institutionId:randomUUID(),reviewNote};
+  assert.equal(validateCoordinatorInput(input).reviewNote,reviewNote);
+  assert.equal(validateCoordinatorInput({...input,reviewNote:reviewNote.replaceAll('\n','\r\n')}).reviewNote,reviewNote.replaceAll('\n','\r\n'));
+  assert.equal(validateCoordinatorInput({...input,reviewNote:'a'.repeat(1000)}).reviewNote.length,1000);
+  for(const invalid of ['', ' \n\t ', 'a'.repeat(1001), 'Message\0hidden', 'Message\x07hidden', 'Message\x7fhidden', null])assert.throws(()=>validateCoordinatorInput({...input,reviewNote:invalid}));
+ }
+ // Multiline support belongs only to the message, not single-line identity fields.
+ assert.throws(()=>validateCoordinatorInput({...submission,displayName:'First\nLast'}));
+});
 test('applications isolate accounts and approval requires independent MFA reviewer, verified pilot and membership',{skip:!process.env.DATABASE_TEST_URL},async t=>{
  const f=await retrievalFixture();t.after(()=>f.close());
  const now=Math.floor(Date.now()/1000),org=randomUUID(),parent=randomUUID();
@@ -59,12 +72,13 @@ test('applications isolate accounts and approval requires independent MFA review
  assert.equal((await own('applicant',{action:'application-status'})).application.status,'approved');
  assert.equal((await coordinator('applicant',{action:'profile',id:org})).profile.displayName,submission.displayName);
  for(const table of ['origen_coordinator_codes','origen_binder_connections','origen_binder_share_grants'])assert.equal((await f.owner.query(`SELECT count(*)::int n FROM ${table}`)).rows[0].n,0);
- await assert.rejects(review('reviewer',approve),/application_changed/);
+ assert.deepEqual(await review('reviewer',approve),{ok:true,replayed:true});
  await own('applicant',{action:'withdraw-application',id:application.id});
  assert.equal((await own('applicant',{action:'application-status'})).application.status,'approved');
  await coordinator('owner',{action:'disable-member',id:org,subject:'applicant'});
  await assert.rejects(coordinator('applicant',{action:'profile',id:org}),{code:'42501'});
- await assert.rejects(review('reviewer',approve),/application_changed/);
+ assert.deepEqual(await review('reviewer',approve),{ok:true,replayed:true});
+ await assert.rejects(coordinator('applicant',{action:'profile',id:org}),{code:'42501'},'Acknowledging a prior decision must not reactivate disabled access');
  await own('declined',{...submission,verifiedEmail:'declined@example.org'});
  const declined=(await own('declined',{action:'application-status'})).application;
  await review('reviewer',{action:'decline-application',id:declined.id,reviewNote:'Please confirm your organization.'});

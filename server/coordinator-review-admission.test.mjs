@@ -2,18 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {randomUUID} from 'node:crypto';
-import {createReviewAdmission,isReviewDiscovery} from './coordinator-review-admission.mjs';
+import {createReviewAdmission,isReviewDiscovery,isReviewWork,reviewAdmissionFor} from './coordinator-review-admission.mjs';
 import {createCoordinatorHandler} from './coordinator-access.mjs';
 import {runAsAccount} from './account-isolation.mjs';
 import {MFA_TIME_CLAIM} from './staff-access.mjs';
 import {AUTH_TIME_CLAIM} from './recent-auth.mjs';
 
-test('review limiter releases once and applies only to expensive discovery reads',()=>{
+test('review limiter releases once and discovery classification stays read-only',()=>{
  const gate=createReviewAdmission(1),release=gate.acquire();assert.equal(gate.acquire(),null);release();release();
  const next=gate.acquire();assert.equal(typeof next,'function');assert.equal(gate.acquire(),null);next();
- for(const action of ['applications','application-organizations'])assert.equal(isReviewDiscovery(action),true);
+ for(const action of ['applications','application-organizations','organization-queue'])assert.equal(isReviewDiscovery(action),true);
  for(const action of ['approve-application','withdraw-application','suspend-organization','disable-member','revoke-code','overview'])assert.equal(isReviewDiscovery(action),false);
  assert.throws(()=>createReviewAdmission(0));assert.throws(()=>createReviewAdmission(5));
+});
+
+test('approval endpoints share capacity while access removal remains available',()=>{
+ const database={},a=reviewAdmissionFor(database),b=reviewAdmissionFor(database);
+ assert.equal(a,b);assert.notEqual(a,reviewAdmissionFor({}));
+ const releaseA=a.acquire(),releaseB=b.acquire();assert.equal(a.acquire(),null);
+ for(const action of ['queue','verify','publish','request-changes','review-affiliation','approve-organization','approve-application','decline-application'])assert.equal(isReviewWork(action),true);
+ for(const action of ['suspend-organization','disable-member','revoke-code','withdraw-application'])assert.equal(isReviewWork(action),false);
+ releaseA();releaseB();
 });
 
 test('150 simultaneous review reads admit two, shed the rest before DB/auth-provider work, and recover',{timeout:10000},async()=>{

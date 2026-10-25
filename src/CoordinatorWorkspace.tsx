@@ -10,7 +10,7 @@ import './InstitutionPortal.css';
 import './CoordinatorWorkspace.css';
 import {CoordinatorApplications,applicationError} from './CoordinatorRegistration';
 
-type Organization={id:string;name:string;role?:string;pilotStatus:string;verificationStatus:string;profile?:{id:string;displayName:string;status:string}};
+type Organization={id:string;name:string;role?:string;pilotStatus:string;pilotRevision:number;verificationStatus:string;profile?:{id:string;displayName:string;status:string}};
 type Profile={displayName:string;organizationName:string;code?:{expiresAt:string}};
 type Member={subject:string;name:string;role:string;coordinatorStatus:string};
 type Overview={organizations:Organization[];canApprove:boolean};
@@ -49,7 +49,7 @@ export default function CoordinatorWorkspace(){
   setBusy(true);setError('');setNotice('');setCode('');setQr('');
   const version=generation.current;
   try{
-   const data=await request({action,id:selected,...extra});if(version!==generation.current)return;
+   const data=await request({action,id:selected,...extra,...(action==='approve-organization'?{revision:org?.pilotRevision}:{})});if(version!==generation.current)return;
    if(data.code){
     setCode(data.code);setExpires(data.expiresAt);setProfile(p=>p?{...p,code:{expiresAt:data.expiresAt}}:p);
     const QRCode=await import('qrcode');const image=await QRCode.toDataURL(`${window.location.origin}/#connect/${data.code}`,{width:240,margin:2});if(version!==generation.current)return;setQr(image);
@@ -61,6 +61,7 @@ export default function CoordinatorWorkspace(){
  async function copy(value:string){try{await navigator.clipboard.writeText(value);setNotice(t('Copied.','Copiado.'));}catch{setNotice(t('Select and copy the code below.','Selecciona y copia el código de abajo.'));}}
  const messages:Record<string,string>={
   coordinator_sharing_unavailable:t('Coordinator accounts are not available yet.','Las cuentas de coordinadores aún no están disponibles.'),
+  organization_changed:t('Organization access changed. Refresh the workspace before approving again.','El acceso de la organización cambió. Actualiza el espacio antes de aprobar de nuevo.'),
   coordinator_access_denied:t('Your account does not have coordinator access. Ask your organization owner to enable it.','Tu cuenta no tiene acceso de coordinador. Pide al propietario de tu organización que lo active.'),
   verified_email_required:t('Verify your sign-in email before opening this workspace.','Verifica tu correo de inicio de sesión antes de abrir este espacio.'),
   invitation_email_required:t('We could not verify your sign-in email. Sign in again.','No pudimos verificar tu correo. Inicia sesión de nuevo.'),

@@ -102,7 +102,7 @@ test('coordinator workspace reads only current explicit publications',{skip:!pro
  await t.test('expiry and lost eligibility remove metadata too; reauthorization never revives revoked grants',async()=>{
   await f.owner.query("UPDATE origen_binder_share_grants SET created_at=now()-interval '2 days',expires_at=now()-interval '1 day' WHERE id=$1",[a.grant]);await assert.rejects(staff('read',{grantId:a.grant}),{status:404});assert.equal((await staff('list')).counts.all,0);await a.publish();
   await f.owner.query("UPDATE origen_eligibility SET revision=revision+1 WHERE subject_hash=$1",[hash('other')]);await assert.rejects(staff('read',{grantId:a.grant}),{status:404});assert.equal((await staff('list')).counts.all,0);
-  await provision('reviewer','suspend-organization',{},true);await assert.rejects(staff('list'),{status:403});await provision('reviewer','approve-organization',{},true);await provision('owner','enable-member',{subject:'staff'});assert.equal((await staff('list')).counts.all,0);
+  await provision('reviewer','suspend-organization',{},true);await assert.rejects(staff('list'),{status:403});await provision('reviewer','approve-organization',{revision:(await f.owner.query('SELECT revision FROM origen_coordinator_organizations WHERE institution_id=$1',[org])).rows[0].revision},true);await provision('owner','enable-member',{subject:'staff'});assert.equal((await staff('list')).counts.all,0);
  });
  await t.test('HTTP rechecks staff MFA/email, fails closed while paused, and never trusts body identity',async()=>{
   const now=Math.floor(Date.now()/1000);let identity={sub:'staff',iat:now,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now},verified=true;

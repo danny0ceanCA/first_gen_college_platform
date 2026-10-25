@@ -16,7 +16,7 @@ export function validateAccess(input){
   if(! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.workEmail)||!['institution','department','program'].includes(input.unitType))throw fail(400,'invalid_institution');out.unitType=input.unitType;return out;
  }
  out.id=uuid(input.id);
- if(action==='review-affiliation'){if(!['verified','changes-requested','resolved'].includes(input.status)||typeof input.note!=='string'||!input.note.trim()||input.note.length>2000)throw fail(400,'invalid_institution');return {...out,status:input.status,note:input.note.trim(),parentId:input.parentId?uuid(input.parentId):null};}
+ if(action==='review-affiliation'){if(!Number.isSafeInteger(input.revision)||input.revision<1||!['verified','changes-requested','resolved'].includes(input.status)||typeof input.note!=='string'||!input.note.trim()||input.note.length>2000)throw fail(400,'invalid_institution');return {...out,revision:input.revision,status:input.status,note:input.note.trim(),parentId:input.parentId?uuid(input.parentId):null};}
  if(action==='invite'){if(typeof input.email!=='string'||input.email.length>320||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))throw fail(400,'invalid_institution');out.email=input.email.trim().toLowerCase();}
  if(['invite','set-role'].includes(action)){if(!['editor','outreach','analyst'].includes(input.role))throw fail(400,'invalid_institution');out.role=input.role;}
  if(['remove-member','set-role','transfer-owner'].includes(action))out.subject=subject(input.subject);
@@ -51,12 +51,13 @@ export async function runAccess(c,sub,input,identity={},canReview=false){
   if(!canReview)throw fail(403,'reviewer_required');
   const req=(await c.query('SELECT * FROM origen_institution_affiliation_requests WHERE id=$1 FOR UPDATE',[input.id])).rows[0];
   if(!req)throw fail(404,'request_not_found');
+  if(req.revision!==input.revision)throw fail(409,'affiliation_changed');
   const parentId=input.parentId||req.parent_institution_id;
   if(parentId){const parent=(await c.query('SELECT id FROM origen_institutions WHERE id=$1 AND parent_institution_id IS NULL AND published IS NOT NULL AND archived_at IS NULL',[parentId])).rows[0];if(!parent)throw fail(404,'parent_not_found');}
   if(req.auth0_subject===sub||parentId&&await membership(c,parentId,sub))throw fail(403,'independent_review_required');
   // Review alone never grants access. Owners invite staff after verification.
   if(input.status==='resolved'&&(!parentId||!await membership(c,parentId,req.auth0_subject)))throw fail(409,'membership_required');
-  await c.query('UPDATE origen_institution_affiliation_requests SET status=$2,review_note=$3,reviewer_subject=$4,parent_institution_id=$5,updated_at=now() WHERE id=$1',[input.id,input.status,input.note,sub,parentId]);return {ok:true};
+  await c.query('UPDATE origen_institution_affiliation_requests SET status=$2,review_note=$3,reviewer_subject=$4,parent_institution_id=$5,revision=revision+1,updated_at=now() WHERE id=$1',[input.id,input.status,input.note,sub,parentId]);return {ok:true};
  }
  if(action==='accept-invite'){
   const found=(await c.query('SELECT institution_id FROM origen_institution_invites WHERE token_hash=$1',[hashToken(input.token)])).rows[0];

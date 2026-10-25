@@ -85,7 +85,8 @@
 .coordinator-application-status > p { font-size: 13px; color: #75695e; line-height: 1.8; }
 .coordinator-review-message { padding: 15px; margin: 18px 0; border-radius: 8px; background: #f5ebdf; }
 .coordinator-review-message > span { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #97644b; }
-.coordinator-review-message p { font-size: 13px; line-height: 1.7; margin: 8px 0 0; }
+.coordinator-review-message p { font-size: 13px; line-height: 1.7; margin: 8px 0 0; white-space: pre-wrap; }
+.approval-review-feedback { margin: 14px 0; font-size: 13px; line-height: 1.6; }
 .coordinator-registration-footer { display: flex; align-items: center; gap: 20px; border-top: 1px solid #dfd3c4; padding: 24px 0 0; color: #8c7c69; }
 .coordinator-registration-footer .coordinator-registration-brand { font-size: 21px; color: #887761; }
 .coordinator-registration-footer p { margin: 0; flex: 1; font-size: 11px; }

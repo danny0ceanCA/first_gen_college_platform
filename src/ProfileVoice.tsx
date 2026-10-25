@@ -190,7 +190,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
 
   const usage=useRef<{id:string;timer?:ReturnType<typeof setInterval>}>({id:''});
   const usageQueue=useRef(Promise.resolve());
-  function usageEvent(action:string,id=usage.current.id){if(!id)return;usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>{privacyLease.assert();return apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,topic:liveMode.current}),keepalive:true});}).then(()=>{}).catch(()=>{});}
+  function usageEvent(action:string,id=usage.current.id){if(!id)return;const body=JSON.stringify({action,id,topic:liveMode.current,...(action==='voice_start'?{segmentId:guidance.current.current()?.segmentId??null}:{})});usageQueue.current=usageQueue.current.catch(()=>{}).then(()=>{privacyLease.assert();return apiFetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true});}).then(()=>{}).catch(()=>{});}
   const logSession=useRef('');
   const logAttempt=useRef('');
   const logSequence=useRef(0);

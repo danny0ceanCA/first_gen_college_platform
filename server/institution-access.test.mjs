@@ -103,12 +103,12 @@ test('affiliation requests stay private, support unregistered parents and never 
   const req={action:'request-affiliation',requestId:crypto.randomUUID(),parentName:'Unregistered college',parentWebsite:'https://college.example/',unitName:'Outreach',unitType:'program',...representative};
   await call('requester',req);await call('requester',req);const requests=(await call('requester',{action:'load'})).affiliationRequests;assert.equal(requests.length,1);
   assert.equal((await call('foreign',{action:'load'})).affiliationRequests.length,0);
-  const id=requests[0].id;await assert.rejects(call('requester',{action:'review-affiliation',id,status:'verified',note:'Self'}),{status:403});
-  await call('reviewer',{action:'review-affiliation',id,status:'verified',note:'Contacted institution'});assert.equal((await call('requester',{action:'access'})).memberships.length,0);
-  await assert.rejects(call('reviewer',{action:'review-affiliation',id,status:'resolved',note:'Resolved'}),{status:409});
+  const id=requests[0].id;await assert.rejects(call('requester',{action:'review-affiliation',id,revision:1,status:'verified',note:'Self'}),{status:403});
+  await call('reviewer',{action:'review-affiliation',id,revision:1,status:'verified',note:'Contacted institution'});assert.equal((await call('requester',{action:'access'})).memberships.length,0);
+  await assert.rejects(call('reviewer',{action:'review-affiliation',id,revision:2,status:'resolved',note:'Resolved'}),{status:409});
   const parent=(await call('owner',registration())).institutions[0];await publish(call,'owner',parent.id);
   await invite(call,'owner',parent.id,'requester');
-  await call('reviewer',{action:'review-affiliation',id,parentId:parent.id,status:'resolved',note:'Verified and owner invitation accepted'});
+  await call('reviewer',{action:'review-affiliation',id,revision:2,parentId:parent.id,status:'resolved',note:'Verified and owner invitation accepted'});
   const resolved=(await call('requester',{action:'load'})).affiliationRequests[0];assert.equal(resolved.status,'resolved');assert.equal(resolved.parent_institution_id,parent.id);
  }finally{await pool.end();}
 });

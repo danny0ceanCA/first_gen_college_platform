@@ -68,7 +68,8 @@ test('server recovers signup across sessions, rejects stale applications, and re
  // Registration retry must not erase the correction request by resubmitting unchanged content.
  await registerSignupOrganization(run,registration);
  assert.equal((await run(status)).organization.status,'changes-requested');
- const updated=await run({action:'save',id:org.id,revision:org.revision,page:{...org.page,description:'Updated services.'}});
+ await assert.rejects(run({action:'save',id:org.id,revision:org.revision,page:{...org.page,description:'Stale edit.'}}),/institution_changed/);
+ const updated=await run({action:'save',id:org.id,revision:changes.revision,page:{...changes.page,description:'Updated services.'}});
  const revision=updated.institutions.find(i=>i.id===org.id).revision;
  await run({action:'submit',id:org.id,revision});
  assert.equal((await run(status)).organization.status,'submitted');
