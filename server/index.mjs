@@ -10,7 +10,7 @@ import {assertContinuityReady} from './conversation-continuity.mjs';
 import {createRecoveryHandler,assertRecoveryReady,recoveryReady,claimRecoveryJob} from './conversation-recovery.mjs';
 import {createCorrectionsHandler} from './binder-corrections.mjs';
 import {isCoordinatorRoute} from './binder-sharing-policy.mjs';
-import {createCoordinatorConnectionsHandler,assertCoordinatorLinkingReady,linkingEnabled} from './coordinator-connections.mjs';
+import {createCoordinatorConnectionsHandler,assertCoordinatorLinkingReady} from './coordinator-connections.mjs';
 import {createCoordinatorHandler,assertCoordinatorProvisioningReady} from './coordinator-access.mjs';
 import {createLiveMemoryHandler} from './live-memory.mjs';
 import {createMemoryHandler} from './student-memory.mjs';
@@ -126,7 +126,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   req.origenIdentity=identity;
   // Provisioning and pilot linking have separate gates. Student sharing uses
   // its own kill switch, preserving stop controls; coordinator reads have a separate switch.
-  if(isCoordinatorRoute(req.url)&&req.url!=='/api/coordinator-notifications'&&req.url!=='/api/binder-sharing'&&req.url!=='/api/coordinator-feedback'&&!(req.url==='/api/coordinator-binders'&&coordinatorViewingEnabled(env)||req.url==='/api/coordinator-access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'||req.url==='/api/coordinator-connections'&&linkingEnabled(env)))return send(503,'coordinator_sharing_unavailable');
+  if(isCoordinatorRoute(req.url)&&req.url!=='/api/coordinator-notifications'&&req.url!=='/api/binder-sharing'&&req.url!=='/api/coordinator-feedback'&&req.url!=='/api/coordinator-connections'&&!(req.url==='/api/coordinator-binders'&&coordinatorViewingEnabled(env)||req.url==='/api/coordinator-access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'))return send(503,'coordinator_sharing_unavailable');
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
   // Frequent diagnostic events must never spend the budget used by permission
   // checks, saves, or research. Both lanes stay bounded before database work.

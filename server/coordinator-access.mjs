@@ -75,7 +75,7 @@ export function createCoordinatorHandler(database,env={},fetcher=fetch){
   }catch(error){
    if(error.code==='40001')return send(409,{error:error.message==='organization_changed'?'organization_changed':'application_changed'});
    if(error.code==='42501')return send(403,{error:['application_review_required','independent_review_required','organization_verification_required','application_membership_required'].includes(error.message)?error.message:'coordinator_access_denied'});
-   const known=[400,401,403].includes(error.status);
+   const known=[400,401,403].includes(error.status)||(error.status===503&&error.message==='identity_verification_unavailable');
    // Never log request bodies, connection codes, emails or DB error details.
    return send(known?error.status:503,{error:known?error.message:'coordinator_access_unavailable'});
   }finally{releaseReview?.();}

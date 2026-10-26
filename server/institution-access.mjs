@@ -1,5 +1,6 @@
 import {notifyInstitution} from './institution-notifications.mjs';
 import {createHash,randomBytes} from 'node:crypto';
+import {trustedIdentity} from './trusted-identity.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export const accessActions=['access','parents','team','invite','accept-invite','revoke-invite','remove-member','set-role','transfer-owner','approve-unit','reject-unit','request-affiliation','review-affiliation'];
 const uuid=v=>{if(typeof v!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))throw fail(400,'invalid_institution');return v;};
@@ -123,11 +124,5 @@ export async function runAccess(c,sub,input,identity={},canReview=false){
 // Fetch trusted identity attributes with the already verified bearer token. The
 // browser's profile and representative form are never proof of email ownership.
 export async function invitationIdentity(req,env,fetcher=fetch){
- const domain=env.AUTH0_DOMAIN;
- if(!domain||! /^[a-z0-9.-]+$/i.test(domain))throw fail(503,'identity_verification_unavailable');
- let response;try{response=await fetcher(`https://${domain}/userinfo`,{headers:{Authorization:req.headers.authorization},signal:AbortSignal.timeout(8000)});}catch{throw fail(503,'identity_verification_unavailable');}
- if(!response.ok)throw fail(403,'invitation_email_required');
- const identity=await response.json();
- if(identity.sub!==req.origenIdentity.sub)throw fail(403,'invitation_email_required');
- return identity;
+ return trustedIdentity(req,env,fetcher);
 }

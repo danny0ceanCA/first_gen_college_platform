@@ -68,11 +68,13 @@ test('Phase 4 allows publication only with provisioning and linking, with indepe
   assert.ok(productionConfigIssues({[key]:value}).some(s=>s.startsWith(key)));
  }
 });
-test('disabled coordinator provisioning/linking/viewing APIs return no content or database calls',async t=>{
+test('disabled coordinator provisioning/viewing APIs return no content or database calls',async t=>{
  let databaseCalls=0;const logs=[];
  const app=createApp({ORIGEN_BINDER_SHARING:'true'},async()=>({sub:'staff'}),{query(){databaseCalls++;throw new Error('must not query');}},line=>logs.push(line));
  const server=createServer(app);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(async()=>{await new Promise(resolve=>server.close(resolve));await app.flushLogs();});
- for(const path of ['coordinator-access','coordinator-connections','coordinator-binders']){
+ // Connections dispatches authenticated, ownership-checked stop controls even
+ // while paused; binder-sharing-stop-controls.test exercises that gateway.
+ for(const path of ['coordinator-access','coordinator-binders']){
   const res=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}`,{method:'POST',headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},body:JSON.stringify({code:'PRIVATE_FAMILY_SENTINEL',classification:'student_only'})});
   assert.equal(res.status,503);assert.equal(res.headers.get('cache-control'),'no-store');assert.deepEqual(await res.json(),{error:'coordinator_sharing_unavailable'});
  }

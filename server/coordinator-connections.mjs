@@ -39,13 +39,14 @@ export async function coordinatorVoiceAvailable(database,env,studentId){
 export function createCoordinatorConnectionsHandler(database,env={},fetcher=fetch){return async(req,res,next)=>{
  if(req.url!=='/api/coordinator-connections')return next();
  const send=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
- if(!linkingEnabled(env))return send(503,{error:'coordinator_sharing_unavailable'});
  if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
  if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'json_required'});
  try{
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'too_large'});}
   let input;try{input=validateConnectionInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_connection_request'});}
+  // Admission can be paused without taking away the student's stop controls.
+  if(!linkingEnabled(env)&&!['list','withdraw','cancel','close'].includes(input.action))return send(503,{error:'coordinator_sharing_unavailable'});
   input.voiceEnabled=env.ORIGEN_COORDINATOR_VOICE_LINKING==='true';
   if(input.channel==='voice'&&env.ORIGEN_COORDINATOR_VOICE_LINKING!=='true')return send(403,{error:'connection_denied'});
   if(input.action==='lookup')input.networkHash=hash(req.socket?.remoteAddress||'unknown'); // never trust browser forwarding headers
@@ -61,6 +62,7 @@ export function createCoordinatorConnectionsHandler(database,env={},fetcher=fetc
 };}
 export async function assertCoordinatorLinkingReady(database,env){
  if(!linkingEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='080_sharing_stop_controls.sql'")).rows.length)throw new Error('sharing_stop_controls_migration_required');
  const row=(await database.query("SELECT to_regprocedure('origen_coordinator_connection_command(jsonb)') AS fn")).rows[0];
  if(!row?.fn||!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_connection_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_linking_migration_or_grant_required');
  if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='058_student_controlled_coordinator_sharing.sql') AS ready")).rows[0]?.ready)throw new Error('coordinator_student_permission_migration_required');

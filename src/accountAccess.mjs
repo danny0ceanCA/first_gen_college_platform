@@ -8,10 +8,12 @@ export async function adminAccessDecision(response){
 
 // This chooses a landing page, not an authorization decision. Each workspace
 // still verifies current access with its own API before showing protected data.
-export function defaultWorkspace(access){
+export function defaultWorkspace(access,{personalRequested=false}={}){
  if(access.coordinatorAccountsEnabled&&access.coordinatorApplicationStatus){
   return access.coordinatorApplicationStatus==='approved'?'coordinator':'registration';
  }
+ // A personal deep link must not override a coordinator's workspace.
+ if(personalRequested)return 'personal';
  if(access.memberships.length)return !access.hasPersonalAccount&&!access.coordinatorAccountsEnabled?'institution':'chooser';
  return 'personal';
 }

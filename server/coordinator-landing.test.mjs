@@ -9,6 +9,21 @@ test('approved coordinators land in their workspace with or without a personal b
 test('approved accounts with removed membership see coordinator access state, not student onboarding',()=>{
  assert.equal(defaultWorkspace({...member,memberships:[]}),'coordinator');
 });
+test('personal deep links cannot send coordinators into student onboarding',()=>{
+ for(const hasPersonalAccount of [false,true]){
+  for(const memberships of [[],member.memberships]){
+   assert.equal(defaultWorkspace({...member,hasPersonalAccount,memberships},{personalRequested:true}),'coordinator');
+  }
+ }
+ for(const coordinatorApplicationStatus of ['pending','declined','withdrawn']){
+  assert.equal(defaultWorkspace({...member,coordinatorApplicationStatus},{personalRequested:true}),'registration');
+ }
+});
+test('personal deep links still open student and non-coordinator personal workspaces',()=>{
+ for(const memberships of [[],member.memberships]){
+  assert.equal(defaultWorkspace({...member,memberships,coordinatorApplicationStatus:null},{personalRequested:true}),'personal');
+ }
+});
 test('pending, declined and withdrawn applicants still reach their application',()=>{
  for(const coordinatorApplicationStatus of ['pending','declined','withdrawn'])assert.equal(defaultWorkspace({...member,coordinatorApplicationStatus}),'registration');
 });

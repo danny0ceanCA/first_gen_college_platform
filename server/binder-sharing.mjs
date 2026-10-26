@@ -54,6 +54,7 @@ export function createBinderSharingHandler(database,env={}){return async(req,res
 };}
 export async function assertBinderSharingReady(database,env){
  if(!binderSharingEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='080_sharing_stop_controls.sql'")).rows.length)throw new Error('sharing_stop_controls_migration_required');
  if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='071_preserve_coordinator_lock_order.sql'")).rows.length)throw new Error('coordinator_lock_order_migration_required');
  if(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true'&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='068_coordinator_follow_through.sql'")).rows.length)throw new Error('coordinator_follow_through_migration_required');
  if(derivedSharingEnabled(env)&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='067_derived_binder_sharing.sql'")).rows.length)throw new Error('derived_binder_sharing_migration_required');
