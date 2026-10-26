@@ -6,7 +6,7 @@ const students=[{id:'one',name:'Sofia'},{id:'two',name:'Sofia'}];
 test('unconfirmed parent sessions offer routing only and omit private history',()=>{
  for(const mode of ['finance','admissions','planning']){
   const session=voiceSession({role:'parent',mode,language:'en',routeConversations:true,students,profile:{name:'PRIVATE PROFILE'},memory:[{summary:'PRIVATE HISTORY'}]},{});
-  assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language']);
+  assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language','end_conversation']);
   assert.deepEqual(session.tools[0].parameters.properties.scope.enum,['family','student:one','student:two']);
   assert.match(session.instructions,/duplicated|ambiguous/);
   assert.match(session.instructions,/spoken choice automatically/);
@@ -17,7 +17,7 @@ test('unconfirmed parent sessions offer routing only and omit private history',(
 });
 test('confirmed family scope retains specialist tools and applies clear spoken switches automatically',()=>{
  const session=voiceSession({role:'parent',mode:'finance',language:'es',routeConversations:true,targetConfirmed:true,scopeRestart:true,studentId:null,students,profile:{}},{});
- assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language','highlight_binder_topics']);
+ assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language','highlight_binder_topics','end_conversation']);
  assert.match(session.instructions,/general family questions/);
  assert.match(session.instructions,/Do not greet or introduce yourself again/);
 });

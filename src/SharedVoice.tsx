@@ -11,7 +11,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  const [entry,setEntry]=useState<VoiceProps|null>(null);
  const voiceLanguage=useRef<'en'|'es'|null>(null),screenLanguage=useRef<'en'|'es'|null>(null);
  const [guide,setGuide]=useState<'finance'|'admissions'|'planning'|'loans'>('planning');
- const [session,setSession]=useState<{id:number;props:VoiceProps}|null>(null);
+ const [session,setSession]=useState<{id:string;props:VoiceProps}|null>(null);
  const [owner,setOwner]=useState<string|null>(null),[expanded,setExpanded]=useState(false);
  const ownerRef=useRef<string|null>(null),queue=useRef(summarySaveQueue());
  const [saveFailed,setSaveFailed]=useState(false),[saving,setSaving]=useState(false);
@@ -52,7 +52,16 @@ export default function SharedVoice({children}:{children:ReactNode}){
  async function retry(){setSaving(true);setSaveFailed(false);try{await queue.current.flush();}catch{setSaveFailed(true);}finally{setSaving(false);}}
 
  const t=entry?.t||session?.props.t||((en:string)=>en);
- function launch(props:VoiceProps){if(ownerRef.current){setExpanded(true);return;}if(!claim('shared',true))return;if(props.mode&&props.mode!=='profile')setGuide(props.mode);const language=props.language===screenLanguage.current?voiceLanguage.current||props.language:props.language;screenLanguage.current=props.language;voiceLanguage.current=language;setSession({id:Date.now(),props:{...props,language}});setExpanded(false);}
+ function launch(props:VoiceProps){
+  // A new student's setup owns a fresh call, never the previous student's guide.
+  const freshSetup=props.onboarding&&props.recoveryKey!==session?.props.recoveryKey;
+  if(ownerRef.current&&!freshSetup){setExpanded(true);return;}
+  const id=crypto.randomUUID();ownerRef.current=id;setOwner(id);
+  if(props.mode&&props.mode!=='profile')setGuide(props.mode);
+  const language=props.language===screenLanguage.current?voiceLanguage.current||props.language:props.language;
+  screenLanguage.current=props.language;voiceLanguage.current=language;
+  setSession({id,props:{...props,language}});setExpanded(false);
+ }
  function talkAbout(focus:WorkspaceFocus){
   const workspaceFocus={...focus,serial:crypto.randomUUID()};
   if(ownerRef.current){setSession(previous=>previous?{...previous,props:{...previous.props,workspaceFocus}}:previous);return;}
@@ -74,7 +83,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  {saving&&<p className="shared-summary-status small-text" role="status">{t('Saving your conversation summary…','Guardando el resumen de tu conversación…')}</p>}
  {saveFailed&&<div className="shared-summary-error" role="alert"><p>{t('Your conversation summary has not saved yet.','El resumen de tu conversacion aun no se ha guardado.')}</p><button type="button" className="button outline" disabled={saving} onClick={()=>void retry()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
  {!active&&entry&&<div className="voice-ready-controls"><span className="voice-current-section">{guideName(entry.mode)}</span></div>}
- <LocalProfileVoice detailsOpen={expanded} onCloseDetails={()=>setExpanded(false)} onGuideChanged={mode=>{setGuide(mode);setSession(previous=>previous?{...previous,props:{...previous.props,mode,...(previous.props.onboarding?{onboarding:false,onSaveProfile:undefined,onAccountDraft:undefined,onDraft:undefined,onProfileSaveComplete:undefined,recoveryKey:undefined}: {})}}:previous);}} switchGuideMode={active&&entry&&entry.mode!=='profile'&&entry.mode!==session.props.mode?entry.mode:undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} t={t} onLanguageChanged={next=>{voiceLanguage.current=next;setSession(previous=>previous?{...previous,props:{...previous.props,language:next}}:previous);session.props.onLanguageChanged?.(next);}} autoStart onActive={live=>{claim('shared',live);session.props.onActive(live);}}/>
+ <LocalProfileVoice detailsOpen={expanded} onCloseDetails={()=>setExpanded(false)} onGuideChanged={mode=>{setGuide(mode);setSession(previous=>previous?{...previous,props:{...previous.props,mode,...(previous.props.onboarding?{onboarding:false,onSaveProfile:undefined,onAccountDraft:undefined,onDraft:undefined,onProfileSaveComplete:undefined,recoveryKey:undefined}: {})}}:previous);}} switchGuideMode={active&&entry&&entry.mode!=='profile'&&entry.mode!==session.props.mode?entry.mode:undefined} switchGuideLabel={entry?guideName(entry.mode):undefined} onRestart={()=>launch({...entry||session.props,mode:guide})} key={session.id} {...session.props} ownerId={session.id} t={t} onLanguageChanged={next=>{voiceLanguage.current=next;setSession(previous=>previous?{...previous,props:{...previous.props,language:next}}:previous);session.props.onLanguageChanged?.(next);}} autoStart onActive={live=>{claim(session.id,live);session.props.onActive(live);}}/>
  </aside>}
  </div>
  </SharedVoiceContext.Provider>;

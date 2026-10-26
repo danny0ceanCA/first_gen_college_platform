@@ -7,6 +7,7 @@ import {ArrowRight,CheckCircle2,Plus,RefreshCw} from 'lucide-react';
 import {apiFetch} from './api';
 import {legacyCreationId,legacyPlanBatches} from './planImport.mjs';
 import './ActionPlan.css';
+import {useBinderNavigationGuard} from './useBinderFollow';
 
 type Step={id:string;title:string;action:string;notes:string;status:'not-started'|'in-progress'|'complete'|'deferred';dueDate:string|null;sources:{title:string;url:string}[]};
 type Plan={id:string;studentId:string|null;title:string;goal:string;category:string;status:'active'|'archived';version:number;summaryIds:string[];steps:Step[]};
@@ -22,6 +23,7 @@ export default function ActionPlan({compact=false,scopeStudentId,studentId,name,
  const [loading,setLoading]=useState(true),[failed,setFailed]=useState(false),[retry,setRetry]=useState(0),[busy,setBusy]=useState(false),lock=useRef(false),loadVersion=useRef(0);
  const [drafts,setDrafts]=useState<Record<string,Draft|undefined>>({}),[messages,setMessages]=useState<Record<string,string>>({}),[archive,setArchive]=useState(false);
  const [legacy,setLegacy]=useState<{scope:string;batches:{requestId:string;steps:Step[]}[];error:boolean}|null>(null);
+ useBinderNavigationGuard(busy||Object.values(drafts).some(Boolean));
  const section=useRef<HTMLElement>(null),lastSeed=useRef<string|null>(null);
  const [expanded,setExpanded]=useState(false);
  const value=data?.scope===scope?data.value:null,plans=value?.plans.filter(p=>p.studentId===target)||[],draft=drafts[scope];

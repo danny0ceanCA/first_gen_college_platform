@@ -22,6 +22,14 @@ test('home introduction distinguishes preview summary storage',()=>{
  assert.doesNotMatch(homeVoiceIntroduction('en'),/This is a preview/);
 });
 
+test('another student starts with that student name even when the account holder is a student',()=>{
+ for(const language of ['en','es'])for(const role of ['parent','student']){
+  const opening=onboardingWelcome(language,{newStudent:true,role});
+  assert.match(opening,language==='es'?/Cómo se llama el nuevo estudiante/:/What is the new student's name/);
+  assert.doesNotMatch(opening,/What should I call you|Cómo te llamas/);
+ }
+});
+
 test('welcome overrides preserve the same natural beginner-friendly voice style',()=>{
  for(const language of ['en','es'])for(const preview of [false,true]){
   const opening=onboardingWelcome(language,{preview});

@@ -172,6 +172,20 @@ test('empty results receive both receipts; invalid results receive neither and r
  }finally{await f.close();}
 });
 
+test('worker reports only a finite rejection code and leaves invalid organization retryable without receipts',database,async()=>{
+ const f=await binderFixture();try{
+  await f.save('source',source);const failures=[];
+  const process=createBinderProcessor(f.db,settings(),async()=>response([{...entries[0],quote:'Private invented source content.'}]));
+  assert.equal(await process(await f.claim(),{onFailure:code=>failures.push(code)}),'pending');
+  assert.deepEqual(failures,['organization_quote']);
+  for(const table of ['origen_topic_notes','origen_student_memories','origen_topic_note_batches','origen_memory_batches'])assert.equal(await count(f,table),0);
+  await f.owner.query("UPDATE origen_binder_jobs SET available_at=now()-interval '1 second'");
+  const retry=createBinderProcessor(f.db,settings(),async()=>response(entries));
+  assert.equal(await retry(await f.claim(),{onFailure:()=>{throw Error('No failure expected');}}),'complete');
+  assert.equal(await count(f,'origen_topic_note_batches'),1);
+ }finally{await f.close();}
+});
+
 test('existing memory receipt wins a late legacy extraction race without duplicating personal facts into the topic store',database,async()=>{
  const f=await binderFixture();try{
   await f.save('source',source);

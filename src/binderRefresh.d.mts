@@ -1,0 +1,1 @@
+export function refreshBinderNotes<T extends {pendingCount?:number;background?:{enabled:boolean;failed:number;retryAfterMs:number}}>(options:{request:(action:string,signal:AbortSignal)=>Promise<T>;onData:(result:T)=>void;onFailure?:(error:string|null)=>void;signal:AbortSignal;action?:string;pause?:(ms:number,signal:AbortSignal)=>Promise<void>}):Promise<T>;

@@ -2,7 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';
+import {fixture} from './family-fixture.mjs';
 const input={sdp:'v=0\r\n',language:'es',role:'parent',profile:{name:'Test student',id:'private-id',color:'peach'}};
+
+test('a returning saved account retains explicit new-student onboarding despite having heard the welcome',async()=>{
+ const {pool,run}=await fixture();
+ try{
+  await run('returning-parent',{action:'complete-onboarding',account:{firstName:'Parent',email:'',role:'parent'},student:{id:'older-student',name:'Older private student',stage:'College',interest:'Private older goal',gpa:'',color:'lilac'}});
+  await run('returning-parent',{action:'welcome-heard'});
+  let config;const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic'},async(_url,options)=>{config=JSON.parse(options.body.get('session'));return new Response('v=0\r\nanswer');},()=>{},pool);
+  for(const language of ['en','es']){
+   const req=Object.assign(Readable.from([JSON.stringify({...input,mode:'profile',language,onboarding:true,collectAccount:false,saveOnboarding:true,replayWelcome:false,profile:{id:'new-draft',name:'',stage:''}})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'returning-parent'}});
+   let status,result;await handler(req,{writeHead(value){status=value;},end(value){result=JSON.parse(value);}},()=>assert.fail('wrong route'));
+   assert.equal(status,200,JSON.stringify(result));assert.equal(result.playWelcome,true);
+   assert.match(config.instructions,/FIRST-REGISTRATION SETUP/);assert.match(config.instructions,/separate new student draft/);
+   assert.doesNotMatch(config.instructions,/Older private student|Private older goal|RETURNING USER:/);
+   assert.ok(config.tools.some(tool=>tool.name==='save_onboarding_profile'));assert.ok(!config.tools.some(tool=>tool.name==='propose_account'));
+  }
+ }finally{await pool.end();}
+});
 
 test('all live modes permit bilingual transcription and explicit language switching',()=>{
  for(const mode of ['profile','finance','admissions','planning','loans']){
@@ -89,7 +107,7 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
   assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
-  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language','highlight_binder_topics']);
+  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language','highlight_binder_topics','end_conversation']);
   assert.equal(session.audio.output.speed,1);
   assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
  }
@@ -104,7 +122,7 @@ test('first-registration setup defers the app tour until the successful save',()
   const welcome=voiceSession({...input,language,onboarding:true},{});
   assert.match(welcome.instructions,/FIRST-REGISTRATION SETUP/);
   assert.match(welcome.instructions,/Do not give an app tour or explain features or summaries before the successful save/);
-  assert.match(welcome.instructions,/collect the account holder name and role and student details one question at a time/);
+  assert.match(welcome.instructions,/the student name, education stage and relevant optional setup details one question at a time/);
   assert.doesNotMatch(voiceSession({...input,language},{}).instructions,/FIRST-REGISTRATION SETUP/);
   assert.doesNotMatch(voiceSession({...input,language,onboarding:true,mode:'finance'},{}).instructions,/FIRST-REGISTRATION SETUP/);
  }

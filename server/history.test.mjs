@@ -35,7 +35,7 @@ test('family histories remain account-private and survive student deletion',asyn
   const voice=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async(url,options)=>{session=JSON.parse(options.body.get('session'));return new Response('v=0\r\nanswer');},()=>{},pool);
   const base={sdp:'v=0',language:'en',role:'parent',mode:'finance',routeConversations:true,students:[{id:'foreign',name:'FORGED NAME'}],profile:{name:'FORGED PROFILE'},memory:[{summary:'FORGED MEMORY'}]};
   assert.equal((await invoke(voice,base,'auth0|one','/api/profile-voice')).status,200);
-  assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language']);
+  assert.deepEqual(session.tools.map(t=>t.name),['request_conversation_target','set_conversation_language','end_conversation']);
   assert.match(session.instructions,/Sofia/);assert.doesNotMatch(session.instructions,/FORGED|General family advice/);
   assert.equal((await invoke(voice,{...base,targetConfirmed:true,studentId:null},'auth0|one','/api/profile-voice')).status,200);
   assert.match(session.instructions,/General family advice/);assert.doesNotMatch(session.instructions,/Residency is unresolved|FORGED/);
@@ -154,7 +154,7 @@ test('summary retry lookup is account scoped and finds records outside the recen
  }finally{await pool.end();}
 });
 
-test('voice reads the welcome receipt from Postgres across devices and preserves explicit replay',async()=>{
+test('voice respects explicit onboarding across devices even after a welcome receipt',async()=>{
  const {pool,run}=await fixture();let session;
  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async(_url,options)=>{session=JSON.parse(options.body.get('session'));return new Response('v=0\r\nanswer');},()=>{},pool);
  const input={sdp:'v=0\r\n',language:'en',role:'parent',mode:'profile',onboarding:true,profile:{}};
@@ -163,7 +163,9 @@ test('voice reads the welcome receipt from Postgres across devices and preserves
   assert.equal(result.status,200);assert.equal(result.body.playWelcome,true);
   await run('auth0|one',{action:'welcome-heard'});
   result=await invoke(handler,input,'auth0|one','/api/profile-voice');
-  assert.equal(result.body.playWelcome,false);assert.match(session.instructions,/RETURNING USER/);assert.doesNotMatch(session.instructions,/FIRST-REGISTRATION SETUP/);
+  assert.equal(result.body.playWelcome,true);assert.match(session.instructions,/FIRST-REGISTRATION SETUP/);assert.doesNotMatch(session.instructions,/RETURNING USER/);
+  result=await invoke(handler,{...input,onboarding:false},'auth0|one','/api/profile-voice');
+  assert.equal(result.body.playWelcome,false);assert.match(session.instructions,/RETURNING USER/);
   result=await invoke(handler,{...input,replayWelcome:true},'auth0|one','/api/profile-voice');
   assert.equal(result.body.playWelcome,true);assert.match(session.instructions,/FIRST-REGISTRATION SETUP/);
   result=await invoke(handler,input,'auth0|two','/api/profile-voice');assert.equal(result.body.playWelcome,true);

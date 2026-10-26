@@ -34,7 +34,7 @@ test('unconfirmed parent scope cannot receive personalized starting options or h
  }
 });
 
-test('onboarding uncertainty helps with setup; only the post-save introduction supports exploration',()=>{
+test('onboarding uncertainty helps with setup; post-save introduction closes without starting exploration',()=>{
  for(const language of ['en','es']){
   const session=voiceSession({mode:'profile',language,role:'student',collectAccount:true,saveOnboarding:true,profile:{}},{});
   assert.match(session.instructions,/PROFILE SETUP TAKES PRIORITY/);
@@ -43,8 +43,9 @@ test('onboarding uncertainty helps with setup; only the post-save introduction s
   assert.ok(session.tools.some(tool=>tool.name==='save_onboarding_profile'));
   assert.ok(!onboardingWelcome(language).includes('Illustrative options'));
   const home=homeVoiceIntroduction(language);
-  assert.ok(home.includes(voiceStartingPoints({language})));
+  assert.ok(!home.includes(voiceStartingPoints({language})));
+  assert.match(home,/Do not collect onboarding details, start counseling, ask another question/);
   assert.match(home,/SAME conversation without Hola/);
-  assert.match(home,/circle logo button labeled Talk with Origen on the bar at the bottom/);
+  assert.match(home,/Origen circle button|botón con el círculo de Origen/);
  }
 });

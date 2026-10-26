@@ -3,12 +3,20 @@ import {animate,createTimeline} from 'animejs';
 import {ArrowRight,BookOpen,X} from 'lucide-react';
 import './PersonalBinder.css';
 
-export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=false}:{initiallyOpen?:boolean;name:string;t:(en:string,es:string)=>string;children:ReactNode;onOpen?:()=>void}){
+export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=false,discussing=[],openRequest=0,onFollowReady}:{openRequest?:number;onFollowReady?:()=>void;discussing?:{id:string;title:string}[];initiallyOpen?:boolean;name:string;t:(en:string,es:string)=>string;children:ReactNode;onOpen?:()=>void}){
  const [phase,setPhase]=useState<'closed'|'opening'|'open'|'closing'>(initiallyOpen?'open':'closed');
  const opened=phase==='open',moving=phase==='opening'||phase==='closing';
  const pagesId=useId();
  const stage=useRef<HTMLDivElement>(null),cover=useRef<HTMLButtonElement>(null),pages=useRef<HTMLDivElement>(null),close=useRef<HTMLButtonElement>(null);
  const startHeight=useRef(0),pending=useRef(false);
+ const automatic=useRef(false),followed=useRef(0),followReady=useRef(onFollowReady);followReady.current=onFollowReady;
+ useLayoutEffect(()=>{
+  if(!openRequest||followed.current===openRequest)return;
+  automatic.current=true;
+  if(phase==='open'){followed.current=openRequest;followReady.current?.();return;}
+  if(phase!=='closed')return;
+  pending.current=true;startHeight.current=stage.current?.getBoundingClientRect().height||0;setPhase('opening');
+ },[openRequest,phase]);
  useLayoutEffect(()=>{
   if(!moving||!stage.current||!cover.current||!pages.current)return;
   const root=stage.current,front=cover.current,inside=pages.current;
@@ -59,11 +67,12 @@ export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=fal
   return()=>{disposed=true;animations.forEach(animation=>animation.revert());root.style.height='';if(frontStyle===null)front.removeAttribute('style');else front.setAttribute('style',frontStyle);if(pageStyle===null)inside.removeAttribute('style');else inside.setAttribute('style',pageStyle);preference.removeEventListener('change',reduce);};
  },[phase,moving]);
  useLayoutEffect(()=>{
-  if(phase==='open')close.current?.focus({preventScroll:true});
-  else if(phase==='closed'&&startHeight.current)cover.current?.focus({preventScroll:true});
+  if(phase==='open'&&!automatic.current)close.current?.focus({preventScroll:true});
+  else if(phase==='closed'&&startHeight.current&&!automatic.current)cover.current?.focus({preventScroll:true});
  },[phase]);
  function changeBinder(opening:boolean){
   if(pending.current||moving)return;
+  automatic.current=false;
   pending.current=true;
   startHeight.current=stage.current?.getBoundingClientRect().height||0;
   if(opening)onOpen?.();
@@ -73,6 +82,7 @@ export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=fal
   <button ref={cover} type="button" className="binder-cover" onClick={()=>changeBinder(true)} disabled={moving} hidden={opened} aria-hidden={phase==='closing'||undefined} aria-expanded={opened} aria-controls={pagesId}>
    <span className="binder-cover-spine" aria-hidden="true"/>
    <span className="binder-cover-content"><span className="binder-brand" aria-hidden="true">○ origen.</span><span className="binder-cover-kicker">{t('YOUR COLLEGE JOURNEY','TU CAMINO A LA UNIVERSIDAD')}</span><strong>{t('My binder','Mi carpeta')}</strong><span className="binder-owner-label"><span>{t('BELONGS TO','PERTENECE A')}</span><span className="binder-cover-owner">{name}</span></span><span className="binder-cover-description">{t('Your conversations, notes, and questions—in one place.','Tus conversaciones, notas y preguntas, en un solo lugar.')}</span><span className="binder-open-label"><BookOpen size={19} aria-hidden="true"/>{t('Open my binder','Abrir mi carpeta')}<ArrowRight size={19} aria-hidden="true"/></span></span>
+   {discussing.length>0&&<span className="binder-cover-discussion" role="status"><span>{t('Discussing now','Conversando ahora')}</span>{discussing.map(topic=><strong key={topic.id} data-topic={topic.id} className="is-discussing">{topic.title}</strong>)}</span>}
    <span className="binder-cover-tabs" aria-hidden="true"><i/><i/><i/><i/></span>
   </button>
   <div ref={pages} id={pagesId} className="binder-pages" hidden={phase==='closed'} inert={!opened}>

@@ -8,8 +8,9 @@ import {voiceMemoryTools} from './voiceMemoryTools.mjs';
 import {notifyMemoryContext,subscribeMemoryContext,watchMemoryRevision} from './memoryContext.mjs';
 import {workspaceGuide,voiceWorkspaceQueue,type WorkspaceSelection} from './voiceWorkspace.mjs';
 import {voiceSaveCompletion} from './voiceSaveCompletion.mjs';
+import {voiceClosing,isVoiceGoodbye,canEndVoiceConversation} from './voiceClosing.mjs';
 import {onboardingVoiceDiagnostics} from './onboardingVoiceDiagnostics.mjs';
-import {voiceProfileSaveTools,type VoiceProfileSaveResult} from './voiceProfileSave.mjs';
+import {voiceProfileSaveTools,voiceProfileSaveConsent,type VoiceProfileSaveResult} from './voiceProfileSave.mjs';
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
 import {binderActivity} from './binderActivity';
 import type {BinderTopic} from './binderSignals.mjs';
@@ -54,6 +55,8 @@ export type VoiceProps={onBusy?:(busy:boolean)=>void;workspaceFocus?:WorkspaceSe
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
+ const setupStarted=useRef(false);
+ useEffect(()=>{if(shared&&props.onboarding&&props.autoStart&&!setupStarted.current){setupStarted.current=true;shared.launch(props);}},[props.autoStart,props.onboarding]);
  useEffect(()=>{if(props.onboarding)shared?.syncOnboarding(props);},[props.profile,props.role,props.language]);
  if(shared&&props.onboarding)return <section className="profile-voice voice-launcher onboarding-voice-launcher"><VoiceStartButton label={shared.active?props.t('Open current conversation','Abrir conversación actual'):props.t('Talk with Origen','Hablar con Origen')} onClick={()=>{if(!shared.active)props.onOnboardingEvent?.('voice_button_pressed',{language:props.language});shared.active?shared.open():shared.launch(props);}}/></section>;
  if(!shared)return <LocalProfileVoice {...props}/>;
@@ -78,7 +81,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const latestSaveComplete=useRef(onProfileSaveComplete);latestSaveComplete.current=onProfileSaveComplete;
   const saveCompletion=useRef<ReturnType<typeof voiceSaveCompletion>|null>(null);
   const onboardingVoice=useRef<ReturnType<typeof onboardingVoiceDiagnostics>|null>(null);
-  const homeIntroduction=useRef<ReturnType<typeof voiceSaveCompletion>|null>(null);
+  const closing=useRef<ReturnType<typeof voiceClosing>|null>(null);
+  const homeClosing=useRef(false);
   const latestProfileSave=useRef(onSaveProfile);latestProfileSave.current=onSaveProfile;
   const [mode,setMode]=useState(initialMode);
   const liveMode=useRef(initialMode);
@@ -222,7 +226,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     void saveSummary();releaseConversation(summaryId.current);
     if(!preserveLogicalSession.current)void guidance.current.event('voice.ended',{reason:finalReason.current})?.catch(()=>{});
     clearInterval(usage.current.timer);usageEvent('voice_end');usage.current={id:''};
-    homeIntroduction.current?.ended(onboardingEndReason.current);homeIntroduction.current=null;
+    closing.current?.stop();closing.current=null;
     onboardingVoice.current?.stop();onboardingVoice.current=null;
     if(logSession.current)trackOnboarding('voice_ended',{reason:onboardingEndReason.current});
     log('session_cleanup');logSession.current='';
@@ -271,7 +275,12 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     },onChange:()=>{if(!liveMemorySaving.current&&memoryRevisionRef.current===memoryRevision)invalidateRememberedContext();},onUnavailable:()=>{if(!liveMemorySaving.current)invalidateRememberedContext(true);}});
   },[state,memoryRevision]);
   useEffect(()=>{if(state==='live'&&workspaceFocus&&workspaceSeen.current!==workspaceFocus.serial&&resources.current.workspace){workspaceSeen.current=workspaceFocus.serial;resources.current.workspace.select(workspaceFocus);}},[workspaceFocus?.serial,state]);
-  function end(){resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  function end(){setFinishing(false);resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  function closeWithFarewell(instructions?:string){
+    if(!closing.current||resources.current.dc?.readyState!=='open'){end();return;}
+    setFinishing(true);setMuted(true);setResearching(false);
+    closing.current.begin(instructions);
+  }
   function handoffContext():VoiceHandoff{return {studentId:summaryScope.current.id,confirmed:summaryScope.current.confirmed,language:spokenLanguage.current,turns:sessionTurns.current.slice(-8).map(turn=>({...turn,text:turn.text.slice(0,2000)}))};}
   function finishCall(drain=true,preserveSession=false){
     if(finishPromise.current)return finishPromise.current;
@@ -326,13 +335,13 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     binderSource.current=crypto.randomUUID();
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
-    const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version,canHear:()=>onboardingVoice.current?.ready()===true,
+    const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version&&!closing.current?.active(),canHear:()=>onboardingVoice.current?.ready()===true,
       post:async(body,signal)=>{const response=await apiFetch('/api/live-memory',{method:'POST',headers:{'Content-Type':'application/json',...(summaryToken.current?{Authorization:`Bearer ${summaryToken.current}`}:{})},body:JSON.stringify(body),signal});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'live_memory_unavailable'),{status:response.status});return data;},
       onWriting:value=>{liveMemorySaving.current=value;setCheckingMemorySave(value);},
       onConflict:()=>invalidateRememberedContext(),
       onUncertain:()=>{invalidateRememberedContext();setNotice(t('The save result could not be confirmed. Check your binder before trying again.','No se pudo confirmar el resultado. Revisa tu carpeta antes de volver a intentarlo.'));},
       onSaved:async result=>{
-        if(generation.current!==version)return;
+        if(generation.current!==version||closing.current?.active())return;
         const nextScope={id:summaryScope.current.id,confirmed:true},nextLanguage=spokenLanguage.current;
         const hasRecovery=!!checkpoint.current;
         if(hasRecovery)await saveSummary();
@@ -356,7 +365,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     try {
       if(summaryQueue.current.size){setNotice(t('Your previous conversation is still saving. You can start talking while it finishes.','Tu conversación anterior sigue guardándose. Puedes empezar a hablar mientras termina.'));void retrySummaries();}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
-      const voiceInput={enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding:onboarding&&(!family.account.welcomeHeard||replayWelcome),replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
+      const voiceInput={enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
       const startup=await voiceStartup({signal:abort.signal,
         getToken:async()=>history.cloud?getAccessTokenSilently():undefined,
         getMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;}),
@@ -370,18 +379,20 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       trackOnboarding('microphone_allowed');
       resources.current.stream=stream;
       const pc=new RTCPeerConnection();resources.current.pc=pc;
-      pc.ontrack=e=>{if(generation.current!==version)return;if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
+      pc.ontrack=e=>{if(generation.current!==version||closing.current?.active())return;if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
       const dc=pc.createDataChannel('oai-events');resources.current.dc=dc;
-      let openingRequested=false,homeIntroductionPending=false;
-      let playWelcome=onboarding&&(!family.account.welcomeHeard||replayWelcome);
+      let openingRequested=false;
+      let playWelcome=onboarding;
+      const saveConsent=voiceProfileSaveConsent();
       let welcomeResponseId:string|undefined,welcomeCompleted=false,welcomeRecorded=false,welcomeInterrupted=false;
       const sentEvents=new Map<string,string>();
       const send=(event:unknown)=>{
         if(dc.readyState!=='open')return;
         const payload=event as {type:string};
-        if(payload.type==='response.create'&&homeIntroductionPending){homeIntroductionPending=false;playWelcome=true;welcomeResponseId=undefined;welcomeCompleted=false;welcomeRecorded=false;welcomeInterrupted=false;trackOnboarding('home_introduction_requested');homeIntroduction.current=voiceSaveCompletion(()=>{},{retryAfterInterruption:false,onEvent:(name,metadata)=>{const mapped:Record<string,string>={save_confirmation_started:'home_introduction_started',save_confirmation_finished:'home_introduction_finished',save_confirmation_interrupted:'home_introduction_failed',save_confirmation_skipped:'home_introduction_failed'};if(mapped[name])trackOnboarding(mapped[name],{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});}});homeIntroduction.current.arm();event={...payload,response:{instructions:homeVoiceIntroduction(spokenLanguage.current,{preview:!history.cloud})}};}
-        else if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(playWelcome)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage,{preview:!history.cloud,role,hasName:!!profile.name.trim(),canSaveProfile:!!onSaveProfile})+(onAccountDraft?' For profile setup, ask the account holder what they would like to be called, then whether they are a student or parent/guardian. Collect these through propose_account before collecting the student profile. This replaces the earlier instruction to ask the student name first.':'')}};}
+        if(closing.current?.active())return;
+        if(payload.type==='response.create'&&!openingRequested){openingRequested=true;if(playWelcome)event={...payload,response:{instructions:onboardingWelcome(sessionLanguage,{preview:!history.cloud,role,hasName:!!profile.name.trim(),canSaveProfile:!!onSaveProfile,newStudent:!onAccountDraft})+(onAccountDraft?' For profile setup, ask the account holder what they would like to be called, then whether they are a student or parent/guardian. Collect these through propose_account before collecting the student profile. This replaces the earlier instruction to ask the student name first.':' The account is already set up. Collect only this new student; never ask for the account-holder name or role.')}};}
+        if(payload.type==='response.create'){const response=(event as {response?:Record<string,unknown>}).response||{};event={...event as Record<string,unknown>,response:{...response,metadata:{...response.metadata as Record<string,unknown>,origen_user_turn:saveConsent.token()}}};}
         const event_id=crypto.randomUUID();
         log('client_event',{eventId:event_id,operation:payload.type});
         sentEvents.set(event_id,payload.type);
@@ -413,7 +424,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             nextGuidance=data.guidance;
             return data.session;
           },{signal:abort.signal}),()=>{
-            if(generation.current!==version)return;
+            if(generation.current!==version||closing.current?.active())return;
             if(focus)currentWorkspace.current=focus;
             guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             if(initialScope){summaryScope.current={...initialScope,name:updateProfile.name};memorySaved.current=false;setTarget(initialScope);log('initial_target_confirmed');}
@@ -427,20 +438,16 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         finally{changingGuide=false;if(generation.current===version)setSwitchingGuide(false);}
       };
       transitionToHome.current=async()=>{
-        if(transitioned.current||generation.current!==version)return;
+        if(transitioned.current||generation.current!==version||closing.current?.active())return;
         transitioned.current=true;
         const complete=latestSetup.current.onProfileSaveComplete;
         const release=turns.holdReply();
         try{
-          trackOnboarding('home_guide_update_started');
-          const accepted=await resources.current.switchGuide?.('planning',{id:latestSetup.current.profile.id,confirmed:true});
-          if(generation.current!==version)return;
-          trackOnboarding(accepted?'home_guide_update_finished':'home_guide_update_failed');
           await complete?.();
           await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
-          if(generation.current!==version)return;
-          if(accepted){homeIntroductionPending=true;turns.request();}
-          else {trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved. You can keep talking; the app introduction is unavailable right now.','Tu perfil está guardado. Puedes seguir hablando; la introducción no está disponible ahora.'));}
+          if(generation.current!==version||closing.current?.active())return;
+          homeClosing.current=true;trackOnboarding('home_introduction_requested');
+          closeWithFarewell(homeVoiceIntroduction(spokenLanguage.current,{preview:!history.cloud}));
         }catch{transitioned.current=false;trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved, but home could not open yet. Please try again.','Tu perfil está guardado, pero no se pudo abrir el inicio. Intenta de nuevo.'));}finally{release();}
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
@@ -458,7 +465,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         busy:()=>turns.busy()||changingGuide,
         onPending:pending=>{if(pending)setNotice(t('We’ll pick this up after the current reply.','Retomaremos esto después de la respuesta actual.'));},
         apply:async selection=>{
-          if(generation.current!==version)return;
+          if(generation.current!==version||closing.current?.active())return;
           if(summaryScope.current.confirmed&&summaryScope.current.id!==selection.studentId){setNotice(t('This call is about a different person or family scope. End it, then press Talk about this again for the selected plan or note.','Esta llamada trata de otra persona o del grupo familiar. Termínala y luego presiona Hablemos de esto para el plan o la nota elegida.'));return;}
           if(liveMode.current==='profile'){setNotice(t('Save the profile before discussing saved work.','Guarda el perfil antes de hablar de tus notas o acciones.'));return;}
           const release=turns.holdReply();
@@ -485,8 +492,20 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       const progress=voiceResearchProgress({speak:sentence=>turns.progress(sentence),language:()=>spokenLanguage.current,isCurrent:()=>generation.current===version&&!abort.signal.aborted,onProgress:elapsed=>log('lookup_progress',{durationMs:elapsed})});
       const stopProgress=()=>{progress.stop();turns.endProgress();};
       resources.current.stopProgress=stopProgress;
+      homeClosing.current=false;
+      closing.current=voiceClosing({
+        send:event=>{if(dc.readyState!=='open')throw new Error('voice_closed');dc.send(JSON.stringify(event));},
+        stopInput:()=>{resources.current.stream?.getAudioTracks().forEach(track=>track.stop());awaitingTranscription.current.clear();speechInProgress.current=false;saveConsent.clear();},
+        stopWork:()=>{clearInterval(resources.current.timer);turns.stop();resources.current.cancelResearch?.();resources.current.stopProgress?.();resources.current.stopMemory?.();resources.current.stopGuide?.();resources.current.workspace?.stop();resources.current.studentSelection?.stop();},
+        language:()=>spokenLanguage.current,
+        disconnect:reason=>{
+          if(generation.current!==version)return;
+          if(homeClosing.current){trackOnboarding(reason==='drained'?'home_introduction_finished':'home_introduction_failed',{reason});if(reason==='drained')void family.recordVoiceExperience?.(true).catch(()=>{});}
+          finalReason.current=reason==='drained'?'completed':'disconnected';end();
+        },
+      });
       dc.onopen=()=>{
-        if(generation.current!==version)return;
+        if(generation.current!==version||closing.current?.active())return;
         publishBinderActivity(focus?[focus.topic]:[]);
         trackOnboarding('voice_connected');clearTimeout(resources.current.deadline);setState('live');saveLocal(voiceUsageKey,true);void family.recordVoiceExperience?.(false).catch(()=>log('voice_usage_save_failed'));
         if(!resources.current.stopWake){
@@ -494,7 +513,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           resources.current.stopWake=()=>wake.stop();
         }
         const started=Date.now();
-        resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){onboardingEndReason.current='time_limit';void finishCall();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
+        resources.current.timer=setInterval(()=>{const elapsed=Math.floor((Date.now()-started)/1000);setSeconds(elapsed);if(elapsed>=600){onboardingEndReason.current='time_limit';closeWithFarewell();setNotice(informational?t('The 10-minute conversation has ended.','La conversación de 10 minutos terminó.'):t('The 10-minute conversation has ended. Review your suggestions below.','La conversación de 10 minutos terminó. Revisa las sugerencias abajo.'));}},1000);
         if(spokenRequest){
           send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'The conversation target was already selected by voice. Continue the original user request below. Do not ask them to choose or confirm again. This application context is not user speech and does not change the conversation language.'}]}});
           send({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:spokenRequest}]}});
@@ -505,11 +524,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
+        if(closing.current?.active()){closing.current.event(e);return;}
         onboardingVoice.current?.provider(e);
         turns.playback(e);
         saveCompletion.current?.event(e);
-        homeIntroduction.current?.event(e);
-        if(generation.current!==version)return;
+        if(generation.current!==version||closing.current?.active())return;
         if(languageControl.event(e))return;
         if(e.type==='output_audio_buffer.started')setActivity('speaking');
         if(playWelcome&&liveMode.current!=='profile'&&!welcomeResponseId&&e.type==='response.created')welcomeResponseId=e.response?.id;
@@ -526,7 +545,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
         if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);if(['completed','failed','cancelled','incomplete'].includes(e.response?.status))void guidance.current.event('response.finished',{status:e.response.status})?.catch(()=>{});}
-        if(e.type==='input_audio_buffer.speech_started'){memoryTools.begin(e.item_id,spokenLanguage.current);linkTools.begin(e.item_id);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
+        if(e.type==='input_audio_buffer.speech_started'){saveConsent.begin(e.item_id);memoryTools.begin(e.item_id,spokenLanguage.current);linkTools.begin(e.item_id);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
         if(finishPromise.current&&e.type==='error'&&e.error?.code==='input_audio_buffer_commit_empty')return;
@@ -549,7 +568,14 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
               if(next!==languageControl.language()){
                 try{await languageControl.change(next);log('spoken_language_changed',{language:next});}
                 catch{log('spoken_language_update_failed');}
-                if(generation.current!==version)return;
+                if(generation.current!==version||closing.current?.active())return;
+              }
+            }
+            if(userTurn){
+              const latestTurn=saveConsent.transcript(e.item_id,e.transcript);
+              if(latestTurn&&isVoiceGoodbye(e.transcript)){
+                sessionTurns.current=appendConversationTurn(sessionTurns.current,{role:'user',text:redactCoordinatorCodes(e.transcript),topic:liveMode.current,language:spokenLanguage.current});
+                checkpointSummary();onboardingEndReason.current='user_end';closeWithFarewell();return;
               }
             }
             if(userTurn){linkTools.begin(e.item_id);memoryTools.transcript(e.item_id,e.transcript,spokenLanguage.current);}
@@ -585,21 +611,31 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           const researchRevision=research.revision();
           const memoryTurn=memoryResponseTurns.get(e.response?.id)??memoryTools.sequence();
           let called=await voiceLanguageTools(e.response?.output||[],languageControl,send)>0;
-          if(generation.current!==version)return;
+          if(generation.current!==version||closing.current?.active())return;
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
+            if(closing.current?.active())return;
             called=true;let accepted=false;
+            if(['propose_account','propose_profile','end_conversation'].includes(item.name)&&e.response?.metadata?.origen_user_turn!==saveConsent.token()){
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'superseded_turn',instruction:'A newer user turn arrived. Follow the latest user words; do not apply an older draft or end the call.'})}});continue;
+            }
+            if(item.name==='end_conversation'){
+              let requested=false;try{requested=JSON.parse(item.arguments).requested_by_user===true;}catch{}
+              const latestWords=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text;
+              if(requested&&canEndVoiceConversation(latestWords)){onboardingEndReason.current='user_end';closeWithFarewell();return;}
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'end_not_requested'})}});continue;
+            }
             if(item.name==='highlight_binder_topics'){
               let topics:unknown;try{topics=JSON.parse(item.arguments).topics;}catch{}
               const applied=privacyLease.valid()&&!scopePending.current&&summaryScope.current.confirmed&&liveMode.current!=='profile'&&binderActivity.update(binderSource.current,topics);
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:applied?'topics_highlighted':'highlight_unavailable',instruction:'Visual update only. No notes were edited or saved. Continue the conversation naturally without announcing the highlight.'})}});continue;
             }
             if(linkTools.isTool(item.name)){
-              const output=await linkTools.invoke(item,linkResponseTurns.get(e.response?.id)??linkTools.sequence());if(generation.current!==version)return;
+              const output=await linkTools.invoke(item,linkResponseTurns.get(e.response?.id)??linkTools.sequence());if(generation.current!==version||closing.current?.active())return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
             }
             if(memoryTools.isTool(item.name)){
-              const output=await memoryTools.invoke(item,memoryTurn);if(generation.current!==version)return;
+              const output=await memoryTools.invoke(item,memoryTurn);if(generation.current!==version||closing.current?.active())return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
             }
             if(item.name==='set_conversation_language'||item.name==='save_onboarding_profile')continue;
@@ -660,7 +696,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
                   }
                   return {result,reused,query};
                 },researchRevision);
-                if(generation.current!==version)return;
+                if(generation.current!==version||closing.current?.active())return;
                 if(!reused)cache.put(query,result);
                 log('lookup_success',{callId:item.call_id,sourceCount:result.sources.length,durationMs:Date.now()-researchStarted.current});
                 output=researchEvidence(result,reused);
@@ -668,7 +704,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
                 setSources(sessionSources.current);
                 setNotice('');
               }catch(error){
-                if(generation.current!==version)return;
+                if(generation.current!==version||closing.current?.active())return;
                 const privateQuery=error instanceof Error&&error.message==='private_search_details';
                 const cancelled=error instanceof Error&&error.name==='AbortError';
                 const timedOut=error instanceof Error&&error.name==='TimeoutError';
@@ -679,7 +715,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
                 if(budgetExceeded)output={error:'research_budget_reached',instruction:'Do not retry research in this call. Explain the limit briefly and use already verified evidence only when its scope and year match; otherwise offer the official source or counselor as the next step. Keep the conversation open and never invent a policy.'};
                 setNotice(cancelled?t('Search stopped. You can keep talking.','Búsqueda detenida. Puedes seguir hablando.'):timedOut?t('The search took too long. You can keep talking or ask to try again.','La búsqueda tardó demasiado. Puedes seguir hablando o pedir otro intento.'):privateQuery?t('Please use a general college or aid question for this search.','Para esta búsqueda, usa una pregunta general sobre la universidad o ayuda financiera.'):budgetExceeded?t('We have reached the lookup limit for this call. You can keep talking about what we found.','Llegamos al límite de consultas de esta llamada. Puedes seguir hablando sobre lo que encontramos.'):t('The lookup could not verify official sources. You can keep talking or try another question.','No se pudieron verificar fuentes oficiales. Puedes seguir conversando o hacer otra pregunta.'));
               }finally{stopProgress();}
-              if(generation.current!==version)return;
+              if(generation.current!==version||closing.current?.active())return;
               setResearching(false);
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});
               continue;
@@ -703,8 +739,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             }catch{/* Invalid suggestions never reach the form. */}
             send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'proposed_for_review_not_saved':'invalid_proposal'})}});
           }
-          called=(await voiceProfileSaveTools(e.response?.output||[],latestProfileSave.current?async()=>{const result=await latestProfileSave.current!();if(result.status==='saved'&&generation.current===version){saveCompletion.current?.arm();log('profile_saved_awaiting_confirmation');}return result;}:undefined,send,()=>generation.current===version)>0)||called;
-          if(generation.current!==version)return;
+          called=(await voiceProfileSaveTools(e.response?.output||[],latestProfileSave.current?async()=>{const result=await latestProfileSave.current!();if(result.status==='saved'&&generation.current===version){saveCompletion.current?.arm();log('profile_saved_awaiting_confirmation');}return result;}:undefined,send,()=>generation.current===version&&!closing.current?.active(),()=>saveConsent.consume(e.response?.metadata?.origen_user_turn))>0)||called;
+          if(generation.current!==version||closing.current?.active())return;
           if(called)turns.toolsCompleted();else turns.completed();
         }
       };
@@ -716,19 +752,19 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       const offer=await pc.createOffer();await pc.setLocalDescription(offer);
       const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':segmentId},body:JSON.stringify({...voiceInput,sdp:offer.sdp,preparedContextId:startup.prepared()}),signal:abort.signal});
       const data=await response.json().catch(()=>null);
-      if(generation.current!==version)return;
+      if(generation.current!==version||closing.current?.active())return;
       setDiagnosticId(responseReference(response)||'');
       guidance.current.accept(data?.guidance);
       if(!response.ok)throw apiFailure(response,data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
-      if(generation.current!==version)return;
+      if(generation.current!==version||closing.current?.active())return;
       memoryTools.configure(data.liveMemorySession);linkTools.configure(data.coordinatorLinking===true);
       memoryPolicyRef.current=data.memoryPolicy;
       if(typeof data.memoryRevision==='number'){memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
       await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){
-      if(generation.current!==version)return;
+      if(generation.current!==version||closing.current?.active())return;
       const code=err instanceof Error?err.message:'';
       finalReason.current='failed';void guidance.current.event('voice.start_failed',{phase:'transport'})?.catch(()=>{});
       const messages:Record<string,[string,string]>={
@@ -774,7 +810,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       {state==='idle'?<VoiceStartButton label={t('Talk with Origen','Hablar con Origen')} onClick={()=>{trackOnboarding('voice_button_pressed',{language});onRestart?onRestart():void start();}}/>:<>
         <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):switchingGuide?t('Following your question…','Siguiendo tu pregunta…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
         {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{trackOnboarding(muted?'microphone_unmuted':'microphone_muted');resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
-        <button type="button" className="button outline voice-end" aria-label={t('End conversation','Terminar conversación')} disabled={finishing} onClick={()=>{onboardingEndReason.current='user_end';void finishCall();}}><PhoneOff size={18}/><span className="voice-control-label">{t('End conversation','Terminar conversación')}</span></button>
+        <button type="button" className="button outline voice-end" aria-label={finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')} onClick={()=>{onboardingEndReason.current='user_end';if(closing.current?.active())closing.current.force();else closeWithFarewell();}}><PhoneOff size={18}/><span className="voice-control-label">{finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')}</span></button>
       </>}
       {state==='live'&&audioBlocked&&<button type="button" className="button outline voice-audio-recovery" onClick={resumeAudio}>{t('Play Origen audio','Reproducir audio de Origen')}</button>}
       {state==='live'&&researching&&<button type="button" className="button outline voice-research-cancel" onClick={()=>resources.current.cancelResearch?.()}>{t('Cancel search','Cancelar búsqueda')}</button>}

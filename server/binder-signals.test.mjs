@@ -8,7 +8,7 @@ test('only confirmed college conversations expose the visual topic tool across l
   const config=voiceSession({mode,language,role,profile:{name:'Synthetic'},studentId:'student-a',routeConversations:role==='parent'&&mode!=='profile',targetConfirmed:confirmed,continuing:true},{});
   const available=mode!=='profile'&&(role==='student'||confirmed);
   assert.equal(config.tools.filter(tool=>tool.name==='highlight_binder_topics').length,available?1:0);
-  if(available){assert.match(config.instructions,/does not navigate, edit or save notes/);assert.match(config.instructions,/Do not call on every reply/);}
+  if(available){assert.match(config.instructions,/does not edit or save notes/);assert.match(config.instructions,/Do not call on every reply/);}
  }
 });
 

@@ -1,7 +1,7 @@
 import {useEffect,useRef,type ReactNode} from 'react';
 import type {BinderTopic} from './binderSignals.mjs';
 
-export default function BinderNoteHighlight({id,topic,fresh,suggested,onRead,children}:{id:string;topic:BinderTopic;fresh:boolean;suggested:boolean;onRead:()=>void;children:ReactNode}){
+export default function BinderNoteHighlight({id,topic,fresh,suggested,onRead,children,memory=false}:{id:string;topic:BinderTopic;fresh:boolean;suggested:boolean;onRead:()=>void;children:ReactNode;memory?:boolean}){
  const element=useRef<HTMLElement>(null),read=useRef(onRead);read.current=onRead;
  useEffect(()=>{
   if(!fresh||!element.current)return;
@@ -12,5 +12,5 @@ export default function BinderNoteHighlight({id,topic,fresh,suggested,onRead,chi
   observer.observe(element.current);document.addEventListener('visibilitychange',update);
   return()=>{stop();observer.disconnect();document.removeEventListener('visibilitychange',update);};
  },[id,fresh]);
- return <article ref={element} data-note-id={id} className={`notebook-note divider-${topic}${suggested?' notebook-suggestion':''}${fresh?' notebook-note-new':''}`}>{children}</article>;
+ return <article ref={element} data-note-id={memory?undefined:id} data-memory-id={memory?id:undefined} className={`notebook-note divider-${topic}${memory?' memory-entry':''}${suggested?' notebook-suggestion':''}${fresh?' notebook-note-new':''}`}>{children}</article>;
 }

@@ -7,6 +7,7 @@ import {fixture} from './family-fixture.mjs';
 import {createHistoryRepository} from './history.mjs';
 import {createLifecycleRepository} from './account-lifecycle.mjs';
 import {createTopicRepository,createTopicService,createTopicNotesHandler,validateTopicRequest,validateSuggestions} from './topic-notes.mjs';
+import {refreshBinderNotes} from '../src/binderRefresh.mjs';
 
 const student={id:'sofia',name:'Sofia',stage:'Community college',interest:'Art',gpa:'',color:'peach'};
 const summary='Sofia is interested in art. We discussed transfer courses. She still wants to ask a counselor which courses transfer.';
@@ -23,6 +24,21 @@ async function setup(t){
  return {...f,repo:createTopicRepository(f.pool),history:createHistoryRepository(f.pool)};
 }
 const rejects=(promise,status,message)=>assert.rejects(promise,{status,...(message?{message}:{})});
+
+test('saved transfer summary reaches the topic view after background work even when an older job failed',async t=>{
+ const {pool,history,repo}=await setup(t);await history('owner',{action:'save',item});
+ const service=createTopicService(pool,{OPENAI_API_KEY:'synthetic'},async()=>response({notes:[suggestion]}));
+ const loads=[];let pending=1,requests=0;
+ await refreshBinderNotes({signal:new AbortController().signal,
+  request:async()=>{requests++;return {...await repo('owner',{action:'load',studentId:'sofia'}),pendingCount:pending,background:{enabled:true,pending,failed:1,retryAfterMs:3000}};},
+  onData:result=>loads.push(result),
+  pause:async()=>{await service('owner',{action:'suggest',studentId:'sofia',summaryId:item.id,language:'en'});pending=0;},
+ });
+ assert.equal(requests,2);assert.equal(loads[0].notes.length,0);assert.equal(loads[1].notes.length,1);
+ assert.equal(loads[1].notes[0].topic,'transfer');assert.equal(loads[1].notes[0].content,suggestion.content);
+ assert.equal(loads[1].notes[0].status,'suggested');assert.deepEqual(loads[1].generatedSummaryIds,[item.id]);
+ for(const [subject,studentId] of [['other','sofia'],['owner','mateo'],['owner',null]])assert.deepEqual((await repo(subject,{action:'load',studentId})).notes,[]);
+});
 
 test('topic API requires explicit scope and bounded valid fields and strips forged ownership',()=>{
  for(const input of [{action:'load'},{action:'load',studentId:''},{action:'source',studentId:null},{...manual(),id:'bad'},{...manual(),note:{...note,content:' '}},{...manual(),note:{...note,content:'x'.repeat(2001)}},{...manual(),note:{...note,topic:'mastered'}},{...manual(),note:{...note,kind:'mastered'}},{...manual(),note:{...note,language:'fr'}},{action:'delete',studentId:null,id:randomUUID(),version:0}])assert.throws(()=>validateTopicRequest(input),{status:400});
