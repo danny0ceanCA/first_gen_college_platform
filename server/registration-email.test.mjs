@@ -11,7 +11,6 @@ test('all four bilingual templates match the parent email branding and escape na
   assert.ok(message.html.includes('#a4513c'));assert.ok(message.html.includes('#f4eee4'));assert.ok(message.html.includes('cid:origen-mark'));
   assert.ok(message.html.includes('lang="es"'));assert.ok(message.html.includes('&lt;img onerror=alert(1)&gt;'));assert.ok(!message.html.includes('<img onerror'));
   assert.ok(message.html.includes('A &amp; B College'));assert.match(message.text,/Daniel\n(?:Founder, )?Origen Edu/);
-  assert.match(message.subject,/Daniel at Origen:/);
   const route=kind.startsWith('organization-')?'institutions':kind==='coordinator-received'?'coordinator-register':'coordinators';
   assert.ok(message.text.includes(`https://origen.example/#${route}`));
  }

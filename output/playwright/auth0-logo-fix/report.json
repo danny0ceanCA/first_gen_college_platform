@@ -1,0 +1,90 @@
+{
+  "tenant": "origenedu.us.auth0.com",
+  "checkedAt": "2026-10-27T18:44:21.037Z",
+  "emailSent": false,
+  "passwordSubmitted": false,
+  "realCoordinatorCreated": false,
+  "screens": [
+    {
+      "name": "login-desktop",
+      "viewport": {
+        "width": 1100,
+        "height": 900
+      },
+      "images": [
+        {
+          "alt": "origenedu",
+          "loaded": true,
+          "source": "https://origenedu.ai/auth0-logo.svg",
+          "width": 162,
+          "height": 48
+        }
+      ],
+      "horizontalOverflow": false,
+      "headings": [
+        "Welcome"
+      ]
+    },
+    {
+      "name": "login-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "images": [
+        {
+          "alt": "origenedu",
+          "loaded": true,
+          "source": "https://origenedu.ai/auth0-logo.svg",
+          "width": 162,
+          "height": 48
+        }
+      ],
+      "horizontalOverflow": false,
+      "headings": [
+        "Welcome"
+      ]
+    },
+    {
+      "name": "password-desktop",
+      "viewport": {
+        "width": 1100,
+        "height": 900
+      },
+      "images": [
+        {
+          "alt": "origenedu",
+          "loaded": true,
+          "source": "https://origenedu.ai/auth0-logo.svg",
+          "width": 162,
+          "height": 48
+        }
+      ],
+      "horizontalOverflow": false,
+      "headings": [
+        "Change Your Password"
+      ]
+    },
+    {
+      "name": "password-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "images": [
+        {
+          "alt": "origenedu",
+          "loaded": true,
+          "source": "https://origenedu.ai/auth0-logo.svg",
+          "width": 162,
+          "height": 48
+        }
+      ],
+      "horizontalOverflow": false,
+      "headings": [
+        "Change Your Password"
+      ]
+    }
+  ],
+  "passed": true
+}
