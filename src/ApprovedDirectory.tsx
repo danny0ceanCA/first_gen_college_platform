@@ -4,6 +4,7 @@ import {Search,Users,Building2,GraduationCap,BookOpen,MessageSquare,CheckCircle2
 import {apiFetch} from './api';
 import {getStaffAccessToken,staffVerificationErrors} from './StaffVerification';
 import OrganizationOverview from './OrganizationOverview';
+import CoordinatorActivation from './CoordinatorActivation';
 
 type RecordItem={id:string;name:string;status:string;email?:string;organizationName?:string;jobRole?:string;approvedAt?:string};
 type Overview={id:string;days:number;active:boolean;linkedStudents:number;sharedBinders:number;pendingConnections:number;guidanceEntries:number;reviewedEntries:number;lastGuidanceAt:string|null};
@@ -57,7 +58,7 @@ export default function ApprovedDirectory({kind,onError}:{kind:'organizations'|'
    <div className="org-review-rows">{items.map(i=><button key={i.id} className="org-review-row" aria-current={i.id===selected?'true':undefined} onClick={()=>setSelected(i.id)}><span className="org-review-row-name"><Icon size={18}/><strong>{i.name}</strong></span>{i.organizationName&&<span className="org-review-row-person">{i.organizationName}</span>}<span className={`org-review-badge ${i.status==='active'?'ready':''}`}>{statusLabel(i)}</span></button>)}</div>
    <div className="approval-pagination">{after&&<button disabled={loading} onClick={()=>setAfter('')}>First page</button>}{next&&<button disabled={loading} onClick={()=>setAfter(next)}>Next page</button>}</div>
   </aside>{item?<article className="org-review-detail"><header><span className={`org-review-badge ${item.status==='active'?'ready':''}`}>{statusLabel(item)}</span><h2>{item.name}</h2>{item.organizationName&&<p className="approval-help">{item.organizationName}{item.jobRole?` · ${item.jobRole}`:''}</p>}</header>
-   {kind==='organizations'?<OrganizationOverview key={`${item.id}-${revision}`} organizationId={item.id} onError={onError}/>:<><section className="org-review-info"><dl><div><dt>Email</dt><dd>{item.email}</dd></div><div><dt>Approved</dt><dd>{item.approvedAt?new Date(item.approvedAt).toLocaleDateString():'On record'}</dd></div></dl></section><CoordinatorOverview key={`${item.id}-${revision}`} id={item.id} request={request} onError={onError}/></>}
+   {kind==='organizations'?<OrganizationOverview key={`${item.id}-${revision}`} organizationId={item.id} onError={onError}/>:<><section className="org-review-info"><dl><div><dt>Email</dt><dd>{item.email}</dd></div><div><dt>Approved</dt><dd>{item.approvedAt?new Date(item.approvedAt).toLocaleDateString():'On record'}</dd></div></dl></section><CoordinatorActivation key={`activation-${item.id}-${revision}`} id={item.id} request={request} onError={onError}/><CoordinatorOverview key={`${item.id}-${revision}`} id={item.id} request={request} onError={onError}/></>}
   </article>:<div className="org-review-empty" role={error?'alert':'status'}><Icon size={32}/><h2>{loading?'Loading…':error?'Directory unavailable':search?'No matches found':after?'No more records':'No approved records yet'}</h2>{error?<><p>The directory could not be loaded. Your records have not changed.</p><button className="button outline" onClick={()=>setRevision(v=>v+1)}>Try again</button></>:!loading&&<p>{search?'Try a different name or clear your search.':'Approved records appear here after review.'}</p>}</div>}</div>
  </section>;
 }

@@ -7,6 +7,7 @@ export const BINDER_SHARING_POLICY_VERSION='coordinator-sharing-v1';
 export const sharingTopics=Object.freeze(['options','transfer','costs','applications']);
 export const coordinatorFlags=Object.freeze(['ORIGEN_COORDINATOR_ACCOUNTS','ORIGEN_COORDINATOR_LINKING','ORIGEN_BINDER_SHARING','ORIGEN_COORDINATOR_FEEDBACK','ORIGEN_COORDINATOR_VOICE_LINKING','ORIGEN_COORDINATOR_BINDER_VIEWING']);
 export const coordinatorTables=Object.freeze([
+ 'origen_coordinator_activation','origen_coordinator_identity_stream',
  'origen_registration_emails',
  'origen_organization_voice_attributions',
  'origen_coordinator_applications','origen_coordinator_application_controls',

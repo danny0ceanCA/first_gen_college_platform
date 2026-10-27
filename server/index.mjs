@@ -27,6 +27,7 @@ import {purgeConversationQuality} from './conversation-quality-store.mjs';
 import {purgeInstitutionOutreach} from './institution-outreach-data.mjs';
 import {createInquiryHandler,purgeInstitutionInquiries} from './institution-inquiries.mjs';
 import {createAdminHandler} from './admin.mjs';
+import {createCoordinatorIdentityHandler,assertCoordinatorActivationReady} from './coordinator-activation.mjs';
 import {createSupportHandler,assertSupportReady} from './support-diagnostics.mjs';
 import {createProgressHandler,assertProgressConfiguration,purgeProgressHistory} from './progress-history.mjs';
 import {createFamilyRepository} from './family.mjs';
@@ -77,6 +78,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const institutions=createInstitutionHandler(database,env);
  const inquiries=createInquiryHandler(database);
  const metrics=createMetricsHandler(database);
+ const coordinatorIdentity=createCoordinatorIdentityHandler(database,env);
  const lifecycle=createLifecycleHandler(database);
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
@@ -117,6 +119,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   }
   if(req.method==='GET'&&/^\/api\/institutions\/(?:directory|(?:published|pages|qr)\/[a-z0-9-]{1,100})$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
   if(req.method!=='POST')return send(405,'method_not_allowed');
+  if(req.url==='/api/auth0/coordinator-events')return coordinatorIdentity(req,res);
   if(req.url==='/api/guardian-permission')return permission.handle(req,res,true);
   if(req.url==='/api/institution-inquiries/public')return inquiries(req,res,()=>send(404,'not_found'));
   if(req.url==='/api/institution-metrics/event')return metrics(req,res,()=>send(404,'not_found'));
@@ -181,6 +184,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  for(const key of ['AUTH0_DOMAIN','AUTH0_AUDIENCE','ALLOWED_ORIGINS'])if(!process.env[key])throw new Error(`Missing ${key}`);
  const rawDatabase=createDatabase();
  database=rawDatabase?isolateDatabase(rawDatabase):null;
+  if(database)await assertCoordinatorActivationReady(rawDatabase,process.env);
   if(database){await assertRuntimeIsolation(rawDatabase);await assertCoordinatorProvisioningReady(rawDatabase,process.env);await assertCoordinatorLinkingReady(rawDatabase,process.env);await assertBinderSharingReady(rawDatabase,process.env);await assertCoordinatorViewingReady(rawDatabase,process.env);await assertCoordinatorFeedbackReady(rawDatabase,process.env);if(diagnosticOperationsEnabled(process.env))await assertDiagnosticOperationsReady(rawDatabase);if(process.env.SUPPORT_DIAGNOSTICS_ENABLED==='true')await assertSupportReady(rawDatabase);if(process.env.OBSERVABILITY_EXPORT==='true')await assertTelemetryLifecycle(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');runtimeLog({event:'service.database.verified'});}
   else runtimeLog({event:'service.database.unavailable'});
   maintenancePool=createMaintenanceDatabase(process.env);

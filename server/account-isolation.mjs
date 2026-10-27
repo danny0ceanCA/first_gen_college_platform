@@ -42,6 +42,13 @@ export function runOperatorReport(work){
  return context.run({subject:'',purpose:'analytics'},work);
 }
 
+// Only the separately authenticated Auth0 webhook or an operator replay uses
+// this purpose. It cannot run inside a browser/account request scope.
+export function runIdentityEvents(work){
+ if(context.getStore())throw new Error('identity_events_not_available_in_request');
+ return context.run({subject:'',purpose:'identity-events'},work);
+}
+
 // One connection/transaction owns its context. SET LOCAL is reset by both
 // COMMIT and ROLLBACK; pooled sessions never retain the previous user's scope.
 export function isolateDatabase(pool,{schema='public'}={}){
