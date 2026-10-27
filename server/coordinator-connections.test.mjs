@@ -29,6 +29,25 @@ test('codes normalize exact separators and case, never repair ambiguous characte
  assert.throws(()=>validateLiveChange({kind:'create',category:'goal',content:'ABCDE-23456'}));
  assert.equal(validateMemory({id:'summary',studentId:'alex',mode:'planning',summary:'Code ABCDE-23456',date:new Date().toISOString(),sources:[]}).summary,'Code [connection code omitted]');
 });
+test('ordinary transfer-planning prose survives code redaction and summary validation',()=>{
+ const prose='Alex wants to understand which classes transfer. Review study plans, assessment requirements and the department website. The counselor visit is the key next step.';
+ assert.equal(redactCoordinatorCodes(prose),prose);
+ assert.equal(redactCoordinatorCodes('Understand the next steps.'),'Understand the next steps.');
+ assert.equal(validateMemory({id:'transfer-summary',studentId:'alex',mode:'planning',summary:prose,date:new Date().toISOString(),sources:[]}).summary,prose);
+ assert.doesNotThrow(()=>validateLiveChange({kind:'create',category:'goal',content:'Understand which courses transfer.'}));
+});
+
+test('code cues and recognizable code formats remain private, including alphabetic codes',()=>{
+ for(const text of ['ABCDE23456','abcde23456','abcde 23456','abcde-fghjk','ABCDEFGHJK','ABCDE FGHJK','The code is abcdefghjk','La clave es abcde fghjk','a b c d e f g h j k']){
+  assert.match(redactCoordinatorCodes(text),/\[connection code omitted\]/,text);
+ }
+ const turns=[{role:'assistant',text:'What is your coordinator connection code?'},{role:'user',text:'abcdefghjk'},{role:'assistant',text:'Let us understand your study plans.'}];
+ const redacted=redactCoordinatorTurns(turns);
+ assert.equal(redacted[1].text,'[Connection code omitted]');
+ assert.equal(redacted[2].text,turns[2].text);
+ assert.deepEqual(redactCoordinatorTurns(redacted),redacted);
+});
+
 test('voice tools deduplicate, ignore stale results and cannot confirm',async()=>{
  const requests=[],cards=[];let resolveLookup;
  const controller=coordinatorVoiceTools({studentId:'alex',onClear:()=>{},onPrepared:c=>cards.push(c),post:async body=>{requests.push(body);if(body.action==='open')return {contextId:randomUUID()};if(body.action==='lookup')return new Promise(r=>resolveLookup=r);return {};}});
