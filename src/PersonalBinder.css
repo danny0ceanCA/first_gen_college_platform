@@ -44,7 +44,9 @@
 .personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{position:absolute;top:0;left:0;width:100%;will-change:transform,opacity}
 .personal-binder.is-transitioning>.binder-cover{z-index:3;pointer-events:none;transition:none;box-shadow:6px 0 24px #3b231c30}
 .personal-binder.is-transitioning>.binder-pages{z-index:1;pointer-events:none;box-shadow:none}
-.personal-binder.binder-closing>.binder-pages{height:100%;overflow:hidden}
+.personal-binder.binder-closing>.binder-pages{overflow:hidden}
+/* Close the cover over stationary dividers before collapsing the book height. */
+.personal-binder.binder-closing{overflow:visible}
 @media(prefers-reduced-motion:reduce){.personal-binder.is-transitioning>.binder-cover,.personal-binder.is-transitioning>.binder-pages{will-change:auto}.binder-open-label{transition:none}}
 
 /* A phone carries one portrait cover and one readable page at a time. */

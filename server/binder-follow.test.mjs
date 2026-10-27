@@ -17,14 +17,17 @@ test('confirmed student opens a binder before a topic exists; topic changes sele
  assert.ok(costs.serial>transfer.serial);
 });
 
-test('related topics and reordered lists keep a stable primary divider',()=>{
+test('the first current topic controls the divider while related topics still glow',()=>{
  const follower=createBinderFollower();
  const first=follower.observe(signal(['costs']),context);
- assert.equal(follower.observe(signal(['transfer','costs']),context),first);
- assert.equal(follower.observe(signal(['costs','transfer']),context),first);
+ assert.equal(first.topic,'costs');
+ assert.equal(follower.observe(signal(['transfer','costs']),context).topic,'transfer');
+ assert.equal(follower.observe(signal(['costs','transfer']),context).topic,'costs');
  const next=follower.observe(signal(['transfer','applications']),context);
  assert.equal(next.topic,'transfer');
- assert.equal(follower.observe(signal(['applications','transfer']),context),next);
+ const applications=follower.observe(signal(['applications','transfer']),context);
+ assert.equal(applications.topic,'applications');
+ assert.equal(follower.observe(signal(['applications','transfer']),context),applications);
 });
 
 test('unrelated conversation cancels a queued topic; it does not select another divider',()=>{

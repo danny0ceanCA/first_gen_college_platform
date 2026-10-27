@@ -10,8 +10,8 @@ export function createBinderFollower(){
   if(!valid){scope='';primary=null;command=null;return null;}
   const nextScope=JSON.stringify([activity.source,subject,activity.studentId]);
   const changed=nextScope!==scope;
-  const topics=binderTopics.filter(topic=>activity.topics.includes(topic));
-  const next=(!changed&&topics.includes(primary)?primary:topics[0])||null;
+  const topics=activity.topics.filter(topic=>binderTopics.includes(topic));
+  const next=topics[0]||null;
   if(changed||next!==primary){
    command=changed||next?{serial:++serial,source:activity.source,subject,studentId:activity.studentId,topic:next}:null;
   }

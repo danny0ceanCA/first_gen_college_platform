@@ -333,6 +333,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
     const version=++generation.current;
     binderSource.current=crypto.randomUUID();
+    // A confirmed student can follow along while the connection is starting.
+    publishBinderActivity(focus?[focus.topic]:[]);
     saveCompletion.current=voiceSaveCompletion(reason=>{if(reason!=='drained')void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});else if(transitionToHome.current)void transitionToHome.current();else void Promise.resolve(latestSaveComplete.current?.()).catch(()=>{});},{onEvent:(name,metadata)=>{trackOnboarding(name,{...metadata,...(name==='save_confirmation_finished'?{playbackReady:onboardingVoice.current?.ready()===true}:{})});if(name==='save_confirmation_finished')log('profile_save_confirmation_finished');}});
     const abort=new AbortController();resources.current.abort=abort;
     const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version&&!closing.current?.active(),canHear:()=>onboardingVoice.current?.ready()===true,

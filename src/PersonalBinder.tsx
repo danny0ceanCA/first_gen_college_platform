@@ -37,7 +37,7 @@ export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=fal
   // A delayed Anime.js track does not apply its initial pose until it starts.
   // Set the incoming surface before paint so it cannot flash over the outgoing one.
   if(opening){inside.style.opacity='0';inside.style.transform='translateX(12px)';}
-  else{front.style.transform='rotateY(-105deg)';}
+  else{front.style.transform='rotateY(-105deg)';inside.style.height=`${startHeight.current}px`;}
   // Keep the cover opaque as it turns: the paper is revealed by the hinge,
   // never through the cover. One timeline owns both surfaces and their height.
   const motion=createTimeline({autoplay:false,onComplete:()=>{
@@ -58,7 +58,8 @@ export default function PersonalBinder({name,t,children,onOpen,initiallyOpen=fal
    const top=root.getBoundingClientRect().top;
    if(top<16)window.scrollTo({top:Math.max(0,window.scrollY+top-24),behavior:'smooth'});
    motion.add(inside,{translateX:[0,6],duration:500,ease:'inOutSine'},0)
-    .add(root,{height:[startHeight.current,targetHeight],duration:760,ease:'inOutCubic'},0)
+    .add(inside,{opacity:[1,0],duration:180,ease:'inCubic'},460)
+    .add(root,{height:[startHeight.current,targetHeight],duration:340,ease:'inOutCubic'},640)
     .add(front,{rotateY:[-105,0],duration:640,ease:'inOutCubic'},120);
   }
   motion.play();

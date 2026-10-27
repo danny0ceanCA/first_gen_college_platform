@@ -1,3 +1,4 @@
+import {useBinderNavigationGuard} from './useBinderFollow';
 import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {apiFetch} from './api';
@@ -45,8 +46,9 @@ function SharingSheet({t,busy,onClose,children}:{t:T;busy:boolean;onClose:()=>vo
   {children}
  </dialog>,document.body);
 }
-export default function BinderSharing({studentId,t,openRequest=0,connectionOpenRequest=0}:{studentId:string;t:T;openRequest?:number;connectionOpenRequest?:number}){
+export default function BinderSharing({studentId,t,openRequest=0,connectionOpenRequest=0,launchRequest=0}:{studentId:string;t:T;openRequest?:number;connectionOpenRequest?:number;launchRequest?:number}){
  const [status,setStatus]=useState<Status>(),[open,setOpen]=useState(false),[view,setView]=useState<SharingView>('notes'),[entries,setEntries]=useState<Entry[]>([]),[selected,setSelected]=useState<string[]>([]),[connection,setConnection]=useState(''),[preview,setPreview]=useState<Preview>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[entriesLoaded,setEntriesLoaded]=useState(false),[entriesBusy,setEntriesBusy]=useState(false),[entryAttempt,setEntryAttempt]=useState(0);
+ useBinderNavigationGuard(open||!!preview||busy);
  const [message,setMessage]=useState(''),[requestHelp,setRequestHelp]=useState(false);
  const generation=useRef(0),refreshRevision=useRef(0),previewRef=useRef<Preview|undefined>(undefined),channel=useRef<BroadcastChannel|null>(null),connectionRef=useRef('');previewRef.current=preview;connectionRef.current=connection;
  const refresh=useCallback(async()=>{
@@ -89,6 +91,7 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
  }
  function show(next:SharingView='notes'){setView(next);setOpen(true);setError('');void refresh().catch(()=>setError(t('Sharing could not be loaded. Try again.','No se pudo cargar el acceso. Intenta de nuevo.')));}
  function close(){if(busy)return;clear();setOpen(false);setError('');setNotice('');}
+ useEffect(()=>{if(launchRequest)show('notes');},[launchRequest]);
  useEffect(()=>{if(openRequest)show('access');},[openRequest]);
  useEffect(()=>{if(connectionOpenRequest)show('connect');},[connectionOpenRequest]);
  // The only auto-selection is the recipient when there is exactly one accepted
