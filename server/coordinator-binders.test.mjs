@@ -108,7 +108,7 @@ test('coordinator workspace reads only current explicit publications',{skip:!pro
   const now=Math.floor(Date.now()/1000);let identity={sub:'staff',iat:now,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now},verified=true;
   const config={...env,AUTH0_DOMAIN:'synthetic.auth0.com'},handler=createCoordinatorBindersHandler(f.db,config,async()=>({ok:true,json:async()=>({sub:identity.sub,email:'synthetic@example.test',email_verified:verified})}));
   const server=createServer((req,res)=>{req.origenIdentity=identity;req.origenAuthorized=true;void runAsAccount(identity,()=>handler(req,res,()=>{res.writeHead(404);res.end();}));});await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  try{const send=body=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-binders`,{method:'POST',headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},body:JSON.stringify({action:'list',organizationId:org,...body})});
+  try{const send=body=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-binders`,{method:'POST',headers:{Authorization:`Bearer synthetic-${verified}`,'Content-Type':'application/json'},body:JSON.stringify({action:'list',organizationId:org,...body})});
    let response=await send({});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
    delete identity[MFA_TIME_CLAIM];assert.equal((await(await send({mfa:true})).json()).error,'staff_mfa_required');identity[MFA_TIME_CLAIM]=now;
    verified=false;assert.equal((await send({verified:true})).status,403);verified=true;

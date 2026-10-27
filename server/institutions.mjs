@@ -110,6 +110,10 @@ export function createInstitutionRepository(database,reviewers=[]){return async(
     await c.query('INSERT INTO origen_institution_registration_requests(auth0_subject,request_id,payload_hash,institution_id) VALUES($1,$2,$3,$4)',[subject,key,fingerprint,row.id]);
     registeredInstitutionId=row.id;await accessEvent(c,row.id,subject,'register',subject);
    }
+   if(identity.sub===subject&&identity.email_verified===true&&typeof identity.email==='string'){
+    await c.query('UPDATE origen_institution_representatives SET verified_email=$2,email_verified_at=now() WHERE auth0_subject=$1',[subject,identity.email.trim().toLowerCase()]);
+    await c.query('SELECT origen_registration_email_organization($1::uuid)',[registeredInstitutionId]);
+   }
   }
   if(['save','submit','verify','publish','request-changes','archive','unpublish','restore'].includes(input.action)){
    const relation=(await c.query('SELECT parent_institution_id FROM origen_institutions WHERE id=$1',[input.id])).rows[0];
@@ -205,7 +209,8 @@ export function createInstitutionHandler(database,env={},fetcher=fetch){
     await requireStaffAccess(database,req.origenIdentity,{scope:'institution',action:input.action,target:input.id,env,permission:review?'manage:institutions':undefined,
      fresh:['verify','publish','request-changes','review-affiliation','invite','accept-invite','revoke-invite','remove-member','set-role','transfer-owner','approve-unit','reject-unit','archive','unpublish','restore'].includes(input.action)});
    }
-   const identity=input.action==='accept-invite'?await invitationIdentity(req,env,fetcher):req.origenIdentity;
+   const identity=['accept-invite','register'].includes(input.action)?await invitationIdentity(req,env,fetcher):req.origenIdentity;
+   if(input.action==='register'&&(identity.sub!==req.origenIdentity?.sub||identity.email_verified!==true||typeof identity.email!=='string'||!identity.email.trim()||identity.email.length>254))return send(403,{error:'verified_email_required'});
    const result=await run(req.origenIdentity?.sub,input,identity);
    if(!publicRequest&&input.action==='access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'){
     const application=(await database.query(`SELECT origen_coordinator_application_command('{"action":"application-status"}'::jsonb) AS result`)).rows[0]?.result?.application;

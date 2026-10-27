@@ -10,6 +10,9 @@ export function validateSharingInput(v){
  const id=key=>{if(!uuid(v[key]))throw fail(400,'invalid_sharing_request');out[key]=v[key];};
  if(v.action==='preview'){
   id('connectionId');
+  if(v.message!==undefined&&(typeof v.message!=='string'||v.message.length>1000||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(v.message)))throw fail(400,'invalid_sharing_request');
+  if(v.requestHelp!==undefined&&typeof v.requestHelp!=='boolean')throw fail(400,'invalid_sharing_request');
+  out.message=v.message?.trim()||'';out.requestHelp=v.requestHelp===true;
   for(const [key,max,valid] of [['topics',4,x=>sharingTopics.includes(x)],['entryIds',50,uuid]]){
    if(!Array.isArray(v[key])||!v[key].length||v[key].length>max||new Set(v[key]).size!==v[key].length||v[key].some(x=>!valid(x)))throw fail(400,'invalid_sharing_request');out[key]=v[key];
   }
@@ -54,6 +57,7 @@ export function createBinderSharingHandler(database,env={}){return async(req,res
 };}
 export async function assertBinderSharingReady(database,env){
  if(!binderSharingEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='081_binder_help_messages.sql'")).rows.length)throw new Error('binder_help_messages_migration_required');
  if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='080_sharing_stop_controls.sql'")).rows.length)throw new Error('sharing_stop_controls_migration_required');
  if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='071_preserve_coordinator_lock_order.sql'")).rows.length)throw new Error('coordinator_lock_order_migration_required');
  if(env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true'&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='068_coordinator_follow_through.sql'")).rows.length)throw new Error('coordinator_follow_through_migration_required');

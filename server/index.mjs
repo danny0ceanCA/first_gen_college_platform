@@ -1,4 +1,5 @@
 import {createCoordinatorNotificationsHandler,maintainCoordinators,assertCoordinatorLifecycleReady} from './coordinator-notifications.mjs';
+import {assertRegistrationEmailReady,startRegistrationEmailWorker} from './registration-email.mjs';
 import {createCoordinatorFeedbackHandler,assertCoordinatorFeedbackReady} from './coordinator-feedback.mjs';
 import {createCoordinatorBindersHandler,assertCoordinatorViewingReady,coordinatorViewingEnabled} from './coordinator-binders.mjs';
 import {createBinderSharingHandler,assertBinderSharingReady} from './binder-sharing.mjs';
@@ -170,7 +171,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  app.privacyMonitor=privacyMonitor;app.flushLogs=log.flush;return app;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- let database,maintenancePool,jobs,stopBinderWorker=async()=>{};
+ let database,maintenancePool,jobs,stopBinderWorker=async()=>{},stopRegistrationEmailWorker=async()=>{};
  let crashing=false;
  const fatal=()=>{if(crashing)return;crashing=true;runtimeLog({event:'service.crashed',code:'operation_failed'});setTimeout(()=>process.exit(1),1000).unref();void runtimeLog.flush().finally(()=>process.exit(1));};
  process.on('uncaughtException',fatal);process.on('unhandledRejection',fatal);
@@ -184,6 +185,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   else runtimeLog({event:'service.database.unavailable'});
   maintenancePool=createMaintenanceDatabase(process.env);
   if(maintenancePool)await assertMaintenanceAccess(maintenancePool);
+  await assertRegistrationEmailReady(maintenancePool,process.env);
   if(database)await assertCoordinatorLifecycleReady(database,process.env,maintenancePool);
   jobs=maintenancePool?createJobRunner(maintenancePool):null;
   const cleanupTasks=[
@@ -210,6 +212,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    await assertContinuityReady(database,process.env);
    await assertRecoveryReady(database,process.env);
   stopBinderWorker=binderJobsEnabled(process.env)?startBinderWorker({application:database,maintenance:maintenancePool,env:process.env}):async()=>{};
+  stopRegistrationEmailWorker=startRegistrationEmailWorker({database:maintenancePool,env:process.env,onError:()=>runtimeLog({event:'job.finished',job:'registration-email',outcome:'failed',code:'operation_failed'})});
   const stopRuntimeMetrics=startRuntimeMetrics(rawDatabase);
   const stopPermissionSupervisor=jobs?startPermissionSupervisor(null,process.env,fetch,jobs):()=>{};
   const emitPrivacyAlert=createPrivacyAlertEmitter(runtimeLog);
@@ -222,11 +225,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    if(stopping)return;stopping=true;runtimeLog({event:'service.stopping'});
    clearInterval(coordinatorTimer);clearInterval(metricsCleanup);clearInterval(checkpointCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
-   server.close(async()=>{try{await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
+   server.close(async()=>{try{await stopRegistrationEmailWorker();await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
   };
   process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
  }catch(error){
   runtimeLog({event:'service.startup.failed',code:['telemetry_configuration_invalid','telemetry_lifecycle_required','restricted_database_runtime_required','database_migration_required','maintenance_database_required','restricted_maintenance_role_required','separate_maintenance_role_required','maintenance_migration_required'].includes(error?.message)?error.message:'startup_failed'});
-  await stopBinderWorker();await jobs?.stop();await maintenancePool?.end().catch(()=>{});await database?.end().catch(()=>{});await runtimeLog.flush();process.exitCode=1;
+  await stopRegistrationEmailWorker();await stopBinderWorker();await jobs?.stop();await maintenancePool?.end().catch(()=>{});await database?.end().catch(()=>{});await runtimeLog.flush();process.exitCode=1;
  }
 }

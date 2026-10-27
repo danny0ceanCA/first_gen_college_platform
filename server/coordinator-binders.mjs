@@ -6,13 +6,14 @@ const fail=(status,message)=>Object.assign(new Error(message),{status});
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
 export const coordinatorViewingEnabled=env=>binderSharingEnabled(env)&&env.ORIGEN_COORDINATOR_BINDER_VIEWING==='true';
 export function validateCoordinatorBinderInput(v){
- if(!v||!['list','read','review'].includes(v.action)||!uuid(v.organizationId))throw fail(400,'invalid_binder_request');
+ if(!v||!['list','read','review','resolve-help'].includes(v.action)||!uuid(v.organizationId))throw fail(400,'invalid_binder_request');
  const out={action:v.action,organizationId:v.organizationId};
  if(v.action==='list'){
   if(v.view!==undefined&&!['all','new','help'].includes(v.view)||v.search!==undefined&&(typeof v.search!=='string'||v.search.length>80||/[\x00-\x1f]/.test(v.search))||v.cursor!=null&&!uuid(v.cursor))throw fail(400,'invalid_binder_request');
   out.view=v.view||'all';out.search=v.search?.trim()||'';if(v.cursor)out.cursor=v.cursor;
  }else{if(!uuid(v.grantId))throw fail(400,'invalid_binder_request');out.grantId=v.grantId;}
- if(v.action==='review'){if(!uuid(v.publicationId))throw fail(400,'invalid_binder_request');out.publicationId=v.publicationId;}
+ if(['review','resolve-help'].includes(v.action)){if(!uuid(v.publicationId))throw fail(400,'invalid_binder_request');out.publicationId=v.publicationId;}
+ if(v.action==='resolve-help'){if(!uuid(v.helpRequestId))throw fail(400,'invalid_binder_request');out.helpRequestId=v.helpRequestId;}
  return out;
 }
 export async function runCoordinatorBinderCommand(database,input){

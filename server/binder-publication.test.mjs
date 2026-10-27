@@ -14,7 +14,7 @@ const hash=v=>createHash('sha256').update(v).digest('hex');
 const env={ORIGEN_COORDINATOR_ACCOUNTS:'true',ORIGEN_COORDINATOR_LINKING:'true',ORIGEN_BINDER_SHARING:'true'};
 test('publication arguments cannot supply contents, ownership, provenance or a feature flag',()=>{
  const value=validateSharingInput({action:'preview',studentId:'alex',connectionId:randomUUID(),entryIds:[randomUUID()],topics:['options'],enabled:true,accountId:'forged',content:'PRIVATE_FAMILY_SENTINEL',classification:'student_only'});
- assert.deepEqual(Object.keys(value).sort(),['action','connectionId','entryIds','studentId','topics']);
+ assert.deepEqual(Object.keys(value).sort(),['action','connectionId','entryIds','message','requestHelp','studentId','topics']);
  for(const extra of [{topics:['family']},{entryIds:[]},{entryIds:Array.from({length:51},()=>randomUUID())}])assert.throws(()=>validateSharingInput({...value,...extra}),{status:400});
  assert.throws(()=>validateSharingInput({action:'publish',studentId:'alex',previewId:randomUUID(),confirmed:'true'}),{status:400});
  assert.equal(binderSharingEnabled(env),true);assert.equal(binderSharingEnabled({ORIGEN_BINDER_SHARING:'true'}),false);

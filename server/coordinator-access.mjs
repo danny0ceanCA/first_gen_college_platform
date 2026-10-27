@@ -93,6 +93,8 @@ export async function assertCoordinatorProvisioningReady(database,env={}){
  if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='076_organization_approval_version.sql') AS migrated")).rows[0]?.migrated)throw new Error('organization_approval_version_migration_required');
  if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='077_organization_approval_retry.sql') AS migrated")).rows[0]?.migrated)throw new Error('organization_approval_retry_migration_required');
  if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='078_approval_consistency.sql') AS migrated")).rows[0]?.migrated)throw new Error('approval_consistency_migration_required');
+ if(!(await database.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='082_registration_emails.sql') AS migrated")).rows[0]?.migrated)throw new Error('registration_email_migration_required');
+ if(!(await database.query("SELECT has_function_privilege(current_user,'origen_registration_email_organization(uuid)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('registration_email_runtime_grant_required');
  if(!(await database.query("SELECT has_function_privilege(current_user,'origen_coordinator_command(jsonb)','EXECUTE') AS allowed")).rows[0]?.allowed)throw new Error('coordinator_runtime_grant_required');
  const overview=(await database.query("SELECT to_regprocedure('origen_admin_organization_overview(uuid,integer)') AS fn")).rows[0];
  if(!overview?.fn)throw new Error('organization_overview_migration_required');

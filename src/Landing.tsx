@@ -6,6 +6,18 @@ import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
 import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
+// Measure each route once. Animation frames only interpolate cached points, avoiding
+// synchronous SVG geometry reads after writes elsewhere in the scene.
+const cacheRoute=(path:SVGPathElement)=>{
+ const length=path.getTotalLength(),steps=Math.max(1,Math.ceil(length*2));
+ const points=Array.from({length:steps+1},(_,i)=>path.getPointAtLength(length*i/steps));
+ return {getTotalLength:()=>length,getPointAtLength:(distance:number)=>{
+  const offset=length?Math.max(0,Math.min(length,distance))/length*steps:0;
+  const index=Math.min(steps-1,Math.floor(offset)),fraction=offset-index;
+  const a=points[index],b=points[index+1];
+  return {x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction};
+ }};
+};
 const villageResidents=[
  {route:0,kind:'lady',x:170,y:389},{route:8,kind:'person',x:270,y:389},
  {route:1,kind:'person',x:438,y:389},{route:5,kind:'lady',x:510,y:389},
@@ -32,9 +44,11 @@ export default function Landing(){
   const animations:ReturnType<typeof animate>[]=[];
   // A soft mask reveals the complete illustration from sky to foreground.
   const gradient=scene.querySelector<SVGLinearGradientElement>('.scene-reveal-gradient')!;
+  const revealed=scene.querySelector<SVGGElement>('.scene-reveal-content')!;
+  revealed.setAttribute('mask',`url(#${sceneId}-reveal)`);
   const reveal={edge:0};
   gradient.setAttribute('y1','-140');gradient.setAttribute('y2','0');
-  animations.push(animate(reveal,{edge:[0,710],duration:1500,ease:'outCubic',onUpdate:()=>{
+  animations.push(animate(reveal,{edge:[0,710],duration:1500,ease:'outCubic',onComplete:()=>revealed.removeAttribute('mask'),onUpdate:()=>{
    gradient.setAttribute('y1',String(reveal.edge-140));gradient.setAttribute('y2',String(reveal.edge));
   }}));
   const sunArcs=scene.querySelector<SVGPathElement>('.sun-orbit')!;
@@ -57,14 +71,13 @@ export default function Landing(){
    animations.push(animate(shimmer,{phase:[index*1.39,index*1.39+Math.PI*2],duration:4200+index%4*1100,loop:true,ease:'linear',onUpdate:()=>{
     const brightness=(Math.sin(shimmer.phase)+1)/2;
     star.style.opacity=String(0.22+0.78*brightness**2);
-    star.style.filter=`drop-shadow(0 0 ${1+brightness*5}px #ffe2ad)`;
    }}));
   });
   // Neighbors meet in pairs, chat with room between their outlines, then head home.
   const residents=Array.from(scene.querySelectorAll<SVGGElement>('.village-resident')).map((visitor,order)=>{
    const index=Number(visitor.dataset.route);
-   const arrival=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!;
-   const departure=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
+   const arrival=cacheRoute(scene.querySelector<SVGPathElement>(`.life-route-${index}`)!);
+   const departure=cacheRoute(scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!);
    return {visitor,index,order,arrival,departure,arrivalLength:arrival.getTotalLength(),departureLength:departure.getTotalLength(),
     legs:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),
     arms:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-arm'))};
@@ -98,7 +111,7 @@ export default function Landing(){
   // Animals wander continuously on independent clocks.
   scene.querySelectorAll<SVGGElement>('.village-animal').forEach(visitor=>{
    const index=Number(visitor.dataset.route),burro=visitor.dataset.kind==='burro',bull=visitor.dataset.kind==='bull';
-   const outward=scene.querySelector<SVGPathElement>(`.life-route-${index}`)!,homeward=scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!;
+   const outward=cacheRoute(scene.querySelector<SVGPathElement>(`.life-route-${index}`)!),homeward=cacheRoute(scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!);
    const outwardLength=outward.getTotalLength(),homewardLength=homeward.getTotalLength();
    const legs=Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),wander={time:0};
    const head=visitor.querySelector<SVGGElement>('.grazing-head'),tail=visitor.querySelector<SVGPathElement>('.animal-tail');
@@ -157,7 +170,7 @@ export default function Landing(){
     <div className="landing-map pueblo-scene">
      <svg ref={line} className="path-drawing" viewBox="0 0 700 570" fill="none" role="img" aria-label={t('A lively pueblo village with people walking, farmers tending fields, and grazing bulls beneath the mountains','Un pueblo lleno de vida, con personas caminando, agricultores trabajando y toros pastando al pie de las montañas')} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
       <defs><linearGradient id={`${sceneId}-fade`} className="scene-reveal-gradient" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="570" y2="710"><stop offset="0" stopColor="white"/><stop offset="1" stopColor="black"/></linearGradient><mask id={`${sceneId}-reveal`} maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="570" style={{maskType:'luminance'}}><rect width="700" height="570" fill={`url(#${sceneId}-fade)`} stroke="none"/></mask></defs>
-      <g mask={`url(#${sceneId}-reveal)`}>
+      <g className="scene-reveal-content" mask={`url(#${sceneId}-reveal)`}>
       {/* Each edge is one continuous stroke: road, village outline, then its mountain ridge. */}
       <path data-side="left" data-duration="7400" d="M296 560 C235 503 410 487 350 443 C329 427 322 411 334 391 C345 368 305 354 265 371 C218 391 151 389 138 361 L138 328 Q138 316 150 316 Q162 316 162 328 L162 364 L235 360 L235 316 L227 316 L227 301 L200 301 L200 316 L190 316 L190 285 L174 285 L174 254 L168 254 L168 239 L113 239 L113 254 L105 254 L105 285 L95 285 L95 323 L62 323 L62 363 M62 323 L62 296 L22 290 L72 230 L92 246 L184 126 L206 152 L248 91 L313 188 L342 159"/>
       <path data-side="right" data-duration="7400" d="M344 560 C287 509 459 493 388 437 C369 422 355 411 368 397 C388 383 419 392 446 374 C468 360 499 356 522 348 L522 308 Q522 298 532 298 Q542 298 542 308 L542 351 L624 347 L624 288 L614 288 L614 267 L580 267 L580 288 L566 288 L566 263 L553 263 L553 238 L490 238 L490 263 L476 263 L476 301 L448 301 L448 346 L476 350 L476 301 M476 263 L566 263 L566 288 L624 288 L644 278 L681 276 L644 226 L621 240 L512 124 L481 144 L455 109 L389 207 L342 159"/>

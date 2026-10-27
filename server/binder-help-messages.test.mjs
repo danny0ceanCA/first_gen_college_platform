@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID,createHash} from 'node:crypto';
+import {retrievalFixture} from './history-retrieval-fixture.mjs';
+import {runAsCoordinatorActor} from './account-isolation.mjs';
+import {runCoordinatorCommand} from './coordinator-access.mjs';
+import {runSharingCommand,validateSharingInput} from './binder-sharing.mjs';
+import {runCoordinatorBinderCommand,validateCoordinatorBinderInput} from './coordinator-binders.mjs';
+
+test('sharing messages and help resolution have bounded, explicit inputs',()=>{
+ const input={action:'preview',studentId:'alex',connectionId:randomUUID(),topics:['options'],entryIds:[randomUUID()]};
+ assert.equal(validateSharingInput({...input,message:'  Please help.  ',requestHelp:true}).message,'Please help.');
+ for(const extra of [{message:'a'.repeat(1001)},{message:{}},{message:'bad\u0000'},{requestHelp:'true'}])assert.throws(()=>validateSharingInput({...input,...extra}),{status:400});
+ const resolve={action:'resolve-help',organizationId:randomUUID(),grantId:randomUUID(),publicationId:randomUUID(),helpRequestId:randomUUID()};
+ assert.deepEqual(validateCoordinatorBinderInput(resolve),resolve);
+ for(const field of ['publicationId','helpRequestId','grantId'])assert.throws(()=>validateCoordinatorBinderInput({...resolve,[field]:'invalid'}),{status:400});
+});
+
+test('publication messages and help requests remain scoped and safely resolve',{skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const f=await retrievalFixture();t.after(()=>f.close());const org=randomUUID();
+ const account=(await f.owner.query("SELECT id FROM origen_accounts WHERE auth0_subject='other'")).rows[0].id;
+ for(const sub of ['owner','staff','colleague','reviewer'])await f.owner.query('INSERT INTO origen_institution_representatives(auth0_subject,first_name,work_email,job_role) VALUES($1,$1,$2,$3)',[sub,`${sub}@example.test`,'Synthetic']);
+ await f.owner.query("INSERT INTO origen_institutions(id,slug,draft,verification_status) VALUES($1,$2,$3,'verified')",[org,org,{name:'Synthetic Community'}]);
+ for(const [sub,role] of [['owner','owner'],['staff','outreach'],['colleague','outreach']])await f.owner.query('INSERT INTO origen_institution_members VALUES($1,$2,$3)',[org,sub,role]);
+ const provision=(sub,action,extra={},administrator=false)=>f.as(sub,()=>runAsCoordinatorActor(sub,{administrator},()=>runCoordinatorCommand(f.db,{action,id:org,...extra})));
+ await provision('reviewer','approve-organization',{},true);for(const subject of ['staff','colleague'])await provision('owner','enable-member',{subject});
+ await f.owner.query("INSERT INTO origen_eligibility(subject_hash,age_band,audience,status,notice_version) VALUES($1,'18plus','grade9plus','adult','synthetic')",[createHash('sha256').update('other').digest('hex')]);
+ const connection=randomUUID(),note=randomUUID();
+ await f.owner.query("INSERT INTO origen_binder_connections(id,account_id,student_id,coordinator_id,status,request_id,expires_at,accepted_at,display_name) SELECT $1,$2,'alex',id,'accepted',$3,now()+interval '7 days',now(),'Alex' FROM origen_coordinator_profiles WHERE auth0_subject='staff' AND institution_id=$4",[connection,account,randomUUID(),org]);
+ await f.note({action:'create',studentId:'alex',id:note,note:{topic:'options',kind:'note',content:'Compare programs with my coordinator.',language:'en'}},'other');
+ const share=(action,extra={},sub='other')=>f.as(sub,()=>runSharingCommand(f.db,{...validateSharingInput({action,studentId:'alex',...extra}),enabled:true}));
+ const staff=(action,extra={},sub='staff')=>f.as(sub,()=>runAsCoordinatorActor(sub,{issuedAt:Math.floor(Date.now()/1000)},()=>runCoordinatorBinderCommand(f.db,validateCoordinatorBinderInput({action,organizationId:org,...extra}))));
+ const card=await share('preview',{connectionId:connection,topics:['options'],entryIds:[note],message:'Please help compare these programs.\nThank you!',requestHelp:true});
+ assert.equal(card.requestHelp,true);assert.match(card.message,/Please help/);
+ const pub=await share('publish',{previewId:card.previewId,confirmed:true,message:'FORGED_PUBLISH_MESSAGE',requestHelp:false});
+ const grant=(await share('status')).grants[0].id;
+ let detail=await staff('read',{grantId:grant});assert.equal(detail.message,card.message);assert.equal(detail.helpRequested,true);
+ assert.equal((await staff('list',{view:'help'})).counts.help,1);
+ assert.ok(!JSON.stringify(await staff('list')).includes(card.message),'message is not returned in lists');
+ const resolution={grantId:grant,publicationId:pub.publicationId,helpRequestId:detail.helpRequestId};
+ await assert.rejects(staff('resolve-help',resolution,'colleague'),{status:404});
+ await assert.rejects(share('help',{grantId:grant,requested:true},'reader'),{status:403});
+ await staff('review',{grantId:grant,publicationId:pub.publicationId});assert.equal((await staff('read',{grantId:grant})).helpRequested,true);
+ assert.equal((await staff('resolve-help',resolution)).status,'resolved');
+ assert.equal((await staff('resolve-help',resolution)).status,'resolved','resolution retry is idempotent');
+ detail=await staff('read',{grantId:grant});assert.equal(detail.helpRequested,false);assert.equal(detail.helpResolved,true);assert.equal(detail.message,card.message);
+ assert.equal((await share('status')).grants[0].helpResolved,true);assert.equal((await staff('list',{view:'help'})).counts.help,0);
+ await share('help',{grantId:grant,requested:true});
+ await assert.rejects(staff('resolve-help',resolution),{status:409},'old response cannot resolve a fresh request on the same publication');
+ detail=await staff('read',{grantId:grant});assert.equal(detail.helpResolved,false);assert.equal(detail.helpRequested,true);
+ const replacement=await share('preview',{connectionId:connection,topics:['options'],entryIds:[note],message:'Nueva pregunta',requestHelp:true});
+ await share('publish',{previewId:replacement.previewId,confirmed:true});
+ await assert.rejects(staff('resolve-help',{...resolution,helpRequestId:detail.helpRequestId}),{status:409});
+ assert.equal((await staff('read',{grantId:grant})).message,'Nueva pregunta');
+ assert.equal((await f.owner.query('SELECT student_message FROM origen_binder_publications WHERE id=$1',[pub.publicationId])).rows[0].student_message,'');
+ await share('revoke',{grantId:grant});await assert.rejects(staff('read',{grantId:grant}),{status:404});
+ assert.equal((await staff('list',{view:'help'})).counts.help,0);
+});
