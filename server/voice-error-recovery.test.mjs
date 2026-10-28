@@ -25,7 +25,7 @@ test('failed reply waits for new speech transcription',()=>{
 });
 test('silent-h greeting reaches onboarding and every specialty in both languages',()=>{
  for(const language of ['en','es']){
-  for(const mode of ['profile','planning','finance','loans','admissions']){const config=voiceSession({mode,language,role:'student',profile:{}},{});assert.match(config.instructions,/OH-lah/);assert.match(config.instructions,/h is completely silent/);}
+  for(const mode of ['profile','planning','finance','loans','admissions']){const config=voiceSession({mode,language,role:'student',profile:{}},{});assert.match(config.instructions,/OH-lah/);assert.match(config.instructions,/completely silent h/);}
   assert.match(onboardingWelcome(language),/OH-lah/);
  }
 });

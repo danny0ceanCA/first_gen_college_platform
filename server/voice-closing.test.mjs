@@ -87,7 +87,7 @@ test('saved onboarding closes with a short home orientation in both languages, n
   f.closing.event(created);f.closing.event(done);assert.deepEqual(f.ended,[]);f.closing.event(drained);assert.deepEqual(f.ended,['drained']);
   for(const mode of ['profile','planning','finance','loans','admissions']){
    const session=voiceSession({mode,language,profile:{}},{});assert.ok(session.tools.some(t=>t.name==='end_conversation'));
-   assert.match(session.instructions,/A bare thanks/);assert.match(session.instructions,/Ending an unsaved setup never saves/);
+   assert.match(session.instructions,/A bare thanks/);assert.match(session.instructions,/Ending never saves an unsaved profile/);
   }
  }
 });

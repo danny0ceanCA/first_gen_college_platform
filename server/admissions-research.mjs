@@ -1,3 +1,4 @@
+import {loadTeachingReferences,teachingReferenceInstructions} from './teaching-library.mjs';
 import {providerOperation} from './observability/dependencies.mjs';
 import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
 import {planningResearchInstructions} from './education-planning.mjs';
@@ -35,7 +36,7 @@ export function createAdmissionsResearchHandler(env,request=fetch,log=()=>{},dat
   let tracking,finished=false;
   try{
    const names=await researchPrivateNames(req,database);input={...input,...publicResearchInput(input,names)};
-   const body=admissionsResearchRequest(env,input);tracking=await trackResearch(req,env,database,body,'lookup_college_applications');
+   const body=admissionsResearchRequest(env,input);if(req.origenAuthorized)body.instructions+=teachingReferenceInstructions(await loadTeachingReferences(database,{topic:input.purpose==='planning'?'planning':'admissions',language:input.language,campus:input.institution,query:input.question,academicYear:input.question.match(/\b\d{4}-\d{2}\b/)?.[0]||''}));tracking=await trackResearch(req,env,database,body,'lookup_college_applications');
    const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY.trim()}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(120000)});
   void (req.log||log)({sessionId,event:'upstream_response',operation:'admissions_lookup',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
    if(!response.ok)return send(502,{error:'research_unavailable'});

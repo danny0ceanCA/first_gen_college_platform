@@ -54,7 +54,8 @@ test('voice sends server-owned settings and returns SDP without exposing credent
     assert.equal(options.headers.Authorization,'Bearer secret');
     const session=JSON.parse(options.body.get('session'));
     assert.equal(session.model,'gpt-realtime-2.1');
-    assert.match(session.instructions,/Speak Spanish/);
+    assert.match(session.instructions,/Current conversation language: Spanish/);
+    assert.match(session.instructions,/Use this language for EVERY complete sentence/);
     assert.match(session.instructions,/proposals require review/);
     assert.ok(!session.instructions.includes('private-id'));
     assert.equal(session.audio.input.turn_detection.interrupt_response,true);
@@ -76,14 +77,14 @@ test('finance voice uses teaching instructions, minimal context and no profile e
   for(const role of ['parent','student'])for(const language of ['en','es']){
     const session=voiceSession({...input,role,language,mode:'finance',profile:{name:'Student',notes:'private-note',gpa:'private-gpa',stage:'Community college'}},{});
     assert.match(session.instructions,/Assume no prior college experience/);
-    assert.match(session.instructions,/one idea at a time/);
-    assert.match(session.instructions,/usually 3 to 5 short sentences/);
+    assert.match(session.instructions,/explain only how the college learns about their circumstances/);
+    assert.match(session.instructions,/Usually give 2 to 4 short sentences/);
     assert.match(session.instructions,/If they say yes, start explaining/);
     assert.match(session.instructions,/Do not require a fixed apology or acknowledgement/);
     assert.equal(session.audio.output.speed,1);
     assert.match(session.instructions,/not a bill/);
     assert.match(session.instructions,/lookup_financial_aid/);
-    assert.match(session.instructions,new RegExp(language==='es'?'Speak Spanish':'Speak English'));
+    assert.match(session.instructions,new RegExp(`Current conversation language: ${language==='es'?'Spanish':'English'}`));
     assert.match(session.instructions,new RegExp(role==='student'?'their own education':'parent understand'));
     assert.ok(!session.instructions.includes('private-note'));
     assert.ok(!session.instructions.includes('private-gpa'));
@@ -103,7 +104,7 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
  for(const role of ['parent','student'])for(const language of ['en','es']){
   const session=voiceSession({...input,mode:'admissions',role,language,profile:{name:'Sample',stage:'Community college',entryTerm:'Fall 2027',notes:'private-note',gpa:'private-gpa'}},{});
   assert.equal(session.model,'gpt-realtime-2.1');
-  assert.match(session.instructions,new RegExp(language==='es'?'Speak Spanish':'Speak English'));
+  assert.match(session.instructions,new RegExp(`Current conversation language: ${language==='es'?'Spanish':'English'}`));
   assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
   assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
@@ -121,8 +122,10 @@ test('first-registration setup defers the app tour until the successful save',()
  for(const language of ['en','es']){
   const welcome=voiceSession({...input,language,onboarding:true},{});
   assert.match(welcome.instructions,/FIRST-REGISTRATION SETUP/);
-  assert.match(welcome.instructions,/Do not give an app tour or explain features or summaries before the successful save/);
-  assert.match(welcome.instructions,/the student name, education stage and relevant optional setup details one question at a time/);
+  assert.match(welcome.instructions,/Do not give an app tour or explain summaries\/features before a successful save/);
+  assert.match(welcome.instructions,/Ask ONE short question at a time/);
+  assert.match(welcome.instructions,/Student name is required; ask education stage, but unknown is allowed/);
+  assert.match(welcome.instructions,/Interests, activities, school, goals, practical needs, institutions and entry term are optional/);
   assert.doesNotMatch(voiceSession({...input,language},{}).instructions,/FIRST-REGISTRATION SETUP/);
   assert.doesNotMatch(voiceSession({...input,language,onboarding:true,mode:'finance'},{}).instructions,/FIRST-REGISTRATION SETUP/);
  }
@@ -132,9 +135,12 @@ test('all live guides open with Hola and explain English terms without leaving S
  for(const mode of ['profile','finance','admissions','planning','loans'])for(const language of ['en','es']){
   const session=voiceSession({...input,mode,language,onboarding:mode==='profile'},{});
   assert.match(session.instructions,/first spoken word must be exactly Hola/);
-  assert.match(session.instructions,/explain its meaning in simple Spanish/);
-  assert.match(session.instructions,/Saying an English term is not a request to change languages/);
-  assert.match(session.instructions,/scope reconnection.*must not repeat the greeting/);
+  assert.match(session.instructions,/immediately defined in Spanish, then continue entirely in Spanish/);
+  assert.match(session.instructions,/An isolated name, college acronym, quoted form label or English term explained in Spanish is not a switch/);
+  const resumed=voiceSession({...input,mode,language,scopeRestart:true},{});
+  assert.match(resumed.instructions,/scope reconnection.*must not repeat the greeting/);
+  assert.match(resumed.instructions,/Do not say Hola, greet, introduce yourself/);
+  assert.doesNotMatch(resumed.instructions,/first spoken word must be exactly Hola/);
  }
  const routed=voiceSession({...input,mode:'finance',routeConversations:true,students:[]},{});
  assert.match(routed.instructions,/first spoken word must be exactly Hola/);
@@ -164,11 +170,11 @@ test('returning users skip tours across every guide while explicit onboarding re
 test('every voice guide teaches college basics naturally across roles, languages, and routing states',()=>{
  for(const mode of ['profile','finance','admissions','planning','loans'])for(const role of ['parent','student'])for(const language of ['en','es'])for(const targetConfirmed of [false,true]){
   const session=voiceSession({...input,mode,role,language,routeConversations:role==='parent',targetConfirmed,studentId:null,experience:{usedApp:true,usedVoice:true}},{});
-  assert.match(session.instructions,/NATURAL VOICE AND COLLEGE BASICS/);
-  assert.match(session.instructions,/Being enrolled or having used Origen does not mean they understand/);
-  assert.match(session.instructions,/Explain acronyms before using them/);
+  assert.match(session.instructions,/# Personality & Tone/);
+  assert.match(session.instructions,/Do not assume prior college knowledge from enrollment or past Origen use/);
+  assert.match(session.instructions,/everyday idea before naming a needed official term or acronym/);
   assert.match(session.instructions,/Do not assume community-college students want to transfer/);
-  assert.match(session.instructions,/without repeating them/);
+  assert.match(session.instructions,/avoid repeating definitions understood in this call/);
  }
 });
 
@@ -201,8 +207,8 @@ test('guide updates return only instructions and tools without creating a new au
 test('brand pronunciation is consistent for English and Spanish across guides',()=>{
  for(const language of ['en','es'])for(const mode of ['profile','finance','planning','admissions','loans']){
   const instructions=voiceSession({...input,language,mode},{}).instructions;
-  assert.match(instructions,/English word origin, OR-ih-jin/);
-  assert.match(instructions,/never read these instructions aloud/);
-  assert.match(instructions,/Do not explain, announce or compare/);
+  assert.match(instructions,/English word origin: OR-ih-jin/);
+  assert.match(instructions,/never read headings or stage directions aloud/);
+  assert.match(instructions,/Silent guidance; never explain, compare or spell the name aloud/);
  }
 });

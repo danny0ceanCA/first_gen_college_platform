@@ -10,7 +10,7 @@ test('all guides and parent scope gates receive exactly one shared style without
  for(const mode of ['profile','planning','finance','loans','admissions'])for(const language of ['en','es'])for(const confirmed of [false,true]){
   const session=voiceSession({mode,language,role:'parent',profile:{name:'Synthetic Student'},students:[{id:'synthetic',name:'Synthetic Student'}],routeConversations:mode!=='profile',targetConfirmed:confirmed,studentId:confirmed?'synthetic':undefined},{});
   assert.equal(session.instructions.split(collegeVoiceStyle).length-1,1);
-  assert.ok(session.instructions.startsWith(brandVoicePronunciation));
+  assert.ok(session.instructions.includes(brandVoicePronunciation));
   assert.match(session.instructions,new RegExp(`Current conversation language: ${language==='es'?'Spanish':'English'}`));
   assert.ok(session.tools.some(tool=>tool.name==='set_conversation_language'));
   if(mode!=='profile'&&!confirmed){assert.match(session.instructions,/Before answering a substantive question, ask who this is about/);assert.ok(!session.tools.some(tool=>tool.name.startsWith('lookup_')));}
@@ -51,7 +51,7 @@ test('an in-place language and specialty update carries the shared style without
  assert.equal(sent[0].session.audio,undefined);assert.equal(sent[0].session.model,undefined);
  control.event({type:'session.updated',session:sent[0].session});await update;
  const change=control.change('es');await new Promise(resolve=>setImmediate(resolve));
- assert.ok(sent[1].session.instructions.startsWith(brandVoicePronunciation));
+ assert.ok(sent[1].session.instructions.includes(brandVoicePronunciation));
  assert.match(sent[1].session.instructions,/Current conversation language: Spanish/);
  assert.equal(sent[1].session.instructions.split(brandVoicePronunciation).length-1,1);
  control.event({type:'session.updated',session:sent[1].session});await change;control.stop();

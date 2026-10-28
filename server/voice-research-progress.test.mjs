@@ -42,8 +42,8 @@ test('tool evidence identifies reuse without claiming fresh verification and ret
  assert.deepEqual(reused.sources,result.sources);assert.equal(reused.checkedAt,result.checkedAt);
  for(const mode of ['planning','finance','loans','admissions']){
   const session=voiceSession({mode,role:'student',language:'en',profile:{}},{});
-  assert.match(session.instructions,/no claimed findings before results/);
-  assert.match(session.instructions,/never call it a fresh search/);
+  assert.match(session.instructions,/never claim verification before a successful result/i);
+  assert.match(session.instructions,/A reused_verified_result is not a fresh search/);
  }
 });
 

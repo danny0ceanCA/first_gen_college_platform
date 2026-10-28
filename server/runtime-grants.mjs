@@ -21,7 +21,7 @@ export async function grantRuntimeAccess(pool,role,{schema='public'}={}){
    await client.query(`REVOKE ALL ON TABLE ${table} FROM ${who},PUBLIC`);
    // Phase 1 sharing records have no application privilege. Lineage is written
    // only by source triggers, never by a request or model-supplied classification.
-   if(coordinatorTables.includes(tablename))continue;
+   if(coordinatorTables.includes(tablename)||['origen_teachings','origen_teaching_revisions'].includes(tablename))continue;
    if(lineageTables.includes(tablename)){await client.query(`GRANT SELECT ON TABLE ${table} TO ${who}`);continue;}
    if(['origen_telemetry_erasure_outbox','origen_support_case_actors'].includes(tablename))continue;
    if(tablename==='origen_support_cases'){await client.query(`GRANT SELECT,INSERT ON TABLE ${table} TO ${who}`);await client.query(`GRANT UPDATE(status) ON TABLE ${table} TO ${who}`);continue;}
@@ -43,6 +43,7 @@ export async function grantRuntimeAccess(pool,role,{schema='public'}={}){
   if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_binder_sharing_command(jsonb)`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.origen_binder_sharing_command(jsonb) TO ${who}`);
   for(const fn of ['origen_coordinator_notification_command(jsonb)','origen_coordinator_export()','origen_coordinator_operations_command(jsonb)','origen_coordinator_record_operation(text)','origen_coordinator_feedback_command(jsonb)','origen_coordinator_binder_command(jsonb)','origen_binder_help_command(jsonb)'])if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.${fn}`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.${fn} TO ${who}`);
   if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.origen_coordinator_feedback_v6(jsonb)`])).rows[0].fn)await client.query(`REVOKE ALL ON FUNCTION ${base}.origen_coordinator_feedback_v6(jsonb) FROM ${who},PUBLIC`);
+  for(const fn of ['origen_teaching_command(jsonb)','origen_read_teachings(jsonb)'])if((await client.query('SELECT to_regprocedure($1) AS fn',[`${base}.${fn}`])).rows[0].fn)await client.query(`GRANT EXECUTE ON FUNCTION ${base}.${fn} TO ${who}`);
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
 }

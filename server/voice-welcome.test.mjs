@@ -33,10 +33,10 @@ test('another student starts with that student name even when the account holder
 test('welcome overrides preserve the same natural beginner-friendly voice style',()=>{
  for(const language of ['en','es'])for(const preview of [false,true]){
   const opening=onboardingWelcome(language,{preview});
-  assert.match(opening,/NATURAL VOICE AND COLLEGE BASICS/);
-  assert.match(opening,/Explain acronyms before using them/);
-  assert.match(opening,/without sounding childish or patronizing/);
-  assert.match(opening,/never read these instructions aloud/);
-  assert.match(opening,/Do not explain, announce or compare/);
+  assert.match(opening,/# Personality & Tone/);
+  assert.match(opening,/everyday idea before naming a needed official term or acronym/);
+  assert.match(opening,/Avoid .*patronizing speech/);
+  assert.match(opening,/never read headings or stage directions aloud/);
+  assert.match(opening,/Silent guidance; never explain, compare or spell the name aloud/);
  }
 });

@@ -64,10 +64,10 @@ test('adding another student keeps setup tools, PIQ focus and explicit save with
  for(const language of ['en','es']){
   const session=voiceSession({mode:'profile',onboarding:true,collectAccount:false,saveOnboarding:true,experience:{usedApp:true,usedVoice:true},allowGuideHandoff:true,language,profile:{name:'Elena',stage:'11th grade'}},{});
   assert.deepEqual(session.tools.map(t=>t.name).sort(),['end_conversation','propose_profile','save_onboarding_profile','set_conversation_language'].sort());
-  assert.match(session.instructions,/do not ask for the account-holder name or role/);
-  assert.match(session.instructions,/Mentioning PIQs, essays, admissions, aid or colleges is profile context/);
-  assert.match(session.instructions,/any other onboarding details or questions, or would like to save/);
-  assert.match(session.instructions,/First propose all latest details/);
+  assert.match(session.instructions,/Do not ask for account-holder name\/role or reuse another student profile/);
+  assert.match(session.instructions,/PIQs, essays, admissions, aid or college mentions are profile context/);
+  assert.match(session.instructions,/ask whether there are other onboarding details\/questions or whether to save/);
+  assert.match(session.instructions,/first propose all latest details\/corrections, then call save_onboarding_profile/);
   assert.doesNotMatch(session.instructions,/RETURNING USER:/);
  }
 });
@@ -76,7 +76,7 @@ test('live save is available only in onboarding and is explained in both languag
   const session=voiceSession({mode:'profile',collectAccount:true,onboarding:true,saveOnboarding:true,language,profile:{}},{});
   assert.ok(session.tools.some(tool=>tool.name==='save_onboarding_profile'));
   assert.ok(!session.instructions.includes('only the Save profile button persists registration'));
-  assert.match(session.instructions,/Only say the profile is saved when the tool returns saved/);
+  assert.match(session.instructions,/Only say saved after the tool returns saved/);
   const welcome=onboardingWelcome(language,{canSaveProfile:true});
   assert.match(welcome,language==='es'?/mientras hablamos/:/while we talk/);
  }

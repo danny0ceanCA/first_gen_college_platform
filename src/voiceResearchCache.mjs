@@ -10,7 +10,8 @@ export function voiceResearchCache(now=Date.now){
  };
 }
 // Per physical call: cache hits are free; failed attempts count toward the budget.
-export function voiceResearchBudget({maxCalls=8,maxAttemptsPerQuestion=2}={}){
+export const voiceResearchLimits=Object.freeze({maxCalls:8,maxAttemptsPerQuestion:2});
+export function voiceResearchBudget({maxCalls=voiceResearchLimits.maxCalls,maxAttemptsPerQuestion=voiceResearchLimits.maxAttemptsPerQuestion}={}){
  let calls=0;const attempts=new Map();
  return {take(query){const key=JSON.stringify([query.mode,query.language,query.institution,query.question.trim().replace(/\s+/g,' ')]);const n=attempts.get(key)||0;if(calls>=maxCalls||n>=maxAttemptsPerQuestion)return false;calls++;attempts.set(key,n+1);return true;},used:()=>calls};
 }

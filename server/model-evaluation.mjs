@@ -18,17 +18,17 @@ export function contractCase(c){
  if(c.category==='memory-correction')input.memory=[{date:'2026-10-01',mode:'planning',summary:'Synthetic old interest: engineering; user now corrects it.'}];
  const config=voiceSession(input,{}),text=config.instructions;
  check('language tool available',config.tools.some(t=>t.name==='set_conversation_language'));
- check('save claims require acknowledgement',text.includes('Never claim a summary was saved'));
+ check('save claims require acknowledgement',/Never claim a save[^\n]+before an explicit successful app acknowledgement/.test(text));
  switch(c.category){
-  case 'introduction':{const opening=onboardingWelcome(c.language);check('profile setup precedes home orientation',opening.includes('Start with Hola')&&opening.includes('focus on profile setup')&&homeVoiceIntroduction(c.language).includes('home page is now open')&&homeVoiceIntroduction(c.language).includes('bar at the bottom'));break;}
-  case 'simple-explanation':check('budget is not a bill',/not necessarily a bill/.test(text));break;
-  case 'language-switch':check('spoken preference changes before lookup',spokenLanguageFromText(c.prompt,'en')==='es'&&text.includes('before any scope, guide or lookup'));break;
-  case 'key-term':check('English term does not change Spanish language',text.includes('continue the explanation in Spanish')&&spokenLanguageFromText('Work-study','es')==='es');break;
-  case 'topic-transition':check('in-place continuity overrides greeting',text.includes('CONTINUING LIVE CONVERSATION')&&text.includes('overrides ALL')&&config.tools.some(t=>t.name==='switch_college_guide'));break;
+  case 'introduction':{const opening=onboardingWelcome(c.language),home=homeVoiceIntroduction(c.language);check('profile setup precedes home orientation',opening.includes('Start with Hola')&&opening.includes('focus on profile setup')&&opening.includes('before the profile is saved')&&home.includes('home page is now open')&&/bar at the bottom|barra de abajo/.test(home)&&home.includes('SAME conversation without Hola'));break;}
+  case 'simple-explanation':check('budget is not a bill',/Cost of attendance[^\n]+estimated budget/i.test(text)&&/Never substitute cost of attendance for the bill/.test(text));break;
+  case 'language-switch':check('spoken preference changes before lookup',spokenLanguageFromText(c.prompt,'en')==='es'&&/set_conversation_language before other tools/.test(text)&&config.tools.filter(t=>t.name.startsWith('lookup_')).every(t=>t.parameters.required.includes('language')));break;
+  case 'key-term':check('English term does not change Spanish language',/English key term[^\n]+immediately defined in Spanish[^\n]+continue entirely in Spanish/.test(text)&&spokenLanguageFromText('Work-study','es')==='es');break;
+  case 'topic-transition':check('in-place continuity overrides greeting',/Do not say Hola, greet/.test(text)&&!text.includes('first spoken word must be exactly Hola')&&config.tools.some(t=>t.name==='switch_college_guide'));break;
   case 'ambiguous-target':check('unknown target has no private profile',!text.includes('11th grade')&&text.includes('never guess')&&config.tools.some(t=>t.name==='request_conversation_target'));break;
   case 'student-switch':check('confirmed target reconnection avoids greeting',text.includes('do not restart your introduction')&&text.includes('Do not combine students'));break;
-  case 'memory-correction':check('memory is not current verified policy',text.includes('Saved summaries are not verified current policy')&&text.includes('Synthetic old interest'));break;
-  case 'tool-failure':check('failed lookup cannot be repeated indefinitely',text.includes('Do not repeatedly retry an identical failed lookup'));break;
+  case 'memory-correction':check('memory is not current verified policy',/Summaries are not current policy/.test(text)&&/Current spoken corrections take priority/.test(text)&&text.includes('Synthetic old interest'));break;
+  case 'tool-failure':check('failed lookup cannot be repeated indefinitely',/Do not repeatedly retry an identical failure/.test(text)&&text.includes('research_budget_reached'));break;
   case 'changing-policy':{
    const query={mode:'admissions',language:c.language,institution:'Synthetic college',question:c.prompt};const cache=voiceResearchCache(()=>0);
    cache.put(query,{sources:[{url:'https://admission.universityofcalifornia.edu/'}]});
@@ -44,7 +44,7 @@ export function contractCase(c){
 }
 export async function contractReport(){
  const {catalog,rubric}=await evaluationDefinitions();const cases=catalog.cases.map(contractCase);
- const sourceFiles=['profile-voice.mjs','research-quality.mjs','finance-research.mjs','admissions-research.mjs','education-planning.mjs','../src/voiceResearchCache.mjs','../src/ProfileVoice.tsx'];
+ const sourceFiles=['profile-voice.mjs','voice-prompts.mjs','research-quality.mjs','finance-research.mjs','admissions-research.mjs','education-planning.mjs','../src/voiceStyle.mjs','../src/financialAidTeaching.mjs','../src/voiceLanguage.mjs','../src/voiceResearchCache.mjs','../src/ProfileVoice.tsx'];
  const sourceHash=hash(await Promise.all(sourceFiles.map(async file=>[file,await readFile(new URL(file,import.meta.url),'utf8')])));
  const requests=['en','es'].flatMap(language=>[financeResearchRequest({}, {language,question:'Synthetic cost query',institution:''}),admissionsResearchRequest({}, {language,question:'Synthetic application query',institution:''})]);
  return {formatVersion:1,kind:'offline-software-contracts',catalogVersion:catalog.version,catalogHash:hash(catalog),rubricVersion:rubric.version,rubricHash:hash(rubric),configurationHash:hash([cases.map(c=>c.configurationHash),requests]),sourceHash,generatedAt:new Date().toISOString(),evaluatedCaseIds:cases.map(c=>c.id).sort(),evaluator:{id:'origen-contract-runner-v1',type:'automatic-software-check'},sampleSize:cases.length,passed:cases.filter(c=>c.passed).length,failed:cases.filter(c=>!c.passed).map(c=>c.id),cases,modelResponsesEvaluated:0,latencyMs:null,costUSD:null,releaseReady:false,limitations:'Checks actual configuration and client helpers, not model behavior, speech quality, live sources, WebRTC latency or academic outcomes. Human-reviewed synthetic responses and measured costs are still required.'};

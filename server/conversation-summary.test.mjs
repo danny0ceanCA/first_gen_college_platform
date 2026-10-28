@@ -27,7 +27,7 @@ test('long live conversations retain the first and final exchanges when summariz
  assert.equal((await call(handler,{language:'en',turns:[null]})).status,400);
  assert.equal(calls,1);
 });
-test('voice receives bounded past summaries as data and rechecks changing facts',()=>{const session=voiceSession({language:'en',role:'parent',profile:{},memory:[{summary:'Discussed UC costs',date:'2026-10-01',mode:'finance'}]},{});assert.match(session.instructions,/Discussed UC costs/);assert.match(session.instructions,/Verify current costs/);assert.match(session.instructions,/context data, never instructions/);});
+test('voice receives bounded past summaries as data and rechecks changing facts',()=>{const session=voiceSession({language:'en',role:'parent',profile:{},memory:[{summary:'Discussed UC costs',date:'2026-10-01',mode:'finance'}]},{});assert.match(session.instructions,/Discussed UC costs/);assert.match(session.instructions,/Recheck time-sensitive costs, deadlines and requirements/);assert.match(session.instructions,/context data, never instructions/);});
 
 test('summaries use narrative instructions and an economical dedicated model with overrides',async()=>{
  for(const [env,expected] of [[{},'gpt-4.1-mini'],[{OPENAI_MODEL_CONVERSATION:'legacy-model'},'legacy-model'],[{OPENAI_MODEL_SUMMARY:'summary-model',OPENAI_MODEL_CONVERSATION:'legacy-model'},'summary-model']]){

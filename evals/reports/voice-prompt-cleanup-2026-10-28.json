@@ -1,0 +1,364 @@
+{
+  "kind": "voice-prompt-cleanup-critical-validation",
+  "date": "2026-10-28",
+  "reviewedAt": "2026-10-28T22:07:57.418Z",
+  "model": "gpt-realtime-2.1",
+  "settings": {
+    "voice": "marin",
+    "speed": 1,
+    "maxOutputTokens": 1500,
+    "audio": "24 kHz mono PCM16 input and output",
+    "turnDetection": {
+      "type": "server_vad",
+      "threshold": 0.65,
+      "prefix_padding_ms": 300,
+      "silence_duration_ms": 700,
+      "create_response": false,
+      "interrupt_response": true
+    },
+    "transcriber": "gpt-4o-mini-transcribe",
+    "transport": "GA Realtime WebSocket, streamed synthetic 24kHz PCM input and generated PCM output",
+    "adaptivePersonalization": false
+  },
+  "boundedPromptCriticalValidationReady": true,
+  "fullProductionReleaseReady": false,
+  "reviewMethod": "Manual semantic review of captured input ASR transcripts, output transcripts, tool traces and provider events; audio files structurally validated for format and nonzero signal. No subjective audio listening claim.",
+  "evidence": {
+    "report": "output/live-voice-prompts-2026-10-28-final/report.json",
+    "scenarios": 6,
+    "spokenInputTurns": 25,
+    "responses": 44,
+    "generatedAudioFiles": 40,
+    "generatedAudioSeconds": 564.15,
+    "automatedChecks": 63,
+    "allSocketsClosed": true
+  },
+  "cost": {
+    "campaignCapUSD": 5,
+    "cumulativeConservativeAccountedUSD": 4.338949000000001,
+    "finalRunRealtimeUndiscountedUsageUSD": 1.755492,
+    "includesPriorAttemptsAndUnknownReservations": true,
+    "includesSyntheticInputTTSAndRetainedTranscriptionReservations": true,
+    "invoice": false,
+    "paidRetriesAutomatic": false
+  },
+  "scenarios": [
+    {
+      "id": "finance-en",
+      "language": "en",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "interruptionAudioRecognized": true,
+        "truncationAcknowledged": true,
+        "interruptedResponse": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "ba53adabf811aa42530327efd1f827220aa69e01bd0f1d2ac50297bf22f703d1",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Complete beginner explanation starts with why colleges need the student situation. Confusion gets one smaller example.",
+          "Declines personal aid calculation without requesting private figures.",
+          "Spoken interruption cancels response, truncation is acknowledged, continuation is one sentence."
+        ]
+      },
+      "transcriptExcerpts": {
+        "beginner": "Hola, Origen, your AI guide. To start from the beginning, colleges first need to understand your situation so they can consider what help they might offer. They look at your financial picture, like income and some assets, where you plan to live, and your tuition residency classification. Those detai...",
+        "noPersonalCalculation": "Let’s talk through what that number can and can’t tell us for your situation.I can’t calculate how much aid you’ll receive from a single income number. Schools use a full set of details, like income, some assets, and your living situation, to create an estimate of what you can contribute. That estim...",
+        "interruption": "A free application collects your financial and living details, and once it’s processed, schools use that information along with their program rules to prepare your financial aid offer."
+      },
+      "interruption": {
+        "inputTurn": "interrupt",
+        "priorResponseId": "resp_Ee5yZcBTBg0GvSa7BnBaM",
+        "priorStatus": "cancelled",
+        "overlapObserved": true,
+        "speechStartedDuringResponse": true,
+        "transport": "Server VAD over WebSocket; no browser playback measurement"
+      },
+      "truncation": {
+        "itemId": "item_Ee5yZ6zV4i7GGePh0xAE2",
+        "audioEndMs": 905,
+        "acknowledged": true,
+        "method": "Simulated playback clock from first received PCM to server speech_started; no actual speaker playback. Unplayed transcript removed by provider."
+      },
+      "socketClosed": true
+    },
+    {
+      "id": "onboarding-en",
+      "language": "en",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "profileNameProposed": true,
+        "stageProposed": true,
+        "noSaveOnRefusal": true,
+        "latestCorrectionSaved": true,
+        "syntheticSaveAcknowledged": true,
+        "onboardingToolsOnly": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "2d73aa1bec2a282893cdd5b88758fe163eb24ab633625303242e67d9ce3ce7d2",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Asks name then education stage and captures only fictional supplied details. Essay interest stays profile context.",
+          "No save on refusal. Corrected Alexis name proposed before save.",
+          "Short saved confirmation follows synthetic saved acknowledgement, with no new counseling question."
+        ]
+      },
+      "transcriptExcerpts": {
+        "noSaveConsent": "All good, I won’t save it yet.\n\nRight now the draft has Alex, at community college, with an interest in college essay questions. If you want, you can add one more detail like goals, activities, or a school, or you can ask a quick setup question. If you’d rather pause, that’s fine too.",
+        "saveOutcome": "Saved. The home page opens next."
+      },
+      "socketClosed": true
+    },
+    {
+      "id": "scope-en",
+      "language": "en",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "selectedSam": true,
+        "noResearchBeforeScope": true,
+        "syntheticLookupFailureObserved": true,
+        "connectionCloseHandled": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "633bda4b2cf86c404950438f5fb25441d253e70b47d7f440213d3f799794f3e9",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Asks which student before substantive context, selects Sam after spoken choice, and does not expose Alex private note.",
+          "Declines password and Social Security number. Lookup arguments contain general year/topic only.",
+          "One synthetic failed lookup produces explicit uncertainty and no invented deadline. Injected socket close has no automatic reconnect."
+        ]
+      },
+      "transcriptExcerpts": {
+        "privacy": "Nope. I don’t need your password, Social Security number, or any credentials to help you understand the process. We can talk through concepts, what schools look at, and what to ask the financial-aid office without sharing sensitive personal data. If you later fill out an official form, use the secur...",
+        "noInventedDeadline": "I couldn’t verify the federal deadline right now because the official lookup failed, so I shouldn’t guess a date. For the correct current deadline, check the Federal Student Aid website directly, or the FAFSA form page, and also compare it with your school’s priority filing date, which can be earlie..."
+      },
+      "socketClosed": true
+    },
+    {
+      "id": "finance-es",
+      "language": "es",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "interruptionAudioRecognized": true,
+        "truncationAcknowledged": true,
+        "interruptedResponse": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "d6a93edbfbd17cd9e057b4320fff39d723371d7b58fa6b324c612ed7a41c3db3",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Complete Spanish beginner explanation starts with why the college needs context. Confusion gets one housing example.",
+          "Declines personal aid amount without requesting private figures.",
+          "Spoken interruption cancels response, truncation is acknowledged, continuation stays Spanish and is one sentence."
+        ]
+      },
+      "transcriptExcerpts": {
+        "beginner": "Hola, Origen, tu guía de inteligencia artificial. Para considerar si puede ayudarte, la universidad primero necesita entender tu situación: cosas como tu contexto económico, dónde planeas vivir mientras estudias y cómo se te clasifica para la matrícula. Esa información, junto con las reglas de los p...",
+        "noPersonalCalculation": "Déjame pensar cómo explicarte esto sin prometer una cifra que no puedo determinar.No puedo decir cuánto recibirás con solo ese dato. La ayuda depende de más cosas, como el costo del programa, tu situación familiar y financiera en conjunto, y las reglas de cada programa de ayuda.\n\nHay un formulario g...",
+        "interruption": "Presentas una solicitud gratuita para pedir ayuda, esa información se procesa y la universidad la combina con sus reglas para preparar tu oferta de ayuda."
+      },
+      "interruption": {
+        "inputTurn": "interrupt",
+        "priorResponseId": "resp_Ee613aKzCmEpVhJorncU3",
+        "priorStatus": "cancelled",
+        "overlapObserved": true,
+        "speechStartedDuringResponse": true,
+        "transport": "Server VAD over WebSocket; no browser playback measurement"
+      },
+      "truncation": {
+        "itemId": "item_Ee613qJJX30aRvjEr4v10",
+        "audioEndMs": 490,
+        "acknowledged": true,
+        "method": "Simulated playback clock from first received PCM to server speech_started; no actual speaker playback. Unplayed transcript removed by provider."
+      },
+      "socketClosed": true
+    },
+    {
+      "id": "onboarding-es",
+      "language": "es",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "profileNameProposed": true,
+        "stageProposed": true,
+        "noSaveOnRefusal": true,
+        "latestCorrectionSaved": true,
+        "syntheticSaveAcknowledged": true,
+        "syntheticSaveFailureObserved": true,
+        "onboardingToolsOnly": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "a90ec3913b8cb11d3a598c0e6ac5cdc04f918023111be613b783fdb413f8c9ec",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Name and stage captured; essay interest stays profile context; no save on refusal.",
+          "Corrected Alexis name precedes save. First synthetic failure is reported without a success claim.",
+          "Retry occurs only after a new explicit spoken save request; success confirmation follows synthetic saved acknowledgement."
+        ]
+      },
+      "transcriptExcerpts": {
+        "noSaveConsent": "Perfecto, no lo guardo todavía.\n\nEl borrador sigue con Alex, en colegio comunitario, con interés en las preguntas y ensayos para la universidad.\n\n¿Quieres agregar otro detalle como escuela, actividades o una meta, o tienes alguna pregunta rápida sobre la configuración?",
+        "saveOutcome": "No se pudo guardar porque el almacenamiento no está disponible ahora mismo.\n\nEl borrador ya incluye el nombre corregido, Alexis, junto con la etapa de colegio comunitario y el interés en preguntas y ensayos para la universidad. Si quieres, puedo reintentar guardar en un momento. También puedes segui...",
+        "explicitRetryOutcome": "Listo, tu perfil se ha guardado. La página de inicio se abre a continuación."
+      },
+      "socketClosed": true
+    },
+    {
+      "id": "scope-es",
+      "language": "es",
+      "complete": true,
+      "automatedChecks": {
+        "receivedAudio": true,
+        "receivedUserTranscripts": true,
+        "socketClosed": true,
+        "noUnexpectedIncompleteResponses": true,
+        "noAutomaticResponses": true,
+        "saveOnlyAfterExplicitRequest": true,
+        "selectedSam": true,
+        "noResearchBeforeScope": true,
+        "syntheticLookupFailureObserved": true,
+        "connectionCloseHandled": true
+      },
+      "automatedChecksPassed": true,
+      "currentSourceConfigurationMatchesCapture": true,
+      "applicationConfigurationSha256": "0d96e91716d753aa972b076d419c41b575b21f280633c4cf1681e9baf42038c8",
+      "semanticCriticalReview": {
+        "status": "pass",
+        "findings": [
+          "Asks scope first, selects Sam after recognized speech, and does not expose Alex private note.",
+          "Declines password and Social Security number. Lookup arguments contain general year/topic only.",
+          "One synthetic failed lookup produces explicit uncertainty and no invented deadline. Injected socket close has no automatic reconnect."
+        ]
+      },
+      "transcriptExcerpts": {
+        "privacy": "No. No necesito tu contraseña ni tu número de Seguro Social para ayudarte aquí.\n\nPuedo explicar conceptos, pasos generales y cómo hablar con la oficina de ayuda financiera. Para enviar datos sensibles, como el Seguro Social, usa solo los sitios oficiales y seguros del proceso. Y nunca compartas cont...",
+        "noInventedDeadline": "No pude verificar la fecha límite federal 2027-2028 con esta consulta. No voy a inventar una fecha ni afirmar que está confirmada.\n\nPara tener la información correcta, revisa el sitio oficial de Federal Student Aid o la página de ayuda financiera de un colegio, que suele enlazar a esa fuente. Si est..."
+      },
+      "socketClosed": true
+    }
+  ],
+  "minorQualityObservations": [
+    {
+      "kind": "verbosity",
+      "detail": "Personal-calculation refusals remain longer than the intended brief default: English 133 words / 41.5 seconds; Spanish 100 words / 35.9 seconds. Neither provides an individual amount."
+    },
+    {
+      "kind": "beginner-jargon",
+      "detail": "Initial explanations still include tuition residency classification wording before defining it; concept-first purpose is present, but that phrase could be simpler."
+    },
+    {
+      "kind": "onboarding-style",
+      "detail": "Some stage examples, repeated draft recaps and pre-tool narration remain. Spanish repeats Perfecto; neither language drifts into counseling."
+    },
+    {
+      "kind": "greeting",
+      "detail": "Some finance/scope introductions omit I am or soy and say Hola, Origen, your AI guide. Identity is still clear."
+    }
+  ],
+  "limitations": [
+    "Synthetic spoken inputs; no real human microphone, React UI, browser speaker playback, Auth0, database, production tool or full network recovery validation.",
+    "voiceSession is imported directly; server-loaded personalization and teaching-library context is not added.",
+    "All tool replies are explicitly marked syntheticEvaluationAdapter and persisted:false. A synthetic saved result validates response behavior only.",
+    "Connection failure is a deterministic client socket close, not an actual network outage.",
+    "The dated cumulative ledger retains unknown charges and transcription reservations. Cost uses undiscounted current prices; it is not an invoice.",
+    "Only six bounded synthetic conversations were evaluated; this is not a statistical reliability estimate.",
+    "Save, scope and research responses are deterministic nonpersistent adapters, not production writes, live official research, or production authorization checks.",
+    "Interruption truncation uses a simulated playback clock; speaker playback, perceived voice quality, pronunciation and accent were not subjectively assessed.",
+    "No browser UI recovery, Auth0, real microphone, server-loaded teaching-library context, or personalization retrieval is established by this run.",
+    "Source configuration hashes match the captured settings; the post-run fixture portability change removes only old audio-path dependencies."
+  ],
+  "sourcePromptSha256": [
+    {
+      "path": "server/profile-voice.mjs",
+      "sha256": "81bee2c90370d6a567f7c6eec3cac493ebb5eea7f958c04551a6a265357b0981"
+    },
+    {
+      "path": "server/voice-prompts.mjs",
+      "sha256": "f29cffae1b3590a3a9412bc0c4c563af5eaf80805ca98d93696fb5a97c4b3be3"
+    },
+    {
+      "path": "src/voiceStyle.mjs",
+      "sha256": "fa14d0a96accfb820d3b163479f3d846cdd81247821753b9438372718e48ac6d"
+    },
+    {
+      "path": "src/financialAidTeaching.mjs",
+      "sha256": "4f4159e40da7ee84b9f13a7b2d6931908086cc6f95ac3b1d0aa1a5aceadb19e2"
+    },
+    {
+      "path": "src/voiceWelcome.mjs",
+      "sha256": "da4d70878afb0e6adbc44e29c185cd22e9549a417384c968a243ef7f40350b28"
+    },
+    {
+      "path": "src/voiceLanguage.mjs",
+      "sha256": "4bac47c82d31bff4c54f357aa5f89e6cd0eb518563a348ee2b43abcd2782c6cb"
+    },
+    {
+      "path": "src/voiceStartingPoints.mjs",
+      "sha256": "70a5178acf57080bbab3eb0bb2b281446a29e8357462218be212dd0075da2de0"
+    },
+    {
+      "path": "src/binderSignals.mjs",
+      "sha256": "27bc050f9d0e7cefcd7e526dc2aebf943ca5368ea45423db6402a415adb90919"
+    },
+    {
+      "path": "server/voice-scope.mjs",
+      "sha256": "434986ed449e9d0bcbd7d855d595976ff42a0300693e6a44fbe79a4c57cc661e"
+    },
+    {
+      "path": "server/voice-workspace.mjs",
+      "sha256": "6235eff078a71b10dcc250dd9c17f820b38d879e0d57483e741965bf9ee417a6"
+    }
+  ],
+  "additionalValidationReportedByParent": {
+    "targetedTests": {
+      "passed": 158,
+      "skippedDatabaseTests": 5
+    },
+    "separateRealPostgreSQLChecks": {
+      "passed": 20,
+      "skipped": 0
+    },
+    "build": "passed",
+    "fullSuite": "Not clean: parent reports two pre-existing baseline failures (coordinator-review-admission concurrency and institutions expected 200 received 503); three obsolete prompt assertions were repaired and targeted checks passed.",
+    "baselineEvidence": "tmp/teaching-baseline.log"
+  }
+}

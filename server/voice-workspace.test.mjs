@@ -56,9 +56,11 @@ test('live topics use owned evidence-linked recaps without treating them as acce
  assert.doesNotMatch(JSON.stringify(context),/other\/|owner\/sibling|owner\/null/);
  assert.equal((await f.load({kind:'topic',studentId:'s',topic:'applications'})).conversationPoints.length,0);
  assert.equal((await f.load({kind:'topic',studentId:null,topic:'costs'},null)).conversationPoints[0].content,'owner/null: FAFSA was discussed.');
- const policy=binderInstructions();assert.match(policy,/Summary and four topic dividers/);assert.match(policy,/topics actually discussed/);assert.match(policy,/unreviewed recaps/);assert.match(policy,/never confirms which student's private information/);
+ const policy=binderInstructions();
+ for(const divider of ['Summary','College options','Transfer & courses','Paying for college','Applications'])assert.ok(policy.includes(divider));
+ assert.match(policy,/topics actually discussed/);assert.match(policy,/unreviewed AI recaps/);assert.match(policy,/Screen navigation alone never confirms whose private information/);
  const session=voiceSession({mode:'finance',role:'student',language:'en',profile:{},workspace:context},{});
- assert.match(session.instructions,/owner\/s: FAFSA/);assert.match(session.instructions,/one short overall recap/);assert.match(session.instructions,/Never claim I saved this/);
+ assert.match(session.instructions,/owner\/s: FAFSA/);assert.match(session.instructions,/one short overall recap/);assert.match(session.instructions,/Never claim a summary was saved or that a point is visible without app confirmation/);
  await history('owner',{action:'delete',id:'recap-s'});assert.equal((await f.load(focus)).conversationPoints.length,0);
 });
 test('actions preserve self-reported status and dates, refresh edits, reject archived and deleted tasks',async t=>{

@@ -22,6 +22,9 @@ mobile/web-build/
 /output/personalization-*/
 /output/student-first-*/
 /output/playwright/student-first-*/
+/output/live-voice-prompts-*/
+/output/live-voice-prompts-budget-*.json*
+/output/playwright/teaching-library/
 
 # Disposable databases, operator scratch files, and browser session captures
 /tmp/

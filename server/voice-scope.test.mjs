@@ -19,7 +19,8 @@ test('confirmed family scope retains specialist tools and applies clear spoken s
  const session=voiceSession({role:'parent',mode:'finance',language:'es',routeConversations:true,targetConfirmed:true,scopeRestart:true,studentId:null,students,profile:{}},{});
  assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language','highlight_binder_topics','end_conversation']);
  assert.match(session.instructions,/general family questions/);
- assert.match(session.instructions,/Do not greet or introduce yourself again/);
+ assert.match(session.instructions,/Do not say Hola, greet, introduce yourself/);
+ assert.doesNotMatch(session.instructions,/first spoken word must be exactly Hola/);
 });
 test('target IDs are validated and switch utterances stay out of previous summaries',()=>{
  assert.equal(resolveScope('family',students),null);
