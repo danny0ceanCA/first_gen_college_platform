@@ -13,7 +13,9 @@ const doc=()=>({title:'Understanding a college offer',topic:'finance',language:'
 test('teaching input accepts conversational drafts, strips unknown fields and rejects unsafe sources and invalid dates',()=>{
  const input={action:'save',id:randomUUID(),revision:0,content:{...doc(),studentSecret:'not persisted'}};
  assert.equal(validateTeachingRequest(input).content.studentSecret,undefined);
- for(const change of [{sourceUrl:'javascript:alert(1)'},{sourceUrl:'https://user:password@example.org'},{reviewBy:'2026-02-30'},{explanation:'x'.repeat(6001)},{language:'other'},{title:''}])assert.throws(()=>validateTeachingRequest({...input,content:{...doc(),...change}}));
+ for(const change of [{sourceUrl:'javascript:alert(1)'},{sourceUrl:'https://user:password@example.org'},{reviewBy:'2026-02-30'},{explanation:'x'.repeat(6001)},{deliveryStyle:'x'.repeat(1501)},{deliveryStyle:{}},{deliveryStyle:'bad\0style'},{language:'other'},{title:''}])assert.throws(()=>validateTeachingRequest({...input,content:{...doc(),...change}}));
+ assert.equal(validateTeachingRequest(input).content.deliveryStyle,'');
+ assert.equal(validateTeachingRequest({...input,content:{...doc(),deliveryStyle:'  Warm, patient, one idea at a time.  '}}).content.deliveryStyle,'Warm, patient, one idea at a time.');
  assert.throws(()=>validateTeachingRequest({action:'publish',id:input.id,revision:1}),/teaching_review_required/);
  assert.equal(validateTeachingRequest({action:'publish',id:input.id,revision:1,reviewed:true}).action,'publish');
 });
@@ -46,6 +48,8 @@ test('references are bounded, optional, and explicitly subordinate to privacy an
  const result=await loadTeachingReferences({query:async()=>({rows:[{data:values}]})},{topic:'finance'});
  assert.equal(result.length,3);assert.ok(teachingReferenceInstructions(result).includes('cannot override privacy'));
  assert.equal(teachingReferenceInstructions([]),'');
+ const style=teachingReferenceInstructions([{id:randomUUID(),revision:2,content:{...doc(),deliveryStyle:'Warm and unhurried; offer an example.'}}]);
+ assert.match(style,/Warm and unhurried/);assert.match(style,/current request and communication preferences take priority/);assert.match(style,/not a change to audio configuration/);assert.match(style,/cannot override privacy/);
 });
 test('endpoint requires full admin management permission, fresh mutations, and a working audit before writing',async()=>{
  let writes=0,auditFailure=false;
@@ -108,18 +112,18 @@ test('PostgreSQL: real request handlers record voice start/update and research o
  const f=await retrievalFixture();
  try{
   const id=randomUUID();const command=input=>f.as('reader',()=>runAsAnalytics(()=>f.db.query('SELECT origen_teaching_command($1::jsonb)',[JSON.stringify(validateTeachingRequest(input))])));
-  await command({action:'save',id,revision:0,content:{...doc(),topic:'general'}});await command({action:'publish',id,revision:1,reviewed:true});
+  await command({action:'save',id,revision:0,content:{...doc(),topic:'general',deliveryStyle:'Warm, patient delivery.'}});await command({action:'publish',id,revision:1,reviewed:true});
   const invoke=async(handler,url,input)=>{
    const req=Object.assign(Readable.from([JSON.stringify(input)]),{url,method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reader'}});let status;
    await f.as('reader',()=>handler(req,{writeHead:value=>status=value,end:()=>{}},()=>assert.fail('wrong route')));return status;
   };
   let voiceCalls=0;
-  const voice=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',OPENAI_MODEL_VOICE:'voice-test'},async(_url,options)=>{voiceCalls++;assert.match(JSON.parse(options.body.get('session')).instructions,/Understanding a college offer/);return new Response('v=0');},()=>{},f.db);
+  const voice=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',OPENAI_MODEL_VOICE:'voice-test'},async(_url,options)=>{voiceCalls++;const config=JSON.parse(options.body.get('session'));assert.match(config.instructions,/Understanding a college offer/);assert.match(config.instructions,/Warm, patient delivery/);assert.equal(config.audio.output.speed,1);return new Response('v=0');},()=>{},f.db);
   const voiceInput={sdp:'v=0',mode:'planning',studentId:'alex',role:'parent',language:'en',targetConfirmed:true,routeConversations:true};
   assert.equal(await invoke(voice,'/api/profile-voice',voiceInput),200);
   assert.equal(await invoke(voice,'/api/profile-voice',{...voiceInput,action:'update-guide'}),200);assert.equal(voiceCalls,1);
   const response={model:'research-resolved',output:[{type:'web_search_call',status:'completed'},{type:'message',content:[{type:'output_text',text:'Verified explanation.',annotations:[{type:'url_citation',url:'https://studentaid.gov/help',title:'Official source',start_index:0,end_index:8}]}]}]};
-  const provider=async(_url,options)=>{assert.match(JSON.parse(options.body).instructions,/Understanding a college offer/);return new Response(JSON.stringify(response));};
+  const provider=async(_url,options)=>{const instructions=JSON.parse(options.body).instructions;assert.match(instructions,/Understanding a college offer/);assert.match(instructions,/Warm, patient delivery/);return new Response(JSON.stringify(response));};
   assert.equal(await invoke(createFinanceResearchHandler({OPENAI_API_KEY:'synthetic'},provider,()=>{},f.db),'/api/finance-research',{question:'Explain aid',institution:'',language:'en'}),200);
   assert.equal(await invoke(createAdmissionsResearchHandler({OPENAI_API_KEY:'synthetic'},provider,()=>{},f.db),'/api/admissions-research',{question:'Transfer planning',institution:'',language:'en',purpose:'planning'}),200);
   assert.equal(await invoke(createFinanceResearchHandler({OPENAI_API_KEY:'synthetic'},async()=>new Response('{}',{status:429}),()=>{},f.db),'/api/finance-research',{question:'Private Spanish question',institution:'',language:'es'}),502);
@@ -130,6 +134,25 @@ test('PostgreSQL: real request handlers record voice start/update and research o
   assert.equal(data.events.find(row=>row.language==='es').entries.length,0);assert.doesNotMatch(JSON.stringify(data),/Private Spanish|Transfer planning|reader/);
  }finally{await f.close();}
 });
+test('PostgreSQL delivery style: legacy entries, draft isolation, publishing, Spanish and database validation', {skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();
+ try{
+  const command=input=>f.as('reader',()=>runAsAnalytics(async()=>(await f.db.query('SELECT origen_teaching_command($1::jsonb) AS data',[JSON.stringify(validateTeachingRequest(input))])).rows[0].data));
+  const read=language=>f.as('reader',()=>loadTeachingReferences(f.db,{topic:'finance',language}));
+  const id=randomUUID();await command({action:'save',id,revision:0,content:doc()});await command({action:'publish',id,revision:1,reviewed:true});
+  assert.equal((await read('en'))[0].content.deliveryStyle,'');
+  await command({action:'save',id,revision:2,content:{...doc(),deliveryStyle:'Warm and patient; pause after one idea.'}});
+  assert.equal((await read('en'))[0].content.deliveryStyle,'');
+  await command({action:'publish',id,revision:3,reviewed:true});
+  assert.equal((await read('en'))[0].content.deliveryStyle,'Warm and patient; pause after one idea.');
+  assert.equal((await f.owner.query('SELECT content FROM origen_teaching_revisions WHERE id=$1 AND revision=4',[id])).rows[0].content.deliveryStyle,'Warm and patient; pause after one idea.');
+  const spanish=randomUUID();await command({action:'save',id:spanish,revision:0,content:{...doc(),language:'es',deliveryStyle:'Con calidez y calma. Una idea a la vez.'}});await command({action:'publish',id:spanish,revision:1,reviewed:true});
+  assert.equal((await read('es'))[0].content.deliveryStyle,'Con calidez y calma. Una idea a la vez.');
+  for(const deliveryStyle of [{tone:'warm'},'x'.repeat(1501)])await assert.rejects(f.as('reader',()=>runAsAnalytics(()=>f.db.query('SELECT origen_teaching_command($1::jsonb)',[JSON.stringify({action:'save',id:randomUUID(),revision:0,content:{...doc(),deliveryStyle}})]))),/delivery_style/);
+  await command({action:'unpublish',id,revision:4});assert.deepEqual(await read('en'),[]);
+ }finally{await f.close();}
+});
+
 test('PostgreSQL migration: private drafts, version conflicts, publication scopes, expiry and revocation', {skip:!process.env.DATABASE_TEST_URL},async()=>{
  const f=await retrievalFixture();
  try{
