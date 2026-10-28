@@ -54,14 +54,16 @@ const output=process.env.ORIGEN_SMOKE_OUTPUT||'output/playwright/student-first-p
    await page.goto(origin+'/phase8-review');await page.locator('.coordinator-updates-heading').click();
    await page.getByText(t('A student asked for help with their shared selection.','Un estudiante pidió ayuda con su selección compartida.'),{exact:true}).waitFor();
    await page.getByRole('button',{name:t('Open update','Abrir novedad'),exact:true}).click();
-   await page.getByText(t('New published selection to review.','Nueva selección publicada para revisar.'),{exact:true}).waitFor();
+   await page.getByRole('button',{name:t('Mark reviewed','Marcar como revisado'),exact:true}).waitFor();
    await page.locator('.coordinator-publication-topics button').filter({hasText:t('Paying for college','Pagar la universidad')}).click();
    await page.getByText(entry.content,{exact:true}).waitFor();
-   await page.getByRole('button',{name:t('Write guidance in this topic','Escribir orientación en este tema'),exact:true}).click();
+   await page.getByRole('button',{name:t('Write in the page margin','Escribir en el margen'),exact:true}).click();
+   if(process.env.ORIGEN_SMOKE_ACCESSIBILITY==='true')assert.ok(await page.getByLabel(t('Your guidance','Tu orientación'),{exact:true}).evaluate(el=>el===document.activeElement));
+   await page.getByText(t('Add a link or suggest a step','Agregar un enlace o sugerir un paso'),{exact:true}).click();
    const kind=page.getByRole('combobox',{name:/^(Type|Tipo)/});await kind.selectOption('suggested-step');
-   if(process.env.ORIGEN_SMOKE_ACCESSIBILITY==='true'){await kind.focus();await page.keyboard.press('Tab');assert.ok(await page.getByRole('combobox',{name:/^(Attach to|Adjuntar a)/}).evaluate(el=>el===document.activeElement));await page.keyboard.press('Tab');assert.ok(await page.getByLabel(t('Your guidance','Tu orientación'),{exact:true}).evaluate(el=>el===document.activeElement));}
+   if(process.env.ORIGEN_SMOKE_ACCESSIBILITY==='true'){await kind.focus();await page.keyboard.press('Tab');assert.ok(await page.getByLabel(t('Resource link (optional, https://)','Enlace de recurso (opcional, https://)'),{exact:true}).evaluate(el=>el===document.activeElement));}
    await page.getByLabel(t('Your guidance','Tu orientación'),{exact:true}).fill(suggestion);
-   await page.getByRole('button',{name:t('Save guidance for student','Guardar orientación para el estudiante'),exact:true}).click();await page.locator('.guidance-body').waitFor();assert.equal(planWrites,0);
+   await page.getByRole('button',{name:t('Save red note','Guardar nota roja'),exact:true}).click();await page.locator('.guidance-body').waitFor();assert.equal(planWrites,0);
    await page.getByRole('button',{name:'Student view',exact:true}).click();await page.locator('.guidance-body').waitFor();
    await page.getByRole('button',{name:t('Add to my next steps','Agregar a mis próximos pasos'),exact:true}).click();
    await page.getByLabel(t('Action title','Título de la acción'),{exact:true}).fill(t('Compare with Jordan','Comparar con Jordan'));
