@@ -1,4 +1,4 @@
-import {loadTeachingReferences,teachingReferenceInstructions} from './teaching-library.mjs';
+import {prepareTeachingAccess} from './teaching-library.mjs';
 import {providerOperation} from './observability/dependencies.mjs';
 import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
 import {planningResearchInstructions} from './education-planning.mjs';
@@ -33,16 +33,17 @@ export function createAdmissionsResearchHandler(env,request=fetch,log=()=>{},dat
   let input;
   try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>12000)return send(413,{error:'request_too_large'});}input=JSON.parse(raw);}catch{return send(400,{error:'invalid_request'});}
   if(!input||(input.purpose!==undefined&&!['planning','admissions'].includes(input.purpose))||typeof input.question!=='string'||!input.question.trim()||input.question.length>3000||typeof input.institution!=='string'||input.institution.length>300||!['en','es'].includes(input.language))return send(400,{error:'invalid_request'});
-  let tracking,finished=false;
+  let tracking,finished=false,teachingAccess,teachingOutcome='failed',teachingResolvedModel;
   try{
    const names=await researchPrivateNames(req,database);input={...input,...publicResearchInput(input,names)};
-   const body=admissionsResearchRequest(env,input);if(req.origenAuthorized)body.instructions+=teachingReferenceInstructions(await loadTeachingReferences(database,{topic:input.purpose==='planning'?'planning':'admissions',language:input.language,campus:input.institution,query:input.question,academicYear:input.question.match(/\b\d{4}-\d{2}\b/)?.[0]||''}));tracking=await trackResearch(req,env,database,body,'lookup_college_applications');
+   const body=admissionsResearchRequest(env,input);if(req.origenAuthorized){teachingAccess=await prepareTeachingAccess(database,{topic:input.purpose==='planning'?'planning':'admissions',language:input.language,campus:input.institution,query:input.question,academicYear:input.question.match(/\b\d{4}-\d{2}\b/)?.[0]||''},{model:body.model,operation:'admissions_lookup',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});body.instructions+=teachingAccess.instructions;};tracking=await trackResearch(req,env,database,body,'lookup_college_applications');
    const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY.trim()}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(120000)});
   void (req.log||log)({sessionId,event:'upstream_response',operation:'admissions_lookup',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
    if(!response.ok)return send(502,{error:'research_unavailable'});
-   const data=await response.json(),result=parseAdmissionsResearch(data,input.institution);
+   teachingOutcome='provider_accepted';
+   const data=await response.json();teachingResolvedModel=data.model;const result=parseAdmissionsResearch(data,input.institution);
    await tracking.finish({status:result?'completed':'failed',upstreamRequestId:response.headers.get('x-request-id'),sources:result?.sources,usage:data.usage,resolvedModel:data.model,errorCode:result?null:'official_sources_unverified'});finished=true;
    return result?send(200,result):send(502,{error:'official_sources_unverified'});
-  }catch(error){req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409].includes(error.status)?error.status:502,{error:error.status?error.message:'research_unavailable'});}finally{if(tracking&&!finished)await tracking.finish({status:'failed',errorCode:'research_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
+  }catch(error){req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409].includes(error.status)?error.status:502,{error:error.status?error.message:'research_unavailable'});}finally{await teachingAccess?.finish(teachingOutcome,teachingResolvedModel);if(tracking&&!finished)await tracking.finish({status:'failed',errorCode:'research_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
  };
 }

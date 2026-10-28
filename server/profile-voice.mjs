@@ -1,4 +1,4 @@
-import {loadTeachingReferences,teachingReferenceInstructions} from './teaching-library.mjs';
+import {prepareTeachingAccess} from './teaching-library.mjs';
 import {voiceMemoryPrompt,financeVoicePrompt,admissionsVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
 import {coordinatorVoiceAvailable} from './coordinator-connections.mjs';
 import {coordinatorLinkTools,coordinatorLinkInstructions} from './coordinator-voice-tools.mjs';
@@ -129,7 +129,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
   return async(req,res,next) => {
     if(req.url?.split('?')[0] !== '/api/profile-voice') return next();
     const started=Date.now();
-    let execution,tracked,upstreamRequestId,storedRole='unknown';
+    let execution,tracked,upstreamRequestId,storedRole='unknown',teachingAccess,teachingOutcome='failed';
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
   const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...body,...(tracked?{guidance:tracked}:{})}));};
@@ -225,7 +225,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const memoryRevision=input.studentBrief?.revision,memoryPolicy=typeof memoryRevision==='number'?personalizationPolicy(env,req.origenAuthorized?req.origenIdentity?.sub:undefined):undefined;
       if(!policy.enabled)input.studentBrief=undefined;
       const config=voiceSession(input,env);
-      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){const references=await loadTeachingReferences(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',query:input.mode||''});config.instructions+=teachingReferenceInstructions(references);}
+      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',query:input.mode||''},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});config.instructions+=teachingAccess.instructions;}
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.
@@ -235,7 +235,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);
         if(!updating)execution=await guidance.startExecution(req.origenIdentity.sub,tracked,version,'voice');
       }
-      if(updating)return send(200,{...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice},guidance:tracked});
+      if(updating){teachingOutcome='prepared';return send(200,{...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice},guidance:tracked});}
       const form=new FormData(); form.set('sdp',input.sdp); form.set('session',JSON.stringify(config));
       const response=await request('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});
   void (req.log||log)({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
@@ -247,8 +247,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       const sdp=await response.text();
       if(!sdp.startsWith('v=0')) return send(502,{error:'voice_unavailable'});
+      teachingOutcome='provider_accepted';
       if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
       return send(200,{sdp,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
-    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
+    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;await teachingAccess?.finish(teachingOutcome);if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
   };
 }

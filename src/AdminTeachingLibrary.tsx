@@ -5,6 +5,7 @@ import {apiFetch} from './api';
 import StaffVerification,{getStaffAccessToken,staffVerificationErrors} from './StaffVerification';
 import {useNavigationGuard,useNavigationState,navigateWorkspace,navigationText} from './workspaceNavigation';
 import './AdminTeachingLibrary.css';
+import TeachingLibraryActivity from './TeachingLibraryActivity';
 
 type Content={title:string;topic:string;language:string;explanation:string;keywords:string;campus:string;academicYear:string;sourceUrl:string;reviewBy:string;example:string;followUp:string;referral:string};
 type Item={id:string;revision:number;draft:Content;published:Content|null;published_revision:number|null;archived:boolean;updated_at:string;published_at:string|null};
@@ -20,6 +21,7 @@ export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:nu
  const [items,setItems]=useState<Item[]>([]),[entry,setEntry]=useState<Item|null>(null),[draft,setDraft]=useState<Content>(blank),[loaded,setLoaded]=useState(false),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[reviewed,setReviewed]=useState(false),[preview,setPreview]=useState(false),[history,setHistory]=useState<History[]|null>(null);
  const [query,setQuery]=useState(''),[search,setSearch]=useNavigationState('admin.teachings.search','',navigationText),[archived,setArchived]=useState(false);
  const [selected,setSelected]=useNavigationState('admin.teachings.id','',navigationText);
+ const [showActivity,setShowActivity]=useState(false),[showEntryActivity,setShowEntryActivity]=useState(false);
  const version=useRef(0),pending=useRef(false),alive=useRef(true),lastSelected=useRef('');
  const dirty=!!entry&&JSON.stringify(draft)!==JSON.stringify(entry.draft);
  useNavigationGuard(dirty,{locked:busy,onLeave:()=>{setEntry(null);setDraft(blank());setPreview(false);setReviewed(false);}});
@@ -50,7 +52,8 @@ export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:nu
  const text=(key:keyof Content,label:string,max:number,rows=3)=><label>{label}<textarea aria-label={label} rows={rows} maxLength={max} value={draft[key]} onChange={e=>edit(key,e.target.value)}/></label>;
  const field=(key:keyof Content,label:string,max:number,type='text')=><label>{label}<input aria-label={label} type={type} maxLength={max} value={draft[key]} onChange={e=>edit(key,e.target.value)}/></label>;
  return <section className="teaching-library" aria-label="Teaching library">
-  <div className="teaching-intro"><div><p>Your explanations, examples, and questions help shape Origen’s conversations.</p><small>Save a draft, review it, then publish when you want Origen to use it.</small></div><button className="button primary" onClick={create}><Plus size={17}/>New teaching</button></div>
+  <div className="teaching-intro"><div><p>Your explanations, examples, and questions help shape Origen’s conversations.</p><small>Save a draft, review it, then publish when you want Origen to use it.</small></div><div className="teaching-intro-actions"><button className="button" aria-expanded={showActivity} onClick={()=>setShowActivity(value=>!value)}>Library activity</button><button className="button primary" onClick={create}><Plus size={17}/>New teaching</button></div></div>
+  {showActivity&&<TeachingLibraryActivity request={request}/>}
   {notice&&<p className="teaching-notice" role="status"><Check size={16}/>{notice}</p>}
   {staffVerificationErrors.includes(error)?<StaffVerification requireMfa={false} returnTo="#admin"/>:error&&<p className="teaching-error" role="alert">{message(error)}</p>}
   <div className="teaching-layout" data-editing={!!entry}>
@@ -59,6 +62,7 @@ export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:nu
     {!items.length&&<p className="teaching-empty" role="status">{loading?'Loading your library…':loaded?'No teachings in this view. Add your first explanation to get started.':'The library has not loaded yet.'}</p>}{items.length===100&&<small>Showing up to 100 entries. Search for a specific title.</small>}
    </aside>
    {entry?<article className="teaching-editor"><header><button className="text-button" onClick={back}><ArrowLeft size={16}/>All teachings</button><span>{entry.revision?state(entry):'New draft'}{dirty?' · Unsaved changes':''}</span></header>
+    {entry.revision>0&&<><button className="button teaching-entry-activity" aria-expanded={showEntryActivity} onClick={()=>setShowEntryActivity(value=>!value)}>View this teaching’s activity</button>{showEntryActivity&&<TeachingLibraryActivity id={entry.id} request={request}/>}</>}
     <nav className="teaching-editor-tabs" aria-label="Teaching view"><button aria-pressed={!preview} onClick={()=>setPreview(false)}>Write</button><button aria-pressed={preview} onClick={()=>setPreview(true)}><Eye size={16}/>Preview draft</button></nav>
     {preview?<section className="teaching-preview" aria-label="Teaching preview"><span>{draft.language==='es'?'Spanish':'English'} · {topics.find(t=>t[0]===draft.topic)?.[1]}</span><h2>{draft.title||'Untitled teaching'}</h2><p>{draft.explanation||'Your explanation will appear here.'}</p>{draft.example&&<><h3>Example conversation</h3><p>{draft.example}</p></>}{draft.followUp&&<><h3>A useful follow-up</h3><p>{draft.followUp}</p></>}{draft.referral&&<><h3>When to refer</h3><p>{draft.referral}</p></>}{draft.campus&&<p>{draft.campus} · {draft.academicYear}</p>}{source(draft.sourceUrl)&&<a href={source(draft.sourceUrl)} target="_blank" rel="noopener noreferrer">Official reference ↗</a>}<p className="teaching-help">Origen adapts this material to the conversation. Its privacy, scope, language, and financial-aid calculation boundaries continue to apply.</p></section>:<form id="teaching-form" onSubmit={e=>{e.preventDefault();void mutate('save');}}><fieldset disabled={busy||entry.archived}>
      {field('title','Title',120)}<div className="teaching-two"><label>Topic<select aria-label="Topic" value={draft.topic} onChange={e=>edit('topic',e.target.value)}>{topics.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><label>Language<select aria-label="Language" value={draft.language} onChange={e=>edit('language',e.target.value)}><option value="en">English</option><option value="es">Spanish</option></select></label></div>
