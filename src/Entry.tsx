@@ -1,23 +1,27 @@
-import CoordinatorConnectPage from './CoordinatorConnectPage';
-import CoordinatorWorkspace from './CoordinatorWorkspace';
-import CoordinatorRegistration from './CoordinatorRegistration';
+import WorkspaceModule from './LoadingSurface';
 import EligibilityGate from './EligibilityGate';
 import AccountOpening from './AccountOpening';
-import {InquiryReceipt} from './InstitutionInquiry';
-import InstitutionInvite from './InstitutionInvite';
-import AdminDashboard from './AdminDashboard';
 import {apiFetch} from './api';
 import {withRequestDeadline} from './requestDeadline.mjs';
 import {adminAccessDecision,defaultWorkspace} from './accountAccess.mjs';
-import InstitutionPortal,{InstitutionPublic,InstitutionDirectory} from './InstitutionPortal';
 import {setAPITokenProvider} from './api';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useState} from 'react';
-import App from './App';
+import {lazy,useEffect,useState} from 'react';
 import Landing from './Landing';
-import LandingInformation from './LandingInformation';
-import InviteAccept from './InviteAccept';
-export default function Entry(){
+const App=lazy(()=>import('./App'));
+const AdminDashboard=lazy(()=>import('./AdminDashboard'));
+const CoordinatorWorkspace=lazy(()=>import('./CoordinatorWorkspace'));
+const CoordinatorRegistration=lazy(()=>import('./CoordinatorRegistration'));
+const CoordinatorConnectPage=lazy(()=>import('./CoordinatorConnectPage'));
+const InstitutionPortal=lazy(()=>import('./InstitutionPortal'));
+const InstitutionPublic=lazy(()=>import('./InstitutionPortal').then(m=>({default:m.InstitutionPublic})));
+const InstitutionDirectory=lazy(()=>import('./InstitutionDirectory'));
+const InstitutionInvite=lazy(()=>import('./InstitutionInvite'));
+const InquiryReceipt=lazy(()=>import('./InstitutionInquiry').then(m=>({default:m.InquiryReceipt})));
+const InviteAccept=lazy(()=>import('./InviteAccept'));
+const LandingInformation=lazy(()=>import('./LandingInformation'));
+export default function Entry(){return <WorkspaceModule layout="workspace"><EntryRoutes/></WorkspaceModule>;}
+function EntryRoutes(){
  const publicRoute=()=>window.location.pathname==='/institutions'?'#directory':/^\/institutions\/[a-z0-9-]{1,100}$/.test(window.location.pathname)?'#institution/'+window.location.pathname.slice(14):'';
  const [route,setRoute]=useState(window.location.hash||publicRoute());
  useEffect(()=>{const token=sessionStorage.getItem('origen.pending-institution-invite');if(!window.location.hash&&token&&/^[A-Za-z0-9_-]{43}$/.test(token)){sessionStorage.removeItem('origen.pending-institution-invite');window.location.hash=`#institution-invite/${token}`;}},[]);

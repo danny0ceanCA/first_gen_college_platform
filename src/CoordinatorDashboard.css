@@ -7,8 +7,8 @@
 .coordinator-dashboard .admin-sidebar nav svg,.coordinator-dashboard .admin-sidebar-bottom svg { flex-shrink: 0; }
 .coordinator-dashboard .admin-sidebar-bottom { gap: 18px; }
 .coordinator-dashboard-main { max-width: 1400px; padding-bottom: 48px; }
-.coordinator-dashboard .coordinator-card { background: var(--admin-surface); border-color: var(--brand-border); border-radius: 16px; margin-top: 24px; }
-.coordinator-dashboard .coordinator-card h2 { font-size: 23px; letter-spacing: -.5px; }
+.coordinator-dashboard .coordinator-card { background: var(--admin-surface); border-color: var(--brand-border); border-radius: var(--radius-card); margin-top: var(--space-5); }
+.coordinator-dashboard .coordinator-card h2 { font-size: var(--text-section); letter-spacing: -.5px; }
 .coordinator-dashboard .coordinator-card p { color: var(--brand-muted); line-height: 1.7; }
 .coordinator-dashboard .institution-actions { flex-wrap: wrap; }
 .coordinator-dashboard .button { min-height: 44px; text-decoration: none; }
@@ -21,7 +21,7 @@
 .coordinator-nav-placeholder { visibility: hidden; }
 .coordinator-dashboard-placeholder :is(h2,.coordinator-organization-bar strong,.coordinator-organization-bar > span) { color: transparent; background: #e9dfd4; border-radius: 6px; }
 .coordinator-dashboard-placeholder .coordinator-home-stats strong { color: transparent; }
-.coordinator-organization-bar { display: flex; align-items: center; gap: 12px; padding: 0 0 22px; margin-bottom: 26px; border-bottom: 1px solid var(--brand-border); }
+.coordinator-organization-bar { display: flex; align-items: center; gap: var(--space-3); padding: 0 0 var(--space-5); margin-bottom: var(--space-5); border-bottom: 1px solid var(--brand-border); }
 .coordinator-organization-bar > svg { color: var(--brand-clay); flex-shrink: 0; }
 .coordinator-organization-bar strong { font-weight: 550; overflow-wrap: anywhere; }
 .coordinator-organization-bar > span { margin-left: auto; font-size: 11px; color: #516b60; background: #e7ede5; border-radius: 6px; padding: 6px 9px; }
@@ -47,7 +47,10 @@
 .coordinator-home-actions small { display: block; margin-top: 5px; color: var(--brand-muted); line-height: 1.5; }
 .coordinator-sharing-note { display: flex; align-items: center; gap: 10px; color: var(--brand-muted); font-size: 12px; margin: 28px 0; }
 .coordinator-sharing-note svg { color: #65796b; flex-shrink: 0; }
-.coordinator-dashboard-status { padding: 12px 16px; border-radius: 8px; background: #f0e7dc; color: var(--brand-clay-dark); }
+.coordinator-dashboard-status { position:fixed;right:24px;bottom:24px;z-index:40;display:flex;align-items:center;gap:20px;max-width:min(440px,calc(100vw - 32px));box-sizing:border-box;margin:0;padding:8px 10px 8px 18px;border:1px solid #ddc8b7;border-radius:12px;background:#fffaf3;color:var(--brand-clay-dark);box-shadow:0 8px 28px #5c382422; }
+.coordinator-dashboard-status .text-button{display:grid;place-items:center;flex-shrink:0;min-width:44px;min-height:44px;border-radius:8px}.coordinator-dashboard-status .text-button:hover{background:#f0e7dc}
+@media(prefers-reduced-motion:no-preference){.coordinator-dashboard-status{animation:coordinator-view-arrive var(--motion-section) var(--motion-ease) backwards}}
+@media(max-width:760px){.coordinator-dashboard-status{right:16px;bottom:16px}}
 .coordinator-dashboard .coordinator-code { max-width: 540px; }
 .coordinator-profile { max-width: 820px; }
 .coordinator-dashboard :is(.coordinator-card,.institution-editor,.institution-team-member,.institution-actions) { min-width: 0; overflow-wrap: anywhere; }
@@ -59,10 +62,32 @@
 .coordinator-inbox-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .coordinator-inbox-heading h2 { margin: 0; }
 .coordinator-inbox-results { min-height: 210px; }
+.coordinator-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px 32px;flex-wrap:wrap;margin-bottom:24px;padding-bottom:22px;border-bottom:1px solid var(--brand-border,#dfcfbd)}
+.coordinator-section-heading>div:first-child{flex:1 1 260px;min-width:0}.coordinator-section-heading h2{margin:0 0 10px}.coordinator-section-heading p{max-width:66ch;margin:0;font-size:14px;line-height:1.65;color:#786a5f}
+.coordinator-section-actions{flex:0 1 auto}.coordinator-section-actions .button{min-height:44px}
+.coordinator-profile-section+.coordinator-profile-section{border-top:1px solid var(--brand-border,#dfcfbd);margin-top:28px;padding-top:28px}
+.coordinator-profile-section h3{margin:0 0 8px;font-size:18px}.coordinator-profile-section>p{font-size:14px;line-height:1.65;max-width:64ch}.coordinator-profile-section form{margin-bottom:0}
+.coordinator-inbox .coordinator-connection{padding:22px 0;border-bottom:1px solid var(--brand-border,#dfcfbd)}.coordinator-connection-identity{display:flex;align-items:center;gap:14px}.coordinator-connection-identity>div{min-width:0}.coordinator-connection-identity h3{margin:0 0 5px;font-size:18px}
+.coordinator-connection-status{font-size:12px;color:#647366}.coordinator-connection-status.requested{color:#994f34}
+.coordinator-empty-state{max-width:55ch;padding:26px 0}.coordinator-empty-state h3{font-size:18px}.coordinator-empty-state p{font-size:14px;line-height:1.7;color:#786a5f}
 .coordinator-connection-placeholder { display: grid; gap: 18px; align-content: start; min-height: 210px; padding: 26px 0; }
 .coordinator-connection-placeholder i { display: block; height: 15px; width: 75%; background: #e9dfd4; border-radius: 5px; }
 .coordinator-connection-placeholder i:first-child { width: 45%; height: 24px; }
 .coordinator-connection-placeholder i:last-child { width: 30%; height: 44px; }
+/* Keep navigation fixed; only the destination content enters. No exit copy of
+   student information is retained when access changes. */
+@keyframes coordinator-view-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes coordinator-surface-arrive { from { opacity: 0; } to { opacity: 1; } }
+@keyframes coordinator-loading-breathe { 50% { opacity: .5; } }
+@media(prefers-reduced-motion:no-preference){
+ .coordinator-dashboard-main > :is(.coordinator-welcome,.coordinator-home-stats,.coordinator-home-actions,.coordinator-sharing-note,.coordinator-profile,.coordinator-inbox) { animation: coordinator-view-arrive var(--motion-section) var(--motion-ease) backwards; }
+ .coordinator-dashboard-main > .coordinator-home-stats { animation-delay: 55ms; }
+ .coordinator-dashboard-main > .coordinator-home-actions { animation-delay: 95ms; }
+ .coordinator-dashboard-main > .coordinator-sharing-note { animation-delay: 125ms; }
+ .coordinator-dashboard-main > .coordinator-binders { animation: coordinator-surface-arrive var(--motion-section) var(--motion-ease) backwards; }
+ .coordinator-dashboard-placeholder :is(h2,.coordinator-organization-bar strong),.coordinator-connection-placeholder i { animation: coordinator-loading-breathe 1800ms ease-in-out infinite; }
+ .coordinator-navigation-panel.is-open { animation: coordinator-view-arrive var(--motion-section) var(--motion-ease) backwards; }
+}
 @media(max-width:1100px){
  .coordinator-dashboard .admin-sidebar { width: 212px; }
  .coordinator-welcome-icon { display: none; }

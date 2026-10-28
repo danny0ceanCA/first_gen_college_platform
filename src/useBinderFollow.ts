@@ -1,5 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {binderActivity} from './binderActivity';
+import {useBinderFollowPaused} from './binderFollowControl';
 import {binderFollowDeliverable,createBinderFollower,createBinderNavigationGuards,type BinderFollowRequest} from './binderFollow.mjs';
 
 const guards=createBinderNavigationGuards();
@@ -11,6 +12,7 @@ const editing=()=>!!document.activeElement?.matches('input,textarea,select,[cont
 
 export function useBinderFollow({subject,studentIds,role,ready,blocked,apply}:{subject:string|undefined;studentIds:string[];role:'parent'|'student';ready:boolean;blocked:boolean;apply:(request:BinderFollowRequest)=>void}){
  const activity=useSyncExternalStore(binderActivity.subscribe,binderActivity.snapshot,()=>null);
+ const paused=useBinderFollowPaused();
  const guarded=useSyncExternalStore(guards.subscribe,guards.snapshot,()=>false);
  const [focused,setFocused]=useState(editing);
  const [follower]=useState(createBinderFollower);
@@ -29,10 +31,10 @@ export function useBinderFollow({subject,studentIds,role,ready,blocked,apply}:{s
   if(!next)setRequest(null);
  },[activity,subject,studentIds.join('|'),role,ready,follower]);
  useEffect(()=>{
-  if(!pending)return;
+  if(!pending||paused)return;
   // Recheck the live source at delivery, including after a draft or dialog closes.
   if(!binderFollowDeliverable(pending,binderActivity.snapshot(),{subject,studentIds,role,ready,blocked:blocked||guarded||guards.snapshot()||focused||editing()}))return;
   applied.current=pending.serial;applyRef.current(pending);setRequest(pending);setPending(null);
- },[pending,blocked,guarded,focused,ready,subject,role,studentIds.join('|')]);
- return {request,pending};
+ },[pending,paused,blocked,guarded,focused,ready,subject,role,studentIds.join('|')]);
+ return {request:paused?null:request,pending:paused?null:pending,paused};
 }

@@ -1,3 +1,4 @@
+import {useDialogSurface} from './useDialogSurface';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,AudioLines,CheckCircle2,Clock3,FileText,LogIn,RefreshCw,TriangleAlert,X} from 'lucide-react';
@@ -12,12 +13,12 @@ type History={events:HistoryEvent[];counts:Record<string,number>;recap:{title:st
 const filters=[['all','All events'],['access','Account & sign-ins'],['onboarding','Onboarding'],['voice','Conversations'],['summaries','Summaries'],['problems','Recorded problems']];
 const sources=[['017_admin_activity.sql','Sign-ins and calls'],['027_onboarding_events.sql','Detailed onboarding'],['019_voice_quality.sql','Voice diagnostics'],['015_guidance_history.sql','Summary generation diagnostics']];
 export default function AdminUserDrawer(props:Props){
- const {getAccessTokenSilently}=useAuth0(),dialog=useRef<HTMLDialogElement>(null),denied=useRef(props.onDenied);denied.current=props.onDenied;
+ const {ref:dialog,dismiss,dialogProps}=useDialogSurface({onDismiss:props.onClose});
+ const {getAccessTokenSilently}=useAuth0(),denied=useRef(props.onDenied);denied.current=props.onDenied;
  const [detail,setDetail]=useState<AdminUser>(),[detailError,setDetailError]=useState(''),[history,setHistory]=useState<History>(),[historyError,setHistoryError]=useState('');
  const [category,setCategory]=useState('all'),[page,setPage]=useState(1),[retry,setRetry]=useState(0),[historyRetry,setHistoryRetry]=useState(0),[diagnostics,setDiagnostics]=useState(false);
  const [conversations,setConversations]=useState(false);
- const cutoff=useRef<string|undefined>(undefined),timelineHeading=useRef<HTMLHeadingElement>(null),closeButton=useRef<HTMLButtonElement>(null);
- useEffect(()=>{const node=dialog.current,opener=document.activeElement as HTMLElement|null;node?.showModal();closeButton.current?.focus();return()=>{node?.close();if(opener?.isConnected)opener.focus();};},[]);
+ const cutoff=useRef<string|undefined>(undefined),timelineHeading=useRef<HTMLHeadingElement>(null);
  async function request(body:object,signal:AbortSignal){
   const token=await getAccessTokenSilently();if(signal.aborted)throw new DOMException('Aborted','AbortError');
   const response=await apiFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),signal});
@@ -42,8 +43,8 @@ export default function AdminUserDrawer(props:Props){
  },[props.id,props.days,props.revision,page,category,historyRetry,retry]);
  function refresh(){cutoff.current=undefined;setPage(1);setRetry(x=>x+1);}
  function changePage(value:number){setPage(value);timelineHeading.current?.focus();}
- return <dialog ref={dialog} className="admin-user-dialog admin-user-drawer" aria-labelledby="admin-detail-title" onCancel={e=>{e.preventDefault();props.onClose();}} onClick={e=>{if(e.target===dialog.current){const b=dialog.current.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)props.onClose();}}}>
-  <header className="admin-user-drawer-header"><div><p>User journey</p><h2 id="admin-detail-title">{detail?.first_name||'Account details'}</h2></div><div><button aria-label="Refresh user view" onClick={refresh}><RefreshCw size={18}/></button><button ref={closeButton} aria-label="Close account details" onClick={props.onClose}><X size={20}/></button></div></header>
+ return <dialog ref={dialog} {...dialogProps} data-mobile-sheet className="admin-user-dialog admin-user-drawer" aria-labelledby="admin-detail-title">
+  <header className="admin-user-drawer-header"><div><p>User journey</p><h2 id="admin-detail-title">{detail?.first_name||'Account details'}</h2></div><div><button aria-label="Refresh user view" onClick={refresh}><RefreshCw size={18}/></button><button aria-label="Close account details" onClick={()=>void dismiss()}><X size={20}/></button></div></header>
   <div className="admin-user-drawer-body">
    {detailError?<div className="admin-error" role="alert">{detailError} <button onClick={()=>setRetry(x=>x+1)}>Retry details</button></div>:!detail?<p role="status">Loading account…</p>:<>
     <div className="admin-user-identity"><JourneyStatus user={detail}/><p>{roleLabel(detail.role)} · {detail.student_profiles===undefined?'Student profiles not recorded':`${number(detail.student_profiles)} saved student ${Number(detail.student_profiles)===1?'profile':'profiles'}`}</p><details><summary>Account reference</summary><code>{detail.id}</code><p>Admin access: {detail.admin_access==='confirmed'?'Confirmed by the backend for this report':'Not verified here · check Auth0'}</p></details></div>

@@ -1,9 +1,11 @@
+import {useDialogSurface} from './useDialogSurface';
+import {useNavigationGuard} from './workspaceNavigation';
 import {useBinderNavigationGuard} from './useBinderFollow';
-import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {apiFetch} from './api';
 import {browserPrivacy} from './browserPrivacy.mjs';
-import {Share2,ShieldCheck,X,UserRoundPlus,CheckCircle2} from 'lucide-react';
+import {ArrowLeft,Share2,ShieldCheck,X,UserRoundPlus,CheckCircle2} from 'lucide-react';
 import CoordinatorConnection from './CoordinatorConnection';
 import './BinderSharing.css';
 type T=(en:string,es:string)=>string;
@@ -21,11 +23,13 @@ async function request(studentId:string,action:string,extra:Record<string,unknow
  }finally{lease.release();}
 }
 function Review({preview,t,busy,error,onCancel,onPublish}:{preview:Preview;t:T;busy:boolean;error:string;onCancel:()=>void;onPublish:()=>void}){
- const ref=useRef<HTMLDialogElement>(null),cancel=useRef(onCancel);cancel.current=onCancel;
- useEffect(()=>{ref.current?.showModal();const timer=setTimeout(()=>cancel.current(),Math.max(0,Date.parse(preview.expiresAt)-Date.now()));return()=>{clearTimeout(timer);ref.current?.close();};},[preview.expiresAt]);
- return createPortal(<dialog ref={ref} className="binder-share-review" aria-labelledby="share-review-title" onCancel={e=>{e.preventDefault();onCancel();}}>
+ const heading=useRef<HTMLHeadingElement>(null);
+ useLayoutEffect(()=>{heading.current?.closest('dialog')?.scrollTo({top:0,behavior:'instant'});heading.current?.focus({preventScroll:true});},[]);
+ const cancel=useRef(onCancel);cancel.current=onCancel;
+ useEffect(()=>{const timer=setTimeout(()=>cancel.current(),Math.max(0,Date.parse(preview.expiresAt)-Date.now()));return()=>clearTimeout(timer);},[preview.expiresAt]);
+ return <section className="binder-share-review" aria-labelledby="share-review-title">
   <p className="binder-share-eyebrow">{t('Review before sharing','Revisa antes de compartir')}</p>
-  <h2 id="share-review-title">{t('Ready to share?','¿Listo para compartir?')}</h2>
+  <h2 ref={heading} tabIndex={-1} id="share-review-title">{t('Ready to share?','¿Listo para compartir?')}</h2>
   <p><strong>{preview.coordinatorName}</strong> · {preview.organizationName}</p>
   <p>{t('For','Para')} {preview.studentName} · {t('Access ends','El acceso termina')} <time dateTime={preview.shareExpiresAt}>{new Date(preview.shareExpiresAt).toLocaleDateString()}</time></p>
   <p>{t('Only the notes below will be shared for 90 days. This replaces any earlier selection for this coordinator. Family conversations stay private. New notes are shared only when you choose them.','Solo se compartirán las notas de abajo durante 90 días. Esto reemplaza la selección anterior para este coordinador. Las conversaciones familiares permanecen privadas. Las notas nuevas solo se comparten cuando las eliges.')}</p>
@@ -33,15 +37,14 @@ function Review({preview,t,busy,error,onCancel,onPublish}:{preview:Preview;t:T;b
   {preview.requestHelp&&<p>{t("You’re asking for help with these notes.","Estás pidiendo ayuda con estas notas.")}</p>}
   <div className="binder-share-preview-entries">{preview.entries.map(e=><article key={e.id}><small>{topicName(e.topic,t)}</small><p>{e.content}</p></article>)}</div>
   {error&&<p role="alert">{error}</p>}
-  <div className="binder-share-actions"><button type="button" className="button outline" disabled={busy} onClick={onCancel}>{error?t('Close review and check sharing','Cerrar revisión y comprobar acceso'):t('Cancel','Cancelar')}</button><button type="button" className="button primary" disabled={busy||!!error} onClick={onPublish}>{busy?t('Publishing…','Publicando…'):t('Share these notes','Compartir estas notas')}</button></div>
- </dialog>,document.body);
+  <div className="binder-share-actions"><button type="button" className="button outline" disabled={busy} onClick={onCancel}>{t('Back to notes','Volver a las notas')}</button><button type="button" className="button primary" disabled={busy||!!error} onClick={onPublish}>{busy?t('Publishing…','Publicando…'):t('Share these notes','Compartir estas notas')}</button></div>
+ </section>;
 }
 type SharingView='notes'|'access'|'connect';
-function SharingSheet({t,busy,onClose,children}:{t:T;busy:boolean;onClose:()=>void;children:ReactNode}){
- const ref=useRef<HTMLDialogElement>(null);
- useEffect(()=>{const dialog=ref.current;dialog?.showModal();return()=>dialog?.close();},[]);
- return createPortal(<dialog ref={ref} className="binder-share-sheet" aria-labelledby="binder-share-title" onCancel={e=>{e.preventDefault();if(!busy)onClose();}}>
-  <header className="binder-share-sheet-heading"><div><span className="binder-share-eyebrow">{t('Your binder, your choice','Tu carpeta, tu decisión')}</span><h2 id="binder-share-title">{t('Share your binder','Comparte tu carpeta')}</h2></div><button type="button" className="binder-share-close" disabled={busy} aria-label={t('Close sharing','Cerrar acceso')} onClick={onClose}><X size={20}/></button></header>
+function SharingSheet({t,busy,onClose,children,reviewing}:{t:T;busy:boolean;onClose:()=>void;children:ReactNode;reviewing:boolean}){
+ const {ref,dismiss,dialogProps}=useDialogSurface({onDismiss:onClose,blocked:busy,animateDismiss:!reviewing});
+ return createPortal(<dialog ref={ref} {...dialogProps} data-mobile-sheet className="binder-share-sheet" aria-labelledby="binder-share-title">
+  <header className="binder-share-sheet-heading"><div><span className="binder-share-eyebrow">{t('Your binder, your choice','Tu carpeta, tu decisión')}</span><h2 tabIndex={-1} id="binder-share-title">{t('Share your binder','Comparte tu carpeta')}</h2></div><button type="button" className="binder-share-close" disabled={busy} aria-label={reviewing?t('Back to notes','Volver a las notas'):t('Close sharing','Cerrar acceso')} onClick={()=>void dismiss()}>{reviewing?<ArrowLeft size={20}/>:<X size={20}/>}</button></header>
   <p className="binder-share-privacy"><ShieldCheck size={19}/>{t('Family conversations always stay private. You choose the notes your coordinator can see.','Las conversaciones familiares siempre son privadas. Tú eliges las notas que puede ver tu coordinador.')}</p>
   {children}
  </dialog>,document.body);
@@ -83,14 +86,15 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
  }
  function cancel(){
   if(busy)return;
-  const old=preview;setPreview(undefined);setError('');
+  const old=preview;restoreSelection.current=true;setPreview(undefined);setError('');
   if(old)void perform('cancel',{previewId:old.previewId},result=>{
    if((result as {status:string}).status==='published')setNotice(t('Your notes were shared. Use Stop sharing below if you want to remove access.','Tus notas se compartieron. Usa Dejar de compartir abajo si quieres eliminar el acceso.'));
    void refresh().catch(()=>setError(t('Could not refresh sharing. Check access before trying again.','No se pudo actualizar el acceso. Compruébalo antes de intentar de nuevo.')));
   });
  }
  function show(next:SharingView='notes'){setView(next);setOpen(true);setError('');void refresh().catch(()=>setError(t('Sharing could not be loaded. Try again.','No se pudo cargar el acceso. Intenta de nuevo.')));}
- function close(){if(busy)return;clear();setOpen(false);setError('');setNotice('');}
+ useNavigationGuard(open&&(!!message.trim()||selected.length>0||!!preview),{locked:busy,onLeave:()=>close()});
+ function close(){if(busy)return;const old=previewRef.current;if(old)void request(studentId,'cancel',{previewId:old.previewId}).catch(()=>{});clear();setOpen(false);setError('');setNotice('');}
  useEffect(()=>{if(launchRequest)show('notes');},[launchRequest]);
  useEffect(()=>{if(openRequest)show('access');},[openRequest]);
  useEffect(()=>{if(connectionOpenRequest)show('connect');},[connectionOpenRequest]);
@@ -103,6 +107,8 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
   void request(studentId,'entries').then(result=>{if(current&&v===generation.current){setEntries(result.entries);setEntriesLoaded(true);}}).catch(()=>{if(current&&v===generation.current)setError(t('Your notes could not be loaded. Refresh to try again.','No se pudieron cargar tus notas. Actualiza para intentar de nuevo.'));}).finally(()=>{if(current&&v===generation.current)setEntriesBusy(false);});
   return()=>{current=false;setEntriesBusy(false);};
  },[open,view,status?.enabled,status?.connections.length,entriesLoaded,studentId,entryAttempt]);
+ const reviewButton=useRef<HTMLButtonElement>(null),selectionScroll=useRef(0),restoreSelection=useRef(false);
+ useLayoutEffect(()=>{if(restoreSelection.current&&!preview&&!busy){restoreSelection.current=false;reviewButton.current?.closest('dialog')?.scrollTo({top:selectionScroll.current,behavior:'instant'});reviewButton.current?.focus({preventScroll:true});}},[preview,busy]);
  const active=status?.grants.filter(g=>g.status==='active')||[];
  const selectedEntries=entries.filter(e=>selected.includes(e.id));
  const selectedTopics=[...new Set(selectedEntries.map(e=>e.topic))];
@@ -111,7 +117,8 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
  return <section className="binder-sharing" aria-label={t('Binder sharing','Compartir carpeta')}>
   <div className="binder-share-banner"><div className="binder-share-banner-copy"><span className="binder-share-icon"><Share2 size={23} aria-hidden="true"/></span><div><h3>{t('Share your binder','Comparte tu carpeta')}</h3><p>{t('Choose notes for your coordinator. Family conversations stay private.','Elige notas para tu coordinador. Las conversaciones familiares son privadas.')}</p>{active.length>0&&<button type="button" className="binder-share-access-link" onClick={()=>show('access')}>{t(`Shared with ${active.length} ${active.length===1?'coordinator':'coordinators'}`,`Compartida con ${active.length} ${active.length===1?'coordinador':'coordinadores'}`)}</button>}</div></div><button type="button" className="button primary binder-share-launch" aria-haspopup="dialog" onClick={()=>show()}><Share2 size={17} aria-hidden="true"/>{t('Share binder','Compartir carpeta')}</button><button type="button" className="button outline binder-share-launch" onClick={()=>{show(active.length?'access':'notes');setRequestHelp(true);}}>{t('Ask for help','Pedir ayuda')}</button></div>
   {error&&!open&&<p role="alert">{error}</p>}
-  {open&&<SharingSheet t={t} busy={busy} onClose={close}>
+  {open&&<SharingSheet t={t} busy={busy} reviewing={!!preview} onClose={preview?cancel:close}>
+   <div hidden={!!preview}>
    <nav className="binder-share-tabs" aria-label={t('Sharing options','Opciones para compartir')}><button type="button" disabled={busy} aria-pressed={view==='notes'||view==='connect'} onClick={()=>setView('notes')}>{t('Choose notes','Elegir notas')}</button><button type="button" disabled={busy} aria-pressed={view==='access'} onClick={()=>setView('access')}>{t('People with access','Personas con acceso')}{active.length>0&&<span>{active.length}</span>}</button></nav>
    {notice&&<p className="binder-share-success" role="status"><CheckCircle2 size={19}/>{notice}</p>}
    {error&&!preview&&<p className="binder-share-error" role="alert">{error}</p>}
@@ -126,7 +133,7 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
      <div className="binder-share-choices">{topics.map(([topic,en,es])=>{const group=entries.filter(e=>e.topic===topic);return group.length>0&&<fieldset key={topic} disabled={busy}><legend>{t(en,es)}<span>{group.length}</span></legend>{group.map(e=><label key={e.id}><input type="checkbox" disabled={selected.length>=50&&!selected.includes(e.id)} checked={selected.includes(e.id)} onChange={event=>setSelected(event.target.checked?[...selected,e.id]:selected.filter(id=>id!==e.id))}/><span>{e.content}</span></label>)}</fieldset>;})}</div>
      {entries.length>50&&<p className="binder-share-limit">{t('Share up to 50 notes at a time.','Comparte hasta 50 notas a la vez.')}</p>}
      <div className="binder-share-help-compose"><label><input type="checkbox" checked={requestHelp} disabled={busy} onChange={e=>setRequestHelp(e.target.checked)}/><span><strong>{t('Ask my coordinator for help','Pedir ayuda a mi coordinador')}</strong><small>{t('Put these notes in their Help requested queue.','Pon estas notas en su lista de ayuda solicitada.')}</small></span></label><label>{t('Message to your coordinator (optional)','Mensaje para tu coordinador (opcional)')}<textarea rows={3} maxLength={1000} value={message} disabled={busy} onChange={e=>setMessage(e.target.value)} placeholder={t('What would you like them to know or help with?','¿Qué quieres que sepa o en qué necesitas ayuda?')}/></label><small>{t('This message will be shared with the coordinator along with your selected notes.','Este mensaje se compartirá con el coordinador junto con las notas que elijas.')} {message.length}/1000</small></div>
-     <div className="binder-share-footer"><span aria-live="polite">{selected.length} {selected.length===1?t('note selected','nota seleccionada'):t('notes selected','notas seleccionadas')}</span><button type="button" className="button primary" disabled={busy||selected.length===0||!recipient} onClick={()=>void perform('preview',{connectionId:connection,topics:selectedTopics,entryIds:selected,message,requestHelp},data=>setPreview(data as Preview))}>{t('Review & share','Revisar y compartir')}<Share2 size={17}/></button></div>
+     <div className="binder-share-footer"><span aria-live="polite">{selected.length} {selected.length===1?t('note selected','nota seleccionada'):t('notes selected','notas seleccionadas')}</span><button ref={reviewButton} type="button" className="button primary" disabled={busy||selected.length===0||!recipient} onClick={()=>{selectionScroll.current=reviewButton.current?.closest('dialog')?.scrollTop||0;void perform('preview',{connectionId:connection,topics:selectedTopics,entryIds:selected,message,requestHelp},data=>setPreview(data as Preview));}}>{t('Review & share','Revisar y compartir')}<Share2 size={17}/></button></div>
     </>}
     {status.connections.length>0&&<button type="button" className="binder-share-add" disabled={busy} onClick={()=>setView('connect')}><UserRoundPlus size={17}/>{t('Connect another coordinator','Conectar con otro coordinador')}</button>}
    </>}
@@ -143,7 +150,8 @@ export default function BinderSharing({studentId,t,openRequest=0,connectionOpenR
    </>}
    {(busy||entriesBusy)&&<p role="status">{t('Updating sharing…','Actualizando acceso…')}</p>}
    <button type="button" className="text-button binder-share-refresh" disabled={busy} onClick={()=>{clear();setError('');void refresh().catch(()=>setError(t('Could not refresh sharing.','No se pudo actualizar el acceso.')));}}>{t('Refresh sharing','Actualizar acceso')}</button>
+   </div>
+  {preview&&<Review preview={preview} t={t} error={error} busy={busy} onCancel={cancel} onPublish={()=>void perform('publish',{previewId:preview.previewId,confirmed:true},()=>{setPreview(undefined);setSelected([]);setView('access');requestAnimationFrame(()=>{const dialog=document.querySelector<HTMLDialogElement>('dialog.binder-share-sheet');dialog?.scrollTo({top:0,behavior:'instant'});dialog?.querySelector<HTMLElement>('#binder-share-title')?.focus({preventScroll:true});});})}/>}
   </SharingSheet>}
-  {preview&&<Review preview={preview} t={t} error={error} busy={busy} onCancel={cancel} onPublish={()=>void perform('publish',{previewId:preview.previewId,confirmed:true},()=>{setPreview(undefined);setSelected([]);setView('access');})}/>}
  </section>;
 }

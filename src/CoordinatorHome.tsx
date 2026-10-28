@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import {useArrivalPending} from './arrivalReadiness';
 import {ArrowRight,BookOpen,HandHelping,UserRoundPlus,KeyRound,ShieldCheck} from 'lucide-react';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import StaffVerification,{staffVerificationErrors} from './StaffVerification';
@@ -6,6 +7,7 @@ import StaffVerification,{staffVerificationErrors} from './StaffVerification';
 type T=(en:string,es:string)=>string;
 export default function CoordinatorHome({organizationId,name,t,request,onBinders,onConnections,onProfile,loading=false,refreshVersion=0}:{organizationId:string;name:string;t:T;request:(input:Record<string,unknown>)=>Promise<any>;onBinders:()=>void;onConnections:()=>void;onProfile:()=>void;loading?:boolean;refreshVersion?:number}){
  const [counts,setCounts]=useState<{all:number;help:number}>(),[error,setError]=useState('');
+ useArrivalPending(!loading&&!counts&&!error);
  const requestRef=useRef(request);requestRef.current=request;
  const refresh=useRef<()=>void>(()=>{}),seenRefresh=useRef(refreshVersion);
  useEffect(()=>{

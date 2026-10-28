@@ -77,3 +77,11 @@
 .home-shelf-content{padding:0 24px}.home-shelf-content>.topic-notebook,.home-shelf-content>.workspace-sheets{margin:0;padding:24px 0;border-top:1px solid #e4d7ca}
 @media(max-width:1100px){.home-at-a-glance{grid-template-columns:1fr}.home-conversation{gap:24px;padding:26px}.home-conversation-tip{padding-left:20px}}
 @media(max-width:760px){.home-main>.page-heading h1{font-size:27px}.home-workspace{gap:22px}.home-person{padding-bottom:12px}.home-person-heading>.text-button{margin-left:0}.home-person-heading .avatar{width:38px;height:38px;flex-shrink:0}.home-person-focus{margin-left:52px}.home-conversation{grid-template-columns:1fr;gap:22px;padding:24px}.home-conversation h2{max-width:20ch;font-size:28px}.home-conversation p{font-size:15px}.home-conversation-tip{border-left:0;border-top:1px solid #d7bba7;padding:20px 0 0}.home-conversation-tip p{font-size:19px;margin:8px 0}.home-conversation .voice-start-label{font-size:15px}.home-memory .history-heading{padding:20px}.home-memory .history-content{padding:0 20px 20px}.home-workspace .action-plan-compact{padding:20px}.home-next-card{padding:18px;grid-template-columns:24px 1fr 18px}.home-shelf>summary{padding:20px 18px;gap:14px}.home-shelf-content{padding:0 18px}.home-shelf small{font-size:13px}.home-shelf>summary>svg:first-child{width:20px}}
+
+/* Home keeps the student and the conversation within reach. */
+.home-student-switch{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:13px;margin-bottom:20px;color:#756b63}
+.home-student-switch select{min-height:44px;max-width:100%;padding:8px 14px;border:1px solid #d5beaa;border-radius:var(--radius-control);background:var(--surface-paper);color:#303b3c}
+.home-primary-actions{display:flex;align-items:center;gap:20px;margin-top:20px}
+.home-primary-actions>span{font-size:13px;color:#756b63;max-width:34ch}
+.home-primary-actions .voice-start{flex-shrink:0}.home-primary-actions .voice-start-label{font-size:15px;font-weight:650}
+@media(max-width:600px){.home-primary-actions{align-items:flex-start;flex-direction:column;gap:10px}.home-person-heading h2{overflow-wrap:anywhere}.home-person-heading>div{min-width:0;flex:1}.home-person-heading>.text-button{margin-left:0}.home-student-switch select{flex:1;min-width:0}}

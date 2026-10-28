@@ -8,7 +8,15 @@
 .account-opening-wave{transform-origin:78px 39px;transform-box:view-box}
 .app-shell{animation:account-arrive 480ms ease-out both}
 .shared-voice.voice-ready{animation:account-arrive 480ms ease-out both}
-.workspace-arrival-content[hidden]{display:none}
-.workspace-arrival-content.arrival-visible{animation:account-arrive 480ms ease-out backwards}
+.workspace-arrival-content.arrival-covered{visibility:hidden;height:100svh;overflow:hidden;pointer-events:none}
+.workspace-arrival-content.arrival-visible{animation:account-arrive var(--motion-arrival) var(--motion-ease) backwards}
+.workspace-arrival-overlay{position:fixed;inset:0;z-index:1000;background:#f4eee4;overflow:hidden;touch-action:none}
+.workspace-arrival-overlay.is-leaving{pointer-events:none;animation:account-depart var(--motion-arrival) var(--motion-ease-exit) both}
+.account-opening-progress{display:block;position:relative;overflow:hidden;width:64px;height:2px;margin:0 auto;border-radius:2px;background:#dfcec0}
+.account-opening-progress i{display:block;width:32px;height:100%;border-radius:inherit;background:#a4513c;animation:account-progress 1600ms ease-in-out infinite alternate}
+@keyframes account-depart{to{opacity:0}}
+@keyframes account-progress{from{transform:translateX(-24px);opacity:.4}to{transform:translateX(56px);opacity:1}}
 @keyframes account-arrive{from{opacity:0}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.app-shell,.shared-voice.voice-ready,.workspace-arrival-content.arrival-visible{animation:none}}
+@media(prefers-reduced-motion:reduce){.app-shell,.shared-voice.voice-ready,.workspace-arrival-content.arrival-visible,.workspace-arrival-overlay.is-leaving,.account-opening-progress i{animation:none}.workspace-arrival-overlay.is-leaving{display:none}}
+
+.account-opening-actions{display:grid;justify-items:center;gap:18px}.account-opening-actions a{color:#964b36}

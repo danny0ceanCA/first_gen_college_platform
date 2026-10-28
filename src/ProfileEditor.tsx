@@ -1,3 +1,4 @@
+import {useNavigationGuard} from './workspaceNavigation';
 import ProfileVoice from './ProfileVoice';
 import {useContext,useState} from 'react';
 import {SharedVoiceContext} from './SharedVoiceContext';
@@ -9,6 +10,7 @@ export default function ProfileEditor({student,t,save,cancel,language,role,remov
  const [deleteFailed,setDeleteFailed]=useState(false);
  const [confirmDelete,setConfirmDelete]=useState(false);const [saving,setSaving]=useState(false);const [error,setError]=useState(false);
  const [draft,setDraft]=useState(student); const [localVoiceActive,setVoiceActive]=useState(false);
+ useNavigationGuard(JSON.stringify(draft)!==JSON.stringify(student),{locked:saving,onLeave:()=>setDraft(student)});
  const sharedVoice=useContext(SharedVoiceContext);
  const voiceActive=localVoiceActive||sharedVoice?.active===true;
 

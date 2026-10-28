@@ -27,3 +27,11 @@
 
 .top-actions .binder-share-shortcut{min-height:40px;padding:8px 14px;font-size:13px;white-space:nowrap}
 @media(max-width:760px){.topbar:has(.binder-share-shortcut){flex-wrap:wrap;gap:10px}.top-actions:has(.binder-share-shortcut){flex-wrap:wrap}.top-actions .binder-share-shortcut{font-size:12px;padding:8px 10px}}
+
+/* Preview is a second step within the same sheet, never a stacked modal. */
+.binder-share-sheet .binder-share-review{width:100%;max-height:none;padding:0;border:0;border-radius:0;box-shadow:none;background:transparent;overflow:visible;animation:sharing-step-in var(--motion-section) var(--ease-standard)}
+.binder-share-review h2:focus{outline:none}
+.binder-share-preview-entries{max-height:38dvh;overflow-y:auto;overscroll-behavior:contain;padding-right:8px;scrollbar-gutter:stable}
+.binder-share-review .binder-share-actions{position:sticky;bottom:0;background:#fffaf2;padding-block:16px;z-index:1}
+@keyframes sharing-step-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.binder-share-sheet .binder-share-review{animation:none}}

@@ -63,7 +63,7 @@ const output=process.env.ORIGEN_SMOKE_OUTPUT||'output/playwright/student-first-p
    const kind=page.getByRole('combobox',{name:/^(Type|Tipo)/});await kind.selectOption('suggested-step');
    if(process.env.ORIGEN_SMOKE_ACCESSIBILITY==='true'){await kind.focus();await page.keyboard.press('Tab');assert.ok(await page.getByLabel(t('Resource link (optional, https://)','Enlace de recurso (opcional, https://)'),{exact:true}).evaluate(el=>el===document.activeElement));}
    await page.getByLabel(t('Your guidance','Tu orientación'),{exact:true}).fill(suggestion);
-   await page.getByRole('button',{name:t('Save red note','Guardar nota roja'),exact:true}).click();await page.locator('.guidance-body').waitFor();assert.equal(planWrites,0);
+   await page.getByRole('button',{name:t('Send to student','Enviar al estudiante'),exact:true}).click();await page.locator('.guidance-body').waitFor();assert.equal(planWrites,0);
    await page.getByRole('button',{name:'Student view',exact:true}).click();await page.locator('.guidance-body').waitFor();
    await page.getByRole('button',{name:t('Add to my next steps','Agregar a mis próximos pasos'),exact:true}).click();
    await page.getByLabel(t('Action title','Título de la acción'),{exact:true}).fill(t('Compare with Jordan','Comparar con Jordan'));

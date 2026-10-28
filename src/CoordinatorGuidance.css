@@ -35,3 +35,61 @@
 .coordinator-guidance .ink-editor-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.coordinator-guidance .ink-editor-actions button{font-size:12px;margin:0;padding:9px 12px;min-height:44px}.coordinator-guidance .ink-editor-actions button[type=submit]{color:#fffdf7;background:#a43629;border-color:#a43629}
 @container shared-paper (max-width:650px){.shared-paper-row{grid-template-columns:minmax(0,1fr);gap:4px;padding:18px 0}.binder-annotation-slot{margin-left:20px}.shared-page-margin .binder-annotation-slot{margin-left:0}.shared-paper-row .coordinator-published-note .notebook-note-content{font-size:22px}.shared-paper-row .guidance-card{margin-top:10px}}
 @media(max-width:600px){.coordinator-guidance .guidance-body{font-size:22px}.coordinator-guidance .guidance-actions button{min-height:44px;flex:0 1 auto}.coordinator-guidance .ink-editor-actions button{width:auto}.coordinator-guidance .guidance-card{padding-left:12px}.coordinator-guidance .guidance-attribution{font-size:10px}}
+/* A compact writing surface opens over the margin and resolves into real ink. */
+.binder-annotation-slot{box-sizing:border-box}
+.binder-annotation-slot[data-resizing]{overflow:clip;overflow-clip-margin:8px}
+.binder-annotation-content{display:flow-root;min-width:0}
+.ink-loading-placeholder{display:grid;align-content:start;gap:18px;min-height:132px;box-sizing:border-box;padding:16px 14px;border-left:2px solid #b3262420}
+.ink-loading-placeholder i{display:block;height:7px;max-width:100%;width:85%;border-radius:8px;background:#b3262410}
+.ink-loading-placeholder i:first-child{width:44%;height:5px;background:#9b776914}.ink-loading-placeholder i:last-child{width:65%}
+@keyframes ink-loading-breathe{50%{opacity:.4}}
+@media(prefers-reduced-motion:no-preference){.ink-loading-placeholder{animation:ink-loading-breathe 1.8s ease-in-out infinite}}
+.ink-composer-reveal{overflow:hidden;transform-origin:top center;padding:5px;margin:-5px}
+.coordinator-guidance form.ink-editor{border-radius:14px;padding:16px;background:linear-gradient(140deg,#fffcf7 35%,#fff1e9);border-color:#cfaa98;box-shadow:0 10px 28px #67302112,0 2px 4px #67302108}
+.ink-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.ink-editor-heading>span{display:flex;align-items:center;gap:8px;color:#92372d;font-size:12px;font-weight:600}
+.coordinator-guidance .ink-editor-heading button{display:grid;place-items:center;border:0;background:transparent;padding:5px;min-width:36px;min-height:36px;margin:0}
+.coordinator-guidance .ink-editor>label>span{font-size:10px;color:#8b7467}
+.coordinator-guidance .ink-editor textarea{min-height:108px;background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(1lh - 1px),#b3262410 calc(1lh - 1px),#b3262410 1lh);border:0;padding:0;caret-color:#b32624}
+.coordinator-guidance .ink-editor textarea::placeholder{color:#ac8273;opacity:1}
+.ink-editor-options summary{display:flex;align-items:center;gap:6px}
+.ink-editor-options summary::after{content:'+';margin-left:auto;font-size:16px}.ink-editor-options[open] summary::after{content:'−'}
+.coordinator-guidance .ink-editor-actions{justify-content:space-between;border-top:1px solid #dcc4b5;padding-top:12px;margin-top:2px}
+.coordinator-guidance .ink-editor-actions button{display:flex;align-items:center;justify-content:center;gap:7px;border-radius:8px}
+.coordinator-guidance .ink-editor-actions button[type=submit]{box-shadow:0 2px 3px #77271d18;transition:background .15s,box-shadow .15s}
+.coordinator-guidance .ink-editor-actions button[type=submit]:hover:not(:disabled){background:#852c24;box-shadow:0 3px 8px #77271d26}
+.ink-sending{width:12px;height:12px;border:2px solid #ffffff50;border-top-color:#fff;border-radius:50%;animation:ink-spin .8s linear infinite}
+.ink-just-sent{position:relative;isolation:isolate;transform-origin:22% 12%;animation:ink-settle var(--motion-ink) var(--motion-ease) both}
+.ink-just-sent::after{content:'';position:absolute;inset:-6px -3px;z-index:-1;border-radius:12px;pointer-events:none;background:radial-gradient(ellipse at 25% 30%,#bd634a20,transparent 75%);animation:ink-contact .95s ease-out both}
+@keyframes ink-settle{0%{opacity:0;transform:translate(6px,-32px) rotate(-1.8deg) scale(1.018)}55%{opacity:1;transform:translate(-1px,3px) rotate(.35deg) scale(.997)}78%{opacity:1;transform:translate(0,-1px) rotate(-.12deg) scale(1)}100%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}}
+@keyframes ink-contact{0%,30%{opacity:0;transform:scale(.97)}62%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.025)}}
+@keyframes ink-spin{to{transform:rotate(360deg)}}
+.coordinator-guidance.student-inline-comments{margin:12px 0;padding:0;border:0;min-width:0}
+.student-note-writing{min-width:0}
+.notebook-note:has(>.student-inline-comments),.memory-entry:has(>.student-inline-comments){display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:28px;align-items:start}
+.student-inline-comments .guidance-card{margin-top:0}
+.comment-new,.comment-topic-signal{color:#aa302a;font-size:10px;font-family:inherit;letter-spacing:.03em}
+.comment-new{display:inline-block;margin-left:7px;background:#b326240e;border-radius:8px;padding:0 6px}
+.coordinator-guidance .comment-unread{border-left-color:#b32624}
+.guidance-card:focus-visible{outline:2px solid #b32624;outline-offset:8px}
+.student-comment-arrival{display:flex;justify-content:space-between;align-items:center;gap:20px;max-width:100%;margin:16px 0;padding:14px 18px;border:1px solid #d3a498;border-radius:12px;background:#fff6ee;color:#992d25;font:inherit;cursor:pointer;text-align:left}
+.student-comment-index{display:grid;gap:8px;margin:16px 0}
+.student-comment-index button{display:grid;gap:4px;padding:14px;text-align:left;border:1px solid #e3c9bb;border-radius:8px;background:#fffaf4;color:#963b30;font:inherit;cursor:pointer;min-width:0}
+.student-comment-index button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.student-comment-index strong{font-size:12px}
+.student-comment-status:empty{display:none}.student-comment-status p{display:flex;align-items:center;gap:7px;font-size:13px;color:#963b30}
+@media(max-width:850px){.notebook-note:has(>.student-inline-comments),.memory-entry:has(>.student-inline-comments){grid-template-columns:minmax(0,1fr);gap:8px}.student-inline-comments{padding-left:14px!important}}
+/* Keep each pair of student writing and red annotations within a readable
+   portion of the page; longer content remains fully accessible by scrolling. */
+.guidance-on-paper{--shared-note-height:clamp(280px,52svh,460px)}
+.shared-paper-row .coordinator-published-note.notebook-note,.guidance-on-paper .binder-annotation-content{max-height:var(--shared-note-height);overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;scrollbar-width:thin;overscroll-behavior-y:contain;box-sizing:border-box}
+.shared-paper-row .coordinator-published-note.notebook-note{padding-right:12px;scrollbar-color:#b6a18b transparent}
+.guidance-on-paper .binder-annotation-content{position:relative;padding:12px 10px 5px 8px;scroll-padding-block:16px;scrollbar-color:#c48b7c transparent;overflow-anchor:none}
+.guidance-on-paper .binder-annotation-content>.ink-add{position:sticky;bottom:0;background:#fffaf3;z-index:1;box-shadow:0 -6px 10px #fffaf3b3}
+.shared-paper-row .coordinator-published-note:focus-visible,.binder-annotation-content:focus-visible{outline:2px solid #a4513c;outline-offset:3px;border-radius:4px}
+.guidance-on-paper .ink-editor textarea{max-height:240px;overflow-y:auto}
+/* Subtle edge shadows appear only when writing extends beyond the margin.
+   Local backgrounds scroll away; the paper and comment positions stay fixed. */
+.guidance-on-paper .binder-annotation-content{background:linear-gradient(var(--binder-paper,#fffdf7) 60%,transparent) top/100% 22px no-repeat local,linear-gradient(transparent,var(--binder-paper,#fffdf7) 40%) bottom/100% 22px no-repeat local,radial-gradient(ellipse at top,#833a2917,transparent 70%) top/100% 10px no-repeat scroll,radial-gradient(ellipse at bottom,#833a2917,transparent 70%) bottom/100% 10px no-repeat scroll}
+@media(max-width:600px){.guidance-on-paper{--shared-note-height:clamp(250px,48svh,400px)}}
+@media print{.shared-paper-row .coordinator-published-note.notebook-note,.guidance-on-paper .binder-annotation-content{max-height:none;overflow:visible}.guidance-on-paper .binder-annotation-content>.ink-add{position:static}}
+@media(prefers-reduced-motion:reduce){.ink-just-sent,.ink-just-sent::after,.ink-sending{animation:none!important}.ink-just-sent::after{display:none}.ink-editor-actions button{transition:none!important}}

@@ -1,10 +1,15 @@
 import './AccountOpening.css';
-import {useLayoutEffect,useRef} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
+import {useArrivalPending} from './arrivalReadiness';
 
 // Shared by each login gate so checking access and loading a profile look like
-// one continuous handoff. WorkspaceArrival controls the shared six-second intro.
-export default function AccountOpening(){
+// one continuous handoff. WorkspaceArrival reveals as soon as content is ready.
+export default function AccountOpening({gate=true,stalled=false}:{gate?:boolean;stalled?:boolean}){
+ useArrivalPending(gate);
+ const [late,setLate]=useState(false);
+ useEffect(()=>{if(!gate)return;const timer=setTimeout(()=>setLate(true),15000);return()=>clearTimeout(timer);},[gate]);
+ const slow=stalled||late;
  const spanish=localStorage.getItem('origen.language')==='es';
  const hand=useRef<SVGGElement>(null);
  useLayoutEffect(()=>{
@@ -13,12 +18,12 @@ export default function AccountOpening(){
   let wave:ReturnType<typeof animate>|undefined;
   const update=()=>{
    wave?.revert();wave=undefined;
-   if(!preference.matches&&hand.current)wave=animate(hand.current,{rotate:[-14,18],duration:650,ease:'inOutSine',alternate:true,loop:true});
+   if(!slow&&!preference.matches&&hand.current)wave=animate(hand.current,{rotate:[-14,18],duration:650,ease:'inOutSine',alternate:true,loop:true});
   };
   update();preference.addEventListener('change',update);
   return()=>{wave?.revert();preference.removeEventListener('change',update);};
- },[]);
- return <main className="account-opening" aria-busy="true" aria-label={spanish?'Abriendo Origen':'Opening Origen'}>
+ },[slow]);
+ return <main className="account-opening" aria-busy={!slow} aria-label={spanish?'Abriendo Origen':'Opening Origen'}>
   <div className="account-opening-content">
    <span className="account-opening-brand" aria-hidden="true"><span/>origen.</span>
    <svg className="account-opening-friend" viewBox="0 0 120 112" aria-hidden="true" focusable="false">
@@ -30,7 +35,8 @@ export default function AccountOpening(){
     </g>
     <g fill="currentColor"><circle cx="56" cy="23" r="1.2"/><circle cx="64" cy="23" r="1.2"/></g>
    </svg>
-   <p role="status">{spanish?'Cargando tu espacio…':'Loading workspace…'}</p>
+   <p role={slow?'alert':'status'}>{slow?(spanish?'Está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo.':'This is taking longer than expected. Check your connection and try again.'):(spanish?'Cargando tu espacio…':'Loading workspace…')}</p>
+   {slow?<div className="account-opening-actions"><button className="button primary" onClick={()=>window.location.reload()}>{spanish?'Intentar de nuevo':'Try again'}</button><a href="/">{spanish?'Volver al inicio':'Back to home'}</a></div>:<span className="account-opening-progress" aria-hidden="true"><i/></span>}
   </div>
  </main>;
 }

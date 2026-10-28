@@ -33,3 +33,10 @@
 .shared-voice.compact:has(.voice-notice){max-height:45dvh}.shared-voice .voice-notice{font-size:13px;line-height:1.5;padding:8px 0 0;margin:8px 0 0;border-top:1px solid #e4d7ca;overflow-wrap:anywhere}
 
 .conversation-recovery{max-width:760px;margin:16px auto;padding:16px;border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}.conversation-recovery label{display:flex;align-items:flex-start;gap:10px;min-height:44px}.conversation-recovery input{flex:none;margin-top:5px}.conversation-recovery button{min-height:44px;margin:4px;white-space:normal}.recovery-transcript{max-height:45vh;overflow-y:auto;border-block:1px solid var(--line);padding:12px}.recovery-transcript>div+div{border-top:1px solid var(--line);padding-top:12px}@media(max-width:760px){.conversation-recovery{margin-inline:12px;}}
+
+/* A fixed status line prevents the dock resizing on each save/activity change. */
+.shared-voice.compact .profile-voice>.voice-progress-status{display:block;min-height:18px;line-height:18px;margin:4px 0 0;font-size:11px;color:#756b63}
+.shared-voice .voice-controls>.voice-activity{min-height:44px;line-height:1.4}
+.voice-follow-control{display:inline-flex;align-items:center;gap:7px;min-height:36px;border:1px solid #dac6b1;border-radius:18px;padding:6px 12px;font-size:12px;color:#813e2e;background:#fffaf3;margin:2px 0 6px}
+.voice-follow-control[aria-pressed=true]{background:#e9dbcc;border-color:#a4513c}
+@media(max-width:600px){.shared-voice.compact .profile-voice>.voice-progress-status{min-height:32px;line-height:16px}.shared-voice .voice-controls>.voice-activity{min-width:100px;font-size:11px}.voice-follow-control{min-height:44px;font-size:11px}}

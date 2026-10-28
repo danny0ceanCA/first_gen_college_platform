@@ -55,6 +55,7 @@ const folder='output/playwright/coordinator-navigation';
   const nav=async(en,es)=>{await openMenu();await navigation.getByRole('button',{name:t(en,es),exact:true}).click();};
   async function inspect(screen){
    await page.evaluate(()=>document.fonts.ready);
+   await page.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{}))));
    const overflow=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,items:[...document.querySelectorAll('main *')].filter(el=>{const r=el.getBoundingClientRect();return r.width&&r.right>innerWidth+2&&!el.closest('.notebook-topics');}).slice(0,6).map(el=>el.className||el.tagName)}));
    report(overflow.scroll<=width+1,`${screen} overflows (${overflow.scroll}px): ${overflow.items.join(', ')}`);
    await page.screenshot({path:`${folder}/${audit?'before-':''}${language}-${width}-${screen}.png`,fullPage:true});
@@ -69,18 +70,18 @@ const folder='output/playwright/coordinator-navigation';
     let warned=false;page.once('dialog',async dialog=>{warned=true;await dialog.dismiss();});await nav('Overview','Resumen');
     report(warned&&await invite.inputValue()==='synthetic@example.test','Navigation lost an unfinished team invitation');await invite.fill('');
    }
-   inboxGate=gate();await nav('Connections','Conexiones');
+   inboxGate=gate();await nav('Connections','Conexiones');await page.locator('.coordinator-inbox').waitFor();
    report(await page.locator('.coordinator-inbox').count()===1,'Connections has no loading shell');
    inboxGate.release();inboxGate=undefined;await page.getByRole('button',{name:t('Accept','Aceptar'),exact:true}).waitFor();await inspect('connections');
    if(!audit){denyInbox=true;await page.getByRole('button',{name:t('Refresh connections','Actualizar conexiones'),exact:true}).click();await page.getByRole('alert').waitFor();report(await page.locator('.coordinator-connection').count()===0,'Denied connection access retained student rows');denyInbox=false;}
    await nav('Shared binders','Carpetas compartidas');await page.locator('.coordinator-binder-list button').click();await page.getByRole('tab',{name:new RegExp(t('Transfer & courses','Transferencia y cursos'))}).click();
-   await page.getByRole('button',{name:t('Add a red note','Agregar una nota roja'),exact:true}).click();
+   await page.getByRole('button',{name:t('Add comment','Agregar comentario'),exact:true}).click();
    const draft=page.getByRole('textbox',{name:t('Your guidance','Tu orientación'),exact:true});await draft.fill('Draft for navigation test');await inspect('binder');
    let warned=false;page.once('dialog',async dialog=>{warned=true;await dialog.dismiss();});await nav('Profile & code','Perfil y código');
    report(warned,'Sidebar navigation discarded an annotation without asking');report(await draft.count()===1,'Cancelled navigation lost the annotation');
    page.removeAllListeners('dialog');
    if(!audit){
-    await page.getByRole('button',{name:t('Cancel','Cancelar'),exact:true}).click();await nav('Profile & code','Perfil y código');
+    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:t('Cancel','Cancelar'),exact:true}).click();await nav('Profile & code','Perfil y código');
     const nameInput=page.getByLabel(t('Name students will see','Nombre que verán los estudiantes'),{exact:true});await nameInput.fill('Unsaved name');
     let nameWarned=false;page.once('dialog',async dialog=>{nameWarned=true;await dialog.dismiss();});await nav('Overview','Resumen');
     report(nameWarned&&await nameInput.inputValue()==='Unsaved name','Profile changes were lost while navigating');

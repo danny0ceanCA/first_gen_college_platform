@@ -1,8 +1,9 @@
+import {useDialogSurface} from './useDialogSurface';
 import LandingStory from './LandingStory';
 import LandingVideo from './LandingVideo';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useId,useRef,useState} from 'react';
 import {animate} from 'animejs';
 import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
@@ -33,24 +34,32 @@ export default function Landing(){
  const signIn=(register=false)=>{if(isAuthenticated){window.location.hash='app';return;}setLogin(false);setSigninError(false);void loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{ui_locales:es?'es':'en',...(register?{screen_hint:'signup'}:{})}}).catch(()=>{setSigninError(true);setLogin(true);});};
  const [es,setEs]=useState(()=>localStorage.getItem('origen.language')==='es'),[login,setLogin]=useState(false),[replay,setReplay]=useState(0),[paused,setPaused]=useState(false);
  const motion=useRef<ReturnType<typeof animate>[]>([]),pauseRef=useRef(false),heroVisible=useRef(true);
- const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null),dialog=useRef<HTMLDialogElement>(null);
+ const line=useRef<SVGSVGElement>(null),ambient=useRef<SVGSVGElement>(null),sky=useRef<SVGSVGElement>(null);
+ const {ref:dialog,dismiss,dialogProps}=useDialogSurface({onDismiss:()=>setLogin(false),open:login});
  const sceneId=useId().replace(/:/g,'');
  const t=(en:string,sp:string)=>es?sp:en;
  const shareDescription=t('Origen is an AI voice assistant that helps students and families make sense of college in English and Spanish. Ask questions, revisit explanations, and prepare for conversations with a counselor or coordinator. Explore it at https://origenedu.ai','Origen es un asistente de voz con inteligencia artificial que ayuda a estudiantes y familias a entender el camino a la universidad en español e inglés. Haz preguntas, repasa explicaciones y prepárate para conversar con un consejero o coordinador. Conócelo en https://origenedu.ai');
  useEffect(()=>{document.documentElement.lang=es?'es':'en';localStorage.setItem('origen.language',es?'es':'en');},[es]);
- useLayoutEffect(()=>{
+ useEffect(()=>{
   if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const scene=line.current;
+  let cancelled=false,cleanup:(()=>void)|undefined;
+  const initialize=()=>{
+  if(cancelled)return;
+  cleanup=(()=>{
   const animations:ReturnType<typeof animate>[]=[];
   // A soft mask reveals the complete illustration from sky to foreground.
   const gradient=scene.querySelector<SVGLinearGradientElement>('.scene-reveal-gradient')!;
   const revealed=scene.querySelector<SVGGElement>('.scene-reveal-content')!;
+  // The first paint stays visible; only an explicit replay uses the reveal mask.
+  if(replay>0){
   revealed.setAttribute('mask',`url(#${sceneId}-reveal)`);
   const reveal={edge:0};
   gradient.setAttribute('y1','-140');gradient.setAttribute('y2','0');
   animations.push(animate(reveal,{edge:[0,710],duration:1500,ease:'outCubic',onComplete:()=>revealed.removeAttribute('mask'),onUpdate:()=>{
    gradient.setAttribute('y1',String(reveal.edge-140));gradient.setAttribute('y2',String(reveal.edge));
   }}));
+  }
   const sunArcs=scene.querySelector<SVGPathElement>('.sun-orbit')!;
   const orbit={angle:0};
   animations.push(animate(orbit,{angle:[0,360],duration:90000,loop:true,ease:'linear',onUpdate:()=>{
@@ -139,12 +148,19 @@ export default function Landing(){
   const observer=new IntersectionObserver(([entry])=>{heroVisible.current=entry.isIntersecting;syncVisibility();},{rootMargin:'80px'});
   observer.observe(scene.closest('.landing-hero')!);document.addEventListener('visibilitychange',syncVisibility);syncVisibility();
   return ()=>{observer.disconnect();document.removeEventListener('visibilitychange',syncVisibility);animations.forEach(animation=>animation.revert());gradient.setAttribute('y1','570');gradient.setAttribute('y2','710');motion.current=[];};
+  })();
+  };
+  // Paint the headline and actions before preparing decorative SVG paths.
+  let second=0,idle=0;const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>{
+   if('requestIdleCallback' in window)idle=window.requestIdleCallback(initialize,{timeout:600});
+   else initialize();
+  });});
+  return()=>{cancelled=true;cancelAnimationFrame(first);cancelAnimationFrame(second);if(idle)window.cancelIdleCallback(idle);cleanup?.();};
  },[replay]);
  useEffect(()=>{
   pauseRef.current=paused;
   motion.current.forEach(animation=>{if(paused||!heroVisible.current||document.hidden)animation.pause();else if(!animation.completed)animation.play();});
  },[paused]);
- useEffect(()=>{if(login)dialog.current?.showModal();else dialog.current?.close();},[login]);
  return <div className="landing">
   <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a className="institution-register-link" href="#institutions">{t('Register your institution','Registra tu institución')}</a><a href="#coordinator-register">{t('Become a coordinator','Ser coordinador')}</a><a href="#educators">{t('For educators','Para educadores')}</a><a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>{setEs(!es);setCopyStatus('');}}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
   <main className="landing-main">
@@ -170,7 +186,7 @@ export default function Landing(){
     <div className="landing-map pueblo-scene">
      <svg ref={line} className="path-drawing" viewBox="0 0 700 570" fill="none" role="img" aria-label={t('A lively pueblo village with people walking, farmers tending fields, and grazing bulls beneath the mountains','Un pueblo lleno de vida, con personas caminando, agricultores trabajando y toros pastando al pie de las montañas')} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
       <defs><linearGradient id={`${sceneId}-fade`} className="scene-reveal-gradient" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="570" y2="710"><stop offset="0" stopColor="white"/><stop offset="1" stopColor="black"/></linearGradient><mask id={`${sceneId}-reveal`} maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="570" style={{maskType:'luminance'}}><rect width="700" height="570" fill={`url(#${sceneId}-fade)`} stroke="none"/></mask></defs>
-      <g className="scene-reveal-content" mask={`url(#${sceneId}-reveal)`}>
+      <g className="scene-reveal-content">
       {/* Each edge is one continuous stroke: road, village outline, then its mountain ridge. */}
       <path data-side="left" data-duration="7400" d="M296 560 C235 503 410 487 350 443 C329 427 322 411 334 391 C345 368 305 354 265 371 C218 391 151 389 138 361 L138 328 Q138 316 150 316 Q162 316 162 328 L162 364 L235 360 L235 316 L227 316 L227 301 L200 301 L200 316 L190 316 L190 285 L174 285 L174 254 L168 254 L168 239 L113 239 L113 254 L105 254 L105 285 L95 285 L95 323 L62 323 L62 363 M62 323 L62 296 L22 290 L72 230 L92 246 L184 126 L206 152 L248 91 L313 188 L342 159"/>
       <path data-side="right" data-duration="7400" d="M344 560 C287 509 459 493 388 437 C369 422 355 411 368 397 C388 383 419 392 446 374 C468 360 499 356 522 348 L522 308 Q522 298 532 298 Q542 298 542 308 L542 351 L624 347 L624 288 L614 288 L614 267 L580 267 L580 288 L566 288 L566 263 L553 263 L553 238 L490 238 L490 263 L476 263 L476 301 L448 301 L448 346 L476 350 L476 301 M476 263 L566 263 L566 288 L624 288 L644 278 L681 276 L644 226 L621 240 L512 124 L481 144 L455 109 L389 207 L342 159"/>
@@ -332,6 +348,6 @@ export default function Landing(){
    <section className="landing-closing"><h2>{t('You belong in this conversation.','Tu voz tiene un lugar aquí.')}</h2><button onClick={()=>setLogin(true)}>{t('Let’s get started','Empecemos')}<ArrowRight size={18}/></button></section>
   </main>
   <footer className="landing-footer"><strong>origen.</strong><a href="#institutions">{t('Register your institution','Registra tu institución')}</a>{publicContactEmail&&<a href="#contact">{t('Contact','Contacto')}</a>}<a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><span>{t('Origen Edu is operated by Blueprint Holdings LLC.','Origen Edu es operado por Blueprint Holdings LLC.')}{publicContactEmail&&<> <a href={`mailto:${publicContactEmail}`}>{publicContactEmail}</a></>}</span><button onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowUpRight size={14}/></button></footer>
-  <dialog ref={dialog} className="landing-dialog landing-auth-dialog" aria-label={t('Sign in or create an account','Iniciar sesión o crear una cuenta')} onCancel={()=>setLogin(false)}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>setLogin(false)}><X size={22}/></button><div className="landing-auth-actions"><button className="landing-primary" disabled={isLoading} onClick={()=>signIn()}>{t('Sign in','Iniciar sesión')}<ArrowRight size={18}/></button><button className="landing-primary" disabled={isLoading} onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowRight size={18}/></button></div>{(signinError||error)&&<p role="alert">{t('Could not sign in. Try again.','No se pudo iniciar sesión. Intenta de nuevo.')}</p>}</dialog>
+  <dialog ref={dialog} {...dialogProps} className="landing-dialog landing-auth-dialog" aria-label={t('Sign in or create an account','Iniciar sesión o crear una cuenta')}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>void dismiss()}><X size={22}/></button><div className="landing-auth-actions"><button className="landing-primary" disabled={isLoading} onClick={()=>signIn()}>{t('Sign in','Iniciar sesión')}<ArrowRight size={18}/></button><button className="landing-primary" disabled={isLoading} onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowRight size={18}/></button></div>{(signinError||error)&&<p role="alert">{t('Could not sign in. Try again.','No se pudo iniciar sesión. Intenta de nuevo.')}</p>}</dialog>
  </div>;
 }

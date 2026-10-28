@@ -7,6 +7,7 @@ import {ArrowRight,CheckCircle2,Plus,RefreshCw} from 'lucide-react';
 import {apiFetch} from './api';
 import {legacyCreationId,legacyPlanBatches} from './planImport.mjs';
 import './ActionPlan.css';
+import {useNavigationGuard,useNavigationState,navigateWorkspace} from './workspaceNavigation';
 import {useBinderNavigationGuard} from './useBinderFollow';
 
 type Step={id:string;title:string;action:string;notes:string;status:'not-started'|'in-progress'|'complete'|'deferred';dueDate:string|null;sources:{title:string;url:string}[]};
@@ -21,11 +22,12 @@ export default function ActionPlan({compact=false,scopeStudentId,studentId,name,
  const target=scopeStudentId!==undefined?scopeStudentId:role==='parent'&&familyFor===studentId?null:studentId,scope=JSON.stringify([user?.sub,target]);
  const currentScope=useRef(scope);currentScope.current=scope;
  const [loading,setLoading]=useState(true),[failed,setFailed]=useState(false),[retry,setRetry]=useState(0),[busy,setBusy]=useState(false),lock=useRef(false),loadVersion=useRef(0);
- const [drafts,setDrafts]=useState<Record<string,Draft|undefined>>({}),[messages,setMessages]=useState<Record<string,string>>({}),[archive,setArchive]=useState(false);
+ const [drafts,setDrafts]=useState<Record<string,Draft|undefined>>({}),[messages,setMessages]=useState<Record<string,string>>({}),[archive,setArchive]=useNavigationState(`plan.${scope}.archived`,false,(v):v is boolean=>typeof v==='boolean');
  const [legacy,setLegacy]=useState<{scope:string;batches:{requestId:string;steps:Step[]}[];error:boolean}|null>(null);
  useBinderNavigationGuard(busy||Object.values(drafts).some(Boolean));
+ useNavigationGuard(Object.values(drafts).some(Boolean),{locked:busy,onLeave:()=>setDrafts({})});
  const section=useRef<HTMLElement>(null),lastSeed=useRef<string|null>(null);
- const [expanded,setExpanded]=useState(false);
+ const [expanded,setExpanded]=useNavigationState(`plan.${scope}.expanded`,false,(v):v is boolean=>typeof v==='boolean');
  const value=data?.scope===scope?data.value:null,plans=value?.plans.filter(p=>p.studentId===target)||[],draft=drafts[scope];
  const latest=draft?.base?plans.find(p=>p.id===draft.base?.id):undefined;
  const conflict=!!draft?.base&&!!value&&latest?.version!==draft.base.version;
@@ -92,12 +94,12 @@ export default function ActionPlan({compact=false,scopeStudentId,studentId,name,
   {compact&&!showFull&&<div className="home-step-preview">
    {loading?<p role="status">{t('Loading your next step…','Cargando tu próximo paso…')}</p>:failed?<p role="alert">{t('We couldn’t load your steps.','No pudimos cargar tus pasos.')} <button type="button" className="text-button" onClick={()=>setRetry(n=>n+1)}>{t('Try again','Intentar de nuevo')}</button></p>:<>
     {nextStep?<><span className="home-step-owner">{scopeName}</span><h3>{nextStep.step.title}</h3>{nextStep.step.action&&<p>{nextStep.step.action}</p>}{nextStep.step.dueDate&&<small>{t('Your target: ','Tu meta: ')}{date(nextStep.step.dueDate)}</small>}<div className="action-plan-toolbar"><button type="button" className="button outline" disabled={busy} onClick={()=>void mutate({action:'update',id:nextStep.plan.id,version:nextStep.plan.version,plan:{...nextStep.plan,steps:nextStep.plan.steps.map(step=>step.id===nextStep.step.id?{...step,status:'complete'}:step)}})}><CheckCircle2 size={16} aria-hidden="true"/>{t('Mark done','Marcar como hecho')}</button></div></>:<p>{active.some(plan=>plan.steps.some(step=>step.status==='deferred'))?t('Your remaining steps are set aside. Resume one whenever you’re ready.','Tus pasos pendientes están en pausa. Retoma uno cuando quieras.'):active.some(plan=>plan.steps.length)?t('You’ve marked all your steps done. Take a moment to enjoy that.','Marcaste todos tus pasos como hechos. Date un momento para disfrutarlo.'):t('No next step yet. You can talk it through with Origen or add one yourself.','Aún no hay un próximo paso. Puedes pensarlo con Origen o agregar uno tú mismo.')}</p>}
-    <button type="button" className="text-button" onClick={()=>{setExpanded(true);if(!plans.length&&!importBatches.length)start();requestAnimationFrame(()=>section.current?.focus({preventScroll:true}));}} aria-expanded={false} aria-controls={`${heading}-plans`}>{plans.length||importBatches.length?t('See all my steps','Ver todos mis pasos'):t('Add a step','Agregar un paso')}<ArrowRight size={16} aria-hidden="true"/></button>
+    <button type="button" className="text-button" onClick={()=>{if(!navigateWorkspace(()=>setExpanded(true)))return;if(!plans.length&&!importBatches.length)start();requestAnimationFrame(()=>section.current?.focus({preventScroll:true}));}} aria-expanded={false} aria-controls={`${heading}-plans`}>{plans.length||importBatches.length?t('See all my steps','Ver todos mis pasos'):t('Add a step','Agregar un paso')}<ArrowRight size={16} aria-hidden="true"/></button>
     {messages[scope]&&<p role="status">{messages[scope]}</p>}
     {!!importBatches.length&&<p className="home-step-owner">{t('You also have older steps to review in “See all my steps.”','También tienes pasos anteriores para revisar en “Ver todos mis pasos”.')}</p>}
    </>}
   </div>}
-  {compact&&showFull&&!draft&&<button type="button" className="text-button" aria-expanded={true} aria-controls={`${heading}-plans`} onClick={()=>{setExpanded(false);requestAnimationFrame(()=>section.current?.focus({preventScroll:true}));}}>{t('Show just my next step','Ver solo mi próximo paso')}</button>}
+  {compact&&showFull&&!draft&&<button type="button" className="text-button" aria-expanded={true} aria-controls={`${heading}-plans`} onClick={()=>{if(!navigateWorkspace(()=>setExpanded(false)))return;requestAnimationFrame(()=>section.current?.focus({preventScroll:true}));}}>{t('Show just my next step','Ver solo mi próximo paso')}</button>}
   <div id={`${heading}-plans`} hidden={!showFull}>
   {scopeStudentId===undefined&&role==='parent'&&<div className="home-summary-switch" role="group" aria-label={t('Plan belongs to','Este plan pertenece a')}><button type="button" aria-pressed={target!==null} onClick={()=>setFamilyFor(null)}>{name}</button><button type="button" aria-pressed={target===null} onClick={()=>setFamilyFor(studentId)}>{t('Family plan','Plan familiar')}</button></div>}
   <div className="action-plan-toolbar"><p><strong>{scopeName}</strong> · {t('Private to your account','Privado en tu cuenta')}</p><button className="text-button" type="button" disabled={busy||loading} onClick={()=>setRetry(n=>n+1)}><RefreshCw size={15}/>{t('Refresh plan','Actualizar plan')}</button></div>

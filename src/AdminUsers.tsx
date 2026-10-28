@@ -1,5 +1,6 @@
 import {useAdminAction} from './AdminPermissions';
 import {useAuth0} from '@auth0/auth0-react';
+import {useNavigationState,navigateWorkspace,navigationText} from './workspaceNavigation';
 import {useEffect,useState} from 'react';
 import {Search,ChevronLeft,ChevronRight} from 'lucide-react';
 import {apiFetch} from './api';
@@ -10,13 +11,13 @@ type Directory={users:User[];total:number;page:number;pageSize:number;funnel:{me
 export default function AdminUsers({days,revision,onDenied}:{days:number;revision:number;onDenied:()=>void}){
  const canSeeMetrics=useAdminAction('onboarding-metrics');
  const {getAccessTokenSilently}=useAuth0();
- const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[role,setRole]=useState('all'),[journey,setJourney]=useState('all'),[sort,setSort]=useState('registered'),[direction,setDirection]=useState('desc'),[page,setPage]=useState(1);
- const [data,setData]=useState<Directory>(),[error,setError]=useState(''),[retry,setRetry]=useState(0),[selected,setSelected]=useState<string>();
+ const [search,setSearch]=useNavigationState('admin.users.search','',navigationText),[query,setQuery]=useNavigationState('admin.users.query','',navigationText),[role,setRole]=useNavigationState('admin.users.role','all',navigationText),[journey,setJourney]=useNavigationState('admin.users.journey','all',navigationText),[sort,setSort]=useNavigationState('admin.users.sort','registered',navigationText),[direction,setDirection]=useNavigationState('admin.users.direction','desc',navigationText),[page,setPage]=useNavigationState('admin.users.page.'+days,1,(v):v is number=>Number.isSafeInteger(v)&&Number(v)>0);
+ const [data,setData]=useState<Directory>(),[error,setError]=useState(''),[retry,setRetry]=useState(0),[selected,setSelected]=useNavigationState<string|undefined>('admin.users.selected',undefined,(v):v is string|undefined=>v===undefined||navigationText(v));
  useEffect(()=>{if(search.trim()===query)return;const timer=setTimeout(()=>{setQuery(search.trim());setPage(1);},300);return()=>clearTimeout(timer);},[search,query]);
- useEffect(()=>{setPage(1);},[days]);
+
  async function request(body:object,signal:AbortSignal){const token=await getAccessTokenSilently();const response=await apiFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body),signal});if(!response.ok){if([401,403].includes(response.status))onDenied();throw new Error(response.status===404?'This account no longer exists.':'Could not load users. Please try again.');}return response.json();}
  useEffect(()=>{const abort=new AbortController();setData(undefined);setError('');void request({action:'users',days,page,search:query,role,journey,sort,direction},abort.signal).then(next=>{if(!abort.signal.aborted){if(page>1&&(page-1)*25>=next.total)setPage(Math.max(1,Math.ceil(next.total/25)));else setData(next);}}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});return()=>abort.abort();},[days,page,query,role,journey,sort,direction,revision,retry]);
- const filter=(setter:(value:string)=>void,value:string)=>{setter(value);setPage(1);};
+ const filter=(setter:(value:string)=>void,value:string)=>{navigateWorkspace(()=>{setter(value);setPage(1);});};
  const funnel=data?.funnel;
  return <>
  <section className="admin-panel"><div className="admin-panel-heading"><div><h2>Onboarding journey</h2><p>New accounts in the selected {days} days · recorded milestones</p></div></div>
@@ -31,12 +32,12 @@ export default function AdminUsers({days,revision,onDenied}:{days:number;revisio
  <label>Sort by<select aria-label="Sort by" value={sort} onChange={e=>filter(setSort,e.target.value)}><option value="registered">Registration</option><option value="name">Name</option><option value="last_activity">Last recorded activity</option><option value="last_login">Last sign-in</option><option value="logins">Sign-ins</option><option value="voice_minutes">Connected voice minutes</option></select></label>
  <label>Order<select aria-label="Order" value={direction} onChange={e=>filter(setDirection,e.target.value)}><option value="desc">Descending</option><option value="asc">Ascending</option></select></label></div>
  {error?<div className="admin-error" role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>Retry users</button></div>:!data?<p className="admin-empty" role="status">Loading accounts…</p>:!data.users.length?<div className="admin-empty"><h3>No matching accounts</h3><p>Try another name or adjust the filters.</p></div>:<div className="admin-table admin-directory-table" tabIndex={0} role="region" aria-label="Account directory, scroll for more columns"><table><caption className="admin-sr-only">Account directory</caption><thead><tr><th>User</th><th>Account-holder role</th><th>Journey stage</th><th>Last recorded activity</th><th>Last sign-in</th><th>Registered</th><th>Sign-ins</th><th>Connected minutes</th></tr></thead><tbody>{data.users.map(user=><tr key={user.id}>
- <td><button className="admin-user-link" onClick={()=>setSelected(user.id)}>{user.first_name||'Name not provided'}</button><small title={user.id}>ID {user.id.slice(0,8)}</small></td>
+ <td><button className="admin-user-link" onClick={()=>navigateWorkspace(()=>setSelected(user.id))}>{user.first_name||'Name not provided'}</button><small title={user.id}>ID {user.id.slice(0,8)}</small></td>
  <td>{roleLabel(user.role)}<small>{user.student_profiles===undefined?'Student profiles not recorded':`${number(user.student_profiles)} saved student ${Number(user.student_profiles)===1?'profile':'profiles'}`}</small>{user.admin_access==='confirmed'&&<span className="admin-access-badge">Admin access confirmed</span>}</td>
  <td><JourneyStatus user={user}/></td><td>{date(user.last_activity_at)}<small>{activityLabels[user.last_activity_kind||'']||'Activity source not recorded'}</small></td>
  <td>{date(user.last_login)}</td><td>{date(user.created_at)}</td><td>{number(user.logins)}</td><td>{number(user.voice_minutes)}</td>
  </tr>)}</tbody></table></div>}
- {data&&<div className="admin-pagination"><span role="status">{data.total?`${(page-1)*25+1}–${Math.min(page*25,data.total)} of ${number(data.total)}`:'0 results'}</span><div><button aria-label="Previous page" disabled={page===1} onClick={()=>setPage(x=>x-1)}><ChevronLeft size={16}/></button><span>Page {page} of {Math.max(1,Math.ceil(data.total/25))}</span><button aria-label="Next page" disabled={page*25>=data.total} onClick={()=>setPage(x=>x+1)}><ChevronRight size={16}/></button></div></div>}
+ {data&&<div className="admin-pagination"><span role="status">{data.total?`${(page-1)*25+1}–${Math.min(page*25,data.total)} of ${number(data.total)}`:'0 results'}</span><div><button aria-label="Previous page" disabled={page===1} onClick={()=>navigateWorkspace(()=>setPage(x=>x-1))}><ChevronLeft size={16}/></button><span>Page {page} of {Math.max(1,Math.ceil(data.total/25))}</span><button aria-label="Next page" disabled={page*25>=data.total} onClick={()=>navigateWorkspace(()=>setPage(x=>x+1))}><ChevronRight size={16}/></button></div></div>}
  </section>
- {selected&&<AdminUserDrawer key={`${selected}:${days}:${revision}`} id={selected} days={days} revision={revision} onClose={()=>setSelected(undefined)} onDenied={onDenied}/>}</>;
+ {selected&&<AdminUserDrawer key={`${selected}:${days}:${revision}`} id={selected} days={days} revision={revision} onClose={()=>navigateWorkspace(()=>setSelected(undefined))} onDenied={onDenied}/>}</>;
 }

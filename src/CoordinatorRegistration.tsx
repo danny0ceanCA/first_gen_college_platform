@@ -1,3 +1,8 @@
+import {focusReviewDetail,ReviewBack,ReviewOutcome,RegistrationProgress} from './ReviewExperience';
+import {useArrivalPending} from './arrivalReadiness';
+import {withRequestDeadline} from './requestDeadline.mjs';
+import {applicationError} from './coordinatorApplicationError';
+import {useNavigationState,useNavigationGuard,navigateWorkspace,confirmWorkspaceNavigation,navigationText,navigationEnum} from './workspaceNavigation';
 import {loadCoordinatorApplicationPage} from './coordinatorApplicationQueue.mjs';
 import {defaultCoordinatorOrganization} from './coordinatorOrganizationDefault.mjs';
 import {normalizeCoordinatorWebsite} from './coordinatorWebsite.mjs';
@@ -15,30 +20,13 @@ import './CoordinatorRegistration.css';
 
 type Application={id:string;displayName:string;email:string;organizationName:string;organizationWebsite:string;jobRole:string;status:'pending'|'approved'|'declined';reviewNote:string;createdAt:string;registeredInstitutionId?:string|null;registeredOrganizationName?:string|null;organizationRegistration?:{description:string;authorized:true}|null};
 type Translate=(en:string,es:string)=>string;
-export function applicationError(error:string,t:Translate){
- const messages:Record<string,string>={
-  invalid_organization_website:t('Enter a website such as example.org or https://example.org.','Escribe un sitio web como ejemplo.org o https://ejemplo.org.'),
-  name_required:t('Enter your first and last name.','Escribe tu nombre y apellido.'),
-  name_too_long:t('Use a first and last name totaling 100 characters or fewer.','Usa un nombre y apellido de hasta 100 caracteres en total.'),
-  organization_changed:t('Organization access changed. Refresh access and review its current status before approving again.','El acceso de la organización cambió. Actualiza el acceso y revisa su estado antes de aprobar de nuevo.'),
-  coordinator_review_busy:t('Review is busy. Wait a moment, then refresh applications to check the latest status.','La revisión está ocupada. Espera un momento y actualiza las solicitudes para ver el estado actual.'),
-  coordinator_sharing_unavailable:t('Coordinator registration is not open yet. Please check back with the Origen team.','El registro de coordinadores aún no está abierto. Consulta con el equipo de Origen.'),
-  verified_email_required:t('Verify your sign-in email, then select Refresh status.','Verifica tu correo de inicio de sesión y selecciona Actualizar estado.'),
-  invitation_email_required:t('Sign in again so we can verify your email.','Inicia sesión de nuevo para verificar tu correo.'),
-  identity_verification_unavailable:t('The sign-in service is temporarily unavailable. Wait a moment, then select Refresh status. You do not need to verify your email again.','El servicio de inicio de sesión no está disponible temporalmente. Espera un momento y selecciona Actualizar estado. No necesitas verificar tu correo de nuevo.'),
-  application_membership_required:t('The applicant must first accept an invitation to the selected organization. Use Invitations and team in its owner workspace.','La persona debe aceptar primero una invitación a la organización seleccionada. Usa Invitaciones y equipo en el espacio del propietario.'),
-  application_review_required:t('The Origen team must approve this coordinator’s application before access can be enabled.','El equipo de Origen debe aprobar la solicitud de este coordinador antes de activar su acceso.'),
-  application_changed:t('This application has changed. Refresh the list before reviewing it.','Esta solicitud ha cambiado. Actualiza la lista antes de revisarla.'),
-  independent_review_required:t('An independent Origen reviewer must review this application. You cannot approve yourself or your own organization.','Un revisor independiente de Origen debe revisar esta solicitud. No puedes aprobarte ni aprobar tu propia organización.'),
-  organization_verification_required:t('Choose an organization whose affiliation and coordinator pilot have been approved.','Elige una organización con afiliación y piloto de coordinadores aprobados.'),
- };
- return messages[error]||t('We couldn’t complete this request. Please try again.','No pudimos completar la solicitud. Intenta de nuevo.');
-}
+export {applicationError} from './coordinatorApplicationError';
 export default function CoordinatorRegistration(){
  const {isAuthenticated,isLoading,user,getAccessTokenSilently,loginWithRedirect,logout}=useAuth0();
  const [es,setEs]=useState(localStorage.getItem('origen.language')==='es');
  const t:Translate=(en,sp)=>es?sp:en;
  const [application,setApplication]=useState<Application|null>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ useArrivalPending(isLoading||isAuthenticated&&(application===undefined||busy)&&!error);
  const [firstName,setFirstName]=useState(''),[lastName,setLastName]=useState('');
  const displayName=[firstName.trim(),lastName.trim()].filter(Boolean).join(' ');
  const [organizationName,setOrganization]=useState(''),[organizationWebsite,setWebsite]=useState(''),[jobRole,setRole]=useState('');
@@ -50,20 +38,20 @@ export default function CoordinatorRegistration(){
  const [organization,setSavedOrganization]=useState<SignupOrganization|null>();
  const [organizationBusy,setOrganizationBusy]=useState(false),[organizationError,setOrganizationError]=useState('');
  const version=useRef(0);
- const request=useCallback(async(input:unknown)=>{
-  const token=await getStaffAccessToken(()=>getAccessTokenSilently());
-  const response=await apiFetch('/api/coordinator-access',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
-  const data=await response.json();if(!response.ok)throw new Error(data.error);return data;
- },[getAccessTokenSilently]);
- const organizationRequest=useCallback(async(input:unknown)=>{
+ const request=useCallback((input:unknown)=>withRequestDeadline(async signal=>{
+  const token=await getStaffAccessToken(()=>getAccessTokenSilently());signal.throwIfAborted();
+  const response=await apiFetch('/api/coordinator-access',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(input),signal});
+  const data=await response.json();signal.throwIfAborted();if(!response.ok)throw new Error(data.error);return data;
+ },{timeoutMs:15000}),[getAccessTokenSilently]);
+ const organizationRequest=useCallback((input:unknown)=>withRequestDeadline(async signal=>{
   const current=version.current;
-  const token=await getStaffAccessToken(()=>getAccessTokenSilently());
+  const token=await getStaffAccessToken(()=>getAccessTokenSilently());signal.throwIfAborted();
   if(current!==version.current)throw new Error('privacy_session_ended');
-  const response=await apiFetch('/api/institutions',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
-  const data=await response.json();if(!response.ok)throw new Error(data.error);
+  const response=await apiFetch('/api/institutions',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(input),signal});
+  const data=await response.json();signal.throwIfAborted();if(!response.ok)throw new Error(data.error);
   if(current!==version.current)throw new Error('privacy_session_ended');
   return data;
- },[getAccessTokenSilently]);
+ },{timeoutMs:15000}),[getAccessTokenSilently]);
  useEffect(()=>{
   const current=++version.current;setApplication(undefined);setError('');setOrganizationError('');setSavedOrganization(undefined);setOrganizationSignup(null);setOrganizationBusy(false);
   if(isAuthenticated){setBusy(true);void request({action:'application-status'}).then(async data=>{
@@ -207,6 +195,7 @@ export default function CoordinatorRegistration(){
    {isLoading?<div className="coordinator-card"><p role="status">{t('Loading…','Cargando…')}</p></div>:!isAuthenticated?null:<>
     <div className="coordinator-application-controls"><span>{t('YOUR APPLICATION','TU SOLICITUD')}</span><button className="text-button" disabled={busy||organizationBusy} onClick={()=>setRetry(n=>n+1)}>{t('Refresh status','Actualizar estado')}</button></div>
     {busy&&<p role="status">{t('Checking your application…','Consultando tu solicitud…')}</p>}
+    {application&&<RegistrationProgress es={es} step={application.status==='approved'?3:staffVerificationErrors.includes(error)||staffVerificationErrors.includes(organizationError)||!!organizationSignup&&!organization?1:2}/>}
     {application?<section className="coordinator-card coordinator-application-status" aria-labelledby="application-status"><span className={'coordinator-status-pill '+application.status}>{application.status==='pending'?t('In review','En revisión'):application.status==='approved'?t('Approved','Aprobada'):t('Review complete','Revisión completada')}</span><h2 id="application-status">{application.status==='pending'?t('Your application is awaiting review','Tu solicitud está pendiente de revisión'):application.status==='approved'?t('Your application was approved','Tu solicitud fue aprobada'):t('Your application was not approved','Tu solicitud no fue aprobada')}</h2><div className="coordinator-applicant"><strong>{application.displayName}</strong><span>{application.organizationName} · {application.jobRole}</span><span>{application.email}</span></div>
      {application.reviewNote&&<div className="coordinator-review-message"><span>{t('From the Origen team','Del equipo de Origen')}</span><p>{application.reviewNote}</p></div>}
      {application.status==='pending'&&<p>{organization||organizationSignup?t('We’ll review your organization and coordinator application before enabling access. Return here to check your status.','Revisaremos tu organización y tu solicitud como coordinador antes de activar el acceso. Vuelve aquí para consultar tu estado.'):t('The Origen team will verify your affiliation. If you’re joining an existing organization, ask its owner to invite you using your sign-in email. Return here to check your status.','El equipo de Origen verificará tu afiliación. Si te unes a una organización existente, pide al propietario una invitación con tu correo de inicio de sesión. Vuelve aquí para consultar tu estado.')}</p>}
@@ -263,19 +252,24 @@ function SignupOrganizationStatus({organization,busy,t,onSubmit}:{organization:S
 const requestedOrganizationName=(item:Application)=>item.registeredOrganizationName||item.organizationName;
 
 type Request=(input:unknown)=>Promise<{applications?:Application[];organizations?:{id:string;name:string}[]}>;
-export function CoordinatorApplications({request,t,onError,streamlined=false}:{request:Request;t:Translate;onError:(error:string)=>void;streamlined?:boolean}){
- const [items,setItems]=useState<Application[]>([]),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[after,setAfter]=useState(''),[next,setNext]=useState('');
- const [selected,setSelected]=useState(''),[note,setNote]=useState(''),[institution,setInstitution]=useState('');
+export function CoordinatorApplications({request,t,onError,streamlined=false,onReviewOrganization}:{request:Request;t:Translate;onError:(error:string)=>void;streamlined?:boolean;onReviewOrganization?:(name:string,id?:string|null)=>void}){
+ const [items,setItems]=useState<Application[]>([]),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[after,setAfter]=useNavigationState('admin.coordinators.after','',navigationText),[next,setNext]=useState('');
+ const [selected,setSelected]=useNavigationState('admin.coordinators.selected','',navigationText),[note,setNote]=useState(''),[institution,setInstitution]=useState('');
  const [organizations,setOrganizations]=useState<{id:string;name:string}[]>([]),[orgBusy,setOrgBusy]=useState(false),[search,setSearch]=useState(''),[orgAfter,setOrgAfter]=useState(''),[orgNext,setOrgNext]=useState('');
  const [orgFailed,setOrgFailed]=useState(false);
  const [reviewError,setReviewError]=useState(''),[reviewNotice,setReviewNotice]=useState(''),[reviewing,setReviewing]=useState<'approve'|'decline'|null>(null);
+ const [detail,setDetail]=useNavigationState('admin.coordinators.detail','queue',navigationEnum('queue','detail'));
+ const root=useRef<HTMLElement>(null),rowScroll=useRef(0);
+ function openApplication(id:string){const rows=root.current?.querySelector<HTMLElement>('.org-review-rows');rowScroll.current=rows?.scrollTop||0;if(navigateWorkspace(()=>{setSelected(id);setDetail('detail');setReviewNotice('');setReviewError('');}))focusReviewDetail(root.current);}
+ function backToQueue(){navigateWorkspace(()=>setDetail('queue'));requestAnimationFrame(()=>{const rows=root.current?.querySelector<HTMLElement>('.org-review-rows');if(rows)rows.scrollTop=rowScroll.current;root.current?.querySelector<HTMLButtonElement>('.org-review-row[aria-current=true]')?.focus({preventScroll:true});});}
  const reviewPending=useRef(false);
+ useNavigationGuard(!!note.trim(),{locked:!!reviewing,onLeave:()=>setNote('')});
  useEffect(()=>{setReviewError('');},[selected]);
  const orgVersion=useRef(0);useEffect(()=>()=>{orgVersion.current++;},[]);
  const version=useRef(0);useEffect(()=>()=>{version.current++;},[]);
  async function load(cursor=''){
   const current=++version.current;orgVersion.current++;setOrgBusy(false);setBusy(true);onError('');
-  try{const data=await loadCoordinatorApplicationPage(request,cursor);if(current!==version.current)return;const list=data.applications;setItems(list.slice(0,50));setNext(list.length>50?list[49].id:'');setAfter(data.after);setLoaded(true);setSearch(streamlined&&list[0]?requestedOrganizationName(list[0]):'');setOrgAfter('');setOrgNext('');setSelected(streamlined?list[0]?.id||'':'');setNote('');setInstitution('');if(streamlined&&list[0])void loadOrganizations(list[0].id,requestedOrganizationName(list[0]),'',requestedOrganizationName(list[0]),list[0].registeredInstitutionId);}
+  try{const data=await loadCoordinatorApplicationPage(request,cursor);if(current!==version.current)return;const list=data.applications;setItems(list.slice(0,50));setNext(list.length>50?list[49].id:'');setAfter(data.after);setLoaded(true);const chosen=list.find(item=>item.id===selected)||(streamlined?list[0]:undefined);setSelected(chosen?.id||'');setNote('');setInstitution('');}
   catch(e){if(current===version.current)onError(e instanceof Error?e.message:'unavailable');}finally{if(current===version.current)setBusy(false);}
  }
  async function loadOrganizations(id:string,query='',cursor='',requestedName=items.find(item=>item.id===id)?.registeredOrganizationName||items.find(item=>item.id===id)?.organizationName||'',registeredId=items.find(item=>item.id===id)?.registeredInstitutionId){
@@ -290,22 +284,23 @@ export function CoordinatorApplications({request,t,onError,streamlined=false}:{r
   try{
    await request({action:approve?'approve-application':'decline-application',id:selected,institutionId:institution,reviewNote:note});
    if(current!==version.current)return;
-   setReviewNotice(approve?t(`Coordinator access approved for ${name}.`, `Acceso de coordinador aprobado para ${name}.`):t(`Application declined for ${name}.`, `Solicitud rechazada para ${name}.`));
+   setDetail('detail');setReviewNotice(approve?t(`Coordinator access approved for ${name}.`, `Acceso de coordinador aprobado para ${name}.`):t(`Application declined for ${name}.`, `Solicitud rechazada para ${name}.`));
    setItems(list=>list.filter(item=>item.id!==selected));setSelected('');setInstitution('');setNote('');
    await load(after);
   }
   catch(e){if(current===version.current){const code=e instanceof Error?e.message:'unavailable';setReviewError(code);if(staffVerificationErrors.includes(code))onError(code);}}
   finally{reviewPending.current=false;setReviewing(null);if(current===version.current)setBusy(false);}
  }
- useEffect(()=>{if(streamlined)void load();},[streamlined,request]);
+ useEffect(()=>{if(streamlined||loaded)void load(after);},[streamlined,request,after]);
+ useEffect(()=>{const item=items.find(i=>i.id===selected);if(!item)return;const name=requestedOrganizationName(item);setSearch(name);setOrgAfter('');setNote('');void loadOrganizations(item.id,name,'',name,item.registeredInstitutionId);},[selected,items]);
  const applicant=items.find(item=>item.id===selected);
  const requestedPending=!!applicant&&!orgBusy&&!orgFailed&&!organizations.length&&!orgNext&&search.trim().toLocaleLowerCase()===requestedOrganizationName(applicant).trim().toLocaleLowerCase();
  const reviewFeedback=<>{reviewing&&<p role="status" className="approval-review-feedback">{reviewing==='approve'?t('Approving coordinator access…','Aprobando el acceso de coordinador…'):t('Saving review decision…','Guardando la decisión…')}</p>}{reviewError&&<p role="alert" className="institution-error approval-review-feedback">{staffVerificationErrors.includes(reviewError)?t('Sign in again using the verification message above, then retry. Your message is still here.','Inicia sesión de nuevo con el aviso de verificación de arriba y vuelve a intentar. Tu mensaje sigue aquí.'):reviewError==='invalid_coordinator_request'?t('The review could not be saved. Use a message of 1–1,000 characters, then try again. Your message is still here.','No se pudo guardar la revisión. Usa un mensaje de 1 a 1,000 caracteres y vuelve a intentar. Tu mensaje sigue aquí.'):applicationError(reviewError,t)}</p>}</>;
- if(streamlined)return <section className="org-review" aria-label={t('Coordinator applications','Solicitudes de coordinadores')}>
-  <div className="approval-section-intro"><div><h2>{t('Coordinator applications','Solicitudes de coordinadores')}</h2><p>{t('Review the applicant and connect them to an approved organization.','Revisa la solicitud y vincula a la persona con una organización aprobada.')}</p></div><button className="button outline" disabled={busy} onClick={()=>void load()}>{t('Refresh applications','Actualizar solicitudes')}</button></div>
-  {reviewNotice&&<p className="approval-notice" role="status">{reviewNotice}</p>}
-  <div className="org-review-workspace"><aside className="org-review-list" aria-label={t('Pending coordinators','Coordinadores pendientes')}><p className="approval-help">{items.length}{next?'+':''} {t('pending on this page','pendientes en esta página')}</p><div className="org-review-rows">{items.map(item=><button key={item.id} className="org-review-row" disabled={busy} aria-current={selected===item.id?'true':undefined} onClick={()=>{setSelected(item.id);setNote('');setSearch(requestedOrganizationName(item));setOrgAfter('');void loadOrganizations(item.id,requestedOrganizationName(item));}}><span className="org-review-row-name"><strong>{item.displayName}</strong></span><span className="org-review-row-person">{item.organizationName}</span><span className="org-review-badge">{t('Awaiting review','Pendiente de revisión')}</span></button>)}</div>{!items.length&&<p className="org-review-no-results" role="status">{loaded?t('No pending applications.','No hay solicitudes pendientes.'):t('Loading applications…','Cargando solicitudes…')}</p>}<div className="approval-pagination">{after&&<button disabled={busy} onClick={()=>void load()}>{t('First page','Primera página')}</button>}{next&&<button disabled={busy} onClick={()=>void load(next)}>{t('Next page','Página siguiente')}</button>}</div></aside>
-  {applicant?<article className="org-review-detail"><header><span className="org-review-badge">{t('Awaiting review','Pendiente de revisión')}</span><h2>{applicant.displayName}</h2><p className="approval-help">{applicant.organizationName} · {applicant.jobRole}</p></header><section className="org-review-info"><h3>{t('Application details','Datos de la solicitud')}</h3><dl><div><dt>{t('Email','Correo electrónico')}</dt><dd>{applicant.email}</dd></div><div><dt>{t('Submitted','Enviada')}</dt><dd>{new Date(applicant.createdAt).toLocaleDateString(t('en','es'),{month:'short',day:'numeric',year:'numeric'})}</dd></div><div><dt>{t('Organization website','Sitio de la organización')}</dt><dd>{applicant.organizationWebsite||t('Not provided','No proporcionado')}</dd></div></dl>{applicant.registeredOrganizationName&&applicant.registeredOrganizationName!==applicant.organizationName&&<p className="approval-help">{t("Current registered organization: ","Organización registrada actual: ")}{applicant.registeredOrganizationName}</p>}</section><p className="approval-help">{t('The organization must have confirmed affiliation and coordinator access enabled. The applicant must also have accepted its membership invitation.','La organización debe tener afiliación confirmada y acceso habilitado. La persona también debe haber aceptado su invitación.')}</p>
+ if(streamlined)return <section ref={root} className="org-review" aria-label={t('Coordinator applications','Solicitudes de coordinadores')}>
+  <div className="approval-section-intro"><div><h2>{t('Coordinator applications','Solicitudes de coordinadores')}</h2><p>{t('Review the applicant and connect them to an approved organization.','Revisa la solicitud y vincula a la persona con una organización aprobada.')}</p></div><button className="button outline" disabled={busy} onClick={()=>{if(confirmWorkspaceNavigation())void load(after);}}>{t('Refresh applications','Actualizar solicitudes')}</button></div>
+  <div className="org-review-workspace review-master-detail" data-detail={detail==='detail'}><aside className="org-review-list" aria-label={t('Pending coordinators','Coordinadores pendientes')}><p className="approval-help">{items.length}{next?'+':''} {t('pending on this page','pendientes en esta página')}</p><div className="org-review-rows">{items.map(item=><button key={item.id} className="org-review-row" disabled={busy} aria-current={selected===item.id?'true':undefined} data-navigation-focus={`review-coordinator-${item.id}`} onClick={()=>openApplication(item.id)}><span className="org-review-row-name"><strong>{item.displayName}</strong></span><span className="org-review-row-person">{item.organizationName}</span><span className="org-review-badge">{t('Awaiting review','Pendiente de revisión')}</span></button>)}</div>{!items.length&&<p className="org-review-no-results" role="status">{loaded?t('No pending applications.','No hay solicitudes pendientes.'):t('Loading applications…','Cargando solicitudes…')}</p>}<div className="approval-pagination">{after&&<button disabled={busy} onClick={()=>navigateWorkspace(()=>setAfter(''))}>{t('First page','Primera página')}</button>}{next&&<button disabled={busy} onClick={()=>navigateWorkspace(()=>setAfter(next))}>{t('Next page','Página siguiente')}</button>}</div></aside>
+  {reviewNotice?<div className="org-review-detail review-completed"><ReviewBack es={t('en','es')==='es'} onClick={backToQueue}/><ReviewOutcome message={reviewNotice} es={t('en','es')==='es'} busy={busy} hasNext={!!items.length} onNext={()=>openApplication(selected||items[0].id)}/></div>:applicant?<article className="org-review-detail" key={applicant.id}><ReviewBack es={t('en','es')==='es'} onClick={backToQueue}/><header><span className="org-review-badge">{t('Awaiting review','Pendiente de revisión')}</span><h2>{applicant.displayName}</h2><p className="approval-help">{applicant.organizationName} · {applicant.jobRole}</p></header><section className="org-review-info"><h3>{t('Application details','Datos de la solicitud')}</h3><dl><div><dt>{t('Email','Correo electrónico')}</dt><dd>{applicant.email}</dd></div><div><dt>{t('Submitted','Enviada')}</dt><dd>{new Date(applicant.createdAt).toLocaleDateString(t('en','es'),{month:'short',day:'numeric',year:'numeric'})}</dd></div><div><dt>{t('Organization website','Sitio de la organización')}</dt><dd>{applicant.organizationWebsite||t('Not provided','No proporcionado')}</dd></div></dl>{applicant.registeredOrganizationName&&applicant.registeredOrganizationName!==applicant.organizationName&&<p className="approval-help">{t("Current registered organization: ","Organización registrada actual: ")}{applicant.registeredOrganizationName}</p>}</section>
+  <section className="review-requirements" aria-label={t('Access requirements','Requisitos de acceso')}><h3>{t('Organization & coordinator requirements','Requisitos de organización y coordinador')}</h3><p>{orgBusy?t('Checking affiliation, organization access, and membership…','Comprobando afiliación, acceso de organización y membresía…'):orgFailed?t('Requirements could not be checked. Search again to retry.','No se pudieron comprobar los requisitos. Busca de nuevo para reintentar.'):institution?t('✓ Organization affiliation confirmed · Coordinator access enabled · Applicant membership confirmed','✓ Afiliación confirmada · Acceso de coordinadores habilitado · Membresía confirmada'):t('Organization eligibility is not confirmed for this selection. Review affiliation, access, and membership before approving.','No se ha confirmado la elegibilidad de esta selección. Revisa la afiliación, el acceso y la membresía antes de aprobar.')}</p><small>{t('Requirements are checked again when you approve.','Los requisitos se comprueban de nuevo al aprobar.')}</small>{onReviewOrganization&&<button className="text-button" onClick={()=>onReviewOrganization(requestedOrganizationName(applicant),applicant.registeredInstitutionId)}>{t('Review organization access','Revisar acceso de la organización')} <span aria-hidden="true">→</span></button>}</section>
   {selected&&<form className="approval-application-form" onSubmit={e=>{e.preventDefault();void review(true);}}><h3>{t('Review decision','Decisión de revisión')}</h3>
    <label>{t('Find an organization','Buscar una organización')}<input maxLength={200} value={search} onChange={e=>setSearch(e.target.value)}/></label>
    <button type="button" className="button outline" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search)}>{t('Search organizations','Buscar organizaciones')}</button>
@@ -313,15 +308,15 @@ export function CoordinatorApplications({request,t,onError,streamlined=false}:{r
    {!orgBusy&&!orgFailed&&!organizations.length&&<p role="status">{requestedPending?t(`${requestedOrganizationName(applicant!)} is not eligible yet. Confirm its affiliation, enable coordinator access, and ensure the applicant has joined the organization.`,`${requestedOrganizationName(applicant!)} aún no cumple los requisitos. Confirma su afiliación, habilita el acceso de coordinadores y verifica que la persona se haya unido a la organización.`):t('No eligible organizations found for this search.','No se encontraron organizaciones elegibles para esta búsqueda.')}</p>}
    <div className="institution-actions">{orgAfter&&<button type="button" className="text-button" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search)}>{t('First organizations','Primeras organizaciones')}</button>}{orgNext&&<button type="button" className="text-button" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search,orgNext)}>{t('More organizations','Más organizaciones')}</button>}</div>
    <label>{t('Message the applicant will see','Mensaje que verá la persona')}<textarea required maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
-   {reviewFeedback}<div className="institution-actions"><button type="submit" className="button primary" disabled={busy||orgBusy||!institution||!note.trim()}>{reviewing==='approve'?t('Approving…','Aprobando…'):t('Approve coordinator access','Aprobar acceso de coordinador')}</button><button type="button" className="button outline" disabled={busy||orgBusy||!note.trim()} onClick={()=>void review(false)}>{reviewing==='decline'?t('Saving…','Guardando…'):t('Decline application','Rechazar solicitud')}</button></div>
+   <div className="review-action-bar">{reviewFeedback}<div className="institution-actions"><button type="submit" className="button primary" disabled={busy||orgBusy||!institution||!note.trim()}>{reviewing==='approve'?t('Approving…','Aprobando…'):t('Approve coordinator access','Aprobar acceso de coordinador')}</button><button type="button" className="button outline" disabled={busy||orgBusy||!note.trim()} onClick={()=>void review(false)}>{reviewing==='decline'?t('Saving…','Guardando…'):t('Decline application','Rechazar solicitud')}</button></div></div>
   </form>}
   </article>:<div className="org-review-empty"><h2>{loaded?t('All caught up','Todo al día'):t('Loading…','Cargando…')}</h2><p>{t('New coordinator applications will appear here.','Las nuevas solicitudes aparecerán aquí.')}</p></div>}</div></section>;
  return <section className="coordinator-card"><h2>{t('Coordinator applications','Solicitudes de coordinadores')}</h2>
   {reviewNotice&&<p className="approval-notice" role="status">{reviewNotice}</p>}
   <p>{t('Verify the applicant’s affiliation independently. Approve the organization’s pilot and have its owner invite the applicant first. Approving below enables coordinator access only after they accept that invitation.','Verifica la afiliación de forma independiente. Aprueba el piloto de la organización y pide al propietario que invite a la persona primero. La aprobación aquí activa el acceso solo después de que acepte esa invitación.')}</p>
-  <button className="button outline" disabled={busy} onClick={()=>void load()}>{t('Refresh applications','Actualizar solicitudes')}</button>
+  <button className="button outline" disabled={busy} onClick={()=>{if(confirmWorkspaceNavigation())void load(after);}}>{t('Refresh applications','Actualizar solicitudes')}</button>
   {loaded&&!items.length&&<p role="status">{t('No pending applications on this page.','No hay solicitudes pendientes en esta página.')}</p>}
-  <ul className="coordinator-members">{items.map(item=><li key={item.id}><div><strong>{item.displayName}</strong><p>{item.organizationName} · {item.jobRole}</p><p>{item.email}</p><p>{item.organizationWebsite}</p></div><button className="button outline" disabled={busy} onClick={()=>{setSelected(item.id);setNote('');setSearch(requestedOrganizationName(item));setOrgAfter('');void loadOrganizations(item.id,requestedOrganizationName(item));}}>{t('Review','Revisar')}</button></li>)}</ul>
+  <ul className="coordinator-members">{items.map(item=><li key={item.id}><div><strong>{item.displayName}</strong><p>{item.organizationName} · {item.jobRole}</p><p>{item.email}</p><p>{item.organizationWebsite}</p></div><button className="button outline" disabled={busy} onClick={()=>{if(item.id!==selected)navigateWorkspace(()=>setSelected(item.id));}}>{t('Review','Revisar')}</button></li>)}</ul>
   {selected&&<form className="coordinator-registration-form" onSubmit={e=>{e.preventDefault();void review(true);}}><h3>{t('Review application','Revisar solicitud')}: {items.find(i=>i.id===selected)?.displayName}</h3>
    <label>{t('Find an organization','Buscar una organización')}<input maxLength={200} value={search} onChange={e=>setSearch(e.target.value)}/></label>
    <button type="button" className="button outline" disabled={busy||orgBusy} onClick={()=>void loadOrganizations(selected,search)}>{t('Search organizations','Buscar organizaciones')}</button>
@@ -331,6 +326,6 @@ export function CoordinatorApplications({request,t,onError,streamlined=false}:{r
    <label>{t('Message the applicant will see','Mensaje que verá la persona')}<textarea required maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
    {reviewFeedback}<div className="institution-actions"><button type="submit" className="button primary" disabled={busy||orgBusy||!institution||!note.trim()}>{reviewing==='approve'?t('Approving…','Aprobando…'):t('Approve coordinator access','Aprobar acceso de coordinador')}</button><button type="button" className="button outline" disabled={busy||orgBusy||!note.trim()} onClick={()=>void review(false)}>{reviewing==='decline'?t('Saving…','Guardando…'):t('Decline application','Rechazar solicitud')}</button></div>
   </form>}
-  <div className="institution-actions">{after&&<button className="text-button" disabled={busy} onClick={()=>void load()}>{t('First page','Primera página')}</button>}{next&&<button className="text-button" disabled={busy} onClick={()=>void load(next)}>{t('Next page','Página siguiente')}</button>}</div>
+  <div className="institution-actions">{after&&<button className="text-button" disabled={busy} onClick={()=>navigateWorkspace(()=>setAfter(''))}>{t('First page','Primera página')}</button>}{next&&<button className="text-button" disabled={busy} onClick={()=>navigateWorkspace(()=>setAfter(next))}>{t('Next page','Página siguiente')}</button>}</div>
  </section>;
 }

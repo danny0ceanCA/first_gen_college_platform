@@ -12,8 +12,31 @@
 .shared-binder-placeholder-tabs{display:flex;gap:8px;padding-top:32px}.shared-binder-placeholder-tabs i{flex:1;height:88px;border-radius:10px 10px 0 0}
 .shared-binder-placeholder-paper{display:grid;align-content:start;gap:25px;min-height:460px;padding:38px;background:#fffdf7;border:1px solid #dfcfbd;border-radius:0 0 12px 12px}
 .shared-binder-placeholder-paper i{width:100%}.shared-binder-placeholder-paper i:first-child{width:40%;height:24px}
-@keyframes shared-content-arrive{from{opacity:.55}to{opacity:1}}
-@media(prefers-reduced-motion:no-preference){.coordinator-binder-list>button,.coordinator-shared-binder:not(.shared-binder-placeholder){animation:shared-content-arrive 160ms ease-out}}
+@keyframes shared-content-arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shared-paper-arrive{from{opacity:0;transform:translateY(12px) scale(.995)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes shared-loading-breathe{50%{opacity:.5}}
+@media(prefers-reduced-motion:no-preference){
+ .coordinator-binder-list>button{animation:shared-content-arrive var(--motion-section) var(--motion-ease) var(--binder-arrival-delay,0ms) backwards;transition:transform var(--motion-control) ease,box-shadow var(--motion-control) ease,border-color var(--motion-control) ease}
+ .coordinator-binder-list>button:hover{transform:translateY(-2px);border-color:#a7563e;box-shadow:2px 5px 0 #ebe0ce,0 8px 18px #5d3b2510}
+ .coordinator-binder-list>button:active{transform:translateY(0)}
+ .coordinator-shared-binder{animation:shared-content-arrive var(--motion-section) var(--motion-ease) backwards}
+ .shared-binder-reading{animation:shared-paper-arrive var(--motion-binder) var(--motion-ease-enter) backwards;transform-origin:top center}
+ .binder-card-placeholder i,.shared-binder-placeholder i{animation:shared-loading-breathe 1800ms ease-in-out infinite}
+}
+.coordinator-shared-binder{scroll-margin-top:20px;overflow-anchor:none}
+.shared-binder-heading h3{line-height:1.25}
+.shared-binder-heading h3:focus{outline:none}
+.shared-binder-heading h3:focus-visible{outline:2px solid #a4513c;outline-offset:4px}
+.shared-binder-placeholder .shared-binder-name-placeholder{height:1.25em;width:260px;max-width:65vw;margin:0}
+.shared-binder-reading{min-width:0}
+.coordinator-binders{overflow-anchor:none;transform-origin:50% 80px}
+html:has(.coordinator-dashboard){scrollbar-gutter:stable}
+/* One scene transition owns the handoff; nested entrances would double the
+   motion and briefly hide the incoming cards after the outer fade finishes. */
+.coordinator-binders[data-binder-scene] :is(.coordinator-shared-binder,.coordinator-binder-list>button){animation:none}
+.coordinator-binder-list>button:focus-visible{outline:2px solid #a7563e;outline-offset:5px}
+.shared-binder-loading-paper{min-height:560px}
+@media(max-width:760px){.coordinator-shared-binder{scroll-margin-top:calc(var(--coordinator-header-height,72px) + 12px)}}
 .coordinator-binder-list-tools{display:flex;justify-content:space-between;align-items:center;gap:12px 20px;flex-wrap:wrap;margin:20px 0;font-size:12px;color:#776a5e}
 .coordinator-dashboard .coordinator-binders:has(.coordinator-shared-binder){background:transparent;border:0;padding:0;box-shadow:none}
 .coordinator-shared-binder.personal-binder{margin:0;padding:0;border:0;border-radius:0;background:transparent;perspective:none}
@@ -40,3 +63,21 @@
 .coordinator-publication-page:focus-visible{outline:2px solid #a4513c;outline-offset:4px}
 @container shared-binder (max-width:650px){.shared-binder-pages .coordinator-publication-topics .notebook-topic{flex-basis:148px}}
 @media(max-width:760px){.coordinator-shared-binder .shared-binder-heading{display:block}.shared-binder-pages .coordinator-publication-page{padding:22px 12px 24px 16px;background:linear-gradient(90deg,transparent 8px,#c57d6a25 8px,#c57d6a25 9px,transparent 9px),var(--binder-paper)}.coordinator-student-message{padding:14px 16px}.shared-binder-toolbar{gap:8px}.shared-binder-toolbar button{font-size:12px}}
+
+/* Carry the student from their card to the paper; keep essential navigation
+   reachable without making the page itself a nested scroll container. */
+.binder-card-identity{display:flex;align-items:center;gap:14px;min-width:0}.binder-card-identity strong{overflow-wrap:anywhere}
+.coordinator-binder-list button:disabled{cursor:progress;opacity:.72}
+.coordinator-shared-binder .shared-binder-heading{justify-content:flex-start;align-items:center;gap:16px}
+.shared-binder-toolbar{display:grid;grid-template-columns:auto minmax(80px,1fr) minmax(220px,270px) 44px;gap:12px}
+.shared-binder-identity{display:flex;align-items:center;gap:10px;min-width:0;font-size:13px;line-height:1.4}
+.shared-binder-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shared-binder-identity .coordinator-student-avatar{width:30px;height:30px;flex-basis:30px;border-radius:9px;font-size:11px}
+.coordinator-card .shared-binder-divider{display:flex;align-items:center;gap:9px;min-width:0;font-size:11px;color:#786653}
+.shared-binder-divider>span{flex-shrink:0;white-space:nowrap}
+.shared-binder-divider select{width:100%;min-width:0;min-height:44px;padding:9px 28px 9px 12px;border:1px solid #d8c3af;border-radius:10px;background:#fffdf8;color:#453e35;font:inherit;font-size:13px}
+.shared-binder-refresh{justify-content:center;border-radius:10px}
+.shared-binder-refresh:hover:not(:disabled){background:#ecdfd0}
+.shared-divider-heading{scroll-margin-top:calc(var(--shared-toolbar-height,66px) + var(--coordinator-header-height,0px) + 20px)}
+.shared-divider-heading:focus{outline:none}.shared-divider-heading:focus-visible{outline:2px solid #a4513c;outline-offset:5px;border-radius:3px}
+@media(max-width:1100px){.shared-binder-toolbar{grid-template-columns:auto minmax(0,1fr) 44px;gap:8px 12px}.shared-binder-identity{grid-column:2;grid-row:1}.shared-binder-divider{grid-column:1/3;grid-row:2}.shared-binder-refresh{grid-column:3;grid-row:1}.shared-binder-divider select{max-width:360px}.coordinator-card .shared-binder-divider{gap:12px}}
+@media(max-width:400px){.shared-binder-toolbar{grid-template-columns:minmax(0,1fr) 44px}.shared-binder-close{grid-column:1;justify-self:start}.shared-binder-refresh{grid-column:2}.shared-binder-identity{grid-row:2;grid-column:1/-1}.shared-binder-divider{grid-row:3;grid-column:1/-1}.shared-binder-identity .coordinator-student-avatar{display:none}.coordinator-shared-binder .shared-binder-heading{display:flex}}

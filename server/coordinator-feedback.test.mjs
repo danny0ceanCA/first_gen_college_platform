@@ -85,7 +85,10 @@ test('guidance enforces live grants and retains only student-owned receipts',{sk
  });
  await t.test('withdrawn attachments stop coordinator reads and edits; student keeps control of their receipt',async()=>{
   const item=(await f.owner.query('SELECT id FROM origen_binder_publication_items WHERE publication_id=$1',[publication.publicationId])).rows[0].id;
-  const attached=await staff(make({publicationItemId:item}));await share('withdraw',{grantId:grant,itemId:item});
+  const attached=await staff(make({publicationItemId:item}));
+  assert.deepEqual((await student({action:'student-list'})).feedback.find(x=>x.id===attached.id).anchor,{id:note,kind:'note',version:1});
+  assert.equal((await staff({action:'staff-list'})).feedback.find(x=>x.id===attached.id).anchor,null);
+  await share('withdraw',{grantId:grant,itemId:item});
   assert.deepEqual((await staff({action:'staff-list'})).feedback.map(x=>x.id),[id]);await assert.rejects(staff({action:'staff-thread',feedbackId:attached.id}),{status:404});await assert.rejects(staff({action:'staff-edit',feedbackId:attached.id,version:1,requestId:randomUUID(),kind:'guidance',body:'Changed attachment.',resourceUrl:''}),{status:409});
   await student({action:'student-review',feedbackId:attached.id,version:1,requestId:randomUUID()});
   await staff({action:'staff-withdraw',feedbackId:attached.id,version:1,requestId:randomUUID()});await student({action:'student-remove',feedbackId:attached.id,version:2,requestId:randomUUID()});await publish();
@@ -101,7 +104,7 @@ test('guidance enforces live grants and retains only student-owned receipts',{sk
   const config={...env,AUTH0_DOMAIN:'synthetic.auth0.com'};
   const handler=createCoordinatorFeedbackHandler(f.db,config,async()=>({ok:true,json:async()=>({sub:identity.sub,email:'synthetic@example.test',email_verified:verified})}));
   const server=createServer((req,res)=>{req.origenAuthorized=true;req.origenIdentity=identity;void runAsAccount(identity,()=>handler(req,res,()=>res.end()));});await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  try{const send=body=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-feedback`,{method:'POST',headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},body:JSON.stringify({organizationId:org,grantId:grant,...body})});
+  try{const send=body=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-feedback`,{method:'POST',headers:{Authorization:`Bearer synthetic-${verified}`,'Content-Type':'application/json'},body:JSON.stringify({organizationId:org,grantId:grant,...body})});
    let r=await send({action:'staff-list'});assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');identity[MFA_TIME_CLAIM]=now-43201;assert.equal((await send(make())).status,403);identity[MFA_TIME_CLAIM]=now;verified=false;assert.equal((await send({action:'staff-list',verified:true})).status,403);verified=true;identity={sub:'other'};assert.equal((await send({action:'student-list',studentId:'alex'})).status,200);assert.equal((await send({action:'student-source',studentId:'alex',feedbackId:id})).status,400);
    config.ORIGEN_COORDINATOR_FEEDBACK='false';assert.equal((await send({action:'student-reply',studentId:'alex',feedbackId:id,version:2,requestId:randomUUID(),body:'Forged enabled',enabled:true})).status,503);assert.equal((await send({action:'student-list',studentId:'alex'})).status,200);identity={sub:'staff',iat:now,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now};assert.equal((await send({...make(),enabled:true})).status,503);assert.equal((await send({action:'staff-list'})).status,200);config.ORIGEN_COORDINATOR_BINDER_VIEWING='false';assert.equal((await send({action:'staff-list'})).status,503);
   }finally{await new Promise(r=>server.close(r));}
