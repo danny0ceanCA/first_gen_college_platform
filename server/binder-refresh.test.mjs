@@ -60,3 +60,12 @@ test('confirming a detail removes its review card while keeping the same scoped 
  assert.deepEqual(binderMemorySummaryEntries([untagged,family,proposed],'alex'),[untagged]);
  assert.deepEqual(binderMemorySummaryEntries([untagged,family,proposed],null),[family]);
 });
+
+
+test('unreviewed details already appear on the notebook without changing their trust or family scope',()=>{
+ const draft={id:'draft',studentId:'alex',status:'proposed',content:'May study biology.',reportedBy:'parent'};
+ const family={...draft,id:'family',studentId:null},other={...draft,id:'other',studentId:'sam'};
+ const entries=binderMemorySummaryEntries([draft,family,other,{...draft,id:'deleted',status:'deleted'}],'alex');
+ assert.deepEqual(entries,[draft]);assert.equal(entries[0],draft);assert.equal(entries[0].status,'proposed');assert.equal(entries[0].reportedBy,'parent');
+ assert.deepEqual(binderMemorySummaryEntries([draft,family],null),[family]);
+});

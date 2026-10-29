@@ -1,9 +1,10 @@
+import {readVillageActors,paintVillageResidents,paintVillageAnimal,cloudFrame} from './landingVillage';
 import {useDialogSurface} from './useDialogSurface';
 import LandingStory from './LandingStory';
 import LandingVideo from './LandingVideo';
 import LandingDetails,{publicContactEmail} from './LandingDetails';
 import {useAuth0} from '@auth0/auth0-react';
-import {useEffect,useId,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {animate} from 'animejs';
 import {ArrowRight,ArrowUpRight,X} from 'lucide-react';
 import './Landing.css';
@@ -40,6 +41,20 @@ export default function Landing(){
  const t=(en:string,sp:string)=>es?sp:en;
  const shareDescription=t('Origen is an AI voice assistant that helps students and families make sense of college in English and Spanish. Ask questions, revisit explanations, and prepare for conversations with a counselor or coordinator. Explore it at https://origenedu.ai','Origen es un asistente de voz con inteligencia artificial que ayuda a estudiantes y familias a entender el camino a la universidad en español e inglés. Haz preguntas, repasa explicaciones y prepárate para conversar con un consejero o coordinador. Conócelo en https://origenedu.ai');
  useEffect(()=>{document.documentElement.lang=es?'es':'en';localStorage.setItem('origen.language',es?'es':'en');},[es]);
+ useLayoutEffect(()=>{
+  if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const scene=line.current;
+  // Hide an explicit replay before resetting it; the initial visit stays visible.
+  if(replay>0){
+   scene.querySelector('.scene-reveal-content')?.setAttribute('mask',`url(#${sceneId}-reveal)`);
+   const gradient=scene.querySelector('.scene-reveal-gradient')!;gradient.setAttribute('y1','-140');gradient.setAttribute('y2','0');
+  }
+  const {residents,animals}=readVillageActors(scene);
+  paintVillageResidents(residents,0);animals.forEach(animal=>paintVillageAnimal(animal,0));
+  const clouds=[...scene.querySelectorAll('.sky-drift'),...ambient.current!.querySelectorAll('path'),...sky.current!.querySelectorAll('.upper-cloud')];
+  clouds.forEach((cloud,index)=>{const frame=cloudFrame(index);cloud.setAttribute('transform',frame.transform);(cloud as SVGElement).style.opacity=frame.opacity;});
+  scene.querySelectorAll('.farmer-upper').forEach(torso=>torso.setAttribute('transform','rotate(4 0 -10)'));
+ },[replay]);
  useEffect(()=>{
   if(!line.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const scene=line.current;
@@ -70,9 +85,8 @@ export default function Landing(){
   clouds.forEach((cloud,index)=>{
    const phase={value:0};
    animations.push(animate(phase,{value:[0,Math.PI*2],duration:12000+index*1700,loop:true,ease:'linear',onUpdate:()=>{
-    const wave=phase.value+index*1.7;
-    cloud.setAttribute('transform',`translate(${Math.sin(wave)*46} ${Math.cos(wave)*7})`);
-    cloud.style.opacity=String(0.65+0.35*(Math.sin(wave)+1)/2);
+    const frame=cloudFrame(index,phase.value);
+    cloud.setAttribute('transform',frame.transform);cloud.style.opacity=frame.opacity;
    }}));
   });
   sky.current!.querySelectorAll<SVGGElement>('.line-star').forEach((star,index)=>{
@@ -83,58 +97,16 @@ export default function Landing(){
    }}));
   });
   // Neighbors meet in pairs, chat with room between their outlines, then head home.
-  const residents=Array.from(scene.querySelectorAll<SVGGElement>('.village-resident')).map((visitor,order)=>{
-   const index=Number(visitor.dataset.route);
-   const arrival=cacheRoute(scene.querySelector<SVGPathElement>(`.life-route-${index}`)!);
-   const departure=cacheRoute(scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!);
-   return {visitor,index,order,arrival,departure,arrivalLength:arrival.getTotalLength(),departureLength:departure.getTotalLength(),
-    legs:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),
-    arms:Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-arm'))};
-  });
+  const {residents,animals}=readVillageActors(scene,cacheRoute);
   const village={time:0};
-  const updateResidents=()=>{
-   residents.forEach(({visitor,index,order,arrival,departure,arrivalLength,departureLength,legs,arms})=>{
-    const gathering=index===0||index===8?0:index===1||index===5?1:null;
-    const phase=(village.time+(gathering===null?0.42+order*0.11:gathering*0.32))%1;
-    const chatting=gathering!==null&&phase>=0.22&&phase<0.44;
-    const travelled=gathering!==null
-     ?phase<0.22?arrivalLength*phase/0.22:phase<0.44?arrivalLength:arrivalLength+departureLength*Math.min(1,(phase-0.44)/0.28)
-     :(arrivalLength+departureLength)*Math.min(1,phase/0.72);
-    const leaving=travelled>=arrivalLength;
-    const route=leaving?departure:arrival,length=leaving?departureLength:arrivalLength;
-    const distance=leaving?travelled-arrivalLength:travelled,point=route.getPointAtLength(distance);
-    const next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
-    const resting=phase>=0.72;
-    const facing=chatting?(index===0||index===1?1:-1):next.x<previous.x?-1:1,stride=chatting||resting?0:Math.sin(travelled*0.46);
-    const scale=index===4?0.63:gathering!==null?0.78:index>=6?0.84:0.78;
-    // The return route ends where the next walk starts: no fade or teleport.
-    visitor.dataset.activity=chatting?'chatting':resting?'resting':'walking';
-    visitor.style.opacity='0.9';
-    visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
-    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1);leg.setAttribute('d',`M0 -10 L${swing*3} -5 L${swing*5} 0`);});
-    arms.forEach((arm,i)=>{const swing=chatting?Math.sin(phase*Math.PI*36+i)*0.55+0.7:stride*(i?1:-1);arm.setAttribute('d',`M0 -18 L${swing*3} -14 L${swing*5} -12`);});
-   });
-  };
+  const updateResidents=()=>paintVillageResidents(residents,village.time);
   updateResidents();
   animations.push(animate(village,{time:[0,1],duration:21000,delay:1500,loop:true,ease:'linear',onUpdate:updateResidents}));
-  // Animals wander continuously on independent clocks.
-  scene.querySelectorAll<SVGGElement>('.village-animal').forEach(visitor=>{
-   const index=Number(visitor.dataset.route),burro=visitor.dataset.kind==='burro',bull=visitor.dataset.kind==='bull';
-   const outward=cacheRoute(scene.querySelector<SVGPathElement>(`.life-route-${index}`)!),homeward=cacheRoute(scene.querySelector<SVGPathElement>(`.life-exit-${index}`)!);
-   const outwardLength=outward.getTotalLength(),homewardLength=homeward.getTotalLength();
-   const legs=Array.from(visitor.querySelectorAll<SVGPathElement>('.walking-leg')),wander={time:0};
-   const head=visitor.querySelector<SVGGElement>('.grazing-head'),tail=visitor.querySelector<SVGPathElement>('.animal-tail');
-   animations.push(animate(wander,{time:[0,1],duration:bull?28000+index*300:burro?22000:16000,delay:1500,loop:true,ease:'linear',onUpdate:()=>{
-    const back=wander.time>=0.5,progress=back?(wander.time-0.5)*2:wander.time*2;
-    const route=back?homeward:outward,length=back?homewardLength:outwardLength,distance=length*progress;
-    const point=route.getPointAtLength(distance),next=route.getPointAtLength(Math.min(length,distance+1)),previous=route.getPointAtLength(Math.max(0,distance-1));
-    const facing=next.x<previous.x?-1:1,stride=Math.sin((distance+(back?outwardLength:0))*0.44),scale=bull?0.94:burro?0.78:0.72;
-    visitor.dataset.activity='walking';visitor.style.opacity='0.9';
-    visitor.setAttribute('transform',`translate(${point.x} ${point.y-Math.abs(stride)*0.45}) scale(${facing*scale} ${scale})`);
-    legs.forEach((leg,i)=>{const swing=stride*(i%2?1:-1),hip=bull?(i<2?-11:10):burro?(i<2?-9:10):(i<2?-6:7),top=bull?-12:burro?-11:-7;leg.setAttribute('d',`M${hip} ${top} L${hip+swing*2.5} -5 L${hip+swing*4} 0`);});
-    head?.setAttribute('transform',`rotate(${10+Math.sin(wander.time*Math.PI*16)*14} 12 -20)`);
-    tail?.setAttribute('transform',`rotate(${Math.sin(wander.time*Math.PI*24)*12} -17 -24)`);
-   }}));
+  // Animals use the same initial pose as the first paint, on independent clocks.
+  animals.forEach(animal=>{
+   const wander={time:0};
+   paintVillageAnimal(animal,0);
+   animations.push(animate(wander,{time:[0,1],duration:animal.bull?28000+animal.index*300:animal.burro?22000:16000,delay:1500,loop:true,ease:'linear',onUpdate:()=>paintVillageAnimal(animal,wander.time)}));
   });
   // Farmers tend the terraces while walkers pass, each with a gentle hoeing rhythm.
   scene.querySelectorAll<SVGGElement>('.field-worker').forEach((worker,index)=>{
@@ -161,7 +133,7 @@ export default function Landing(){
   pauseRef.current=paused;
   motion.current.forEach(animation=>{if(paused||!heroVisible.current||document.hidden)animation.pause();else if(!animation.completed)animation.play();});
  },[paused]);
- return <div className="landing">
+ return <div className="landing landing-home">
   <header className="landing-nav"><a className="landing-logo" href="#" aria-label="Origen"><span className="landing-mark">○</span>origen<span>.</span></a><nav aria-label={t('Navigation','Navegación')}><a className="institution-register-link" href="#institutions">{t('Register your institution','Registra tu institución')}</a><a href="#coordinator-register">{t('Become a coordinator','Ser coordinador')}</a><a href="#educators">{t('For educators','Para educadores')}</a><a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><button className="landing-language" lang={es?'en':'es'} aria-label={es?'Switch to English':'Ver en español'} onClick={()=>{setEs(!es);setCopyStatus('');}}>{es?'English':'Español'}</button><button className="landing-login" onClick={()=>setLogin(true)}>{t('Sign in','Ingresar')}<ArrowUpRight size={16}/></button></nav></header>
   <main className="landing-main">
    <section className="landing-hero">

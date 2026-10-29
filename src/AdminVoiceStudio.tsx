@@ -1,0 +1,102 @@
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {useAuth0} from '@auth0/auth0-react';
+import {BookOpen,Mic,MicOff,Square,AudioLines,ArrowRight,RefreshCw} from 'lucide-react';
+import {apiFetch} from './api';
+import StaffVerification,{getStaffAccessToken,staffVerificationErrors} from './StaffVerification';
+import {useNavigationGuard} from './workspaceNavigation';
+import './AdminVoiceStudio.css';
+
+export type TeachingContent={title:string;topic:string;language:string;explanation:string;deliveryStyle:string;keywords:string;campus:string;academicYear:string;sourceUrl:string;reviewBy:string;example:string;followUp:string;referral:string};
+type Run={id:string;model:string;mode:string;language:string;topic:string;scenario:string;campus:string;academicYear:string;minutes:number;status:string;startedAt:string;endedAt?:string;error?:string;draftError?:string;draft?:TeachingContent;draftAvailable?:boolean;teachings:{source:string;topic:string;entries:{id:string;revision:number;title:string}[]}[];cost:{complete:boolean;total:number;totals:Record<string,number>;rateCard:{version:string};usage:{id:string;model:string}[]}};
+type Connection={id:string;pc:RTCPeerConnection;stream:MediaStream;channel:RTCDataChannel;audio:HTMLAudioElement;token:string};
+const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:4,maximumFractionDigits:4}).format(n||0);
+const topics=[['general','Across college guidance'],['profile','Getting to know the student'],['planning','College and transfer planning'],['finance','Paying for college'],['loans','Borrowing and repayment'],['admissions','Applications and PIQs']];
+const errors:Record<string,string>={voice_not_configured:'Voice testing needs the server’s OpenAI connection.',model_not_available:'This OpenAI project does not have access to the selected model. Realtime 2.1 is still the production default.',voice_already_active:'A conversation is already running. End it before starting another. An interrupted connection releases automatically.',voice_monitor_unavailable:'The usage monitor could not connect. The test was stopped.',voice_start_failed:'The conversation could not start. Check your connection and try again.',voice_studio_unavailable:'The voice studio could not load or save. Check the API connection and migration 089.',voice_provider_error:'The provider reported a voice error. The call has ended; any reported usage is retained.',teaching_transcript_unavailable:'The interview transcript is no longer available. Transcripts are kept only briefly in memory. Start a new teaching conversation.',draft_failed:'The draft could not be prepared. You can retry while this interview remains available.',connection_lost:'The connection ended unexpectedly. Usage may be incomplete.',final_usage_unconfirmed:'The call ended before all final usage arrived. The estimate may be incomplete.',session_not_on_this_server:'This session cannot be resumed on this server. Saved results are shown.'};
+const explain=(e:unknown)=>e instanceof Error?(errors[e.message]||(/permission|notallowed/i.test(e.name+e.message)?'Allow microphone access to start a conversation.':e.message)):'The request could not complete.';
+
+export default function AdminVoiceStudio({mode='test',onDraft}:{mode?:'test'|'teach';onDraft?:(draft:TeachingContent)=>void}){
+ const {getAccessTokenSilently}=useAuth0();
+ const [model,setModel]=useState('gpt-realtime-2.1'),[language,setLanguage]=useState('en'),[topic,setTopic]=useState('general'),[scenario,setScenario]=useState(''),[campus,setCampus]=useState(''),[academicYear,setAcademicYear]=useState(''),[minutes,setMinutes]=useState(2);
+ const [runs,setRuns]=useState<Run[]>([]),[run,setRun]=useState<Run>(),[phase,setPhase]=useState('idle'),[error,setError]=useState(''),[configured,setConfigured]=useState(false),[loading,setLoading]=useState(true),[muted,setMuted]=useState(false),[caption,setCaption]=useState(''),[elapsed,setElapsed]=useState(0);
+ const connection=useRef<Connection|undefined>(undefined),mounted=useRef(true),busy=useRef(false),activeId=useRef(''),generation=useRef(0),tokenRef=useRef(''),endRef=useRef<(()=>Promise<void>)|undefined>(undefined);
+ const active=['starting','active','stopping','drafting'].includes(phase);
+ const release=useCallback(()=>{const c=connection.current;connection.current=undefined;if(c){c.stream.getTracks().forEach(t=>t.stop());c.channel.close();c.pc.close();c.audio.pause();c.audio.srcObject=null;}},[]);
+ const request=useCallback(async(input:unknown,token?:string)=>{
+  const access=token||await getStaffAccessToken(()=>getAccessTokenSilently());tokenRef.current=access;
+  const r=await apiFetch('/api/admin-voice',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${access}`},body:JSON.stringify(input),signal:AbortSignal.timeout(50000)});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'voice_studio_unavailable');return data;
+ },[getAccessTokenSilently]);
+ const update=useCallback((next:Run)=>{if(!mounted.current)return;setRun(next);setRuns(list=>[next,...list.filter(r=>r.id!==next.id)].slice(0,40));},[]);
+ const refresh=useCallback(async()=>{try{const data=await request({action:'list'});if(mounted.current){setRuns(data.runs);setConfigured(data.configured);}}catch(e){if(mounted.current)setError(explain(e));}finally{if(mounted.current)setLoading(false);}},[request]);
+ useEffect(()=>{mounted.current=true;void refresh();return()=>{mounted.current=false;generation.current++;release();if(activeId.current)void request({action:'stop',id:activeId.current},tokenRef.current).catch(()=>{});};},[refresh,release,request]);
+ useNavigationGuard(active,{locked:phase==='starting'||phase==='stopping'||phase==='drafting',onLeave:()=>{release();if(activeId.current)void request({action:'stop',id:activeId.current},tokenRef.current).catch(()=>{});}});
+ const prepareDraft=useCallback(async(id:string)=>{
+  setPhase('drafting');setError('');try{update(await request({action:'draft',id}));}catch(e){setError(explain(e));}finally{if(mounted.current)setPhase('idle');}
+ },[request,update]);
+ const end=useCallback(async()=>{
+  if(busy.current||!activeId.current)return;busy.current=true;setPhase('stopping');const id=activeId.current;
+  // Stop microphone input immediately, while preserving the channel for final usage.
+  connection.current?.stream.getTracks().forEach(t=>t.enabled=false);
+  try{const next=await request({action:'stop',id});update(next);release();activeId.current='';if(mode==='teach'&&next.draftAvailable)await prepareDraft(id);}
+  catch(e){if(mounted.current)setError(explain(e));}
+  finally{release();activeId.current='';busy.current=false;if(mounted.current)setPhase('idle');}
+ },[request,update,release,mode,prepareDraft]);endRef.current=end;
+ useEffect(()=>{
+  if(phase!=='active')return;
+  let pending=false,failures=0;const began=Date.now();
+  const clock=window.setInterval(()=>{const seconds=Math.floor((Date.now()-began)/1000);setElapsed(seconds);if(seconds>=minutes*60)void endRef.current?.();},1000);
+  const poll=window.setInterval(async()=>{if(pending||!activeId.current)return;pending=true;try{const next=await request({action:'status',id:activeId.current});failures=0;update(next);if(next.status==='ended'){release();activeId.current='';setPhase('idle');if(mode==='teach'&&next.draftAvailable)void prepareDraft(next.id);}}catch(e){if(++failures>=3){setError(explain(e));void endRef.current?.();}}finally{pending=false;}},4000);
+  return()=>{clearInterval(clock);clearInterval(poll);};
+ },[phase,request,update,release,mode,prepareDraft,minutes]);
+ async function start(){
+  if(busy.current||activeId.current)return;busy.current=true;setPhase('starting');setError('');setCaption('');setElapsed(0);setMuted(false);const stamp=++generation.current;
+  let stream:MediaStream|undefined,id='';
+  try{
+   const token=await getStaffAccessToken(()=>getAccessTokenSilently());tokenRef.current=token;
+   stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+   if(!mounted.current||stamp!==generation.current){stream.getTracks().forEach(t=>t.stop());return;}
+   const pc=new RTCPeerConnection(),audio=new Audio();audio.autoplay=true;pc.ontrack=e=>{audio.srcObject=e.streams[0];void audio.play().catch(()=>setError('Tap Resume audio to hear Origen.'));};
+   stream.getTracks().forEach(t=>pc.addTrack(t,stream!));const channel=pc.createDataChannel('oai-events');id=crypto.randomUUID();activeId.current=id;
+   connection.current={id,pc,stream,channel,audio,token};let greeted=false;
+   const greeting=()=>{if(greeted)return;greeted=true;channel.send(JSON.stringify(model==='gpt-live-1'?{type:'session.commentary.append',event_id:crypto.randomUUID(),delegation_id:null,content:`Introduce yourself as Origen, the AI guide, in ${language==='es'?'Spanish':'English'} and invite the caller to begin. Pause and listen.`}:{type:'response.create',response:{instructions:mode==='teach'?`Introduce yourself as Origen and ask the educator how they would explain their chosen idea to a student. Speak ${language==='es'?'Spanish':'English'}.`:`Introduce yourself as Origen, the AI guide, briefly in ${language==='es'?'Spanish':'English'}. Invite the student to begin.`}}));};
+   channel.onmessage=event=>{try{const e=JSON.parse(event.data);if(model==='gpt-live-1'&&e.type==='session.started')greeting();if(e.type==='response.output_audio_transcript.delta')setCaption(v=>(v+e.delta).slice(-1500));if(e.type==='response.created')setCaption('');}catch{/* Non-text events do not affect the call. */}};
+   channel.onopen=()=>{if(model!=='gpt-live-1')greeting();};
+   pc.onconnectionstatechange=()=>{if(['failed','disconnected'].includes(pc.connectionState)&&activeId.current)void endRef.current?.();};
+   await pc.setLocalDescription(await pc.createOffer());
+   if(pc.iceGatheringState!=='complete')await new Promise<void>(resolve=>{const timer=setTimeout(resolve,1500);pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete'){clearTimeout(timer);resolve();}});});
+   const next=await request({action:'start',id,mode,model:mode==='teach'?'gpt-realtime-2.1':model,language,topic,scenario,campus,academicYear,minutes,sdp:pc.localDescription?.sdp},token);
+   if(!mounted.current||stamp!==generation.current){await request({action:'stop',id},token);return;}
+   await pc.setRemoteDescription({type:'answer',sdp:next.sdp});update(next);setPhase('active');
+  }catch(e){stream?.getTracks().forEach(t=>t.stop());release();if(id)void request({action:'stop',id},tokenRef.current).catch(()=>{});activeId.current='';if(mounted.current){setPhase('idle');setError(explain(e));}}
+  finally{busy.current=false;}
+ }
+ const evidence=run?.teachings.flatMap(access=>access.entries.map(entry=>({...entry,source:access.source})))||[];
+ return <section className="voice-studio" aria-label={mode==='teach'?'Teach Origen':'Voice testing'}>
+  <header className="voice-studio-intro"><span className="voice-studio-symbol">{mode==='teach'?<BookOpen/>:<AudioLines/>}</span><div><h2>{mode==='teach'?'Your knowledge, in your own words':'Listen. Compare. Refine.'}</h2><p>{mode==='teach'?'Explain an idea as you would to a student. Origen will ask follow-up questions and capture an editable teaching draft.':'Try both voices with your published teaching library and a fictional student scenario.'}</p></div></header>
+  <p className="voice-studio-disclosure">{mode==='teach'?'You review and publish every teaching. This builds your library; it does not retrain model weights.':'Production stays on Realtime 2.1. These tests do not read or change student binders and do not run web research.'}</p>
+  {staffVerificationErrors.includes(error)?<StaffVerification requireMfa={false} returnTo="#admin"/>:error&&<p className="teaching-error" role="alert">{error}</p>}
+  <div className="voice-studio-grid"><div className="voice-studio-setup">
+   <fieldset disabled={active}><legend>{mode==='teach'?'Start a teaching conversation':'Set up your comparison'}</legend>
+    {mode==='test'&&<div className="voice-model-choices">{[['gpt-realtime-2.1','Realtime 2.1','Production default'],['gpt-live-1','GPT-Live-1','Live voice + GPT-6 Luna backend']].map(([id,label,hint])=><label key={id} data-selected={model===id}><input type="radio" name="voice-model" checked={model===id} onChange={()=>setModel(id)}/><strong>{label}</strong><small>{hint}</small></label>)}</div>}
+    <div className="voice-studio-fields"><label>Conversation language<select value={language} onChange={e=>setLanguage(e.target.value)}><option value="en">English</option><option value="es">Español</option></select></label><label>Topic<select value={topic} onChange={e=>setTopic(e.target.value)}>{topics.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label></div>
+    <label>{mode==='teach'?'What would you like to teach?':'Fictional student scenario'}<textarea rows={3} maxLength={1500} value={scenario} onChange={e=>setScenario(e.target.value)} placeholder={mode==='teach'?'How colleges understand a student’s circumstances…':'A first-generation student comparing transfer options…'}/></label>
+    <div className="voice-studio-fields"><label>Campus (optional)<input value={campus} maxLength={160} onChange={e=>setCampus(e.target.value)}/></label><label>Academic year (optional)<input value={academicYear} maxLength={7} placeholder="2026-27" onChange={e=>setAcademicYear(e.target.value)}/></label></div>
+    <label>Automatic stop<select value={minutes} onChange={e=>setMinutes(Number(e.target.value))}><option value={2}>2 minutes</option><option value={5}>5 minutes</option></select></label>
+   </fieldset>
+   <p className="voice-studio-fineprint">Starting sends microphone audio to OpenAI. Origen does not store recordings. Interview text is held briefly to prepare your draft. Voice and draft preparation use paid API calls.</p>
+   <div className="voice-studio-controls">{!active?<button className="button primary" disabled={loading||!configured||!scenario.trim()} onClick={()=>void start()}><Mic size={18}/>{mode==='teach'?'Talk through my teaching':'Start voice test'}</button>:<><button className="button" disabled={phase!=='active'} onClick={()=>{connection.current?.stream.getTracks().forEach(t=>t.enabled=muted);setMuted(!muted);}} aria-pressed={muted}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button><button className="button primary" disabled={phase!=='active'} onClick={()=>void end()}><Square size={16}/>{mode==='teach'?'End & create draft':'End test'}</button></>}</div>
+   <p role="status" className="voice-studio-status">{phase==='starting'?'Connecting your microphone…':phase==='active'?`${muted?'Microphone muted':'Conversation connected'} · ${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,'0')}`:phase==='stopping'?'Ending conversation and collecting usage…':phase==='drafting'?'Shaping your explanation into a draft…':'Ready when you are.'}</p>
+   {error==='Tap Resume audio to hear Origen.'&&<button className="button" onClick={()=>void connection.current?.audio.play().then(()=>setError(''))}>Resume audio</button>}
+   {caption&&<details className="voice-studio-caption"><summary>Current spoken response</summary><p>{caption}</p></details>}
+  </div><aside className="voice-studio-results" aria-label="Conversation results">
+   <h3>{run?'Conversation estimate':'What you’ll see here'}</h3>
+   <strong className="voice-cost-total">{run?money(run.cost.total):'—'}</strong><span>{run?(run.cost.complete?'Usage collected · estimated total':'Partial estimate · usage may still be missing'):'Voice, backend, and transcription costs'}</span>
+   {run&&<><dl>{Object.entries(run.cost.totals).map(([label,value])=><div key={label}><dt>{label==='draft'?'Draft preparation':label==='tools'?'Library lookup fee':label[0].toUpperCase()+label.slice(1)}</dt><dd>{money(value)}</dd></div>)}</dl><small>USD list-rate estimate, {run.cost.rateCard.version}. Not an invoice. Library queries have no separate model fee. Hosted app/database costs are excluded.</small>{run.error&&<p role="status">{errors[run.error]||'This run ended with incomplete information.'}</p>}</>}
+   {mode==='test'&&<><h3>Teaching references supplied</h3>{evidence.length?<ul>{evidence.map((e,i)=><li key={e.id+i}>{e.title}<small>Revision {e.revision} · {e.source==='initial'?'Starting context':'Library tool lookup'}</small></li>)}</ul>:<p>{run?'No matching published teachings were supplied. Check topic, language, campus and review dates.':'You’ll see titles and revisions here as Origen retrieves them.'}</p>}<small>Supplied means available to the model, not proof it spoke or followed the teaching.</small></>}
+   {mode==='teach'&&run?.draft&&<div className="voice-draft-ready"><BookOpen size={22}/><h3>{run.draft.title}</h3><p>{run.draft.explanation.slice(0,240)}…</p><button className="button primary" disabled={active} onClick={()=>onDraft?.(run.draft!)}>Review teaching draft <ArrowRight size={16}/></button><small>Check wording, tone, sources and review date before publishing.</small></div>}
+   {mode==='teach'&&run?.draftAvailable&&!run.draft&&!active&&<button className="button" onClick={()=>void prepareDraft(run.id)}>{run.draftError?'Retry draft preparation':'Create teaching draft'}</button>}
+   {run?.draftError&&<p role="alert">{errors[run.draftError]}</p>}
+  </aside></div>
+  <section className="voice-studio-history"><header><h3>Your recent {mode==='teach'?'teaching conversations':'comparisons'}</h3><button className="button" disabled={active||loading} onClick={()=>void refresh()}><RefreshCw size={15}/>Refresh</button></header><div className="voice-history-scroll"><table><thead><tr><th>Conversation</th><th>Model</th><th>Language</th><th>Estimated total</th><th>Usage</th></tr></thead><tbody>{runs.filter(r=>r.mode===mode).map(r=><tr key={r.id}><td><button disabled={active} onClick={()=>{setRun(r);setScenario(r.scenario);setLanguage(r.language);setTopic(r.topic);setCampus(r.campus||'');setAcademicYear(r.academicYear||'');setMinutes(r.minutes||2);}}>{r.scenario||r.topic}<small>{new Date(r.startedAt).toLocaleString()}</small></button></td><td>{r.model==='gpt-live-1'?'GPT-Live-1 + Luna':'Realtime 2.1'}</td><td>{r.language==='es'?'Spanish':'English'}</td><td>{money(r.cost.total)}</td><td>{r.cost.complete?'Collected':'Partial'}</td></tr>)}</tbody></table></div>{!runs.some(r=>r.mode===mode)&&<p>{loading?'Loading previous conversations…':'Your completed conversations will appear here.'}</p>}</section>
+ </section>;
+}

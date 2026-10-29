@@ -37,3 +37,24 @@
 .landing-conversation-footer .landing-start-actions{margin:0;flex-shrink:0}
 @media(max-width:960px){.landing-conversation-row{grid-template-columns:1fr;gap:24px}.landing-conversation-copy{max-width:680px}.landing-conversation-footer{align-items:flex-start;flex-direction:column;gap:20px}}
 @media(max-width:760px){.landing-conversation-row{gap:22px;padding:26px 0}.landing-conversation-copy>p,.landing-conversation-heading>p{font-size:15px}.landing-conversation-copy h3{font-size:23px}.landing-conversation-heading>p{margin-bottom:26px}}
+
+/* An entrance, not a loading gate: the page stays readable and interactive.
+   Only text moves, vertically; the illustration keeps its exact starting pose.
+   Backwards fill releases the temporary compositing layers when motion ends. */
+@keyframes landing-arrival-fade{from{opacity:.55}to{opacity:1}}
+@keyframes landing-arrival-copy{from{opacity:.55;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:no-preference){
+ .landing-home>.landing-nav{animation:landing-arrival-fade 460ms cubic-bezier(.16,1,.3,1) backwards}
+ .landing-home .landing-copy>*{animation:landing-arrival-copy 620ms cubic-bezier(.16,1,.3,1) var(--landing-arrival-delay,0ms) backwards}
+ .landing-home .landing-copy>h1{--landing-arrival-delay:40ms}
+ .landing-home .landing-copy>p{--landing-arrival-delay:80ms}
+ .landing-home .landing-copy>.landing-actions{--landing-arrival-delay:120ms;animation-name:landing-arrival-fade}
+ .landing-home .landing-copy>.landing-caption{--landing-arrival-delay:160ms}
+ .landing-home .landing-map.pueblo-scene{animation:landing-arrival-fade 780ms cubic-bezier(.16,1,.3,1) 40ms backwards}
+ /* Focused controls are immediately crisp and never move under a pointer. */
+ .landing-home>.landing-nav:focus-within,.landing-home .landing-actions:focus-within{animation:none}
+}
+@media(max-width:760px) and (prefers-reduced-motion:no-preference){
+ .landing-home .landing-copy>*{animation-duration:480ms}
+ .landing-home .landing-map.pueblo-scene{animation-duration:600ms}
+}

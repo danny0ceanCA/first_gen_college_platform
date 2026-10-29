@@ -1,3 +1,4 @@
+import {retrievalFixture} from './history-retrieval-fixture.mjs';
 import {createTestLogin,useTestLogin} from './fixtures/postgres-test-login.mjs';
 import {exportDeletionManifest,replayDeletionManifest,validateDeletionManifest} from '../ops/privacy-recovery.mjs';
 import test from 'node:test';
@@ -138,4 +139,24 @@ test('student memory lifecycle under real PostgreSQL RLS',{skip:!process.env.DAT
    assert.equal((await as('b',()=>run('b',{action:'load',studentId:'one'}))).memories[0].content,'Private to b');
   });
  }finally{await runtime?.end();await owner.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await owner.query(`DROP SCHEMA IF EXISTS ${schema}_reporting CASCADE`);await owner.query(`DROP ROLE IF EXISTS ${role}`);await owner.end();}
+});
+
+
+test('repeating an already confirmed personal detail does not create a new confirmation card', {skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();
+ try{
+  const statement='The parent says the student works evenings.';let text=statement,calls=0;
+  const service=createMemoryService(f.db,{ORIGEN_PERSONALIZATION_MODE:'on',ORIGEN_PERSONALIZATION_EXTRACTION:'true',OPENAI_API_KEY:'synthetic'},async()=>{calls++;return response(text);});
+  const sync=(studentId='alex')=>f.as('reader',()=>service('reader',{action:'sync',studentId}));
+  await f.save('first',statement);const first=(await sync()).memories[0];
+  await f.memory({action:'confirm',studentId:'alex',id:first.id,version:first.version});
+  await f.save('second',statement);let result=await sync();
+  assert.equal(result.memories.length,1);assert.equal(result.memories[0].id,first.id);assert.equal(result.memories[0].status,'confirmed');assert.equal(result.pendingCount,0);
+  await sync();assert.equal(calls,2,'the repeated source gets an extraction receipt');
+  text='The parent says the student does not work evenings.';await f.save('third',text);result=await sync();
+  assert.equal(result.memories.length,2,'a contradictory report must remain distinct, not silently replace a confirmed detail');
+  assert.equal(result.memories.find(m=>m.status==='proposed').content,text);
+  text=statement;await f.save('sibling',text,{studentId:'sam'});assert.equal((await sync('sam')).memories.length,1);
+  await f.save('family',text,{studentId:null});assert.equal((await sync(null)).memories.length,1);
+ }finally{await f.close();}
 });

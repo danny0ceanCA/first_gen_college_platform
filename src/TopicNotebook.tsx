@@ -383,7 +383,7 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
   {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/></>}
   <p className="notebook-scope">{t('Notebook for: ','Cuaderno de: ')}<strong>{scopeLabel}</strong></p></>}
   {!history.cloud?<p>{t('Sign in to save topic notes to your account.','Inicia sesión para guardar notas en tu cuenta.')}</p>:<>
-   <StudentMemory presentation="review" key={scope} onEntries={entries=>setMemoryData({scope,entries})} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>
+   <StudentMemory presentation="loader" key={scope} onEntries={entries=>setMemoryData({scope,entries})} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>
    {loading&&<p role="status">{t('Loading your notebook…','Cargando tu cuaderno…')}</p>}
    {loadError&&<p role="alert">{t('Your notebook could not be loaded. Your saved notes have not been replaced.','No se pudo cargar tu cuaderno. Tus notas guardadas no se han reemplazado.')} <button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
    <div className="notebook-export-toolbar">{exportButton(selected?.id)}</div>

@@ -14,5 +14,5 @@ export function binderMemoryReviewEntries(memories,studentId){
 // Legacy or manually added details without a topic stay on this scope's
 // Summary page. Never guess a divider or copy a family detail to a student.
 export function binderMemorySummaryEntries(memories,studentId){
- return (memories||[]).filter(item=>item.studentId===studentId&&item.status==='confirmed'&&!binderTopics.includes(item.organization?.topic));
+ return (memories||[]).filter(item=>item.studentId===studentId&&['proposed','confirmed'].includes(item.status)&&!binderTopics.includes(item.organization?.topic));
 }

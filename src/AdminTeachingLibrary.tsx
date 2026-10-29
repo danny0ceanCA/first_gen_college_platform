@@ -1,3 +1,4 @@
+import AdminVoiceStudio,{type TeachingContent} from './AdminVoiceStudio';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
 import {ArrowLeft,BookOpen,Check,Eye,Plus,Save,Search} from 'lucide-react';
@@ -18,6 +19,8 @@ const state=(item:Item)=>item.archived?'Archived':!item.published?'Draft':item.p
 
 export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:number;onDenied:()=>void}){
  const {getAccessTokenSilently}=useAuth0();
+ const [authorMode,setAuthorMode]=useState<'library'|'teach'>('library');
+ function importTeaching(content:TeachingContent){const item:Item={id:crypto.randomUUID(),revision:0,draft:blank(),published:null,published_revision:null,archived:false,updated_at:new Date().toISOString(),published_at:null};setEntry(item);setDraft(content);setSelected(item.id);lastSelected.current=item.id;setReviewed(false);setAuthorMode('library');setPreview(false);setNotice('Conversation captured as an editable draft. Review your wording and tone, add sources and a review date, then save. Nothing has been published.');}
  const [items,setItems]=useState<Item[]>([]),[entry,setEntry]=useState<Item|null>(null),[draft,setDraft]=useState<Content>(blank),[loaded,setLoaded]=useState(false),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[reviewed,setReviewed]=useState(false),[preview,setPreview]=useState(false),[history,setHistory]=useState<History[]|null>(null);
  const [query,setQuery]=useState(''),[search,setSearch]=useNavigationState('admin.teachings.search','',navigationText),[archived,setArchived]=useState(false);
  const [selected,setSelected]=useNavigationState('admin.teachings.id','',navigationText);
@@ -52,6 +55,8 @@ export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:nu
  const text=(key:keyof Content,label:string,max:number,rows=3)=><label>{label}<textarea aria-label={label} rows={rows} maxLength={max} value={draft[key]??''} onChange={e=>edit(key,e.target.value)}/></label>;
  const field=(key:keyof Content,label:string,max:number,type='text')=><label>{label}<input aria-label={label} type={type} maxLength={max} value={draft[key]??''} onChange={e=>edit(key,e.target.value)}/></label>;
  return <section className="teaching-library" aria-label="Teaching library">
+  <div className="teaching-mode-tabs" aria-label="Teaching tools"><button className="button" aria-pressed={authorMode==='library'} onClick={()=>navigateWorkspace(()=>setAuthorMode('library'))}>Library</button><button className="button" aria-pressed={authorMode==='teach'} onClick={()=>{if(authorMode==='teach')return;navigateWorkspace(()=>{setEntry(null);setDraft(blank());setSelected('');lastSelected.current='';setAuthorMode('teach');});}}>Teach Origen</button></div>
+  {authorMode==='teach'?<AdminVoiceStudio mode="teach" onDraft={importTeaching}/>:<>
   <div className="teaching-intro"><div><p>Your explanations, examples, and questions help shape Origen’s conversations.</p><small>Save a draft, review it, then publish when you want Origen to use it.</small></div><div className="teaching-intro-actions"><button className="button" aria-expanded={showActivity} onClick={()=>setShowActivity(value=>!value)}>Library activity</button><button className="button primary" onClick={create}><Plus size={17}/>New teaching</button></div></div>
   {showActivity&&<TeachingLibraryActivity request={request}/>}
   {notice&&<p className="teaching-notice" role="status"><Check size={16}/>{notice}</p>}
@@ -77,5 +82,5 @@ export default function AdminTeachingLibrary({revision=0,onDenied}:{revision?:nu
     {entry.revision>0&&<details className="teaching-history" onToggle={e=>{if(e.currentTarget.open&&history===null){const id=entry.id;void request({action:'history',id}).then(data=>{if(alive.current&&lastSelected.current===id)setHistory(data.history);}).catch(e=>{if(alive.current)setError(e.message);});}}}><summary>Saved revision history</summary>{history?.map(row=><p key={row.revision}>Revision {row.revision} · {row.action} · {new Date(row.createdAt).toLocaleString()}</p>)}</details>}
    </article>:<div className="teaching-welcome"><BookOpen size={32}/><h2>Your approach, in your words.</h2><p>Capture how you explain an idea, what helps a student understand it, and the questions you would ask next.</p><button className="button primary" onClick={create}>Write a teaching</button><p className="teaching-help">Drafts are private to administrators. Publishing makes the reviewed material available for relevant Origen guidance.</p></div>}
   </div>
- </section>;
+ </>}</section>;
 }

@@ -64,8 +64,15 @@ export function createMemoryRepository(database){return async(subject,input,{cli
    if(hash(summary.summary)!==input.sourceVersion||await revision()!==input.revision)throw fail(409,'memory_source_changed');
    const done=(await c.query('SELECT summary_id FROM origen_memory_batches WHERE account_id=$1 AND summary_id=$2',[owner,input.summaryId])).rows.length;
    if(!done){
+    // A later conversation repeating a saved detail is not a new review task.
+    // Compare only exact normalized wording in the same scope and attribution;
+    // never merge tentative/negative statements or other people's reports.
+    const key=n=>JSON.stringify([n.category,n.language,n.content.normalize('NFKC').toLocaleLowerCase('en').replace(/\s+/gu,' ').trim(),n.reported_by||reportedBy]);
+    const existing=(await c.query(`SELECT category,language,content,reported_by FROM origen_student_memories WHERE account_id=$1 AND ${scope} AND status IN ('proposed','confirmed')`,args)).rows;
+    const known=new Set(existing.map(key));
     for(const n of validateMemoryProposals(input.proposals,summary.summary)){
-     await capacity();
+     if(known.has(key(n)))continue;
+     await capacity();known.add(key(n));
      // The authenticated account supplies the attribution, never the extractor.
      await insert(randomUUID(),1,{...n,speaker:reportedBy},'proposed',summary.id,input.sourceVersion,n.quote,summary.conversation_at);
     }
