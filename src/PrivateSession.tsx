@@ -3,6 +3,7 @@ import {Auth0Context,useAuth0} from '@auth0/auth0-react';
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import AccountOpening from './AccountOpening';
+import {resetTestSession} from './testSessionReset.mjs';
 import LogoutTransition,{type LogoutPhase} from './LogoutTransition';
 import {clearLogoutReturn,createLogoutTransition,readLogoutReturn,LOGOUT_COVER_MS,LOGOUT_REVEAL_MS} from './logoutHandoff.mjs';
 
@@ -20,7 +21,11 @@ export default function PrivateSession({children}:{children:ReactNode}){
  if(!flow.current||subject&&subject!==flowSubject.current&&logoutPhase==='idle'){
   flowSubject.current=subject;
   flow.current=createLogoutTransition({
-  cleanup:()=>endRecoverySession(()=>latestAuth.current.getAccessTokenSilently()),
+  cleanup:async()=>{
+   const current=latestAuth.current;
+   await endRecoverySession(()=>current.getAccessTokenSilently());
+   await resetTestSession({user:current.user,getToken:()=>current.getAccessTokenSilently(),stop:()=>browserPrivacy.stop('logout'),base:(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')});
+  },
   stop:()=>browserPrivacy.stop('logout'),
   redirect:(options:Parameters<typeof auth.logout>[0])=>latestAuth.current.logout(options),
   cover:()=>new Promise<void>(resolve=>window.setTimeout(resolve,reducedMotion()?0:LOGOUT_COVER_MS)),

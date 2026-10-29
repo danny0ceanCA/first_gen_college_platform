@@ -4,6 +4,8 @@ import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {recentlyAuthenticated} from './recent-auth.mjs';
 import {unlinkFamily} from './family-unlink.mjs';
+import {trustedIdentity} from './trusted-identity.mjs';
+import {isOnboardingTestAccount} from '../src/testAccount.mjs';
 export const subjectHash=subject=>createHash('sha256').update(subject).digest('hex');
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export async function accountClosed(database,subject){
@@ -13,8 +15,10 @@ export async function accountClosed(database,subject){
 export async function purgeExpiredInvites(database){
  if(database)await database.query('DELETE FROM origen_family_invites WHERE expires_at < now()');
 }
-export function createLifecycleRepository(database){return async(subject,input)=>{
+export function createLifecycleRepository(database){return async(subject,input,identity)=>{
  if(!database)throw fail(503,'database_not_ready');
+ const resetting=input.action==='reset-test-session';
+ if(resetting&&(!isOnboardingTestAccount(identity)||identity.sub!==subject))throw fail(403,'test_account_required');
  const c=await database.connect();
  try{
   await c.query('BEGIN');
@@ -55,7 +59,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
    // No invite tokens/hashes, other participants' private data or identity credentials.
    await c.query('COMMIT');return data;
   }
-  if(input.action!=='delete'||input.confirmation!=='DELETE')throw fail(400,'confirmation_required');
+  if(!resetting&&(input.action!=='delete'||input.confirmation!=='DELETE'))throw fail(400,'confirmation_required');
   if((await c.query('SELECT institution_id FROM origen_institution_members WHERE auth0_subject=$1',[subject])).rows.length)throw fail(409,'institution_membership_requires_review');
   if((await c.query('SELECT id FROM origen_institution_reviews WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length&&(await c.query('SELECT id FROM origen_institution_affiliation_requests WHERE reviewer_subject=$1',[subject])).rows.length)throw fail(409,'reviewer_records_require_review');
@@ -65,6 +69,12 @@ export function createLifecycleRepository(database){return async(subject,input)=
    const links=(await c.query('SELECT id FROM origen_student_links WHERE owner_account_id=$1 OR member_account_id=$1 ORDER BY id',[account.id])).rows;
    for(const link of links)await unlinkFamily(c,account.id,link.id);
   }
+  if(resetting){
+   // Delete the app workspace through its existing cascading foreign keys.
+   // Keep Auth0 credentials and eligibility so the next login can start setup.
+   if(account)await c.query('DELETE FROM origen_accounts WHERE id=$1',[account.id]);
+   await c.query('COMMIT');return {reset:true};
+  }
   await c.query('INSERT INTO origen_closed_accounts(subject_hash) VALUES($1) ON CONFLICT(subject_hash) DO NOTHING',[subjectHash(subject)]);
   if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_eligibility'")).rows.length)await c.query('DELETE FROM origen_eligibility WHERE subject_hash=$1',[subjectHash(subject)]);
   if(account)await c.query('DELETE FROM origen_accounts WHERE id=$1',[account.id]);
@@ -72,7 +82,7 @@ export function createLifecycleRepository(database){return async(subject,input)=
   await c.query('COMMIT');return {deleted:true,identityProviderDeletion:'pending',backupDeletion:'provider_retention',closureReceipt:'subject_sha256'};
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 };}
-export function createLifecycleHandler(database){const run=createLifecycleRepository(database);return async(req,res,next)=>{
+export function createLifecycleHandler(database,{env=process.env,lookup=trustedIdentity}={}){const run=createLifecycleRepository(database);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/account-data')return next();
  const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
  if(!req.origenAuthorized||!req.origenIdentity?.sub)return send(401,{error:'authentication_required'});
@@ -81,10 +91,11 @@ export function createLifecycleHandler(database){const run=createLifecycleReposi
  try{
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>512)return send(413,{error:'too_large'});}
   let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_request');}
-  if(!input||Array.isArray(input)||!['export','delete'].includes(input.action)||Object.keys(input).some(k=>!['action','confirmation'].includes(k)))throw fail(400,'invalid_request');
-  if(!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
+  if(!input||Array.isArray(input)||!['export','delete','reset-test-session'].includes(input.action)||Object.keys(input).some(k=>!['action','confirmation'].includes(k)))throw fail(400,'invalid_request');
+  const identity=input.action==='reset-test-session'?await lookup(req,env):undefined;
+  if(input.action!=='reset-test-session'&&!recentlyAuthenticated(req.origenIdentity))return send(403,{error:'reauthentication_required'});
   if(input.action==='export')await recordPrivacyEvent(database,req.origenIdentity.sub,'export_requested','account');
-  const result=await run(req.origenIdentity.sub,input);
+  const result=await run(req.origenIdentity.sub,input,identity);
   if(input.action==='export')await recordPrivacyEvent(database,req.origenIdentity.sub,'export_prepared','account');
   return send(200,result);
  }catch(error){const known=[400,403,409].includes(error.status);if(!known)req.log?.({event:'database_error',code:safeErrorCode(error)});return send(known?error.status:503,{error:known?error.message:'account_data_unavailable'});}

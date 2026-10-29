@@ -1,0 +1,1 @@
+export function resetTestSession(options:{user:{sub?:string;email?:string;email_verified?:boolean}|undefined;getToken:()=>Promise<string|undefined>;stop:()=>void;fetcher?:typeof fetch;base?:string}):Promise<void>;
