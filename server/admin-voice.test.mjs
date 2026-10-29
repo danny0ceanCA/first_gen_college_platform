@@ -28,6 +28,7 @@ test('cost ledger separates voice/backend/transcription and deduplicates cumulat
  const minimum=createCostLedger('gpt-live-1');assert.equal(minimum.snapshot().total,.0125);assert.equal(minimum.snapshot(false,false).total,0);
 });
 test('test session allowlist, teaching interview, English/Spanish and existing philosophy',()=>{
+ assert.equal(validateVoiceStart(config()).verifyTeachings,false);assert.equal(validateVoiceStart({...config(),verifyTeachings:true}).verifyTeachings,true);
  assert.throws(()=>validateVoiceStart({...config(),model:'user-controlled-model'}));assert.throws(()=>validateVoiceStart({...config(),minutes:60}));
  assert.throws(()=>validateVoiceStart({...config(),mode:'teach',model:'gpt-live-1'}));
  for(const language of ['en','es']){
@@ -36,6 +37,8 @@ test('test session allowlist, teaching interview, English/Spanish and existing p
   const interview=adminVoiceSession({...config(),language,mode:'teach'},[]);assert.equal(interview.tools.length,0);assert.match(interview.instructions,/educator/);assert.match(interview.instructions,/nothing is published automatically/);
  }
  const live=adminVoiceSession({...config(),model:'gpt-live-1'},[{content:{topic:'admissions',title:'Essay support',deliveryStyle:'Warm and unhurried'}}]);assert.equal(live.delegation.responses.model,'gpt-6-luna');assert.match(live.instructions,/<\|SpawnThinking\|>/);assert.equal(live.store,false);assert.match(live.instructions,/Warm and unhurried/);assert.match(live.instructions,/Apply delivery preferences silently/);
+ assert.doesNotMatch(live.instructions,/at least eight consecutive words/);assert.doesNotMatch(live.delegation.responses.instructions,/at least eight consecutive words/);
+ const complete=adminVoiceSession({...config(),model:'gpt-live-1',verifyTeachings:true},[{content:{topic:'admissions',title:'Support',deliveryStyle:'Warm. '.repeat(110)+'ACKNOWLEDGE THE CONCERN.',conversationApproach:'Validate without pity.',example:'Let us explore that together.'}}]);assert.match(complete.instructions,/ACKNOWLEDGE THE CONCERN/);assert.match(complete.instructions,/Validate without pity/);assert.match(complete.instructions,/Let us explore/);assert.match(complete.instructions,/at least eight consecutive words/);
  assert.match(draftInstructions,/Assistant questions are context, not evidence/);
 });
 function fixture({providerOverride,dbOverride}={}){

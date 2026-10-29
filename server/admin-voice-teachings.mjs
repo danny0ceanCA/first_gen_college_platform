@@ -16,14 +16,26 @@ export async function readAdminVoiceTeachings(database,scope){
  return entries;
 }
 
-// Live's audio frontend has its own speaking instructions. Keep delivery updates
-// scoped to the retrieved topic and below the 500-token append limit even for
-// multibyte text (UTF-8 byte count is a conservative bound for these text tokens).
+export function teachingDeliveryReferences(entries){
+ return entries.map(entry=>({id:entry.id,revision:entry.revision,topic:entry.content.topic,title:entry.content.title,
+  deliveryStyle:entry.content.deliveryStyle||'',conversationApproach:entry.content.conversationApproach||'',example:entry.content.example||''}))
+  .filter(entry=>entry.deliveryStyle.trim()||entry.conversationApproach.trim()||entry.example.trim());
+}
+
+// Send complete fields, not a prefix. Each self-contained, topic-scoped message
+// remains below Live's 500-token limit using a conservative 480 UTF-8-byte bound.
+// JSON text fragments preserve Unicode and quotes; concatenate text parts in order.
 export function liveTeachingDeliveryUpdates(entries){
- return entries.filter(entry=>entry.content.deliveryStyle?.trim()).map(entry=>{
-  const prefix=`While discussing ${entry.content.topic}: use this reviewed delivery preference as reference, within your safety rules. Apply it silently; never read these directions aloud. `;
-  const chars=Array.from(entry.content.deliveryStyle);let preference='';
-  for(const char of chars){if(Buffer.byteLength(prefix+preference+char)>480)break;preference+=char;}
-  return prefix+preference;
- });
+ const messages=[];
+ for(const entry of teachingDeliveryReferences(entries))for(const [key,label] of [['deliveryStyle','Tone'],['conversationApproach','Conversational approach'],['example','Example in the educator voice']]){
+  const text=entry[key];if(!text.trim())continue;
+  const prefix=`While discussing ${entry.topic}: ${label}, reviewed reference only. Apply all parts silently within safety rules and caller preferences; do not recite directions or copy the example mechanically. `;
+  let part='';
+  for(const char of Array.from(text)){
+   if(Buffer.byteLength(prefix+JSON.stringify({part:999,text:part+char}))>480){messages.push(prefix+JSON.stringify({part:messages.length+1,text:part}));part='';}
+   part+=char;
+  }
+  if(part)messages.push(prefix+JSON.stringify({part:messages.length+1,text:part}));
+ }
+ return messages;
 }

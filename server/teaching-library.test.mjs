@@ -13,8 +13,10 @@ const doc=()=>({title:'Understanding a college offer',topic:'finance',language:'
 test('teaching input accepts conversational drafts, strips unknown fields and rejects unsafe sources and invalid dates',()=>{
  const input={action:'save',id:randomUUID(),revision:0,content:{...doc(),studentSecret:'not persisted'}};
  assert.equal(validateTeachingRequest(input).content.studentSecret,undefined);
- for(const change of [{sourceUrl:'javascript:alert(1)'},{sourceUrl:'https://user:password@example.org'},{reviewBy:'2026-02-30'},{explanation:'x'.repeat(6001)},{deliveryStyle:'x'.repeat(1501)},{deliveryStyle:{}},{deliveryStyle:'bad\0style'},{language:'other'},{title:''}])assert.throws(()=>validateTeachingRequest({...input,content:{...doc(),...change}}));
+ for(const change of [{sourceUrl:'javascript:alert(1)'},{sourceUrl:'https://user:password@example.org'},{reviewBy:'2026-02-30'},{explanation:'x'.repeat(6001)},{deliveryStyle:'x'.repeat(1501)},{deliveryStyle:{}},{deliveryStyle:'bad\0style'},{conversationApproach:'x'.repeat(1501)},{conversationApproach:{}},{conversationApproach:'bad\0approach'},{language:'other'},{title:''}])assert.throws(()=>validateTeachingRequest({...input,content:{...doc(),...change}}));
  assert.equal(validateTeachingRequest(input).content.deliveryStyle,'');
+ assert.equal(validateTeachingRequest(input).content.conversationApproach,'');
+ assert.equal(validateTeachingRequest({...input,content:{...doc(),conversationApproach:'  Acknowledge before asking.  '}}).content.conversationApproach,'Acknowledge before asking.');
  assert.equal(validateTeachingRequest({...input,content:{...doc(),deliveryStyle:'  Warm, patient, one idea at a time.  '}}).content.deliveryStyle,'Warm, patient, one idea at a time.');
  assert.throws(()=>validateTeachingRequest({action:'publish',id:input.id,revision:1}),/teaching_review_required/);
  assert.equal(validateTeachingRequest({action:'publish',id:input.id,revision:1,reviewed:true}).action,'publish');
@@ -50,6 +52,22 @@ test('references are bounded, optional, and explicitly subordinate to privacy an
  assert.equal(teachingReferenceInstructions([]),'');
  const style=teachingReferenceInstructions([{id:randomUUID(),revision:2,content:{...doc(),deliveryStyle:'Warm and unhurried; offer an example.'}}]);
  assert.match(style,/Warm and unhurried/);assert.match(style,/current request and communication preferences take priority/);assert.match(style,/not a change to audio configuration/);assert.match(style,/cannot override privacy/);
+ const structured=teachingReferenceInstructions([{content:{...doc(),conversationApproach:'Acknowledge before asking.',example:'We can explore this together.'}}]);assert.match(structured,/Acknowledge before asking/);assert.match(structured,/not a script/);assert.match(structured,/choose at most one relevant question/);assert.match(structured,/do not invent feelings/);
+});
+
+test('PostgreSQL retains legacy tone, separates draft from published approach, and rejects undeliverable publications',{skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const f=await retrievalFixture();t.after(f.close);const id=randomUUID(),legacy={...doc(),deliveryStyle:'Existing style remains untouched.'};
+ const raw=input=>f.as('reader',()=>runAsAnalytics(async()=>(await f.db.query('SELECT origen_teaching_command($1::jsonb) AS data',[JSON.stringify(input)])).rows[0].data));
+ await raw({action:'save',id,revision:0,content:legacy});await raw({action:'publish',id,revision:1});
+ const current=(await raw({action:'list'})).items.find(e=>e.id===id);assert.deepEqual(current.published,legacy);assert.equal(current.published.conversationApproach,undefined);
+ const content={...legacy,conversationApproach:'Acknowledge the concern before a question.',example:'We can explore this together.'};
+ await raw(validateTeachingRequest({action:'save',id,revision:2,content}));
+ const read=()=>f.as('reader',()=>loadTeachingReferences(f.db,{topic:'finance',language:'en'}));assert.equal((await read())[0].content.conversationApproach,undefined);
+ await raw({action:'publish',id,revision:3});assert.equal((await read())[0].content.conversationApproach,content.conversationApproach);assert.equal((await read())[0].content.deliveryStyle,legacy.deliveryStyle);
+ await assert.rejects(raw({action:'save',id,revision:4,content:{...content,conversationApproach:'x'.repeat(1501)}}),{code:'23514'});
+ const large={...content,explanation:'x'.repeat(6000),deliveryStyle:'t'.repeat(1500),conversationApproach:'a'.repeat(1500),example:'e'.repeat(3000)};
+ await raw(validateTeachingRequest({action:'save',id,revision:4,content:large}));await assert.rejects(raw({action:'publish',id,revision:5}),/teaching_delivery_too_large/);assert.equal((await read())[0].content.explanation,legacy.explanation);
+ await assert.rejects(f.runtime.query('SELECT * FROM origen_teachings'),{code:'42501'});
 });
 test('endpoint requires full admin management permission, fresh mutations, and a working audit before writing',async()=>{
  let writes=0,auditFailure=false;
@@ -185,7 +203,7 @@ test('PIQ teaching reaches admissions voice start and handoff, while research ke
  const f=await retrievalFixture();
  try{
   const command=input=>f.as('reader',()=>runAsAnalytics(async()=>(await f.db.query('SELECT origen_teaching_command($1::jsonb) AS data',[JSON.stringify(validateTeachingRequest(input))])).rows[0].data));
-  const id=randomUUID(),content={...doc(),title:'Student background - Essays',topic:'admissions',keywords:"PIQ's, essays, writing about myself",explanation:'Your experiences matter. You do not need a dramatic story or have to share anything painful.',deliveryStyle:'Be warm, patient, and encouraging. Ask one gentle question at a time.'};
+  const id=randomUUID(),content={...doc(),title:'Student background - Essays',topic:'admissions',keywords:"PIQ's, essays, writing about myself",explanation:'Your experiences matter. You do not need a dramatic story or have to share anything painful.',deliveryStyle:'Be warm, patient, and encouraging. Ask one gentle question at a time.',conversationApproach:'Acknowledge the concern before a question.',example:'We can explore this together.'};
   await command({action:'save',id,revision:0,content});await command({action:'publish',id,revision:1,reviewed:true});
   const read=scope=>f.as('reader',()=>loadTeachingReferences(f.db,{topic:'admissions',language:'en',...scope}));
   assert.equal((await read({retrieval:'guide'}))[0].id,id);
@@ -197,9 +215,9 @@ test('PIQ teaching reaches admissions voice start and handoff, while research ke
    const req=Object.assign(Readable.from([JSON.stringify({sdp:'v=0',mode:'admissions',studentId:'alex',role:'parent',language:'en',routeConversations:true,targetConfirmed:true,...extra})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reader'}});let status,body;
    await f.as('reader',()=>voice(req,{writeHead:s=>status=s,end:s=>body=JSON.parse(s)},()=>assert.fail('wrong route')));assert.equal(status,200);responses.push(body);return body;
   };
-  await invoke({});assert.match(inputs[0].instructions,/Your experiences matter/);assert.match(inputs[0].instructions,/Be warm, patient/);
+  await invoke({});assert.match(inputs[0].instructions,/Your experiences matter/);assert.match(inputs[0].instructions,/Be warm, patient/);assert.match(inputs[0].instructions,/Acknowledge the concern before a question/);assert.match(inputs[0].instructions,/We can explore this together/);
   await invoke({mode:'planning'});assert.doesNotMatch(inputs[1].instructions,/Your experiences matter/);
-  const handoff=await invoke({action:'update-guide'});assert.equal(inputs.length,2,'handoff prepares an update without opening another provider call');assert.match(handoff.session.instructions,/Your experiences matter/);assert.match(handoff.session.instructions,/one gentle question/);
+  const handoff=await invoke({action:'update-guide'});assert.equal(inputs.length,2,'handoff prepares an update without opening another provider call');assert.match(handoff.session.instructions,/Your experiences matter/);assert.match(handoff.session.instructions,/one gentle question/);assert.match(handoff.session.instructions,/Acknowledge the concern before a question/);
   const unresolved=await invoke({action:'update-guide',role:'student',targetConfirmed:false,studentId:undefined});assert.doesNotMatch(unresolved.session.instructions,/Your experiences matter/);
   const generalIds=[];
   for(let i=0;i<7;i++){const extra=randomUUID();generalIds.push(extra);await command({action:'save',id:extra,revision:0,content:{...doc(),topic:'general',title:'General teaching '+i}});await command({action:'publish',id:extra,revision:1,reviewed:true});}

@@ -2,7 +2,13 @@
 
 Keep Realtime 2.1 as the student production default. This verification option affects administrator comparisons only.
 
-The comparison screen defaults to **Verify teaching wording**. When relevant, the model is asked to naturally include a short exact phrase from a supplied teaching explanation. Administrators can disable this request to compare unconstrained phrasing.
+The comparison screen defaults to natural conversation with **Verify teaching wording** off. Administrators can enable it as an optional diagnostic that requests a short exact phrase from a relevant teaching. Wording matching does not evaluate empathy or warmth and should not be used as a quality score.
+
+Teaching authors can separately enter **Tone**, **Conversational approach**, and **Example in my voice**. Tone uses the existing `deliveryStyle` field, approach uses the optional `conversationApproach` field, and the example uses the existing `example` field. Legacy text stays intact. Teach Origen draft capture follows the same structure. Saving remains separate from publishing; no existing teaching is rewritten or republished by the upgrade.
+
+Live receives complete relevant delivery preferences at startup. Newly retrieved revisions are sent as complete, topic-scoped parts, each below a conservative 480 UTF-8-byte bound for the provider's 500-token append limit. The receiver gets the entire field, including Unicode and trailing directions; already supplied revisions are not appended again. Realtime and research references include the same structured fields, subject to their existing topic and publication filters. Examples illustrate the educator's approach and are not scripts or facts about the student.
+
+Migration 090 adds optional-field validation and rejects new oversized publications explicitly. The editor warns before publishing, while still allowing a draft to be saved. Existing publications and revision history are not changed. No new runtime grants are needed.
 
 Each result distinguishes:
 
@@ -25,4 +31,10 @@ Both GPT-Live-1 and Realtime 2.1 produced spoken transcript matches against **St
 
 The two actual calls were English. English/Spanish prompt and delivery contracts also have automated regression coverage; this check does not claim a new Spanish live call.
 
-Regression tests cover late/missed startup events, greeting idempotency, silent sessions, streamed wording matching, backend text exclusion, account boundaries, and the separation of output from playback evidence. No additional migration or runtime database grant is required beyond migration 089.
+Regression tests cover late/missed startup events, greeting idempotency, silent sessions, streamed wording matching, backend text exclusion, account boundaries, and the separation of output from playback evidence. Structured teaching delivery also covers legacy compatibility, draft/publication isolation, complete long and multilingual delivery fields, explicit capacity errors, and natural-comparison defaults.
+
+## Structured delivery release — October 29, 2026
+
+Thirty focused checks passed with the real local PostgreSQL fixture, including migration 090, unchanged legacy documents, published/draft separation, runtime isolation, and both voice test modes. Additional student-handler checks confirm the approach and example reach regular admissions voice startup and topic handoff. Desktop/mobile browser checks cover editing, preview, save payloads, publication capacity warnings, and phrase verification defaulting off. The production build passed.
+
+Three additional capped English provider calls exercised natural phrasing against the existing published revision 10, without changing the teaching or enabling phrase forcing. Both models produced audio and supportive language. Realtime initially stacked reflection questions, prompting the instruction to choose at most one rather than recite the example list. The final short rerun observed only the beginning of its response before the test cutoff; it is not a complete-turn empathy or adherence evaluation. No new structured content was published by these tests. All five provider calls together, including the earlier verification checks, had complete usage accounting and an approximately $0.191 list-rate estimate under the approved $2 ceiling.

@@ -18,7 +18,7 @@ export function validateVoiceStart(input){
  for(const [key,max] of [['scenario',1500],['campus',160],['academicYear',7]])if(typeof input[key]!=='string'||input[key].length>max)throw fail(400,'invalid_voice_request');
  if(input.academicYear&&!/^\d{4}-\d{2}$/.test(input.academicYear)||typeof input.sdp!=='string'||!input.sdp.startsWith('v=0')||input.sdp.length>100000)throw fail(400,'invalid_voice_request');
  if(input.verifyTeachings!==undefined&&typeof input.verifyTeachings!=='boolean')throw fail(400,'invalid_voice_request');
- return {...Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]])),verifyTeachings:input.mode==='test'&&input.verifyTeachings!==false};
+ return {...Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]])),verifyTeachings:input.mode==='test'&&input.verifyTeachings===true};
 }
 
 export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSocket){
@@ -75,7 +75,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    if(item.name!=='search_teaching_library'||!topics.includes(args.topic)||typeof args.query!=='string'||args.query.length>1500||run.tools.size>20||run.config.mode!=='test')throw Error('invalid_tool');
    const entries=await refs(run,args.topic,args.query);
    run.evidence.supplied(entries);
-   if(run.config.model==='gpt-live-1')for(const content of liveTeachingDeliveryUpdates(entries))send(run,{type:'session.instructions.append',event_id:randomUUID(),delegation_id:null,content});
+   if(run.config.model==='gpt-live-1'){const fresh=entries.filter(e=>!run.deliveryRefs.has(e.id+':'+e.revision));for(const content of liveTeachingDeliveryUpdates(fresh))send(run,{type:'session.instructions.append',event_id:randomUUID(),delegation_id:null,content});fresh.forEach(e=>run.deliveryRefs.add(e.id+':'+e.revision));}
    run.teachings.push({topic:args.topic,source:'tool',at:new Date().toISOString(),entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    result={entries};
   }catch{result={error:'teaching_lookup_unavailable',instruction:'Do not invent a teaching. Explain that the library lookup could not complete.'};}
@@ -124,7 +124,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   if(!env.OPENAI_API_KEY)throw fail(503,'voice_not_configured');
   if(owners.has(identity.sub)||[...runs.values()].filter(r=>!r.finalized).length>=4)throw fail(409,'voice_already_active');
   owners.add(identity.sub);
-  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),evidence:createTeachingEvidence(),providerErrorCodes:[],teachings:[],tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
+  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),evidence:createTeachingEvidence(),providerErrorCodes:[],teachings:[],deliveryRefs:new Set(),tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
   run.closed=new Promise(resolve=>run.resolveClosed=resolve);
   run.startPending=true;run.startDone=new Promise(resolve=>run.resolveStart=resolve);
   let reserved=false;
@@ -133,6 +133,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    await command(identity,{action:'create',id:config.id,data:view(run)});reserved=true;runs.set(config.id,run);
    const entries=config.mode==='test'?await refs(run,config.topic,config.scenario):[];
    run.evidence.supplied(entries);
+   entries.forEach(e=>run.deliveryRefs.add(e.id+':'+e.revision));
    run.teachings.push({topic:config.topic,source:'initial',at:run.startedAt,entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    const session=adminVoiceSession(config,entries),headers={Authorization:`Bearer ${env.OPENAI_API_KEY}`};let answer;
    if(config.model==='gpt-live-1'){
