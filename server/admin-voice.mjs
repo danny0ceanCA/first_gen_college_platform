@@ -1,7 +1,9 @@
 import WebSocket from 'ws';
+import {randomUUID} from 'node:crypto';
 import {adminCapabilities,requireStaffAccess} from './staff-access.mjs';
 import {runAsAccount,runAsAnalytics} from './account-isolation.mjs';
-import {readTeachingReferences,validateTeachingRequest} from './teaching-library.mjs';
+import {validateTeachingRequest} from './teaching-library.mjs';
+import {readAdminVoiceTeachings,liveTeachingDeliveryUpdates} from './admin-voice-teachings.mjs';
 import {adminVoiceSession,draftInstructions,teachingDraftSchema} from './admin-voice-prompts.mjs';
 import {createCostLedger,rateCard} from './admin-voice-cost.mjs';
 
@@ -20,7 +22,7 @@ export function validateVoiceStart(input){
 export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSocket){
  const runs=new Map(),owners=new Set();
  const command=(identity,input)=>runAsAccount(identity,()=>runAsAnalytics(async()=>(await database.query('SELECT origen_admin_voice_command($1::jsonb) AS data',[JSON.stringify(input)])).rows[0].data));
- const refs=(run,topic,query,retrieval='question')=>runAsAccount(run.identity,()=>runAsAnalytics(()=>readTeachingReferences(database,{...run.config,topic,query,retrieval})));
+ const refs=(run,topic,query)=>runAsAccount(run.identity,()=>runAsAnalytics(()=>readAdminVoiceTeachings(database,{...run.config,topic,query})));
  const view=run=>({...run.config,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,error:run.error||'',teachings:run.teachings,cost:run.ledger.snapshot(run.status==='ended',run.created),draft:run.draft||null,draftError:run.draftError||'',draftAvailable:run.status==='ended'&&run.config.mode==='teach'&&run.transcript.some(x=>x.role==='user'),draftBusy:!!run.draftPromise});
  const persist=run=>{const data=view(run);run.persistence=(run.persistence||Promise.resolve()).catch(()=>{}).then(()=>command(run.identity,{action:'update',id:run.config.id,data}));return run.persistence;};
  const send=(run,event)=>{if(run.socket?.readyState===1)run.socket.send(JSON.stringify(event));};
@@ -60,6 +62,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    const args=JSON.parse(item.arguments||'{}');
    if(item.name!=='search_teaching_library'||!topics.includes(args.topic)||typeof args.query!=='string'||args.query.length>1500||run.tools.size>20||run.config.mode!=='test')throw Error('invalid_tool');
    const entries=await refs(run,args.topic,args.query);
+   if(run.config.model==='gpt-live-1')for(const content of liveTeachingDeliveryUpdates(entries))send(run,{type:'session.instructions.append',event_id:randomUUID(),delegation_id:null,content});
    run.teachings.push({topic:args.topic,source:'tool',at:new Date().toISOString(),entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    result={entries};
   }catch{result={error:'teaching_lookup_unavailable',instruction:'Do not invent a teaching. Explain that the library lookup could not complete.'};}
@@ -112,7 +115,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   try{
    // Reserve before the paid API call. A duplicate/retry never starts another call.
    await command(identity,{action:'create',id:config.id,data:view(run)});reserved=true;runs.set(config.id,run);
-   const entries=config.mode==='test'?await refs(run,config.topic,config.scenario,'guide'):[];
+   const entries=config.mode==='test'?await refs(run,config.topic,config.scenario):[];
    run.teachings.push({topic:config.topic,source:'initial',at:run.startedAt,entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    const session=adminVoiceSession(config,entries),headers={Authorization:`Bearer ${env.OPENAI_API_KEY}`};let answer;
    if(config.model==='gpt-live-1'){
