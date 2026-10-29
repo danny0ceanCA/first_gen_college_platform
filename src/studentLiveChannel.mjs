@@ -59,6 +59,13 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     const current=response.epoch===version&&version===epoch;
     const metadata={origen_user_turn:current?getTurn():'superseded-live-turn'};
     const output=response.output.length?response.output:(event.response?.output||[]).filter(item=>item.type==='function_call');
+    if(output.length&&!current){
+     // The existing memory/link handlers capture their sequence on the canonical
+     // response.created event. Never give stale work a newly current sequence.
+     for(const item of output)transmit({type:'response.item.create',event_id:id(),item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'superseded_turn',instruction:'A newer user turn arrived. Do not execute the old request. Follow the latest complete user request and current authorized scope.'})}});
+     await emit({type:'response.done',response:{id:responseId,metadata,status:'cancelled',output:[]}});
+     transmit({type:'response.create',event_id:id()});return;
+    }
     if(output.length){await emit({type:'response.created',response:{id:responseId,metadata}});await emit({type:'response.done',response:{id:responseId,metadata,status:event.response?.status||(event.type==='response.completed'?'completed':event.type.split('.').at(-1)),output}});}
     return;
    }

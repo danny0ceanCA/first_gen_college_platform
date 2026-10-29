@@ -28,6 +28,12 @@ test('A newer user turn cannot authorize an older backend write',async()=>{
  f.receive({type:'session.input_transcript.delta',delta:'No, do not save it yet.'});f.backend('response.output_item.done','old',{item:{type:'function_call',name:'save_onboarding_profile',call_id:'old-c',arguments:'{}'}});f.backend('response.completed','old');await pause(1200);
  const done=f.events.find(e=>e.type==='response.done');assert.equal(done.response.metadata.origen_user_turn,'superseded-live-turn');assert.equal(f.consent.consume(done.response.metadata.origen_user_turn),false);f.channel.close();
 });
+for(const name of ['remember_student_detail','prepare_coordinator_connection','set_conversation_language'])test(`Stale ${name} never reaches a current-turn handler`,async()=>{
+ const f=fixture();f.receive({type:'session.input_transcript.delta',delta:'An earlier request.'});f.backend('response.created','old');await pause(1200);
+ f.receive({type:'session.input_transcript.delta',delta:'Stop. I changed my mind.'});f.backend('response.output_item.done','old',{item:{type:'function_call',name,call_id:'stale-call',arguments:'{}'}});f.backend('response.completed','old');await pause(1200);
+ assert.ok(!f.events.some(event=>event.type==='response.done'&&event.response.output?.some(item=>item.type==='function_call')));
+ const reply=f.sent.find(event=>event.type==='response.item.create');assert.equal(reply.item.call_id,'stale-call');assert.equal(JSON.parse(reply.item.output).status,'superseded_turn');assert.equal(f.sent.filter(event=>event.type==='response.create').length,1);f.channel.close();
+});
 test('Partial save phrase followed by not yet never grants save consent',async()=>{
  const f=fixture();f.receive({type:'session.input_transcript.delta',delta:'Save my profile'});f.backend('response.created','r');f.receive({type:'session.input_transcript.delta',delta:'? No, not yet.'});f.backend('response.output_item.done','r',{item:{type:'function_call',name:'save_onboarding_profile',call_id:'c',arguments:'{}'}});f.backend('response.completed','r');await pause(1200);
  const done=f.events.find(e=>e.type==='response.done');assert.equal(f.consent.consume(done.response.metadata.origen_user_turn),false);f.channel.close();
