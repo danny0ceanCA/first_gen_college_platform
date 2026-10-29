@@ -281,6 +281,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   useEffect(()=>{if(state==='live'&&workspaceFocus&&workspaceSeen.current!==workspaceFocus.serial&&resources.current.workspace){workspaceSeen.current=workspaceFocus.serial;resources.current.workspace.select(workspaceFocus);}},[workspaceFocus?.serial,state]);
   function end(){setFinishing(false);resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function closeWithFarewell(instructions?:string){
+    if(closing.current?.active())return;
     if(!closing.current||resources.current.dc?.readyState!=='open'){end();return;}
     setFinishing(true);setMuted(true);setResearching(false);
     const current=closing.current;const dc=resources.current.dc as ReturnType<typeof studentLiveChannel>|undefined;void (dc?.flush?.()||Promise.resolve()).then(()=>{if(closing.current===current)current.begin(instructions);});
