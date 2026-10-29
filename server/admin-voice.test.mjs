@@ -82,6 +82,7 @@ test('real PostgreSQL migration grants no raw table access and scopes retained r
  await assert.rejects(f.as('a',()=>f.db.query('SELECT origen_admin_voice_command($1::jsonb)',[JSON.stringify({action:'list'})])),{code:'42501'});
  const evidence={outputTranscriptCharacters:80,browserPlaybackReported:true,matches:[{id:'teaching',revision:8,quote:'Your experiences matter even when they do not appear'}]};
  await command('a',{action:'update',id,data:{status:'ended',evidence}});assert.deepEqual((await command('a',{action:'get',id})).evidence,evidence);assert.equal(await command('b',{action:'get',id}),null);
+ await command('a',{action:'update',id,data:{status:'ended',testTranscript:{items:[{role:'user',text:'Synthetic question'}]}}});assert.equal((await command('a',{action:'get',id})).testTranscript.items[0].text,'Synthetic question');await command('a',{action:'update',id,data:{status:'ended',testTranscript:null}});assert.equal((await command('a',{action:'get',id})).testTranscript,null);
  await command('a',{action:'create',id:randomUUID(),data:{status:'active'}});
 });
 test('stale authentication, revoked access, or unavailable audit cannot start paid calls',async t=>{
@@ -120,4 +121,17 @@ test('only spoken output events create teaching evidence; backend text alone is 
  const socket=f.sockets[0];socket.event({type:'response.event',event:{type:'response.output_text.delta',delta:explanation}});assert.equal((await f.call({action:'status',id:c.id})).body.evidence.matches.length,0);
  socket.event({type:'session.output_transcript.delta',delta:explanation});socket.event({type:'session.output_audio.delta',delta:'AA=='});
  const result=await f.call({action:'stop',id:c.id});assert.equal(result.body.error,'');assert.equal(result.body.evidence.matches[0].revision,8);assert.equal(result.body.evidence.providerAudioChunks,1);
+});
+
+test('full test transcript is opt-in, owner scoped, omitted from lists, and deletable after reconnect',async t=>{
+ const f=fixture();t.after(()=>f.handler.close());const c={...config(),model:'gpt-live-1',captureTranscript:true};await f.call(c);
+ const socket=f.sockets[0];socket.event({type:'session.input_transcript.delta',delta:'I am worried.'});socket.event({type:'session.output_transcript.delta',delta:'We can take our time.'});socket.event({type:'response.event',event:{type:'response.output_text.delta',delta:'internal backend text'}});
+ assert.equal((await f.call({action:'clear-transcript',id:c.id})).status,409);
+ const stopped=await f.call({action:'stop',id:c.id});assert.equal(stopped.body.testTranscript.items.length,2);assert.doesNotMatch(JSON.stringify(stopped.body.testTranscript),/backend text/);
+ assert.equal((await f.call({action:'status',id:c.id},identity('another'))).status,404);
+ await f.handler.close();const list=(await f.call({action:'list'})).body.runs;assert.equal(list[0].hasTestTranscript,true);assert.equal(list[0].testTranscript,undefined);
+ assert.equal((await f.call({action:'status',id:c.id})).body.testTranscript.items[0].text,'I am worried.');
+ const cleared=await f.call({action:'clear-transcript',id:c.id});assert.equal(cleared.body.testTranscript,null);assert.equal((await f.call({action:'status',id:c.id})).body.testTranscript,null);
+ const off=config();await f.call(off);f.sockets.at(-1).event({type:'response.output_audio_transcript.delta',delta:'Not retained'});assert.equal((await f.call({action:'stop',id:off.id})).body.testTranscript,null);
+ assert.equal(validateVoiceStart({...config(),mode:'teach',captureTranscript:true}).captureTranscript,false);
 });

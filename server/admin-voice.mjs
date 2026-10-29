@@ -1,3 +1,4 @@
+import {createTestTranscript} from './admin-voice-transcript.mjs';
 import WebSocket from 'ws';
 import {randomUUID} from 'node:crypto';
 import {adminCapabilities,requireStaffAccess} from './staff-access.mjs';
@@ -17,15 +18,16 @@ export function validateVoiceStart(input){
  if(input.mode==='teach'&&input.model!=='gpt-realtime-2.1')throw fail(400,'invalid_voice_request');
  for(const [key,max] of [['scenario',1500],['campus',160],['academicYear',7]])if(typeof input[key]!=='string'||input[key].length>max)throw fail(400,'invalid_voice_request');
  if(input.academicYear&&!/^\d{4}-\d{2}$/.test(input.academicYear)||typeof input.sdp!=='string'||!input.sdp.startsWith('v=0')||input.sdp.length>100000)throw fail(400,'invalid_voice_request');
+ if(input.captureTranscript!==undefined&&typeof input.captureTranscript!=='boolean')throw fail(400,'invalid_voice_request');
  if(input.verifyTeachings!==undefined&&typeof input.verifyTeachings!=='boolean')throw fail(400,'invalid_voice_request');
- return {...Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]])),verifyTeachings:input.mode==='test'&&input.verifyTeachings===true};
+ return {...Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]])),captureTranscript:input.mode==='test'&&input.captureTranscript===true,verifyTeachings:input.mode==='test'&&input.verifyTeachings===true};
 }
 
 export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSocket){
  const runs=new Map(),owners=new Set();
  const command=(identity,input)=>runAsAccount(identity,()=>runAsAnalytics(async()=>(await database.query('SELECT origen_admin_voice_command($1::jsonb) AS data',[JSON.stringify(input)])).rows[0].data));
  const refs=(run,topic,query)=>runAsAccount(run.identity,()=>runAsAnalytics(()=>readAdminVoiceTeachings(database,{...run.config,topic,query})));
- const view=run=>({...run.config,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,error:run.error||'',teachings:run.teachings,evidence:run.evidence.snapshot(),providerErrorCodes:run.providerErrorCodes,cost:run.ledger.snapshot(run.status==='ended',run.created),draft:run.draft||null,draftError:run.draftError||'',draftAvailable:run.status==='ended'&&run.config.mode==='teach'&&run.transcript.some(x=>x.role==='user'),draftBusy:!!run.draftPromise});
+ const view=run=>({...run.config,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,error:run.error||'',teachings:run.teachings,testTranscript:run.testTranscript.snapshot(),evidence:run.evidence.snapshot(),providerErrorCodes:run.providerErrorCodes,cost:run.ledger.snapshot(run.status==='ended',run.created),draft:run.draft||null,draftError:run.draftError||'',draftAvailable:run.status==='ended'&&run.config.mode==='teach'&&run.transcript.some(x=>x.role==='user'),draftBusy:!!run.draftPromise});
  const persist=run=>{const data=view(run);run.persistence=(run.persistence||Promise.resolve()).catch(()=>{}).then(()=>command(run.identity,{action:'update',id:run.config.id,data}));return run.persistence;};
  const send=(run,event)=>{if(run.socket?.readyState!==1)return false;run.socket.send(JSON.stringify(event));return true;};
  function ready(run){
@@ -85,6 +87,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   if(run.finalized)return;
   run.ledger.ingest(envelope);
   const e=envelope.type==='response.event'?envelope.event:envelope;
+  run.testTranscript.event(e);if(run.testTranscript.snapshot()?.limited&&run.status==='active'){run.error='test_transcript_limit';void stop(run);}
   if(e.type==='session.output_transcript.delta'||e.type==='response.output_audio_transcript.delta'){run.evidence.transcript(e.delta);if(typeof e.delta==='string'&&e.delta.length)clearTimeout(run.outputTimer);}
   if(e.type==='session.output_audio.delta'||e.type==='response.output_audio.delta'){run.evidence.audio();clearTimeout(run.outputTimer);}
   const batchKey=envelope.delegation_id||e.response_id||e.response?.id||'realtime';
@@ -124,7 +127,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   if(!env.OPENAI_API_KEY)throw fail(503,'voice_not_configured');
   if(owners.has(identity.sub)||[...runs.values()].filter(r=>!r.finalized).length>=4)throw fail(409,'voice_already_active');
   owners.add(identity.sub);
-  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),evidence:createTeachingEvidence(),providerErrorCodes:[],teachings:[],deliveryRefs:new Set(),tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
+  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),evidence:createTeachingEvidence(),providerErrorCodes:[],testTranscript:createTestTranscript(config.mode==='test'&&config.captureTranscript),teachings:[],deliveryRefs:new Set(),tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
   run.closed=new Promise(resolve=>run.resolveClosed=resolve);
   run.startPending=true;run.startDone=new Promise(resolve=>run.resolveStart=resolve);
   let reserved=false;
@@ -193,14 +196,15 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   try{
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>110000)return respond(413,{error:'request_too_large'});}
    let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_voice_request');}
-   if(!input||!['list','start','status','stop','draft','ready','playback'].includes(input.action))throw fail(400,'invalid_voice_request');
+   if(!input||!['list','start','status','stop','draft','ready','playback','clear-transcript'].includes(input.action))throw fail(400,'invalid_voice_request');
    if(input.action!=='list'&&!uuid.test(input.id))throw fail(400,'invalid_voice_request');
-   await requireStaffAccess(database,identity,{scope:'admin',action:'voice-'+input.action,target:input.id,permission:'manage:institutions',env,fresh:['start','draft'].includes(input.action)});
-   if(input.action==='list')return respond(200,{runs:await command(identity,{action:'list'}),configured:!!env.OPENAI_API_KEY,rateCard});
+   await requireStaffAccess(database,identity,{scope:'admin',action:'voice-'+input.action,target:input.id,permission:'manage:institutions',env,fresh:['start','draft','clear-transcript'].includes(input.action)});
+   if(input.action==='list')return respond(200,{runs:(await command(identity,{action:'list'})).map(({testTranscript,...metadata})=>({...metadata,hasTestTranscript:!!testTranscript})),configured:!!env.OPENAI_API_KEY,rateCard});
    if(input.action==='start')return respond(201,await start(identity,input));
    const run=runs.get(input.id);
    if(run&&run.identity.sub!==identity.sub)throw fail(404,'voice_run_not_found');
-   if(!run){const saved=await command(identity,{action:'get',id:input.id});if(!saved)throw fail(404,'voice_run_not_found');if(input.action==='draft'){if(saved.draft)return respond(200,saved);throw fail(409,'teaching_transcript_unavailable');}if(saved.status==='ended')return respond(200,{...saved,draftAvailable:false});return respond(200,{...saved,status:'ended',cost:{...saved.cost,complete:false},draftAvailable:false,error:saved.error||'session_not_on_this_server'});}
+   if(!run){const saved=await command(identity,{action:'get',id:input.id});if(!saved)throw fail(404,'voice_run_not_found');if(input.action==='clear-transcript'){if(saved.status!=='ended')throw fail(409,'voice_already_active');const data={...saved,testTranscript:null,captureTranscript:false};await command(identity,{action:'update',id:input.id,data});return respond(200,data);}if(input.action==='draft'){if(saved.draft)return respond(200,saved);throw fail(409,'teaching_transcript_unavailable');}if(saved.status==='ended')return respond(200,{...saved,draftAvailable:false});return respond(200,{...saved,status:'ended',cost:{...saved.cost,complete:false},draftAvailable:false,error:saved.error||'session_not_on_this_server'});}
+   if(input.action==='clear-transcript'){if(!run.finalized)throw fail(409,'voice_already_active');run.testTranscript.clear();run.config.captureTranscript=false;await persist(run);return respond(200,view(run));}
    if(input.action==='stop')await stop(run);
    if(input.action==='ready')ready(run);
    if(input.action==='playback'&&run.status==='active')run.evidence.playback();

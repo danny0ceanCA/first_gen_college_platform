@@ -1,5 +1,11 @@
 # Verifying teaching use in administrator voice tests
 
+## Optional full test transcripts
+
+Enable **Save full test transcript** before starting an administrator comparison. This defaults off and never enables transcripts for regular student calls or teaching interviews. Both speakers' provider-transcribed words are saved in the existing owner-scoped run record, excluding backend reasoning, tools and audio bytes. Automatic transcription can mishear words; overlapping speakers appear in receipt order.
+
+Select a completed comparison to load its transcript. History lists omit transcript bodies. Text remains until **Delete transcript** is selected after the call ends; this clears stored and in-memory test capture without removing cost or teaching evidence. Authorization, ownership and audit checks protect reads and deletion. Existing calls cannot be reconstructed retroactively. Capture stops the test and explicitly labels the text incomplete if its 60 KB serialized limit is reached. No new migration or grant is needed.
+
 Keep Realtime 2.1 as the student production default. This verification option affects administrator comparisons only.
 
 The comparison screen defaults to natural conversation with **Verify teaching wording** off. Administrators can enable it as an optional diagnostic that requests a short exact phrase from a relevant teaching. Wording matching does not evaluate empathy or warmth and should not be used as a quality score.
@@ -17,7 +23,7 @@ Each result distinguishes:
 - **Matching wording observed:** at least eight consecutive words from an explanation occur in the spoken output transcript. The matched teaching revision and phrase are retained with the run.
 - **Audio:** provider audio events when available, and a separate browser playback report based on nonzero inbound audio energy while the audio element is playing. Browser reporting is not proof that a person heard the sound.
 
-These are observable checks, not a guarantee that every future answer follows every teaching or that a paraphrase did not use one. No matching wording means **unconfirmed**, even if references were loaded. A media-ready session with no provider output stops after 20 seconds and is marked as a failed silent test. Raw transcripts and recordings are not persisted by this feature; only matched library wording is retained.
+These are observable checks, not a guarantee that every future answer follows every teaching or that a paraphrase did not use one. No matching wording means **unconfirmed**, even if references were loaded. A media-ready session with no provider output stops after 20 seconds and is marked as a failed silent test. Recordings are not persisted. By default, only matched library wording is retained; administrator test transcripts require the explicit opt-in described above.
 
 ## Live startup
 
