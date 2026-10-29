@@ -1,0 +1,1 @@
+export function studentLiveChannel(channel:RTCDataChannel,options?:{getTurn?:()=>string;schedule?:typeof setTimeout;cancel?:typeof clearTimeout;isPlaybackIdle?:()=>boolean}):RTCDataChannel&{configure:(data:{voiceProvider?:string;voiceSession?:Record<string,unknown>})=>void;flush:()=>Promise<void>};

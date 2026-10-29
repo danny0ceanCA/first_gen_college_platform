@@ -60,6 +60,8 @@ services:
         value: "true"
       - key: ORIGEN_PERSONALIZATION_EXTRACTION
         value: "true"
+      - key: OPENAI_MODEL_VOICE
+        value: gpt-live-1
       - key: OPENAI_API_KEY
         sync: false
       - key: AUTH0_DOMAIN

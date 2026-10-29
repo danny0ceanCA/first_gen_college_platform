@@ -70,7 +70,7 @@ export async function prepareTeachingAccess(database,scope,{model,operation,onLo
  let entries=[],availability='available';
  try{entries=await readTeachingReferences(database,scope);}catch{availability='unavailable';}
  const id=randomUUID();let recorded=false;
- return {instructions:teachingReferenceInstructions(entries),async finish(outcome='failed',resolvedModel){
+ return {entries,instructions:teachingReferenceInstructions(entries),async finish(outcome='failed',resolvedModel){
   if(recorded||!database)return;recorded=true;
   try{await database.query('SELECT origen_record_teaching_access($1::jsonb)',[JSON.stringify({id,topic:scope.topic,language:scope.language||'en',operation,model,resolvedModel,availability,outcome,entries:entries.map(({id,revision})=>({id,revision}))})]);}
   catch{try{onLogFailure();}catch{/* Observability must not interrupt a voice conversation. */}}

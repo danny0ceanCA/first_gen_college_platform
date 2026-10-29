@@ -5,7 +5,7 @@ import {safeErrorCode} from './error-codes.mjs';
 import {metrics,dependencyOperations} from './metrics.mjs';
 import {detailedSpansEnabled} from './collection-policy.mjs';
 
-const models=new Set(['gpt-4.1-mini','gpt-4o-mini','gpt-realtime','gpt-realtime-2.1','gpt-realtime-2_1','gpt-6-luna','gpt-6.1','gpt-6.1-sol']);
+const models=new Set(['gpt-4.1-mini','gpt-4o-mini','gpt-realtime','gpt-realtime-2.1','gpt-live-1','gpt-realtime-2_1','gpt-6-luna','gpt-6.1','gpt-6.1-sol']);
 const pending=new Map();let next=0;
 export const approvedModel=value=>models.has(value)?value:'other';
 export function sampledOperation(context=currentDiagnosticContext()){

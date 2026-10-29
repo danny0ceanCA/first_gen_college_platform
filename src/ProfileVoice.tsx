@@ -1,3 +1,5 @@
+import {studentLivePlayback} from './studentLivePlayback.mjs';
+import {studentLiveChannel} from './studentLiveChannel.mjs';
 import {conversationCheckpoint,type CheckpointState} from './conversationCheckpoint.mjs';
 import {recoveryChoice,recoveryRequest,activeCheckpoints} from './conversationRecovery';
 import {coordinatorVoiceTools} from './coordinatorVoiceTools.mjs';
@@ -281,7 +283,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   function closeWithFarewell(instructions?:string){
     if(!closing.current||resources.current.dc?.readyState!=='open'){end();return;}
     setFinishing(true);setMuted(true);setResearching(false);
-    closing.current.begin(instructions);
+    const current=closing.current;const dc=resources.current.dc as ReturnType<typeof studentLiveChannel>|undefined;void (dc?.flush?.()||Promise.resolve()).then(()=>{if(closing.current===current)current.begin(instructions);});
   }
   function handoffContext():VoiceHandoff{return {studentId:summaryScope.current.id,confirmed:summaryScope.current.confirmed,language:spokenLanguage.current,turns:sessionTurns.current.slice(-8).map(turn=>({...turn,text:turn.text.slice(0,2000)}))};}
   function finishCall(drain=true,preserveSession=false){
@@ -315,6 +317,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     if(!privacyLease.valid())return;
     if(resources.current.abort)return;
     if(shared&&!shared.claim(ownerId,true))return;
+    const livePlayback=studentLivePlayback();void livePlayback.prime();resources.current.stopConnection=()=>livePlayback.stop();
     const focus=!memoryResume&&workspaceFocus?.studentId===scope.id?workspaceFocus:undefined;
     currentWorkspace.current=focus;
     if(focus)workspaceSeen.current=focus.serial;
@@ -369,7 +372,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     try {
       if(summaryQueue.current.size){setNotice(t('Your previous conversation is still saving. You can start talking while it finishes.','Tu conversación anterior sigue guardándose. Puedes empezar a hablar mientras termina.'));void retrySummaries();}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
-      const voiceInput={enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
+      const voiceInput={voiceProtocol:'live-v1',enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
       const startup=await voiceStartup({signal:abort.signal,
         getToken:async()=>history.cloud?getAccessTokenSilently():undefined,
         getMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;}),
@@ -382,10 +385,10 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       if(generation.current!==version){stream.getTracks().forEach(track=>track.stop());return;}
       trackOnboarding('microphone_allowed');
       resources.current.stream=stream;
-      const pc=new RTCPeerConnection();resources.current.pc=pc;
-      pc.ontrack=e=>{if(generation.current!==version||closing.current?.active())return;if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
+      const pc=new RTCPeerConnection();resources.current.pc=pc;const stopPlaybackTimer=setInterval(()=>livePlayback.idle(),100);const priorStopConnection=resources.current.stopConnection;resources.current.stopConnection=()=>{clearInterval(stopPlaybackTimer);priorStopConnection?.();};
+      pc.ontrack=e=>{if(generation.current!==version||closing.current?.active())return;void livePlayback.attach(e.streams[0]);if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
-      const dc=pc.createDataChannel('oai-events');resources.current.dc=dc;
+      const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted});resources.current.dc=dc;
       let openingRequested=false;
       let playWelcome=onboarding;
       const saveConsent=voiceProfileSaveConsent();
@@ -762,7 +765,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         }
       };
       const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
-      resources.current.stopConnection=()=>connection.stop();
+      const stopPlayback=resources.current.stopConnection;resources.current.stopConnection=()=>{stopPlayback?.();connection.stop();};
       let connectedRecorded=false;
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}
       log('connection_state',{connectionState:pc.connectionState});if(generation.current===version){if(pc.connectionState==='connected'&&!connectedRecorded&&guidance.current.current()){connectedRecorded=true;void guidance.current.event('voice.connected')?.catch(()=>{});}connection.change(pc.connectionState);}};
@@ -779,7 +782,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       memoryTools.configure(data.liveMemorySession);linkTools.configure(data.coordinatorLinking===true);
       memoryPolicyRef.current=data.memoryPolicy;
       if(typeof data.memoryRevision==='number'){memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
-      await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
+      dc.configure(data);await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){
       if(generation.current!==version||closing.current?.active())return;
       const code=err instanceof Error?err.message:'';
