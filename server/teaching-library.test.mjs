@@ -179,3 +179,32 @@ test('PostgreSQL migration: private drafts, version conflicts, publication scope
   assert.ok((await command({action:'history',id})).history.length>=6);
  }finally{await f.close();}
 });
+
+
+test('PIQ teaching reaches admissions voice start and handoff, while research keeps keyword and scope restrictions', {skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();
+ try{
+  const command=input=>f.as('reader',()=>runAsAnalytics(async()=>(await f.db.query('SELECT origen_teaching_command($1::jsonb) AS data',[JSON.stringify(validateTeachingRequest(input))])).rows[0].data));
+  const id=randomUUID(),content={...doc(),title:'Student background - Essays',topic:'admissions',keywords:"PIQ's, essays, writing about myself",explanation:'Your experiences matter. You do not need a dramatic story or have to share anything painful.',deliveryStyle:'Be warm, patient, and encouraging. Ask one gentle question at a time.'};
+  await command({action:'save',id,revision:0,content});await command({action:'publish',id,revision:1,reviewed:true});
+  const read=scope=>f.as('reader',()=>loadTeachingReferences(f.db,{topic:'admissions',language:'en',...scope}));
+  assert.equal((await read({retrieval:'guide'}))[0].id,id);
+  for(const query of ['Help me with PIQs',"Help with PIQ’s",'Let us discuss college ESSAYS'])assert.equal((await read({query}))[0].id,id);
+  for(const scope of [{query:'Housing costs'},{topic:'planning',retrieval:'guide'},{language:'es',retrieval:'guide'}])assert.deepEqual(await read(scope),[]);
+  const inputs=[],responses=[];
+  const voice=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic'},async(_url,options)=>{inputs.push(JSON.parse(options.body.get('session')));return new Response('v=0');},()=>{},f.db);
+  const invoke=async extra=>{
+   const req=Object.assign(Readable.from([JSON.stringify({sdp:'v=0',mode:'admissions',studentId:'alex',role:'parent',language:'en',routeConversations:true,targetConfirmed:true,...extra})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reader'}});let status,body;
+   await f.as('reader',()=>voice(req,{writeHead:s=>status=s,end:s=>body=JSON.parse(s)},()=>assert.fail('wrong route')));assert.equal(status,200);responses.push(body);return body;
+  };
+  await invoke({});assert.match(inputs[0].instructions,/Your experiences matter/);assert.match(inputs[0].instructions,/Be warm, patient/);
+  await invoke({mode:'planning'});assert.doesNotMatch(inputs[1].instructions,/Your experiences matter/);
+  const handoff=await invoke({action:'update-guide'});assert.equal(inputs.length,2,'handoff prepares an update without opening another provider call');assert.match(handoff.session.instructions,/Your experiences matter/);assert.match(handoff.session.instructions,/one gentle question/);
+  const unresolved=await invoke({action:'update-guide',role:'student',targetConfirmed:false,studentId:undefined});assert.doesNotMatch(unresolved.session.instructions,/Your experiences matter/);
+  const generalIds=[];
+  for(let i=0;i<7;i++){const extra=randomUUID();generalIds.push(extra);await command({action:'save',id:extra,revision:0,content:{...doc(),topic:'general',title:'General teaching '+i}});await command({action:'publish',id:extra,revision:1,reviewed:true});}
+  const bounded=await read({retrieval:'guide'});assert.equal(bounded.length,6);assert.equal(bounded[0].id,id,'guide-specific PIQ teaching is not crowded out by newer general entries');
+  for(const extra of generalIds)await command({action:'archive',id:extra,revision:2});
+  await f.owner.query("UPDATE origen_teachings SET published=jsonb_set(published,'{reviewBy}','\"2000-01-01\"') WHERE id=$1",[id]);assert.deepEqual(await read({retrieval:'guide'}),[]);
+ }finally{await f.close();}
+});

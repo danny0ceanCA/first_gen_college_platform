@@ -14,6 +14,7 @@ import {voiceProfileSaveTools,voiceProfileSaveConsent,type VoiceProfileSaveResul
 import {holdConversation,releaseConversation,researchModeForTool} from './liveConversation.mjs';
 import {binderActivity} from './binderActivity';
 import type {BinderTopic} from './binderSignals.mjs';
+import {voiceBinderTopics} from './voiceBinderTopics.mjs';
 import {voiceDraft} from './voiceDraft.mjs';
 import {guidanceHistory} from './guidanceHistory.mjs';
 import {privateRecovery} from './privateRecovery';
@@ -207,7 +208,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopMemory?:()=>void;cancelResearch?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection)=>Promise<boolean>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopMemory?:()=>void;cancelResearch?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;stopTopics?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection,isCurrent?:()=>boolean)=>Promise<boolean>}>({});
   const generation=useRef(0);
   const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
   const preserveLogicalSession=useRef(false);
@@ -236,7 +237,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
     r.abort?.abort();clearInterval(r.timer);clearTimeout(r.deadline);
     transitionToHome.current=null;
     r.stopWake?.();r.stopProgress?.();r.stopMemory?.();
-    r.stopConnection?.();r.stopTurns?.();r.stopGuide?.();onBusy?.(false);
+    r.stopConnection?.();r.stopTurns?.();r.stopTopics?.();r.stopGuide?.();onBusy?.(false);
     if(r.dc){r.dc.onclose=null;r.dc.close();}
     if(r.pc){r.pc.onconnectionstatechange=null;r.pc.close();}
     r.stream?.getTracks().forEach(track=>track.stop());
@@ -405,7 +406,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       };
       const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);void guidance.current.event('guidance.language_changed',{language:next,basis:'model-detection'})?.catch(()=>{});}}});resources.current.stopGuide=()=>languageControl.stop();
       let changingGuide=false;
-      resources.current.switchGuide=async (next,initialScope,focus)=>{
+      resources.current.switchGuide=async (next,initialScope,focus,isCurrent)=>{
+        if(isCurrent&&!isCurrent())return false;
         if(next===liveMode.current&&!initialScope&&!focus)return true;
         if((!summaryScope.current.confirmed&&!initialScope)||changingGuide)return false;
         const updateScope=initialScope||summaryScope.current;
@@ -421,6 +423,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             const data=await response.json();if(!response.ok)setErrorReference(responseReference(response));if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
             signal.throwIfAborted();
             if(generation.current!==version)throw new Error('voice_session_stopped');
+            if(isCurrent&&!isCurrent())throw new Error('topic_superseded');
             if(memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryPolicyRef.current=data.memoryPolicy;
             if(typeof data.memoryRevision==='number'){if(memoryRevisionRef.current!==null&&memoryRevisionRef.current!==data.memoryRevision){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
             memoryTools.configure(data.liveMemorySession);linkTools.configure(data.coordinatorLinking===true);
@@ -428,11 +431,11 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             return data.session;
           },{signal:abort.signal}),()=>{
             if(generation.current!==version||closing.current?.active())return;
-            if(focus)currentWorkspace.current=focus;
+            if(focus&&(!isCurrent||isCurrent()))currentWorkspace.current=focus;
             guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             if(initialScope){summaryScope.current={...initialScope,name:updateProfile.name};memorySaved.current=false;setTarget(initialScope);log('initial_target_confirmed');}
             liveMode.current=next;checkpointSummary();setMode(next);onGuideChanged?.(next);setNotice('');log('guide_update_complete',{mode:next});
-            publishBinderActivity(focus?[focus.topic]:next==='finance'||next==='loans'?['costs']:next==='admissions'?['applications']:[]);
+            if(!isCurrent||isCurrent())publishBinderActivity(focus?[focus.topic]:next==='finance'||next==='loans'?['costs']:next==='admissions'?['applications']:[]);
           });
           if(generation.current!==version)return false;
           // A specialty change remains one conversation and one recovery record.
@@ -440,6 +443,16 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         }catch(error){if(focus)throw error;if(generation.current===version){log('guide_update_failed',{mode:next});setNotice(t('I could not change topics yet. You can keep talking or try again.','No pude cambiar de tema todavía. Puedes seguir hablando o intentar de nuevo.'));}return false;}
         finally{changingGuide=false;if(generation.current===version)setSwitchingGuide(false);}
       };
+      const topicControl=voiceBinderTopics({
+        getTurn:()=>saveConsent.token(),
+        canApply:()=>generation.current===version&&privacyLease.valid()&&!closing.current?.active()&&!scopePending.current&&summaryScope.current.confirmed&&liveMode.current!=='profile',
+        getGuide:()=>liveMode.current,
+        getFocusTopic:()=>currentWorkspace.current?.topic,
+        highlight:topics=>binderActivity.update(binderSource.current,topics),
+        switchGuide:(next,topic,isCurrent)=>onGuideChanged?resources.current.switchGuide!(next,undefined,{kind:'topic',studentId:summaryScope.current.id,topic,serial:crypto.randomUUID()},isCurrent):Promise.resolve(false),
+        onGuideUnavailable:()=>setNotice(t('I could not change guides yet. You can keep talking or try again.','No pude cambiar de guía todavía. Puedes seguir hablando o intentar de nuevo.')),
+      });
+      resources.current.stopTopics=()=>topicControl.stop();
       transitionToHome.current=async()=>{
         if(transitioned.current||generation.current!==version||closing.current?.active())return;
         transitioned.current=true;
@@ -619,7 +632,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             if(item.type!=='function_call')continue;
             if(closing.current?.active())return;
             called=true;let accepted=false;
-            if(['propose_account','propose_profile','end_conversation'].includes(item.name)&&e.response?.metadata?.origen_user_turn!==saveConsent.token()){
+            if(['propose_account','propose_profile','end_conversation','highlight_binder_topics','switch_college_guide'].includes(item.name)&&e.response?.metadata?.origen_user_turn!==saveConsent.token()){
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'superseded_turn',instruction:'A newer user turn arrived. Follow the latest user words; do not apply an older draft or end the call.'})}});continue;
             }
             if(item.name==='end_conversation'){
@@ -630,8 +643,9 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             }
             if(item.name==='highlight_binder_topics'){
               let topics:unknown;try{topics=JSON.parse(item.arguments).topics;}catch{}
-              const applied=privacyLease.valid()&&!scopePending.current&&summaryScope.current.confirmed&&liveMode.current!=='profile'&&binderActivity.update(binderSource.current,topics);
-              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:applied?'topics_highlighted':'highlight_unavailable',instruction:'Visual update only. No notes were edited or saved. Continue the conversation naturally without announcing the highlight.'})}});continue;
+              const applied=await topicControl.update(topics,e.response?.metadata?.origen_user_turn);
+              if(generation.current!==version||closing.current?.active())return;
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:applied?'topics_highlighted':'highlight_unavailable',guide:liveMode.current,instruction:'No notes were edited or saved. The guide field identifies the currently acknowledged specialist. Continue the conversation naturally without announcing the highlight.'})}});continue;
             }
             if(linkTools.isTool(item.name)){
               const output=await linkTools.invoke(item,linkResponseTurns.get(e.response?.id)??linkTools.sequence());if(generation.current!==version||closing.current?.active())return;

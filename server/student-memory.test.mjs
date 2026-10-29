@@ -56,12 +56,14 @@ test('student memory lifecycle under real PostgreSQL RLS',{skip:!process.env.DAT
    await assert.rejects(as('a',()=>run('a',{action:'confirm',studentId:'two',id:record.id,version:1})),{status:404});
   });
   await t.test('confirm, correction, stale writes and retries preserve exactly one current version',async()=>{
+   const organization={topic:'transfer',reportedBy:'parent',certainty:'tentative'};
+   await as('a',()=>db.query('UPDATE origen_student_memories SET organization=$2::jsonb WHERE id=$1',[record.id,JSON.stringify(organization)]));
    const input={action:'confirm',studentId:'one',id:record.id,version:1};
-   let result=await as('a',()=>run('a',input));assert.equal(result.memories[0].version,2);assert.equal(result.memories[0].status,'confirmed');
+   let result=await as('a',()=>run('a',input));assert.equal(result.memories[0].version,2);assert.equal(result.memories[0].status,'confirmed');assert.deepEqual(result.memories[0].organization,organization);
    assert.equal((await as('a',()=>run('a',input))).memories[0].version,2);
    const note=createTopicRepository(db);await as('a',()=>note('a',{action:'store-suggestions',studentId:'one',summaryId:'source',language:'en',fingerprint:record.sourceVersion,notes:[{topic:'options',kind:'note',content:'OBSOLETE_WORKSPACE_DETAIL',quote:'student works evenings'}]}));
    const edit={action:'update',studentId:'one',id:record.id,version:2,memory:{...detail('The parent reports that mornings are now free.'),speaker:'parent'}};
-   result=await as('a',()=>run('a',edit));record=result.memories[0];assert.equal(record.version,3);assert.deepEqual(result.suppressedSummaryIds,['source']);
+   result=await as('a',()=>run('a',edit));record=result.memories[0];assert.equal(record.version,3);assert.deepEqual(record.organization,organization);assert.deepEqual(result.suppressedSummaryIds,['source']);
    assert.equal((await as('a',()=>run('a',edit))).memories[0].version,3);
    await assert.rejects(as('a',()=>run('a',{...edit,memory:detail('A concurrent different edit')})),{status:409});
    await assert.rejects(as('a',()=>run('a',{...input,version:2})),{status:409});

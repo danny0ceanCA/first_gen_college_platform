@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refreshBinderNotes} from '../src/binderRefresh.mjs';
-import {binderMemoryEntries,binderMemorySignalId} from '../src/binderMemory.mjs';
+import {binderMemoryEntries,binderMemorySignalId,binderMemoryReviewEntries,binderMemorySummaryEntries} from '../src/binderMemory.mjs';
 
 const result=(pending,failed=0,notes=[])=>({notes,generatedSummaryIds:notes.map(n=>n.summaryId),pendingCount:pending,background:{enabled:true,pending,failed,retryAfterMs:3000}});
 test('older failed jobs do not prevent newly saved transfer points from arriving',async()=>{
@@ -44,4 +44,19 @@ test('topic views expose existing scoped personal records without copying, confi
  assert.deepEqual(binderMemoryEntries(items,null,'transfer').map(item=>item.id),['family']);
  assert.deepEqual(binderMemoryEntries(items,'student-b','transfer').map(item=>item.id),['sibling']);
  assert.equal(binderMemorySignalId('goal'),'memory:goal');assert.notEqual(binderMemorySignalId('goal'),'goal');
+});
+
+
+test('confirming a detail removes its review card while keeping the same scoped notebook record',()=>{
+ const proposed={id:'detail',studentId:'alex',status:'proposed',organization:{topic:'transfer'},content:'Transfer next year.'};
+ const confirmed={...proposed,status:'confirmed'};
+ const other={...proposed,id:'other',studentId:'sibling'};
+ assert.deepEqual(binderMemoryReviewEntries([proposed,other],'alex'),[proposed]);
+ assert.deepEqual(binderMemoryReviewEntries([confirmed,other],'alex'),[]);
+ assert.deepEqual(binderMemoryEntries([confirmed,other],'alex','transfer'),[confirmed]);
+ assert.deepEqual(binderMemorySummaryEntries([confirmed,other],'alex'),[]);
+ const untagged={...confirmed,id:'legacy',organization:undefined};
+ const family={...untagged,id:'family',studentId:null};
+ assert.deepEqual(binderMemorySummaryEntries([untagged,family,proposed],'alex'),[untagged]);
+ assert.deepEqual(binderMemorySummaryEntries([untagged,family,proposed],null),[family]);
 });

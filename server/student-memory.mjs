@@ -47,7 +47,10 @@ export function createMemoryRepository(database){return async(subject,input,{cli
   const scope=input.studentId===null?'student_id IS NULL':'student_id=$2',args=input.studentId===null?[owner]:[owner,input.studentId];
   const revision=async()=>((await c.query('SELECT revision FROM origen_memory_scopes WHERE account_id=$1 AND scope_key=$2',[owner,input.studentId??''])).rows[0]?.revision||0);
   const bump=()=>c.query('INSERT INTO origen_memory_scopes(account_id,scope_key,student_id) VALUES($1,$2,$3) ON CONFLICT(account_id,scope_key) DO UPDATE SET revision=origen_memory_scopes.revision+1',[owner,input.studentId??'',input.studentId]);
-  const insert=async(id,version,n,status,source=null,sourceVersion=null,quote='',sourceAt=null)=>c.query('INSERT INTO origen_student_memories(account_id,id,version,student_id,category,content,language,speaker,reported_by,last_action,status,source_summary_id,source_version,source_quote,source_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[owner,id,version,input.studentId,n.category,n.content,n.language,n.speaker,reportedBy,status==='proposed'?'propose':input.action,status,source,sourceVersion,quote,sourceAt]);
+  const insert=async(id,version,n,status,source=null,sourceVersion=null,quote='',sourceAt=null)=>{const saved=await c.query('INSERT INTO origen_student_memories(account_id,id,version,student_id,category,content,language,speaker,reported_by,last_action,status,source_summary_id,source_version,source_quote,source_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[owner,id,version,input.studentId,n.category,n.content,n.language,n.speaker,reportedBy,status==='proposed'?'propose':input.action,status,source,sourceVersion,quote,sourceAt]);
+   // Preserve server-owned divider evidence when versioning an organized detail.
+   if(n.organization)await c.query('UPDATE origen_student_memories SET organization=$4::jsonb WHERE account_id=$1 AND id=$2 AND version=$3',[owner,id,version,JSON.stringify(n.organization)]);
+   return saved;};
   const current=async()=>((await c.query("SELECT * FROM origen_student_memories WHERE account_id=$1 AND id=$2 AND status<>'superseded'",[owner,input.id])).rows[0]);
   const capacity=async()=>{if(Number((await c.query("SELECT count(*) AS n FROM origen_student_memories WHERE account_id=$1 AND status IN ('proposed','confirmed')",[owner])).rows[0].n)>=200)throw fail(409,'memory_limit');};
   if(input.action==='revision'){const result={available:true,revision:await revision()};await commit();return result;}
@@ -85,7 +88,7 @@ export function createMemoryRepository(database){return async(subject,input,{cli
      await c.query("UPDATE origen_student_memories SET status='deleted',last_action='delete',content='',source_quote='',version=version+1,updated_at=now() WHERE account_id=$1 AND id=$2 AND version=$3",[owner,input.id,input.version]);
     }else{
      await c.query("UPDATE origen_student_memories SET status='superseded',content='',source_quote='',updated_at=now() WHERE account_id=$1 AND id=$2 AND version=$3",[owner,input.id,input.version]);
-     await insert(old.id,old.version+1,input.memory||old,'confirmed',old.source_summary_id,old.source_version,old.source_quote,old.source_at);
+     await insert(old.id,old.version+1,{...(input.memory||old),organization:old.organization},'confirmed',old.source_summary_id,old.source_version,old.source_quote,old.source_at);
     }
     if(old.source_summary_id&&input.action!=='confirm'){
      await c.query('UPDATE origen_memory_batches SET suppressed=true WHERE account_id=$1 AND summary_id=$2',[owner,old.source_summary_id]);
