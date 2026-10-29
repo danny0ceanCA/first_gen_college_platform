@@ -4,6 +4,7 @@ import {adminCapabilities,requireStaffAccess} from './staff-access.mjs';
 import {runAsAccount,runAsAnalytics} from './account-isolation.mjs';
 import {validateTeachingRequest} from './teaching-library.mjs';
 import {readAdminVoiceTeachings,liveTeachingDeliveryUpdates} from './admin-voice-teachings.mjs';
+import {createTeachingEvidence} from './admin-voice-evidence.mjs';
 import {adminVoiceSession,draftInstructions,teachingDraftSchema} from './admin-voice-prompts.mjs';
 import {createCostLedger,rateCard} from './admin-voice-cost.mjs';
 
@@ -16,19 +17,30 @@ export function validateVoiceStart(input){
  if(input.mode==='teach'&&input.model!=='gpt-realtime-2.1')throw fail(400,'invalid_voice_request');
  for(const [key,max] of [['scenario',1500],['campus',160],['academicYear',7]])if(typeof input[key]!=='string'||input[key].length>max)throw fail(400,'invalid_voice_request');
  if(input.academicYear&&!/^\d{4}-\d{2}$/.test(input.academicYear)||typeof input.sdp!=='string'||!input.sdp.startsWith('v=0')||input.sdp.length>100000)throw fail(400,'invalid_voice_request');
- return Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]]));
+ if(input.verifyTeachings!==undefined&&typeof input.verifyTeachings!=='boolean')throw fail(400,'invalid_voice_request');
+ return {...Object.fromEntries(['id','mode','model','language','topic','minutes','scenario','campus','academicYear'].map(k=>[k,input[k]])),verifyTeachings:input.mode==='test'&&input.verifyTeachings!==false};
 }
 
 export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSocket){
  const runs=new Map(),owners=new Set();
  const command=(identity,input)=>runAsAccount(identity,()=>runAsAnalytics(async()=>(await database.query('SELECT origen_admin_voice_command($1::jsonb) AS data',[JSON.stringify(input)])).rows[0].data));
  const refs=(run,topic,query)=>runAsAccount(run.identity,()=>runAsAnalytics(()=>readAdminVoiceTeachings(database,{...run.config,topic,query})));
- const view=run=>({...run.config,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,error:run.error||'',teachings:run.teachings,cost:run.ledger.snapshot(run.status==='ended',run.created),draft:run.draft||null,draftError:run.draftError||'',draftAvailable:run.status==='ended'&&run.config.mode==='teach'&&run.transcript.some(x=>x.role==='user'),draftBusy:!!run.draftPromise});
+ const view=run=>({...run.config,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,error:run.error||'',teachings:run.teachings,evidence:run.evidence.snapshot(),providerErrorCodes:run.providerErrorCodes,cost:run.ledger.snapshot(run.status==='ended',run.created),draft:run.draft||null,draftError:run.draftError||'',draftAvailable:run.status==='ended'&&run.config.mode==='teach'&&run.transcript.some(x=>x.role==='user'),draftBusy:!!run.draftPromise});
  const persist=run=>{const data=view(run);run.persistence=(run.persistence||Promise.resolve()).catch(()=>{}).then(()=>command(run.identity,{action:'update',id:run.config.id,data}));return run.persistence;};
- const send=(run,event)=>{if(run.socket?.readyState===1)run.socket.send(JSON.stringify(event));};
+ const send=(run,event)=>{if(run.socket?.readyState!==1)return false;run.socket.send(JSON.stringify(event));return true;};
+ function ready(run){
+  if(run.status!=='active')return;run.evidence.ready();
+  if(!run.outputTimer){run.outputTimer=setTimeout(()=>{const proof=run.evidence.snapshot();if(run.status==='active'&&!proof.outputTranscriptCharacters&&!proof.providerAudioChunks){run.error='voice_no_output';void stop(run);}},20000);run.outputTimer.unref?.();}
+  if(run.config.model!=='gpt-live-1'||run.greetingSent)return;
+  // Attached sidebands already belong to a running session. Send the greeting
+  // after the browser confirms its media channel opened, rather than depending
+  // on a one-shot session.started event arriving again on that data channel.
+  run.greetingSent=send(run,{type:'session.commentary.append',event_id:randomUUID(),delegation_id:null,content:`Introduce yourself as Origen, the AI guide, in ${run.config.language==='es'?'Spanish':'English'}. Ask the caller to begin, then listen.`});
+ }
  function finish(run,reason){
-  if(run.finalized)return;run.finalized=true;run.status='ended';run.endedAt=new Date().toISOString();clearInterval(run.timer);owners.delete(run.identity.sub);
+  if(run.finalized)return;run.finalized=true;run.status='ended';run.endedAt=new Date().toISOString();clearInterval(run.timer);clearTimeout(run.outputTimer);owners.delete(run.identity.sub);
   if(reason){run.error=reason;run.ledger.missing();}
+  const proof=run.evidence.snapshot();if(!run.error&&proof.readyAt&&!proof.outputTranscriptCharacters&&!proof.providerAudioChunks)run.error='voice_no_output';
   void persist(run).catch(()=>{run.error='voice_save_failed';});
   run.socket?.close();
   run.expiry=setTimeout(()=>{run.transcript=[];runs.delete(run.config.id);},10*60*1000);run.expiry.unref?.();
@@ -62,6 +74,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    const args=JSON.parse(item.arguments||'{}');
    if(item.name!=='search_teaching_library'||!topics.includes(args.topic)||typeof args.query!=='string'||args.query.length>1500||run.tools.size>20||run.config.mode!=='test')throw Error('invalid_tool');
    const entries=await refs(run,args.topic,args.query);
+   run.evidence.supplied(entries);
    if(run.config.model==='gpt-live-1')for(const content of liveTeachingDeliveryUpdates(entries))send(run,{type:'session.instructions.append',event_id:randomUUID(),delegation_id:null,content});
    run.teachings.push({topic:args.topic,source:'tool',at:new Date().toISOString(),entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    result={entries};
@@ -72,6 +85,8 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   if(run.finalized)return;
   run.ledger.ingest(envelope);
   const e=envelope.type==='response.event'?envelope.event:envelope;
+  if(e.type==='session.output_transcript.delta'||e.type==='response.output_audio_transcript.delta'){run.evidence.transcript(e.delta);if(typeof e.delta==='string'&&e.delta.length)clearTimeout(run.outputTimer);}
+  if(e.type==='session.output_audio.delta'||e.type==='response.output_audio.delta'){run.evidence.audio();clearTimeout(run.outputTimer);}
   const batchKey=envelope.delegation_id||e.response_id||e.response?.id||'realtime';
   if(e.type==='conversation.item.input_audio_transcription.completed'){
    if(!run.transcribed.has(e.item_id)){run.transcribed.add(e.item_id);run.transcript.push({role:'user',content:String(e.transcript||'').slice(0,8000)});}
@@ -87,6 +102,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   }
   if(e.type==='session.closed'){finish(run);run.resolveClosed();}
   if(e.type==='error'&&!['response_cancel_not_active','response_cancel_not_found'].includes(e.error?.code)){
+   const code=e.error?.code;if(typeof code==='string'&&/^[a-z0-9_]{1,80}$/.test(code)&&!run.providerErrorCodes.includes(code)&&run.providerErrorCodes.length<16)run.providerErrorCodes.push(code);
    run.error='voice_provider_error';run.ledger.missing();void stop(run);
   }
  }
@@ -108,7 +124,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   if(!env.OPENAI_API_KEY)throw fail(503,'voice_not_configured');
   if(owners.has(identity.sub)||[...runs.values()].filter(r=>!r.finalized).length>=4)throw fail(409,'voice_already_active');
   owners.add(identity.sub);
-  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),teachings:[],tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
+  const run={config,identity,status:'starting',startedAt:new Date().toISOString(),created:false,ledger:createCostLedger(config.model),evidence:createTeachingEvidence(),providerErrorCodes:[],teachings:[],tools:new Map(),batches:new Map(),transcript:[],transcribed:new Set(),lastPing:Date.now()};
   run.closed=new Promise(resolve=>run.resolveClosed=resolve);
   run.startPending=true;run.startDone=new Promise(resolve=>run.resolveStart=resolve);
   let reserved=false;
@@ -116,6 +132,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    // Reserve before the paid API call. A duplicate/retry never starts another call.
    await command(identity,{action:'create',id:config.id,data:view(run)});reserved=true;runs.set(config.id,run);
    const entries=config.mode==='test'?await refs(run,config.topic,config.scenario):[];
+   run.evidence.supplied(entries);
    run.teachings.push({topic:config.topic,source:'initial',at:run.startedAt,entries:entries.map(e=>({id:e.id,revision:e.revision,title:e.content.title}))});
    const session=adminVoiceSession(config,entries),headers={Authorization:`Bearer ${env.OPENAI_API_KEY}`};let answer;
    if(config.model==='gpt-live-1'){
@@ -175,7 +192,7 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
   try{
    let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>110000)return respond(413,{error:'request_too_large'});}
    let input;try{input=JSON.parse(raw);}catch{throw fail(400,'invalid_voice_request');}
-   if(!input||!['list','start','status','stop','draft'].includes(input.action))throw fail(400,'invalid_voice_request');
+   if(!input||!['list','start','status','stop','draft','ready','playback'].includes(input.action))throw fail(400,'invalid_voice_request');
    if(input.action!=='list'&&!uuid.test(input.id))throw fail(400,'invalid_voice_request');
    await requireStaffAccess(database,identity,{scope:'admin',action:'voice-'+input.action,target:input.id,permission:'manage:institutions',env,fresh:['start','draft'].includes(input.action)});
    if(input.action==='list')return respond(200,{runs:await command(identity,{action:'list'}),configured:!!env.OPENAI_API_KEY,rateCard});
@@ -184,6 +201,8 @@ export function createAdminVoiceHandler(database,env,request=fetch,Socket=WebSoc
    if(run&&run.identity.sub!==identity.sub)throw fail(404,'voice_run_not_found');
    if(!run){const saved=await command(identity,{action:'get',id:input.id});if(!saved)throw fail(404,'voice_run_not_found');if(input.action==='draft'){if(saved.draft)return respond(200,saved);throw fail(409,'teaching_transcript_unavailable');}if(saved.status==='ended')return respond(200,{...saved,draftAvailable:false});return respond(200,{...saved,status:'ended',cost:{...saved.cost,complete:false},draftAvailable:false,error:saved.error||'session_not_on_this_server'});}
    if(input.action==='stop')await stop(run);
+   if(input.action==='ready')ready(run);
+   if(input.action==='playback'&&run.status==='active')run.evidence.playback();
    if(input.action==='draft')return respond(200,await draft(run));
    run.lastPing=Date.now();return respond(200,view(run));
   }catch(error){return respond(error.status||503,{error:error.status?error.message:'voice_studio_unavailable'});}

@@ -77,7 +77,9 @@ test('real PostgreSQL migration grants no raw table access and scopes retained r
  await assert.rejects(command('b',{action:'update',id,data:{status:'ended'}}),{code:'42501'});
  await assert.rejects(f.runtime.query('SELECT * FROM origen_admin_voice_runs'),{code:'42501'});
  await assert.rejects(f.as('a',()=>f.db.query('SELECT origen_admin_voice_command($1::jsonb)',[JSON.stringify({action:'list'})])),{code:'42501'});
- await command('a',{action:'update',id,data:{status:'ended'}});await command('a',{action:'create',id:randomUUID(),data:{status:'active'}});
+ const evidence={outputTranscriptCharacters:80,browserPlaybackReported:true,matches:[{id:'teaching',revision:8,quote:'Your experiences matter even when they do not appear'}]};
+ await command('a',{action:'update',id,data:{status:'ended',evidence}});assert.deepEqual((await command('a',{action:'get',id})).evidence,evidence);assert.equal(await command('b',{action:'get',id}),null);
+ await command('a',{action:'create',id:randomUUID(),data:{status:'active'}});
 });
 test('stale authentication, revoked access, or unavailable audit cannot start paid calls',async t=>{
  for(const problem of ['stale','revoked','audit']){
@@ -97,4 +99,22 @@ test('sideband loss hangs up Realtime and marks accounting incomplete',async t=>
 });
 test('failed draft preparation never becomes a false complete cost or a published teaching',async t=>{
  const f=fixture({providerOverride:async url=>url.endsWith('/responses')?new Response('',{status:503}):undefined});t.after(()=>f.handler.close());const c={...config(),mode:'teach'};await f.call(c);f.sockets[0].event({type:'conversation.item.input_audio_transcription.completed',item_id:'u',transcript:'My own explanation.',usage:{input_tokens:10,output_tokens:10}});await f.call({action:'stop',id:c.id});const result=await f.call({action:'draft',id:c.id});assert.equal(result.body.draft,null);assert.equal(result.body.draftError,'draft_failed');assert.equal(result.body.cost.complete,false);
+});
+test('browser media-ready handshake greets Live once even when session.started was missed',async t=>{
+ const f=fixture();t.after(()=>f.handler.close());const c={...config(),model:'gpt-live-1'};await f.call(c);
+ await Promise.all([f.call({action:'ready',id:c.id}),f.call({action:'ready',id:c.id})]);
+ assert.equal(f.sockets[0].sent.filter(e=>e.type==='session.commentary.append').length,1);
+ const session=JSON.parse(f.provider[0].options.body).session;assert.equal(session.input[0].role,'developer');assert.match(session.input[0].content[0].text,/introduce yourself as Origen/);
+ const result=await f.call({action:'stop',id:c.id});assert.equal(result.body.error,'voice_no_output');assert.equal(result.body.evidence.matches.length,0);
+});
+test('a media-ready session with no output stops automatically instead of silently consuming minutes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','setInterval']});const f=fixture();t.after(()=>f.handler.close());const c={...config(),model:'gpt-live-1'};await f.call(c);await f.call({action:'ready',id:c.id});t.mock.timers.tick(20001);await new Promise(resolve=>setImmediate(resolve));
+ const result=await f.call({action:'status',id:c.id});assert.equal(result.body.error,'voice_no_output');assert.equal(result.body.status,'ended');assert.equal(f.sockets[0].sent.filter(e=>e.type==='session.close').length,1);
+});
+test('only spoken output events create teaching evidence; backend text alone is insufficient',async t=>{
+ const explanation="Your experiences matter even when they don't appear on a transcript";
+ const f=fixture({dbOverride:async(sql,params)=>sql.includes('origen_read_teachings')?{rows:[{data:[{id:'proof',revision:8,content:{title:'Essay',topic:JSON.parse(params[0]).topic,explanation}}]}]}:undefined});t.after(()=>f.handler.close());const c={...config(),model:'gpt-live-1'};await f.call(c);await f.call({action:'ready',id:c.id});
+ const socket=f.sockets[0];socket.event({type:'response.event',event:{type:'response.output_text.delta',delta:explanation}});assert.equal((await f.call({action:'status',id:c.id})).body.evidence.matches.length,0);
+ socket.event({type:'session.output_transcript.delta',delta:explanation});socket.event({type:'session.output_audio.delta',delta:'AA=='});
+ const result=await f.call({action:'stop',id:c.id});assert.equal(result.body.error,'');assert.equal(result.body.evidence.matches[0].revision,8);assert.equal(result.body.evidence.providerAudioChunks,1);
 });
