@@ -1,4 +1,5 @@
 import {studentLivePlayback} from './studentLivePlayback.mjs';
+import {accountDraftProposal,type AccountDraft} from './voiceAccountDraft.mjs';
 import {studentLiveChannel} from './studentLiveChannel.mjs';
 import {conversationCheckpoint,type CheckpointState} from './conversationCheckpoint.mjs';
 import {recoveryChoice,recoveryRequest,activeCheckpoints} from './conversationRecovery';
@@ -54,7 +55,7 @@ const labels = {
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export type VoiceHandoff={studentId:string|null;confirmed:boolean;language:'en'|'es';turns:{role:'user'|'assistant';text:string}[]};
-export type VoiceProps={onBusy?:(busy:boolean)=>void;workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:{firstName:string;role:'parent'|'student'})=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={onBusy?:(busy:boolean)=>void;workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:AccountDraft)=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
@@ -467,7 +468,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
           if(generation.current!==version||closing.current?.active())return;
           homeClosing.current=true;trackOnboarding('home_introduction_requested');
-          closeWithFarewell(homeVoiceIntroduction(spokenLanguage.current,{preview:!history.cloud}));
+          closeWithFarewell(homeVoiceIntroduction(spokenLanguage.current,{preview:!history.cloud,role:latestSetup.current.role}));
         }catch{transitioned.current=false;trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved, but home could not open yet. Please try again.','Tu perfil está guardado, pero no se pudo abrir el inicio. Intenta de nuevo.'));}finally{release();}
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
@@ -743,7 +744,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
             }
             if(item.name==='propose_account'&&onAccountDraft){
               let accepted=false;
-              try{const details=JSON.parse(item.arguments);if(typeof details.firstName==='string'&&details.firstName.trim()&&details.firstName.length<=100&&['parent','student'].includes(details.role)){onAccountDraft({firstName:details.firstName.trim(),role:details.role});accepted=true;}}catch{}
+              try{const details=accountDraftProposal(JSON.parse(item.arguments));if(details){onAccountDraft(details);accepted=true;}}catch{}
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'account_draft_updated_not_saved':'invalid_account_draft'})}});continue;
             }
             if(mode==='profile'&&item.name==='propose_profile')try{

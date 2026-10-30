@@ -6,8 +6,24 @@ import {createServer} from 'node:http';
 import {createHistoryRepository} from './history.mjs';
 import {resetTestSession} from '../src/testSessionReset.mjs';
 import {createLogoutTransition} from '../src/logoutHandoff.mjs';
+import {ONBOARDING_TEST_SUBJECT} from '../src/testAccount.mjs';
 
 const identity={sub:'test-owner',email:'test@test.org',email_verified:true};
+test('the pinned synthetic Auth0 identity resets even though its fictional email is unverified',async()=>{
+ const {pool,run}=await fixture();
+ const pinned={sub:ONBOARDING_TEST_SUBJECT,email:'test@test.org',email_verified:false};
+ try{
+  await run(pinned.sub,{action:'save-student',student:{id:'s',name:'Synthetic',stage:'College'}});
+  let stopped=false;
+  await resetTestSession({user:pinned,getToken:async()=> 'synthetic-token',stop:()=>{stopped=true;},fetcher:async()=>{
+   assert.equal(stopped,true);
+   const result=await createLifecycleRepository(pool)(pinned.sub,{action:'reset-test-session'},pinned);
+   return {ok:true,json:async()=>result};
+  }});
+  assert.deepEqual((await run(pinned.sub,{action:'load'})).students,[]);
+  assert.equal(await accountClosed(pool,pinned.sub),false);
+ }finally{await pool.end();}
+});
 test('test workspace survives normal loads, resets on logout, and can onboard again without closing sign-in',async()=>{
  const {pool,run}=await fixture();const life=createLifecycleRepository(pool);
  try{

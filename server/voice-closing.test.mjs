@@ -80,7 +80,7 @@ test('normal turn completions cannot restart output after closing cancels work',
 test('saved onboarding closes with a short home orientation in both languages, never an exploration question',()=>{
  for(const language of ['en','es']){
   const f=fixture(language);const intro=homeVoiceIntroduction(language);f.closing.begin(intro);
-  assert.match(intro,/home page is now open/);assert.match(intro,language==='es'?/Mi carpeta/:/My binder/);
+  assert.match(intro,/binder is now open/);assert.match(intro,language==='es'?/Esta es tu carpeta/:/This is your binder/);
   assert.match(intro,language==='es'?/botón con el círculo de Origen/:/Origen circle button/);
   assert.doesNotMatch(intro,/What would you like|Qué te gustaría|\?/);
   assert.equal([...f.timers.values()][0].delay,45000);

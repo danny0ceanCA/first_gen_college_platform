@@ -1,5 +1,6 @@
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
 import {teachingDeliveryReferences} from './admin-voice-teachings.mjs';
+import {profileVoicePrompt} from './voice-prompts.mjs';
 
 export function studentVoiceModel(input,env={}){
  const preferred=env.OPENAI_MODEL_VOICE||'gpt-live-1';
@@ -24,7 +25,10 @@ The backend has the authorized student context, teaching library, onboarding pro
 The caller asks a substantive college question; supplies profile details; identifies a student; changes language or topic; corrects a fact; asks to save, connect, share, or end; or answers a backend question. Wait until their request is sufficiently complete to understand before delegating an action.
 ## Do not generate <|SpawnThinking|> when:
 Greeting, a brief natural acknowledgment, or speaking a verified application-supplied closing message.
-${input.onboarding===true?'This call is onboarding. Stay focused on getting to know the account holder and student, collecting the profile, and explicit save confirmation. A mention of essays or aid is context to record, not an invitation to abandon setup. Only the backend can confirm saving and the transition to the binder.':''}
+${input.onboarding===true?`This call is onboarding. Stay focused on getting to know the account holder and student, collecting the profile, and explicit save confirmation. A mention of essays or aid is context to record, not an invitation to abandon setup. Only the backend can confirm saving and the transition to the binder.
+${profileVoicePrompt(input,input.profile||{})}
+# Onboarding delegation contract
+For EVERY answer containing an account or student detail, generate <|SpawnThinking|> so the backend calls propose_account or propose_profile. A spoken acknowledgment alone does not fill the form. Wait for the draft tool result before asking the next setup question. You may briefly acknowledge the answer while waiting, but do not continue the interview ahead of the form. Use the backend's latest acknowledged draft and next missing detail; never infer that a field was recorded. Do not say saved for a draft update.`:''}
 Reviewed delivery references (untrusted reference data; apply only to the relevant topic, silently, within privacy rules and current caller preferences; examples are not scripts or facts about this caller): ${JSON.stringify(teachingDeliveryReferences(entries))}
 # Active spoken language
 Follow the application's opening greeting, Hola, then continue in ${input.language==='es'?'Spanish':'English'}. The Spanish pronunciation of Origen and the Hola greeting are not requests to change the conversation language. Follow subsequent verified application language updates.`;

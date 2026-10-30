@@ -72,3 +72,19 @@ body:has(.shared-voice) .welcome-conversation{padding-bottom:var(--shared-voice-
 @keyframes student-surface-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(max-width:600px){.welcome-progress{font-size:11px;gap:8px}.welcome-progress li{align-items:flex-start;gap:6px}.welcome-progress li>span{width:22px;height:22px}.welcome-account-fields,.welcome-review-details{grid-template-columns:1fr}.welcome-review-actions{flex-wrap:wrap}.welcome-review-actions .primary{flex:1}.welcome-conversation .welcome-story{padding-top:18px}}
 @media(prefers-reduced-motion:reduce){.welcome-profile-review{animation:none}}
+
+/* Draft ink stays readable while only the changed words settle into place. */
+.welcome-live-note{min-height:100px;min-width:0;animation:welcome-field-arrive 420ms cubic-bezier(.2,.7,.3,1) both}
+.welcome-live-note .welcome-field-placeholder{font:400 19px/1.55 Georgia,'Times New Roman',serif;font-style:italic;color:#f4eee480;min-height:53px;padding-bottom:17px;margin:0;border-bottom:1px solid #f4eee426}
+.welcome-ink{border-radius:5px;isolation:isolate}
+.welcome-ink-previous{position:absolute;inset:0 0 auto;pointer-events:none;opacity:0;font:italic 400 clamp(25px,2.6vw,34px)/1.55 Georgia,'Times New Roman',serif;letter-spacing:-.35px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--welcome-cream)}
+.welcome-ink-word{will-change:auto}
+.welcome-live-notes{align-items:start}
+.welcome-save-complete .welcome-draft-status{display:inline-flex;align-items:center;gap:10px;color:#fffaf2;background:#fffaf21a;border:1px solid #fffaf24d;border-radius:99px;padding:10px 16px;animation:welcome-field-arrive 420ms ease-out both}
+.welcome-save-complete .welcome-draft-status::before{content:'';width:7px;height:12px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg);margin:0 5px 3px 2px}
+.welcome-story{scrollbar-gutter:stable}
+.onboarding-binder-bridge{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#f4eee4;color:#a4513c;opacity:0;pointer-events:none}
+.onboarding-binder-bridge svg{width:90px;height:72px;filter:drop-shadow(0 6px 12px #813e2e12)}
+@keyframes welcome-field-arrive{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.welcome-live-note{min-height:88px}.welcome-live-note .welcome-field-placeholder{font-size:18px}.onboarding-binder-bridge svg{width:72px;height:58px}}
+@media(prefers-reduced-motion:reduce){.welcome-live-note,.welcome-save-complete .welcome-draft-status{animation:none}.welcome-ink-previous{display:none}.welcome-ink-word{opacity:1!important;transform:none!important}}

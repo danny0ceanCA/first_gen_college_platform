@@ -1,9 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isOnboardingTestAccount,shouldReplayTestOnboarding,testAccountAdultScreen,testWorkspaceSeed} from '../src/testAccount.mjs';
+import {ONBOARDING_TEST_SUBJECT,isOnboardingTestAccount,shouldReplayTestOnboarding,testAccountAdultScreen,testWorkspaceSeed} from '../src/testAccount.mjs';
 import {fixture} from './family-fixture.mjs';
 import {createPermissionRepository} from './guardian-permission.mjs';
 const owner={sub:'auth0|synthetic-owner',email:'test@test.org',email_verified:true};
+
+test('designated fictional-mailbox identity is recognized without falsifying email verification',()=>{
+ const pinned={sub:ONBOARDING_TEST_SUBJECT,email:'test@test.org',email_verified:false};
+ assert.equal(isOnboardingTestAccount(pinned),true);
+ assert.equal(shouldReplayTestOnboarding(pinned,'new','old'),true);
+ assert.equal(isOnboardingTestAccount({...pinned,sub:'auth0|different'}),false);
+ assert.equal(isOnboardingTestAccount({...pinned,email:'other@example.org'}),false);
+ assert.equal(isOnboardingTestAccount({...pinned,sub:''}),false);
+});
 
 test('test conveniences require the exact verified signed-in identity',()=>{
  assert.equal(isOnboardingTestAccount(owner),true);
