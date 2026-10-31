@@ -1,0 +1,2 @@
+export type GuidanceFollowThrough={stepsTruncated?:boolean;state:'available'|'explored'|'deferred';revision:number;feedbackVersion:number|null;updatedAt:string|null;steps:{planId:string;stepId:string;status:'not-started'|'in-progress'|'complete'|'deferred';planStatus:'active'|'archived';planVersion:number;feedbackVersion:number}[]};
+export function guidanceProgress(progress?:GuidanceFollowThrough|null):{state:'suggested'|'explored'|'deferred'|'accepted'|'in-progress'|'complete'|'archived';hasLinkedSteps:boolean;shouldOffer:boolean};

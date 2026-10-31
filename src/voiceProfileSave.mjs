@@ -12,6 +12,7 @@ export function voiceProfileSaveConsent(){
   begin(id){if(id!==itemId){itemId=id;sequence++;}consent=false;},
   transcript(id,text){if(itemId&&id!==itemId)return false;if(!itemId){itemId=id;sequence++;}consent=explicitProfileSaveRequest(text);return true;},
   token:()=>String(sequence),
+  requested:token=>token===String(sequence)&&consent,
   consume(token){if(token!==String(sequence))return false;const accepted=consent;consent=false;return accepted;},
   clear(){sequence++;consent=false;},
  };

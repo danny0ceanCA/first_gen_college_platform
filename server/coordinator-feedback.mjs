@@ -8,7 +8,7 @@ const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}
 const text=(v,n)=>typeof v==='string'&&v.trim().length>0&&v.length<=n&&!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(v);
 export const coordinatorFeedbackEnabled=env=>coordinatorViewingEnabled(env)&&env.ORIGEN_COORDINATOR_FEEDBACK==='true';
 export function validateFeedbackInput(v){
- const actions=['staff-list','staff-thread','staff-create','staff-edit','staff-withdraw','student-list','student-thread','student-review','student-reply','student-hide','student-unhide','student-remove','student-report'];
+ const actions=['staff-list','staff-thread','staff-create','staff-edit','staff-withdraw','student-list','student-thread','student-review','student-reply','student-hide','student-unhide','student-remove','student-report','student-follow-through'];
  if(!v||!actions.includes(v.action))throw fail(400,'invalid_feedback_request');
  const out={action:v.action},staff=v.action.startsWith('staff-');
  if(staff){if(!uuid(v.organizationId)||!uuid(v.grantId))throw fail(400,'invalid_feedback_request');out.organizationId=v.organizationId;out.grantId=v.grantId;}
@@ -25,6 +25,7 @@ export function validateFeedbackInput(v){
  }
  if(v.action==='staff-create'){if(!['options','transfer','costs','applications'].includes(v.topic)||!uuid(v.publicationId)||v.publicationItemId!=null&&!uuid(v.publicationItemId))throw fail(400,'invalid_feedback_request');out.topic=v.topic;out.publicationId=v.publicationId;if(v.publicationItemId)out.publicationItemId=v.publicationItemId;}
  if(v.action==='student-report'){if(!['abuse','spam','inaccurate','privacy','other'].includes(v.reason))throw fail(400,'invalid_feedback_request');out.reason=v.reason;}
+ if(v.action==='student-follow-through'){if(!['available','explored','deferred'].includes(v.state)||!Number.isSafeInteger(v.progressRevision)||v.progressRevision<0)throw fail(400,'invalid_feedback_request');out.state=v.state;out.progressRevision=v.progressRevision;}
  return out;
 }
 export async function runFeedbackCommand(database,input){
@@ -56,6 +57,7 @@ export function createCoordinatorFeedbackHandler(database,env={},fetcher=fetch){
 };}
 export async function assertCoordinatorFeedbackReady(database,env){
  if(!coordinatorFeedbackEnabled(env))return;
+ if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='093_private_guidance_follow_through.sql'")).rows.length)throw new Error('private_guidance_follow_through_migration_required');
  if(!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='071_preserve_coordinator_lock_order.sql'")).rows.length)throw new Error('coordinator_lock_order_migration_required');
  if((derivedSharingEnabled(env)||env.ORIGEN_COORDINATOR_FOLLOW_THROUGH==='true')&&!(await database.query("SELECT 1 FROM origen_schema_migrations WHERE name='068_coordinator_follow_through.sql'")).rows.length)throw new Error('coordinator_follow_through_migration_required');
  const fn='origen_coordinator_feedback_command(jsonb)';

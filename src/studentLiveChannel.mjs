@@ -4,6 +4,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0;
+ let draftTimer,lastDelegatedEpoch=-1;
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
@@ -16,6 +17,15 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   const item_id=inputId,transcript=input;input='';inputId='';
   await emit({type:'input_audio_buffer.speech_stopped',item_id});
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
+  // Live can acknowledge a profile answer without delegating it. Give natural
+  // delegation a brief head start, then ask the same guarded backend to process
+  // this complete answer. This never parses or saves a profile in the adapter.
+  if(draftTimer)cancel(draftTimer);const inputEpoch=epoch;
+  if(session.onboarding&&session.tools?.some(tool=>tool.name==='review_onboarding_profile'))draftTimer=schedule(()=>{
+   draftTimer=null;
+   if(closed||inputId||responses.size||epoch!==inputEpoch||lastDelegatedEpoch===inputEpoch||!session.tools?.some(tool=>tool.name==='review_onboarding_profile'))return;
+   lastDelegatedEpoch=inputEpoch;transmit({type:'response.create',event_id:id()});
+  },1200);
  }
  async function finishSpeech(force=false){
   if(outputTimer)cancel(outputTimer);outputTimer=null;if(!outputId)return;
@@ -47,11 +57,12 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(e.type==='response.event'){
    const event=e.event||{},responseId=event.response?.id||event.response_id||[...responses].find(([,value])=>value.delegationId===e.delegation_id)?.[0];
-   if(event.type==='response.created'){responses.set(responseId,{epoch,turn:null,output:[],delegationId:e.delegation_id});return;}
+   if(event.type==='response.created'){lastDelegatedEpoch=epoch;responses.set(responseId,{epoch,turn:null,output:[],delegationId:e.delegation_id});await emit({type:'origen.backend.started',response_id:responseId});return;}
    const response=responses.get(responseId);
    if(event.type==='response.output_item.done'&&event.item?.type==='function_call'){if(response&&!response.output.some(item=>item.call_id===event.item.call_id))response.output.push(event.item);return;}
    if(['response.completed','response.failed','response.cancelled','response.incomplete'].includes(event.type)){
     if(!response||seenResponses.has(responseId))return;seenResponses.add(responseId);responses.delete(responseId);
+    try{
     // Complete transcription before the existing consent and scope handlers run.
     // A later input fragment invalidates all actions from this older response.
     while(inputId&&now()-lastInput<1100&&!closed)await new Promise(resolve=>schedule(resolve,Math.max(20,1100-(now()-lastInput))));
@@ -67,6 +78,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
      transmit({type:'response.create',event_id:id()});return;
     }
     if(output.length){await emit({type:'response.created',response:{id:responseId,metadata}});await emit({type:'response.done',response:{id:responseId,metadata,status:event.response?.status||(event.type==='response.completed'?'completed':event.type.split('.').at(-1)),output}});}
+    }finally{await emit({type:'origen.backend.finished',response_id:responseId});}
     return;
    }
    return;
@@ -95,6 +107,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     if(response.instructions)append('session.instructions.append',response.instructions);
     transmit({type:'session.commentary.append',event_id:event.event_id||id(),delegation_id:null,content:special==='origen_farewell'?'Give the application-requested closing message now, then stop speaking. Do not run tools or ask another question.':special==='origen_lookup_progress'?'Give the brief verified progress update requested above, without extra claims.':`Follow the application opening: greet with Hola and introduce yourself as Origen, an AI college guide, then ask one short ${session.onboarding?'onboarding question following the application setup instructions':'question about what the student wants to discuss today'}. After Hola, speak ${session.language==='es'?'Spanish':'English'}, then listen.`});
    }else if(continuation){continuation=false;transmit({type:'response.create',event_id:event.event_id});}
+   else return false; // Continuous speech needs no requested response to wait for.
    return;
   }
   if(event.type==='input_audio_buffer.commit'){void flushInput();return;}
@@ -107,6 +120,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  const api={configure(data){live=data.voiceProvider==='live';session=data.voiceSession||{};},flush:async()=>{if(live){await flushInput();await finishSpeech(true);}}};
  raw.onmessage=event=>{try{void receive(JSON.parse(event.data)).catch(()=>void emit({type:'error',error:{code:'live_adapter_failed'}}));}catch{void emit({type:'error',error:{code:'live_event_invalid'}});}};
- raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>handlers.onclose?.(event);
- return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;cancel(inputTimer);cancel(outputTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
+ raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>{if(draftTimer)cancel(draftTimer);handlers.onclose?.(event);};
+ return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
 }

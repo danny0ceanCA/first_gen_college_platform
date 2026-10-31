@@ -1,5 +1,7 @@
+import {loadRelevantCoordinatorGuidance} from './coordinator-voice-context.mjs';
+import {coordinatorFeedbackEnabled} from './coordinator-feedback.mjs';
 import {negotiateStudentLive,studentLiveInstructions,studentVoiceModel} from './student-live-session.mjs';
-import {prepareTeachingAccess} from './teaching-library.mjs';
+import {prepareTeachingAccess,teachingSituationQuery} from './teaching-library.mjs';
 import {voiceMemoryPrompt,financeVoicePrompt,admissionsVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
 import {coordinatorVoiceAvailable} from './coordinator-connections.mjs';
 import {coordinatorLinkTools,coordinatorLinkInstructions} from './coordinator-voice-tools.mjs';
@@ -44,7 +46,7 @@ export function voiceSession(input, env) {
   const session={
     type:'realtime',model:env.OPENAI_MODEL_VOICE||'gpt-realtime-2.1',
     audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',prompt:bilingualTranscriptionPrompt},turn_detection:{type:'server_vad',threshold:0.65,prefix_padding_ms:300,silence_duration_ms:700,create_response:false,interrupt_response:true}},output:{voice:'marin',speed:1}},
-    tools:scopePending?[routing.tool]:planning?[planningTool]:admissions?[admissionsTool]:finance?[financeTool]:[{type:'function',name:'propose_profile',description:setup?'Immediately update the visible unsaved onboarding form with explicitly supplied details or corrections. Replace corrected fields and preserve unrelated fields; do not ask for confirmation of every draft edit. This does not save the profile.':'Propose updated profile fields for review, without saving them.',parameters:{type:'object',properties:{changes:{type:'array',items:{type:'object',properties:{field:{type:'string',enum:profileFields},value:{type:'string'}},required:['field','value'],additionalProperties:false}}},required:['changes'],additionalProperties:false}}],
+    tools:scopePending?[routing.tool]:planning?[planningTool]:admissions?[admissionsTool]:finance?[financeTool]:[{type:'function',name:'propose_profile',description:setup?'Immediately update the visible unsaved onboarding form with explicitly supplied details or corrections. Replace corrected fields and preserve unrelated fields; do not ask for confirmation of every draft edit. This does not save the profile.':'Propose updated profile fields for review, without saving them.',parameters:{type:'object',properties:{changes:{type:'array',items:{type:'object',properties:{field:{type:'string',enum:profileFields},value:{type:'string'},clear:{type:'boolean',description:'Only true when the user explicitly asks to remove this optional field. Never clear fields as part of saving or merely because they were not mentioned.'}},required:['field','value'],additionalProperties:false}}},required:['changes'],additionalProperties:false}}],
     tool_choice:'auto',max_output_tokens:1500,
   };
   if(routing&&!scopePending)session.tools.push(routing.tool);
@@ -55,12 +57,13 @@ export function voiceSession(input, env) {
     session.tools.push({type:'function',name:'switch_college_guide',description:'Continue the same conversation in the specialty needed for the user’s current question. Use only when another guide’s specialty is needed, not just because a related topic is mentioned. Preserve the confirmed student or general family scope and language. No user confirmation form is needed.',parameters:{type:'object',additionalProperties:false,properties:{guide:{type:'string',enum:['planning','finance','loans','admissions'].filter(g=>g!==input.mode)}},required:['guide']}});
   }
   if(input.collectAccount===true&&input.mode==='profile'&&!scopePending)session.tools.push({type:'function',name:'propose_account',description:'Immediately record each explicitly stated account field as an unsaved onboarding draft, even if only firstName or role is known. Never invent a missing field or substitute a student name for a parent name.',parameters:{type:'object',properties:{firstName:{type:'string'},role:{type:'string',enum:['parent','student']}},required:[],minProperties:1,additionalProperties:false}});
+  if(setup&&!scopePending)session.tools.push({type:'function',name:'review_onboarding_profile',description:'Make the current populated draft ready for final review only after account name and role, student name, education stage (or explicitly unknown), and the optional question answered or declined. First apply every supplied detail with draft tools. Then give a brief recap and ask whether to save. This does not save or grant consent.',parameters:{type:'object',properties:{education_stage_addressed:{type:'boolean',enum:[true]}},required:['education_stage_addressed'],additionalProperties:false}});
   if(input.saveOnboarding===true&&(input.collectAccount===true||input.onboarding===true)&&input.mode==='profile'&&!scopePending)session.tools.push({type:'function',name:'save_onboarding_profile',description:'Save the current onboarding account and student profile only after the user asks to save, in English or Spanish. The live call continues. First propose all details shared in this turn. Do not claim a save until this tool reports success.',parameters:{type:'object',properties:{requested_by_user:{type:'boolean',enum:[true]}},required:['requested_by_user'],additionalProperties:false}});
   if(!scopePending&&!setup&&input.liveMemoryEnabled)session.tools.push(...liveMemoryTools.filter(t=>t.name==='recall_student_context'?input.liveMemoryReadEnabled!==false:input.liveMemoryWriteEnabled!==false));
   if(!scopePending&&!setup&&input.guidedConversation&&input.liveMemoryEnabled)session.tools.push(...guidedConversationTools.filter(t=>t.name==='get_guidance_question'?input.adaptiveEnabled!==false:input.liveMemoryWriteEnabled!==false));
   if(input.coordinatorLinking&&!scopePending&&!setup)session.tools.push(...coordinatorLinkTools);
   session.tools.push({type:'function',name:'end_conversation',description:'End this call only when the person clearly concludes or says goodbye. A bare thanks, a pause, or thanks followed by another question is not a request to end. The app will speak a brief farewell and disconnect after playback. Do not say a separate farewell first.',parameters:{type:'object',properties:{requested_by_user:{type:'boolean',enum:[true]}},required:['requested_by_user'],additionalProperties:false}});
-  if(setup)session.tools=session.tools.filter(t=>['propose_profile','propose_account','save_onboarding_profile','set_conversation_language','end_conversation'].includes(t.name));
+  if(setup)session.tools=session.tools.filter(t=>['propose_profile','propose_account','review_onboarding_profile','save_onboarding_profile','set_conversation_language','end_conversation'].includes(t.name));
   const has=name=>session.tools.some(t=>t.name===name);
   if(!has('recall_student_context')){
     const descriptions={
@@ -215,6 +218,17 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         const preparedContextId=versionBefore!==undefined&&versionBefore===versionAfter?preparations.put(req.origenIdentity.sub,preparationKey,versionAfter,{input,storedRole}):undefined;
         return send(200,{preparedContextId:preparedContextId||null});
       }
+      // Fetch after preparation/cache reuse: hidden, edited or withdrawn comments
+      // must not be restored from a prepared voice snapshot.
+      if(input.workspace)delete input.workspace.relatedCoordinatorGuidance;
+      if(req.origenAuthorized&&input.workspace?.available&&input.onboarding!==true&&policy.retrieval&&coordinatorFeedbackEnabled(env)&&!input.workspaceFocus?.kind?.includes('coordinator-guidance')){
+        const topics=input.workspace.topic?[input.workspace.topic]:input.mode==='finance'||input.mode==='loans'?['costs']:input.mode==='admissions'?['applications']:['options','transfer'];
+        const query=Array.isArray(input.continuity)?input.continuity.filter(t=>t?.role==='user'&&typeof t.text==='string').at(-1)?.text?.slice(0,1000)||'':'';
+        try{
+          const guidance=await loadRelevantCoordinatorGuidance(database,req.origenIdentity.sub,{studentId:input.studentId,topics,query});
+          if(guidance&&JSON.stringify({...input.workspace,relatedCoordinatorGuidance:guidance}).length<=10000)input.workspace.relatedCoordinatorGuidance=guidance;
+        }catch{req.log?.({event:'guidance_error',code:'coordinator_context_unavailable'});}
+      }
       input.guidedConversation=guidedConversationEnabled(env);
       input.coordinatorLinking=await coordinatorVoiceAvailable(database,env,input.studentId);
       let liveMemorySession;
@@ -226,7 +240,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const memoryRevision=input.studentBrief?.revision,memoryPolicy=typeof memoryRevision==='number'?personalizationPolicy(env,req.origenAuthorized?req.origenIdentity?.sub:undefined):undefined;
       if(!policy.enabled)input.studentBrief=undefined;
       const config=voiceSession(input,{...env,OPENAI_MODEL_VOICE:studentVoiceModel(input,env)});
-      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',retrieval:'guide'},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});config.instructions+=teachingAccess.instructions;}
+      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',retrieval:'guide',query:teachingSituationQuery(input)},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});config.instructions+=teachingAccess.instructions;}
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.

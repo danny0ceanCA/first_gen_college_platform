@@ -1,5 +1,36 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {studentLiveChannel} from '../src/studentLiveChannel.mjs';
+
+test('Live backend work keeps save busy across silent processing, including text-only completions',async()=>{
+ const raw={readyState:'open',send(){},close(){}},holds=new Map();
+ const channel=studentLiveChannel(raw),turns=voiceTurns(()=>false);
+ channel.configure({voiceProvider:'live',voiceSession:{}});
+ channel.onmessage=({data})=>{const e=JSON.parse(data);if(e.type==='origen.backend.started')holds.set(e.response_id,turns.holdReply());if(e.type==='origen.backend.finished'){holds.get(e.response_id)?.();holds.delete(e.response_id);}};
+ const receive=async event=>{raw.onmessage({data:JSON.stringify({type:'response.event',delegation_id:'d',event})});await new Promise(setImmediate);};
+ await receive({type:'response.created',response:{id:'processing'}});turns.request();assert.equal(turns.busy(),true);
+ await receive({type:'response.completed',response:{id:'processing',status:'completed',output:[]}});assert.equal(turns.busy(),false);assert.equal(holds.size,0);
+ turns.stop();channel.close();
+});
+
+test('continuous Live replies release busy after recap playback without waiting for an ignored request',async()=>{
+ const sent=[],busy=[],raw={readyState:'open',send:text=>sent.push(JSON.parse(text)),close(){}};
+ const channel=studentLiveChannel(raw,{isPlaybackIdle:()=>true});channel.configure({voiceProvider:'live',voiceSession:{}});
+ raw.onmessage({data:JSON.stringify({type:'session.started'})});
+ const turns=voiceTurns(event=>channel.send(JSON.stringify(event)),()=>{},{onBusy:value=>busy.push(value)});
+ turns.request(); // The opening is a real request.
+ turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'recap'});
+ turns.speechStarted('answer');turns.transcript('answer','Please review my profile.');
+ turns.beginDone('recap');turns.completed();assert.equal(turns.busy(),true,'still wait for audible recap');
+ turns.playback({type:'output_audio_buffer.stopped',response_id:'recap'});
+ assert.equal(turns.busy(),false,'the auto-reply request was deliberately not sent');
+ assert.equal(busy.at(-1),false);
+ channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'review',output:'ready'}}));
+ turns.request();assert.equal(turns.busy(),true,'real delegated continuations still block saving');
+ assert.equal(sent.at(-1).type,'response.create');
+ turns.beginDone('continuation');turns.completed();assert.equal(turns.busy(),false);
+ turns.stop();channel.close();
+});
 import {voiceTurns} from '../src/voiceTurns.mjs';
 test('silence and punctuation are ignored without a reply or deletion',()=>{
   const events=[], turns=voiceTurns(e=>events.push(e));

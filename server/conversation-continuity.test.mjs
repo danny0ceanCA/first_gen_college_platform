@@ -58,9 +58,11 @@ test('return conversations use current scoped evidence, respect question state a
  const change=async(store,row,action,value)=>f.as('reader',()=>createCorrectionService(f.db,env)('reader',{operationId:randomUUID(),store,studentId:'alex',id:row.id,version:row.version,action,before:correctionSnapshot(row,store),...(value?{value}:{})}));
  try{
   await assertContinuityReady(f.db,env);
-  await t.test('exact Spanish baseline case finds the redacted stored evidence without lowering match threshold',async()=>{
+  await t.test('Spanish baseline preserves ordinary wording and redacts actual codes without lowering match threshold',async()=>{
    const c=historyRetrievalCatalog.cases.find(c=>c.id==='es-renta');await f.save('rent',c.content);
-   const result=await f.retrieve(c.query);assert.equal(result.items[0].id,'rent');assert.match(result.items[0].content,/connection code omitted/);
+   const result=await f.retrieve(c.query);assert.equal(result.items[0].id,'rent');assert.equal(result.items[0].content,c.content);
+   await f.save('rent-code',`${c.content} Clave: ABCDE23456.`);
+   const coded=(await f.retrieve(c.query)).items.find(i=>i.id==='rent-code');assert.ok(coded);assert.match(coded.content,/connection code omitted/);assert.ok(!coded.content.includes('ABCDE23456'));
    assert.equal((await f.retrieve('zirconium dragonfly')).items.length,0);
   });
   await t.test('declines and answered prompts persist by account/student and expire',async()=>{

@@ -52,7 +52,9 @@ test('a model save claim without current transcript consent never writes',async(
 test('save consent belongs to its requested response, is consumed once, and is revoked by interruptions',()=>{
  const consent=voiceProfileSaveConsent();consent.begin('first');consent.transcript('first','Her name is Ana');const old=consent.token();
  consent.begin('second');consent.transcript('second','Actually Elena, save her profile');const latest=consent.token();
+ assert.equal(consent.requested(old),false);assert.equal(consent.requested(latest),true,'review can acknowledge consent without consuming it');
  assert.equal(consent.consume(old),false,'old draft response must not consume newer consent');assert.equal(consent.consume(latest),true);assert.equal(consent.consume(latest),false);
+ assert.equal(consent.requested(latest),false,'review cannot reuse consumed consent');
  consent.begin('third');consent.transcript('third','Save my profile');const saving=consent.token();consent.begin('fourth');
  assert.equal(consent.consume(saving),false,'new speech revokes consent even before transcription');
  assert.equal(consent.transcript('third','Save it'),false,'late transcript cannot restore old consent');
@@ -63,11 +65,11 @@ test('save consent belongs to its requested response, is consumed once, and is r
 test('adding another student keeps setup tools, PIQ focus and explicit save without recollecting account identity',()=>{
  for(const language of ['en','es']){
   const session=voiceSession({mode:'profile',onboarding:true,collectAccount:false,saveOnboarding:true,experience:{usedApp:true,usedVoice:true},allowGuideHandoff:true,language,profile:{name:'Elena',stage:'11th grade'}},{});
-  assert.deepEqual(session.tools.map(t=>t.name).sort(),['end_conversation','propose_profile','save_onboarding_profile','set_conversation_language'].sort());
+  assert.deepEqual(session.tools.map(t=>t.name).sort(),['end_conversation','propose_profile','review_onboarding_profile','save_onboarding_profile','set_conversation_language'].sort());
   assert.match(session.instructions,/Do not ask for account-holder name\/role or reuse another student profile/);
   assert.match(session.instructions,/PIQs, essays, admissions, aid or college mentions are profile context/);
   assert.match(session.instructions,/ask whether there are other onboarding details\/questions or whether to save/);
-  assert.match(session.instructions,/first propose all latest details\/corrections, then call save_onboarding_profile/);
+  assert.match(session.instructions,/first propose all latest details\/corrections, ensure review_onboarding_profile/);
   assert.doesNotMatch(session.instructions,/RETURNING USER:/);
  }
 });

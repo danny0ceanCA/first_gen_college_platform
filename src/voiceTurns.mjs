@@ -22,8 +22,8 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
     active = true; pending = false;
     if (resume) {
       resume = false; recoveryUsed = true; onRecovery();
-      send({type:'response.create'});
-    } else send({type:'response.create'});
+      if(send({type:'response.create'})===false)active=false;
+    } else if(send({type:'response.create'})===false)active=false;
     }finally{notify();}
   }
   function request() { pending = true; flush(); }

@@ -18,8 +18,8 @@ export async function readAdminVoiceTeachings(database,scope){
 
 export function teachingDeliveryReferences(entries){
  return entries.map(entry=>({id:entry.id,revision:entry.revision,topic:entry.content.topic,title:entry.content.title,
-  deliveryStyle:entry.content.deliveryStyle||'',conversationApproach:entry.content.conversationApproach||'',example:entry.content.example||''}))
-  .filter(entry=>entry.deliveryStyle.trim()||entry.conversationApproach.trim()||entry.example.trim());
+  deliveryStyle:entry.content.deliveryStyle||'',conversationApproach:entry.content.conversationApproach||'',example:entry.content.example||'',concern:entry.content.concern||'',useWhen:entry.content.useWhen||'',followUp:entry.content.followUp||'',skipFollowUp:entry.content.skipFollowUp||'',referral:entry.content.referral||''}))
+  .filter(entry=>entry.deliveryStyle.trim()||entry.conversationApproach.trim()||entry.example.trim()||entry.concern.trim()||entry.useWhen.trim()||entry.followUp.trim()||entry.skipFollowUp.trim()||entry.referral.trim());
 }
 
 // Send complete fields, not a prefix. Each self-contained, topic-scoped message
@@ -27,7 +27,7 @@ export function teachingDeliveryReferences(entries){
 // JSON text fragments preserve Unicode and quotes; concatenate text parts in order.
 export function liveTeachingDeliveryUpdates(entries){
  const messages=[];
- for(const entry of teachingDeliveryReferences(entries))for(const [key,label] of [['deliveryStyle','Tone'],['conversationApproach','Conversational approach'],['example','Example in the educator voice']]){
+ for(const entry of teachingDeliveryReferences(entries))for(const [key,label] of [['deliveryStyle','Tone'],['conversationApproach','Conversational approach'],['example','Example in the educator voice'],['concern','Possible concern, not a diagnosis'],['useWhen','When this teaching fits'],['followUp','Optional follow-up'],['skipFollowUp','When to skip the follow-up'],['referral','Boundaries and referrals']]){
   const text=entry[key];if(!text.trim())continue;
   const prefix=`While discussing ${entry.topic}: ${label}, reviewed reference only. Apply all parts silently within safety rules and caller preferences; do not recite directions or copy the example mechanically. `;
   let part='';

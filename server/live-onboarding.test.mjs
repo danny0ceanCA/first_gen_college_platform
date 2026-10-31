@@ -36,7 +36,7 @@ for(const language of ['en','es'])for(const collectAccount of [true,false])test(
   assert.doesNotMatch(instructions,/keep the opening to one or two sentences/,'ordinary greeting limits cannot override the onboarding welcome');
  }
  assert.match(live.instructions,/For EVERY answer containing an account or student detail/);
- assert.ok(config.tools.every(tool=>['propose_account','propose_profile','save_onboarding_profile','set_conversation_language','end_conversation'].includes(tool.name)));
+ assert.ok(config.tools.every(tool=>['propose_account','propose_profile','review_onboarding_profile','save_onboarding_profile','set_conversation_language','end_conversation'].includes(tool.name)));
  if(collectAccount){const tool=config.tools.find(tool=>tool.name==='propose_account');assert.deepEqual(tool.parameters.required,[]);assert.equal(tool.parameters.minProperties,1);}
  else{assert.ok(!config.tools.some(tool=>tool.name==='propose_account'));assert.match(live.instructions,/Do not ask for account-holder name\/role/);}
 });
@@ -76,4 +76,23 @@ for(const language of ['en','es'])test(`Live ${language} delegated draft events 
  assert.deepEqual(form,{account:{firstName:'Daniel',role:'parent'},student:{name:'Ana',stage:'Community college'}});
  assert.equal(consent.consume(consent.token()),false,'correcting a field is not final save consent');
  channel.close();
+});
+
+
+test('onboarding delegates skipped draft updates once, without racing natural delegation or newer speech',async()=>{
+ const make=async(onboarding=true)=>{
+  const sent=[],timers=new Map();let sequence=0;
+  const raw={readyState:'open',send:text=>sent.push(JSON.parse(text)),close(){}};
+  const channel=studentLiveChannel(raw,{schedule:(fn,delay)=>{const id=++sequence;timers.set(id,{fn,delay});return id;},cancel:id=>timers.delete(id)});
+  channel.configure({voiceProvider:'live',voiceSession:{onboarding,tools:[{name:'review_onboarding_profile'}]}});
+  const receive=async event=>{raw.onmessage({data:JSON.stringify(event)});await new Promise(setImmediate);};
+  const tick=async delay=>{for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);timer.fn();}await new Promise(setImmediate);};
+  await receive({type:'session.started'});return{sent,timers,channel,receive,tick};
+ };
+ const missed=await make();await missed.receive({type:'session.input_transcript.delta',delta:'Me llamo Alex.'});await missed.tick(1100);await missed.tick(1200);await missed.tick(1200);
+ assert.deepEqual(missed.sent.map(e=>e.type),['response.create'],'evaluate the answer; never synthesize draft or save tool results');missed.channel.close();
+ const natural=await make();await natural.receive({type:'session.input_transcript.delta',delta:'My name is Alex.'});await natural.tick(1100);
+ await natural.receive({type:'response.event',delegation_id:'d',event:{type:'response.created',response:{id:'r'}}});await natural.tick(1200);assert.deepEqual(natural.sent,[]);natural.channel.close();
+ const newer=await make();await newer.receive({type:'session.input_transcript.delta',delta:'Alex'});await newer.tick(1100);await newer.receive({type:'session.input_transcript.delta',delta:'Actually Alexis'});await newer.tick(1200);assert.deepEqual(newer.sent,[]);newer.channel.close();assert.equal(newer.timers.size,0);
+ const guide=await make(false);await guide.receive({type:'session.input_transcript.delta',delta:'Transfer planning'});await guide.tick(1100);await guide.tick(1200);assert.deepEqual(guide.sent,[]);guide.channel.close();
 });

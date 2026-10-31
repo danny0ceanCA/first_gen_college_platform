@@ -1,5 +1,8 @@
 // Live onboarding writes directly to its canonical draft. Never replay a second,
 // older suggestion snapshot over details the person subsequently corrected.
+export function shouldApplyDraftField(change,live){
+ return !live||Boolean(change.value.trim())||change.clear===true;
+}
 export function voiceDraft(recovery,live){
  return {
   read(){return live?{}:recovery?.read({})||{};},

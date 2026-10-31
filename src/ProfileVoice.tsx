@@ -18,7 +18,7 @@ import {holdConversation,releaseConversation,researchModeForTool} from './liveCo
 import {binderActivity} from './binderActivity';
 import type {BinderTopic} from './binderSignals.mjs';
 import {voiceBinderTopics} from './voiceBinderTopics.mjs';
-import {voiceDraft} from './voiceDraft.mjs';
+import {voiceDraft,shouldApplyDraftField} from './voiceDraft.mjs';
 import {guidanceHistory} from './guidanceHistory.mjs';
 import {privateRecovery} from './privateRecovery';
 import {browserPrivacy} from './browserPrivacy.mjs';
@@ -55,7 +55,7 @@ const labels = {
 type Field = keyof typeof labels;
 type Suggestions = Partial<Record<Field,string>>;
 export type VoiceHandoff={studentId:string|null;confirmed:boolean;language:'en'|'es';turns:{role:'user'|'assistant';text:string}[]};
-export type VoiceProps={onBusy?:(busy:boolean)=>void;workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:AccountDraft)=>void;onDraft?:(changes:Suggestions)=>void;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
+export type VoiceProps={onBusy?:(busy:boolean)=>void;onReviewProfile?:(stageAddressed:boolean)=>boolean;workspaceFocus?:WorkspaceSelection;onOnboardingEvent?:(name:string,metadata?:Record<string,unknown>)=>void;profileSaved?:number;onProfileSaveComplete?:()=>void;onSaveProfile?:()=>Promise<VoiceProfileSaveResult>;onLanguageChanged?:(language:'en'|'es')=>void;onAccountDraft?:(details:AccountDraft)=>void|boolean;onDraft?:(changes:Suggestions)=>void|boolean;recoveryKey?:string;onGuideChanged?:(mode:'finance'|'admissions'|'planning'|'loans')=>void;switchGuideMode?:'finance'|'admissions'|'planning'|'loans';detailsOpen?:boolean;onCloseDetails?:()=>void;continuity?:VoiceHandoff;onHandoff?:(mode:'finance'|'admissions'|'planning'|'loans',context:VoiceHandoff)=>void;onSwitchGuide?:(context:VoiceHandoff)=>void;switchGuideLabel?:string;onRestart?:()=>void;ownerId?:string;autoStart?:boolean;onboarding?:boolean;replayWelcome?:boolean;mode?:'profile'|'finance'|'admissions'|'planning'|'loans';profile:StudentProfile;language:'en'|'es';role:'parent'|'student';apply:(changes:Suggestions)=>void;onActive:(active:boolean)=>void;t:(en:string,es:string)=>string};
 export default function ProfileVoice(props:VoiceProps){
  const shared=useContext(SharedVoiceContext);
  const localOwner=useRef(crypto.randomUUID());
@@ -68,7 +68,7 @@ export default function ProfileVoice(props:VoiceProps){
  if(shared.active&&shared.owner!==localOwner.current)return <p role="status">{props.t('End your current voice conversation before starting profile setup.','Termina la conversacion actual antes de iniciar el perfil.')} <button className="text-button" onClick={shared.open}>{props.t('Open conversation','Abrir conversacion')}</button></p>;
  return <LocalProfileVoice {...props} ownerId={localOwner.current}/>;
 }
-export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
+export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboardingEvent,profileSaved,onProfileSaveComplete,onSaveProfile,onLanguageChanged,onAccountDraft,onDraft,profile:initialProfile,language,role,apply,onActive,t,mode:initialMode='profile',onboarding=false,replayWelcome=false,autoStart=false,ownerId='shared',onRestart,onSwitchGuide,onHandoff,continuity,switchGuideLabel,detailsOpen=false,onCloseDetails,onGuideChanged,switchGuideMode,recoveryKey}:VoiceProps) {
   const [connectionCard,setConnectionCard]=useState<ConnectionCard>();
   const connectionController=useRef<ReturnType<typeof coordinatorVoiceTools>|undefined>(undefined);
   useEffect(()=>{connectionController.current?.stop();setConnectionCard(undefined);},[initialProfile.id]);
@@ -78,6 +78,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
   const latestOnboardingEvent=useRef(onOnboardingEvent);latestOnboardingEvent.current=onOnboardingEvent;
   const onboardingEndReason=useRef('unknown');
   function trackOnboarding(name:string,metadata:Record<string,unknown>={}){try{latestOnboardingEvent.current?.(name,{...metadata,voiceSessionId:logSession.current,voiceAttemptId:logAttempt.current});}catch{/* Tracking never interrupts a conversation. */}}
+  const latestReviewProfile=useRef(onReviewProfile);latestReviewProfile.current=onReviewProfile;
+  const latestDraftHandlers=useRef({onDraft,onAccountDraft});latestDraftHandlers.current={onDraft,onAccountDraft};
   const latestSetup=useRef({profile:initialProfile,role,onProfileSaveComplete});latestSetup.current={profile:initialProfile,role,onProfileSaveComplete};
   const transitioned=useRef(false);
   const transitionToHome=useRef<(()=>Promise<void>)|null>(null);
@@ -396,6 +398,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
       const saveConsent=voiceProfileSaveConsent();
       let welcomeResponseId:string|undefined,welcomeCompleted=false,welcomeRecorded=false,welcomeInterrupted=false;
       const sentEvents=new Map<string,string>();
+      const backendReplyHolds=new Map<string,()=>void>();
+      let responseIgnored=false;
       const send=(event:unknown)=>{
         if(dc.readyState!=='open')return;
         const payload=event as {type:string};
@@ -406,7 +410,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         log('client_event',{eventId:event_id,operation:payload.type});
         sentEvents.set(event_id,payload.type);
         if(sentEvents.size>100)sentEvents.delete(sentEvents.keys().next().value!);
-        dc.send(JSON.stringify({...event as Record<string,unknown>,event_id}));
+        responseIgnored=dc.send(JSON.stringify({...event as Record<string,unknown>,event_id}))===false;
         return event_id;
       };
       const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);void guidance.current.event('guidance.language_changed',{language:next,basis:'model-detection'})?.catch(()=>{});}}});resources.current.stopGuide=()=>languageControl.stop();
@@ -472,7 +476,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         }catch{transitioned.current=false;trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved, but home could not open yet. Please try again.','Tu perfil está guardado, pero no se pudo abrir el inicio. Intenta de nuevo.'));}finally{release();}
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
-      const turns=voiceTurns(send,()=>log('empty_interruption_recovered'),{onBusy,onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
+      const turns=voiceTurns(event=>{responseIgnored=false;const eventId=send(event);return responseIgnored?false:eventId;},()=>log('empty_interruption_recovered'),{onBusy,onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
       resources.current.studentSelection=voiceWorkspaceQueue<string|null>({
         busy:()=>turns.busy()||changingGuide,
         apply:async id=>{
@@ -561,6 +565,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
         if(e.type==='input_audio_buffer.speech_stopped')setActivity('thinking');
         // Status audio is outside the conversation: never save it as an answer.
         if(turns.progressEvent(e))return;
+        if(e.type==='origen.backend.started'){if(!backendReplyHolds.has(e.response_id))backendReplyHolds.set(e.response_id,turns.holdReply());return;}
+        if(e.type==='origen.backend.finished'){backendReplyHolds.get(e.response_id)?.();backendReplyHolds.delete(e.response_id);return;}
         memoryTools.event(e);
         if(['output_audio_buffer.started','output_audio_buffer.stopped','output_audio_buffer.cleared','error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
@@ -636,7 +642,8 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
           for(const item of e.response?.output||[]) {
             if(item.type!=='function_call')continue;
             if(closing.current?.active())return;
-            called=true;let accepted=false;
+            called=true;let accepted=false,draftLocked=false;
+            if(item.name==='review_onboarding_profile')continue;
             if(['propose_account','propose_profile','end_conversation','highlight_binder_topics','switch_college_guide'].includes(item.name)&&e.response?.metadata?.origen_user_turn!==saveConsent.token()){
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'superseded_turn',instruction:'A newer user turn arrived. Follow the latest user words; do not apply an older draft or end the call.'})}});continue;
             }
@@ -660,7 +667,7 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
               const output=await memoryTools.invoke(item,memoryTurn);if(generation.current!==version||closing.current?.active())return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
             }
-            if(item.name==='set_conversation_language'||item.name==='save_onboarding_profile')continue;
+            if(item.name==='set_conversation_language'||item.name==='save_onboarding_profile'||item.name==='review_onboarding_profile')continue;
             if(item.name==='switch_college_guide'&&onGuideChanged){
               let next:string|undefined;try{next=JSON.parse(item.arguments).guide;}catch{}
               const accepted=!!next&&['finance','admissions','planning','loans'].includes(next)&&await resources.current.switchGuide?.(next as 'finance'|'admissions'|'planning'|'loans');
@@ -742,24 +749,33 @@ export function LocalProfileVoice({onBusy,workspaceFocus,onOnboardingEvent,profi
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});
               continue;
             }
-            if(item.name==='propose_account'&&onAccountDraft){
+            if(item.name==='propose_account'&&latestDraftHandlers.current.onAccountDraft){
               let accepted=false;
-              try{const details=accountDraftProposal(JSON.parse(item.arguments));if(details){onAccountDraft(details);accepted=true;}}catch{}
-              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'account_draft_updated_not_saved':'invalid_account_draft'})}});continue;
+              try{const details=accountDraftProposal(JSON.parse(item.arguments));if(details){draftLocked=latestDraftHandlers.current.onAccountDraft(details)===false;accepted=!draftLocked;}}catch{}
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'account_draft_updated_not_saved':draftLocked?'draft_locked':'invalid_account_draft',...(draftLocked?{instruction:'The reviewed profile is being saved or is already saved. This update was not applied. Do not claim it changed; explain that a new correction can be made in the binder after saving.'}:{})})}});continue;
             }
             if(mode==='profile'&&item.name==='propose_profile')try{
               const parsed=JSON.parse(item.arguments);const next:Suggestions={};
               if(!Array.isArray(parsed.changes)||parsed.changes.length>11)throw new Error();
               for(const change of parsed.changes){
                 if(!Object.hasOwn(labels,change.field)||typeof change.value!=='string'||change.value.length>2000)throw new Error();
-                if(change.field==='stage'&&!['9th grade','10th grade','11th grade','12th grade','Community college','College'].includes(change.value))throw new Error();
+                if(!shouldApplyDraftField(change,!!latestDraftHandlers.current.onDraft))continue;
+                if(change.field==='stage'&&!(change.value===''&&change.clear===true)&&!['9th grade','10th grade','11th grade','12th grade','Community college','College'].includes(change.value))throw new Error();
                 if(change.field==='name'&&(!change.value.trim()||change.value.length>100))throw new Error();
                 if(change.field==='gpa'&&change.value.length>30)throw new Error();
                 next[change.field as Field]=change.value;
               }
-              if(onDraft){draftSuggestions.accept({},next,onDraft);setChanges({});}else setChanges(prev=>draftSuggestions.accept(prev,next,()=>{}));accepted=true;
+              if(latestDraftHandlers.current.onDraft){draftSuggestions.accept({},next,patch=>{draftLocked=latestDraftHandlers.current.onDraft?.(patch)===false;});setChanges({});}else setChanges(prev=>draftSuggestions.accept(prev,next,()=>{}));accepted=!draftLocked;
             }catch{/* Invalid suggestions never reach the form. */}
-            send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'proposed_for_review_not_saved':'invalid_proposal'})}});
+            send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:accepted?'proposed_for_review_not_saved':draftLocked?'draft_locked':'invalid_proposal',...(draftLocked?{instruction:'The reviewed profile is being saved or is already saved. This update was not applied. Do not claim it changed; explain that a new correction can be made in the binder after saving.'}:{})})}});
+          }
+          // Review always follows draft patches, regardless of model tool order.
+          for(const item of e.response?.output||[]){
+            if(item.type!=='function_call'||item.name!=='review_onboarding_profile')continue;
+            called=true;let ready=false;
+            try{if(e.response?.metadata?.origen_user_turn===saveConsent.token())ready=latestReviewProfile.current?.(JSON.parse(item.arguments).education_stage_addressed===true)===true;}catch{}
+            const saveRequested=saveConsent.requested(e.response?.metadata?.origen_user_turn);
+            send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:ready?'ready_for_final_review':'missing_details',instruction:ready?(saveRequested?'The current draft is ready and this caller has already explicitly requested saving it in the current turn. Call save_onboarding_profile now; do not ask for permission again. Wait for its saved result before claiming success.':'The current draft is ready for review, not saved. Briefly recap the latest values, then ask for an explicit save request. The button becomes available after your speech finishes.'):'Keep the draft intact. Collect missing account name, role or student name and address education stage before final review.'})}});
           }
           called=(await voiceProfileSaveTools(e.response?.output||[],latestProfileSave.current?async()=>{const result=await latestProfileSave.current!();if(result.status==='saved'&&generation.current===version){saveCompletion.current?.arm();log('profile_saved_awaiting_confirmation');}return result;}:undefined,send,()=>generation.current===version&&!closing.current?.active(),()=>saveConsent.consume(e.response?.metadata?.origen_user_turn))>0)||called;
           if(generation.current!==version||closing.current?.active())return;

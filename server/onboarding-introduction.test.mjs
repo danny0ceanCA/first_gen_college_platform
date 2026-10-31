@@ -19,11 +19,17 @@ for(const language of ['en','es'])test(`${language} registration supplies the sa
   assert.match(instructions,/sincerely glad the person is here/);
   assert.match(instructions,/slight natural pause after his name/);
   assert.match(instructions,/do not restart the introduction/);
+  assert.match(instructions,/Spend the first few sentences welcoming the person before introducing Daniel/);
+  assert.match(instructions,/without stretching syllables, over-enunciating/);
+  assert.match(instructions,/do not compress it into a one-minute target/);
+  assert.match(instructions,/Until the caller explicitly supplies their own name, address them without a name/);
   assert.ok(instructions.includes(onboardingFormIntroduction(language)),'explain the live form before collecting details');
  }
  assert.match(welcome,language==='es'?/cómo nació/:/how it came to be/);
  assert.match(welcome,language==='es'?/¿Cómo te gustaría que te llamara\?/:/What would you like me to call you\?/);
  assert.ok(config.tools.some(tool=>tool.name==='save_onboarding_profile'));
+ assert.equal(config.audio.output.speed,1,'story pacing must not change audio playback speed');
+ assert.equal(live.audio.output.speed,undefined,'Live keeps its normal audio speed');
  assert.match(config.instructions,/Only say saved after the tool returns saved/);
 });
 
