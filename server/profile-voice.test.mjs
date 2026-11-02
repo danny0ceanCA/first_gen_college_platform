@@ -122,7 +122,7 @@ test('first-registration setup defers the app tour until the successful save',()
  for(const language of ['en','es']){
   const welcome=voiceSession({...input,language,onboarding:true},{});
   assert.match(welcome.instructions,/FIRST-REGISTRATION SETUP/);
-  assert.match(welcome.instructions,/Do not give an app tour or explain summaries\/features before a successful save/);
+  assert.match(welcome.instructions,/Do not give a detailed app tour or explain summary mechanics before a successful save/);
   assert.match(welcome.instructions,/Ask ONE short question at a time/);
   assert.match(welcome.instructions,/Student name is required; ask education stage, but unknown is allowed/);
   assert.match(welcome.instructions,/Interests, activities, school, goals, practical needs, institutions and entry term are optional/);

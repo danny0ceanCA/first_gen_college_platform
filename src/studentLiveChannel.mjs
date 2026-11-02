@@ -1,10 +1,10 @@
 // Adapt Live's continuous speech/delegated tools to the application's existing
 // guarded tool handlers. No tool is executed here and no permission is granted.
-export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false}={}){
+export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0;
- let draftTimer,lastDelegatedEpoch=-1;
+ let draftTimer,lastDelegatedEpoch=-1,lastAudibleVersion=0;
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
@@ -35,7 +35,8 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
   // Continuous Live has no output-audio-done event. This is a conservative idle
   // boundary for UI/drain scheduling, never a claim that a person heard speech.
-  await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:'idle_estimate'});
+  const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
+  await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
@@ -105,7 +106,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(special==='origen_farewell'||special==='origen_lookup_progress'||!opening){
     opening=true;outputMetadata=response.metadata||{};
     if(response.instructions)append('session.instructions.append',response.instructions);
-    transmit({type:'session.commentary.append',event_id:event.event_id||id(),delegation_id:null,content:special==='origen_farewell'?'Give the application-requested closing message now, then stop speaking. Do not run tools or ask another question.':special==='origen_lookup_progress'?'Give the brief verified progress update requested above, without extra claims.':`Follow the application opening: greet with Hola and introduce yourself as Origen, an AI college guide, then ask one short ${session.onboarding?'onboarding question following the application setup instructions':'question about what the student wants to discuss today'}. After Hola, speak ${session.language==='es'?'Spanish':'English'}, then listen.`});
+    transmit({type:'session.commentary.append',event_id:event.event_id||id(),delegation_id:null,content:special==='origen_follow_up'?'Speak only the exact application-provided check-in sentence above, then listen. Do not add a greeting, introduction or another question.':special==='origen_farewell'?'Give the application-requested closing message now, then stop speaking. Do not run tools or ask another question.':special==='origen_lookup_progress'?'Give the brief verified progress update requested above, without extra claims.':`Follow the application opening: greet with Hola and introduce yourself as Origen, an AI college guide, then ask one short ${session.onboarding?'onboarding question following the application setup instructions':'question about what the student wants to discuss today'}. After Hola, speak ${session.language==='es'?'Spanish':'English'}, then listen.`});
    }else if(continuation){continuation=false;transmit({type:'response.create',event_id:event.event_id});}
    else return false; // Continuous speech needs no requested response to wait for.
    return;

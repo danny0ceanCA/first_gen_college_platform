@@ -1,0 +1,147 @@
+{
+  "contract": "outcome-quality-v1",
+  "purpose": "service_quality",
+  "synthetic": true,
+  "definition": {
+    "id": "document_submitted",
+    "version": 1,
+    "criterion": "Sent the specified requested document through the intended channel; acceptance is a separate claim.",
+    "doesNotEstablish": [
+      "document_accepted",
+      "decision_received",
+      "waiver_approved"
+    ]
+  },
+  "ruleVersion": "outcome-assessment-v1",
+  "period": "2026-10",
+  "cutoff": "2026-11-02T00:00:00.000Z",
+  "unit": "one_current_assessment_per_consented_episode",
+  "institutionScope": "one_authorized_organization",
+  "evidenceScope": "student_account_only_coordinator_observations_not_linked",
+  "minimumParticipants": 10,
+  "status": "available",
+  "episodes": 40,
+  "metrics": {
+    "recorded_answer": {
+      "count": 20,
+      "denominator": 40,
+      "rate": 0.5,
+      "suppressed": false
+    },
+    "explicit_outcome_decline": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "unknown_outcome": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "pending": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "goal_changed": {
+      "count": null,
+      "denominator": null,
+      "rate": null,
+      "suppressed": true
+    },
+    "adverse_decision": {
+      "count": null,
+      "denominator": null,
+      "rate": null,
+      "suppressed": true
+    },
+    "complete_event_dates": {
+      "count": 20,
+      "denominator": 40,
+      "rate": 0.5,
+      "suppressed": false
+    },
+    "missing_event_dates": {
+      "count": 20,
+      "denominator": 40,
+      "rate": 0.5,
+      "suppressed": false
+    },
+    "unresolved": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "contradictions": {
+      "count": null,
+      "denominator": null,
+      "rate": null,
+      "suppressed": true
+    },
+    "stale_or_unavailable": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "revised_since_opt_in": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    },
+    "window_up_to_30_days": {
+      "count": null,
+      "denominator": null,
+      "rate": null,
+      "suppressed": true
+    },
+    "window_31_to_90_days": {
+      "count": 30,
+      "denominator": 40,
+      "rate": 0.75,
+      "suppressed": false
+    },
+    "window_over_90_days": {
+      "count": 10,
+      "denominator": 40,
+      "rate": 0.25,
+      "suppressed": false
+    }
+  },
+  "requiredStructuredFields": {
+    "count": 40,
+    "denominator": 40,
+    "basis": "validated_definition_scope_window_and_version_contract"
+  },
+  "provenance": {
+    "student_account": {
+      "count": 40,
+      "denominator": 40
+    },
+    "coordinator_observations": "not_linked_to_private_episodes",
+    "institution_verified": "not_available"
+  },
+  "observationWindow": "Each episode uses its approved inclusive local-date window; duration bands below do not replace that window.",
+  "coverage": {
+    "population": "currently_permitted_episodes_recorded_in_the_completed_month",
+    "allEligibleStudents": "not_measured",
+    "evaluationDeclines": "excluded_not_counted",
+    "outcomePresentation": "not_recorded",
+    "outcomeSilence": "not_inferred",
+    "corrections": "linked_report_corrections_observed_since_first_explicit_opt_in",
+    "historicalCorrectionFrequency": "not_available",
+    "timeToOutcome": "not_estimated"
+  },
+  "limitations": [
+    "Voluntary participation and return/reporting behavior select this group; it does not represent every eligible student.",
+    "Pending, unknown, declined outcomes and adverse results stay in the denominator when the episode is permitted.",
+    "Repeated reports or observations do not create additional episodes or successes.",
+    "No coordinator ranking, causal effect, partner export, research or model training is authorized.",
+    "Small cells and their complements are suppressed; no arbitrary date, term, process or demographic filters are available."
+  ]
+}

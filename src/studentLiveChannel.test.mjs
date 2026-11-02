@@ -28,7 +28,7 @@ test('A newer user turn cannot authorize an older backend write',async()=>{
  f.receive({type:'session.input_transcript.delta',delta:'No, do not save it yet.'});f.backend('response.output_item.done','old',{item:{type:'function_call',name:'save_onboarding_profile',call_id:'old-c',arguments:'{}'}});f.backend('response.completed','old');await pause(1200);
  const done=f.events.find(e=>e.type==='response.done');assert.equal(done.response.metadata.origen_user_turn,'superseded-live-turn');assert.equal(f.consent.consume(done.response.metadata.origen_user_turn),false);f.channel.close();
 });
-for(const name of ['remember_student_detail','prepare_coordinator_connection','set_conversation_language'])test(`Stale ${name} never reaches a current-turn handler`,async()=>{
+for(const name of ['remember_student_detail','recall_student_context','prepare_coordinator_connection','prepare_coordinator_review_request','confirm_coordinator_review_request','set_conversation_language'])test(`Stale ${name} never reaches a current-turn handler`,async()=>{
  const f=fixture();f.receive({type:'session.input_transcript.delta',delta:'An earlier request.'});f.backend('response.created','old');await pause(1200);
  f.receive({type:'session.input_transcript.delta',delta:'Stop. I changed my mind.'});f.backend('response.output_item.done','old',{item:{type:'function_call',name,call_id:'stale-call',arguments:'{}'}});f.backend('response.completed','old');await pause(1200);
  assert.ok(!f.events.some(event=>event.type==='response.done'&&event.response.output?.some(item=>item.type==='function_call')));
@@ -39,3 +39,8 @@ test('Partial save phrase followed by not yet never grants save consent',async()
  const done=f.events.find(e=>e.type==='response.done');assert.equal(f.consent.consume(done.response.metadata.origen_user_turn),false);f.channel.close();
 });
 test('All chunks preserve complete teaching text and have bounded UTF-8 lengths',()=>{const f=fixture(),text='Warmly acknowledge uncertainty. '.repeat(100);f.channel.send(JSON.stringify({type:'session.update',event_id:'u',session:{instructions:'Backend updated',tools:[],liveInstructions:text}}));const parts=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content);assert.equal(parts.join(''),text);assert.ok(parts.every(part=>Buffer.byteLength(part)<=440));f.channel.close();});
+
+test('End-of-call flush labels output completion as forced, never played consent',async()=>{
+ const f=fixture();f.receive({type:'session.output_transcript.delta',delta:'An unfinished readback.'});await pause(0);await f.channel.flush();
+ assert.equal(f.events.find(e=>e.type==='output_audio_buffer.stopped').liveBoundary,'forced_flush');f.channel.close();
+});

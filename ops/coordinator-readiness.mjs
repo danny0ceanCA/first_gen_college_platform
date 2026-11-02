@@ -1,3 +1,6 @@
+import {assertOutcomeEvaluationReady} from '../server/outcome-evaluation.mjs';
+import {assertOutcomeEvidenceReady} from '../server/outcome-evidence.mjs';
+import {assertStudentFollowUpReady} from '../server/student-follow-up.mjs';
 // Read-only release checks. A passing report never enables coordinator access.
 import {createHash} from 'node:crypto';
 import {readFile,readdir,writeFile} from 'node:fs/promises';
@@ -6,13 +9,17 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createDatabase} from '../server/database.mjs';
 import {assertRuntimeIsolation} from '../server/account-isolation.mjs';
 import {createMaintenanceDatabase,assertMaintenanceAccess} from '../server/maintenance-database.mjs';
-import {coordinatorFlags,coordinatorConfigurationIssues} from '../server/binder-sharing-policy.mjs';
+import {coordinatorFlags,reviewRequestFlags,coordinatorConfigurationIssues} from '../server/binder-sharing-policy.mjs';
 import {assertCoordinatorProvisioningReady} from '../server/coordinator-access.mjs';
 import {assertCoordinatorLinkingReady} from '../server/coordinator-connections.mjs';
 import {assertBinderSharingReady} from '../server/binder-sharing.mjs';
 import {assertCoordinatorViewingReady} from '../server/coordinator-binders.mjs';
 import {assertCoordinatorFeedbackReady} from '../server/coordinator-feedback.mjs';
 import {assertCoordinatorLifecycleReady} from '../server/coordinator-notifications.mjs';
+import {assertReviewRequestsReady} from '../server/review-requests.mjs';
+import {assertReviewVoiceReady} from '../server/review-request-voice.mjs';
+import {assertReviewDeliveryReady} from '../server/review-request-delivery.mjs';
+import {assertReviewResponseContextReady} from '../server/review-response-context.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const sha=value=>createHash('sha256').update(value).digest('hex');
@@ -23,7 +30,7 @@ export async function coordinatorSourceFingerprint(directory=root){
  const files=[];
  async function walk(path){for(const entry of await readdir(path,{withFileTypes:true})){if(entry.isSymbolicLink())throw new Error('release_symlink_unsupported');const full=resolve(path,entry.name);if(entry.isDirectory())await walk(full);else if(/\.(?:mjs|cjs|js|jsx|ts|tsx|css|sql|json|html|svg)$/.test(entry.name))files.push(full);}}
  for(const name of ['server','src','scripts','ops','auth0','public'])await walk(resolve(directory,name));
- for(const name of ['package.json','package-lock.json','index.html','vite.config.ts','tsconfig.json'])files.push(resolve(directory,name));
+ for(const name of ['package.json','package-lock.json','index.html','vite.config.ts','tsconfig.json','render.yaml','.github/workflows/checks.yml'])files.push(resolve(directory,name));
  const hashes=[];for(const file of files.sort())hashes.push([relative(directory,file).replaceAll('\\','/'),sha((await readFile(file,'utf8')).replaceAll('\r\n','\n'))]);
  return sha(JSON.stringify(hashes));
 }
@@ -46,10 +53,11 @@ export async function checkCoordinatorDatabase(runtime,maintenance,{schema='publ
   for(const name of files)if(applied.get(name)!==sha((await readFile(new URL(name,migrationDirectory),'utf8')).replaceAll('\r\n','\n')))throw new Error('migration_mismatch');
  });
  // Check every implemented capability even when the actual rollout flags are off.
- const all=Object.fromEntries(coordinatorFlags.map(k=>[k,'true']));
+ const all=Object.fromEntries([...coordinatorFlags,...reviewRequestFlags].map(k=>[k,'true']));
  for(const [id,fn] of [['provisioning',assertCoordinatorProvisioningReady],['linking',assertCoordinatorLinkingReady],['publication',assertBinderSharingReady],['viewing',assertCoordinatorViewingReady],['guidance',assertCoordinatorFeedbackReady]])await check(id,()=>fn(runtime,all));
  await check('lifecycle',()=>assertCoordinatorLifecycleReady(runtime,all,maintenance));
- return {kind:'coordinator-database-check',schemaVersion:1,checkedAt:new Date().toISOString(),passed:checks.every(c=>c.passed),checks,flags:Object.fromEntries(coordinatorFlags.map(k=>[k,env[k]==='true'])),changesApplied:false};
+ for(const [id,fn] of [['review-requests',assertReviewRequestsReady],['review-voice',assertReviewVoiceReady],['review-delivery',assertReviewDeliveryReady],['review-response-context',assertReviewResponseContextReady],['student-follow-up',assertStudentFollowUpReady],['outcome-evidence',assertOutcomeEvidenceReady],['outcome-evaluation',assertOutcomeEvaluationReady]])await check(id,()=>fn(runtime,all));
+ return {kind:'coordinator-database-check',schemaVersion:1,checkedAt:new Date().toISOString(),passed:checks.every(c=>c.passed),checks,flags:Object.fromEntries([...coordinatorFlags,...reviewRequestFlags].map(k=>[k,env[k]==='true'])),changesApplied:false};
 }
 
 export function assessCoordinatorPilot(record,verification,{sourceFingerprint,now=new Date()}={}){

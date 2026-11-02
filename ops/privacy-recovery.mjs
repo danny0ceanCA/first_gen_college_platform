@@ -26,6 +26,22 @@ export function validateDeletionManifest(manifest){
   if(!Array.isArray(payload.coordinatorFeedbackTombstones))throw new Error('invalid_deletion_manifest');
   for(const r of payload.coordinatorFeedbackTombstones)if(!uuid(r.account_id)||!hex(r.author_hash)||!uuid(r.request_id)||!uuid(r.feedback_id)||typeof r.deleted!=='boolean')throw new Error('invalid_deletion_manifest');
  }
+ if(payload.studentFollowUpReportFences!==undefined){
+  if(!Array.isArray(payload.studentFollowUpReportFences))throw new Error('invalid_deletion_manifest');
+  for(const r of payload.studentFollowUpReportFences)if(!uuid(r.account_id)||!uuid(r.id)||!Number.isSafeInteger(r.version)||r.version<1)throw new Error('invalid_deletion_manifest');
+ }
+ for(const field of ['outcomeEpisodeFences','outcomeEvidenceFences','outcomeObservationFences','outcomeDisputeFences'])if(payload[field]!==undefined){
+  if(!Array.isArray(payload[field]))throw new Error('invalid_deletion_manifest');
+  for(const r of payload[field])if(!uuid(r.account_id)||!uuid(r.id)||!Number.isSafeInteger(r.version)||r.version<1)throw new Error('invalid_deletion_manifest');
+ }
+ if(payload.reviewResponseFences!==undefined){
+  if(!Array.isArray(payload.reviewResponseFences))throw new Error('invalid_deletion_manifest');
+  for(const r of payload.reviewResponseFences)if(!uuid(r.account_id)||!uuid(r.request_id)||!Number.isSafeInteger(r.version)||r.version<1||typeof r.withdrawn!=='boolean')throw new Error('invalid_deletion_manifest');
+ }
+ if(payload.reviewRequestTombstones!==undefined){
+  if(!Array.isArray(payload.reviewRequestTombstones))throw new Error('invalid_deletion_manifest');
+  for(const r of payload.reviewRequestTombstones)if(!uuid(r.account_id)||typeof r.student_id!=='string'||!r.student_id||r.student_id.length>128||!uuid(r.request_id)||!uuid(r.request_key)||!date(r.deleted_at))throw new Error('invalid_deletion_manifest');
+ }
  return payload;
 }
 // Operator credential only, invoked while writes are stopped for final cutover.
@@ -41,7 +57,19 @@ export async function exportDeletionManifest(pool){
   const coordinatorReady=(await c.query("SELECT to_regprocedure('origen_coordinator_export()') AS fn")).rows[0]?.fn;
   const coordinatorFeedbackFences=coordinatorReady?(await c.query('SELECT account_id,id,version,(hidden_at IS NOT NULL) AS hidden FROM origen_coordinator_feedback ORDER BY account_id,id')).rows:[];
   const coordinatorFeedbackTombstones=coordinatorReady?(await c.query('SELECT account_id,author_hash,request_id,feedback_id,deleted FROM origen_coordinator_feedback_tombstones ORDER BY author_hash,request_id')).rows:[];
-  const payload=JSON.parse(JSON.stringify({version:1,memoryExclusions,memoryFences,coordinatorFeedbackFences,coordinatorFeedbackTombstones,exportedAt:new Date().toISOString(),deletions,closures}));
+  const reviewsReady=(await c.query("SELECT to_regprocedure('origen_review_request_command(jsonb)') AS fn")).rows[0]?.fn;
+  const reviewRequestTombstones=reviewsReady?(await c.query('SELECT account_id,student_id,request_id,request_key,deleted_at FROM origen_review_request_tombstones ORDER BY account_id,request_key')).rows:[];
+  const responsesReady=(await c.query("SELECT to_regprocedure('origen_review_response_view(uuid)') AS fn")).rows[0]?.fn;
+  const reviewResponseFences=responsesReady?(await c.query('SELECT account_id,request_id,version,(withdrawn_at IS NOT NULL) AS withdrawn FROM origen_review_request_responses ORDER BY account_id,request_id')).rows:[];
+  const followUpReady=(await c.query("SELECT to_regprocedure('origen_student_follow_up_after_restore()') AS fn")).rows[0]?.fn;
+  const studentFollowUpReportFences=followUpReady?(await c.query('SELECT account_id,id,version FROM origen_student_follow_up_reports ORDER BY account_id,id')).rows:[];
+  const outcomesReady=(await c.query("SELECT to_regprocedure('origen_outcome_evidence_after_restore()') AS fn")).rows[0]?.fn;
+  const outcomeEpisodeFences=outcomesReady?(await c.query('SELECT account_id,id,version FROM origen_outcome_episodes ORDER BY account_id,id')).rows:[];
+  const outcomeEvidenceFences=outcomesReady?(await c.query('SELECT account_id,id,version FROM origen_outcome_evidence ORDER BY account_id,id')).rows:[];
+  const observationReady=(await c.query("SELECT to_regprocedure('origen_outcome_observation_after_restore()') AS fn")).rows[0]?.fn;
+  const outcomeObservationFences=observationReady?(await c.query('SELECT account_id,id,version FROM origen_outcome_observations ORDER BY account_id,id')).rows:[];
+  const outcomeDisputeFences=observationReady?(await c.query('SELECT account_id,observation_id AS id,version FROM origen_outcome_observation_disputes ORDER BY account_id,observation_id')).rows:[];
+  const payload=JSON.parse(JSON.stringify({version:1,outcomeObservationFences,outcomeDisputeFences,outcomeEpisodeFences,outcomeEvidenceFences,studentFollowUpReportFences,reviewResponseFences,memoryExclusions,memoryFences,coordinatorFeedbackFences,coordinatorFeedbackTombstones,reviewRequestTombstones,exportedAt:new Date().toISOString(),deletions,closures}));
   await c.query('COMMIT');return {...payload,checksum:hash(payload)};
  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}
 }
@@ -53,6 +81,7 @@ export async function replayDeletionManifest(pool,manifest){
   await c.query('SELECT pg_advisory_xact_lock(728419,5)');
   // Restored cooldowns and pending voice confirmations are not reliable current
   // consent/context. Discard this bounded metadata rather than resurrect it.
+  if((await c.query("SELECT to_regprocedure('origen_review_voice_command(jsonb)') AS fn")).rows[0]?.fn)await c.query('DELETE FROM origen_review_voice_sessions');
   if((await c.query("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_guidance_questions'")).rows.length){
    await c.query('DELETE FROM origen_guidance_questions');
    await c.query('DELETE FROM origen_live_memory_sessions');
@@ -65,6 +94,42 @@ export async function replayDeletionManifest(pool,manifest){
   // Fail closed after every restore, even if revocation evidence was newer than
   // the last exported manifest. No old recipient, code or publication survives.
   // A new pilot approval, recipient connection and student publication are required.
+  if((await c.query("SELECT to_regprocedure('origen_review_request_invalidate(uuid,text)') AS fn")).rows[0]?.fn){
+   await c.query("SELECT origen_review_request_invalidate(id,'restored') FROM origen_review_requests ORDER BY id");
+  }
+  if((await c.query("SELECT to_regprocedure('origen_review_response_context_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_review_response_context_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_review_response_choices_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_review_response_choices_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_review_followups_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_review_followups_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_follow_up_conversations_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_follow_up_conversations_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_conversation_opening_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_conversation_opening_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_student_follow_up_after_restore()') AS fn")).rows[0]?.fn){
+   await c.query('SELECT origen_student_follow_up_after_restore()');
+   // An old, deleted or subsequently corrected report is not restored as truth.
+   // Older manifests without this field conservatively remove these reports.
+   await c.query(`DELETE FROM origen_student_follow_up_reports r WHERE NOT EXISTS(
+    SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS f(account_id uuid,id uuid,version integer)
+    WHERE f.account_id=r.account_id AND f.id=r.id AND f.version=r.version)`,[JSON.stringify(payload.studentFollowUpReportFences||[])]);
+  }
+  if((await c.query("SELECT to_regprocedure('origen_outcome_evidence_after_restore()') AS fn")).rows[0]?.fn){
+   for(const [table,field] of [['origen_outcome_evidence','outcomeEvidenceFences'],['origen_outcome_episodes','outcomeEpisodeFences']])await c.query(`DELETE FROM ${table} r WHERE NOT EXISTS(
+    SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS f(account_id uuid,id uuid,version integer)
+    WHERE f.account_id=r.account_id AND f.id=r.id AND f.version=r.version)`,[JSON.stringify(payload[field]||[])]);
+   await c.query('SELECT origen_outcome_evidence_after_restore()');
+  }
+  if((await c.query("SELECT to_regprocedure('origen_outcome_observation_after_restore()') AS fn")).rows[0]?.fn){
+   // A restored observation must not outlive a missing or superseded disagreement.
+   // Dropping that observation also fences stale approval/delete requests by ID.
+   await c.query(`DELETE FROM origen_outcome_observations o WHERE
+    EXISTS(SELECT 1 FROM origen_outcome_observation_disputes d WHERE d.observation_id=o.id AND NOT EXISTS(
+      SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS f(account_id uuid,id uuid,version integer) WHERE f.account_id=d.account_id AND f.id=d.observation_id AND f.version=d.version))
+    OR EXISTS(SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS f(account_id uuid,id uuid,version integer) WHERE f.id=o.id AND f.account_id=o.account_id AND NOT EXISTS(
+      SELECT 1 FROM origen_outcome_observation_disputes d WHERE d.observation_id=f.id AND d.version=f.version))`,[JSON.stringify(payload.outcomeDisputeFences||[])]);
+   for(const [table,key,field] of [['origen_outcome_observations','id','outcomeObservationFences'],['origen_outcome_observation_disputes','observation_id','outcomeDisputeFences']])await c.query(`DELETE FROM ${table} r WHERE NOT EXISTS(
+    SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS f(account_id uuid,id uuid,version integer)
+    WHERE f.account_id=r.account_id AND f.id=r.${key} AND f.version=r.version)`,[JSON.stringify(payload[field]||[])]);
+   await c.query('SELECT origen_outcome_observation_after_restore()');
+  }
+  if((await c.query("SELECT to_regprocedure('origen_outcome_evaluation_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_outcome_evaluation_after_restore()');
   const coordinatorReady=(await c.query("SELECT to_regprocedure('origen_coordinator_export()') AS fn")).rows[0]?.fn;
   if(coordinatorReady){
    await c.query("UPDATE origen_coordinator_organizations SET status='suspended',revision=revision+1 WHERE status='active'");
@@ -104,6 +169,15 @@ export async function replayDeletionManifest(pool,manifest){
    else await c.query("INSERT INTO origen_deletion_journal(subject_hash,account_id,kind,record_id) VALUES($1,$2,'summary',$3) ON CONFLICT DO NOTHING",[subjectHash(account.auth0_subject),r.account_id,r.summary_id]);
   }
   for(const r of payload.memoryFences||[])await c.query("UPDATE origen_student_memories SET status='deleted',last_action='delete',content='',source_quote='' WHERE account_id=$1 AND id=$2 AND version<$3 AND status<>'superseded'",[r.account_id,r.id,r.version]);
+  if((await c.query("SELECT to_regprocedure('origen_review_response_view(uuid)') AS fn")).rows[0]?.fn){
+   const scrub="UPDATE origen_review_request_responses SET guidance='',suggested_action='',resource_url='',follow_up_on=NULL,withdrawn_at=coalesce(withdrawn_at,clock_timestamp()),updated_at=clock_timestamp()";
+   for(const r of payload.reviewResponseFences||[])await c.query(scrub+' WHERE account_id=$1 AND request_id=$2 AND (version<>$3 OR $4)',[r.account_id,r.request_id,r.version,r.withdrawn]);
+   await c.query(scrub+' WHERE NOT (request_id=ANY($1::uuid[]))',[(payload.reviewResponseFences||[]).map(r=>r.request_id)]);
+  }
+  if((await c.query("SELECT to_regprocedure('origen_review_request_command(jsonb)') AS fn")).rows[0]?.fn)for(const r of payload.reviewRequestTombstones||[]){
+   await c.query('DELETE FROM origen_review_requests WHERE account_id=$1 AND (id=$2 OR request_key=$3)',[r.account_id,r.request_id,r.request_key]);
+   await c.query('INSERT INTO origen_review_request_tombstones(account_id,student_id,request_id,request_key,deleted_at) SELECT $1,$2,$3,$4,$5 WHERE EXISTS(SELECT 1 FROM origen_students WHERE account_id=$1 AND id=$2) ON CONFLICT(account_id,request_key) DO NOTHING',[r.account_id,r.student_id,r.request_id,r.request_key,r.deleted_at]);
+  }
   for(const r of payload.deletions){
    const account=accounts.find(a=>a.id===r.account_id);
    if(account&&subjectHash(account.auth0_subject)!==r.subject_hash)throw new Error('restored_account_identity_mismatch');

@@ -1,0 +1,70 @@
+{
+  "kind": "review-response-local-verification",
+  "schemaVersion": 2,
+  "startedAt": "2026-11-01T21:49:32.387Z",
+  "sourceFingerprint": "6ee5478cf7db90e06a97701e972ddc3b979fa0d3642a246be76092809774020d",
+  "disposablePostgres": true,
+  "syntheticIdentity": true,
+  "syntheticSpeech": true,
+  "suites": {
+    "server": {
+      "tests": 239,
+      "pass": 239,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0,
+      "passed": true
+    },
+    "operations": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0,
+      "passed": true
+    }
+  },
+  "browsers": {
+    "workflow": {
+      "passed": true,
+      "journeys": 12
+    },
+    "notebook": {
+      "passed": true,
+      "journeys": 6
+    },
+    "delivery": {
+      "passed": true,
+      "journeys": 6
+    },
+    "navigation": {
+      "passed": true,
+      "journeys": 7
+    },
+    "connected": {
+      "passed": true,
+      "journeys": 8
+    },
+    "choices": {
+      "passed": true,
+      "journeys": 6
+    },
+    "followups": {
+      "passed": true,
+      "journeys": 6
+    }
+  },
+  "build": true,
+  "logging": true,
+  "sourceUnchanged": true,
+  "passed": true,
+  "productionEnabled": false,
+  "checkedAt": "2026-11-01T21:57:52.697Z",
+  "externalChecksNotPerformed": [
+    "deployed-authentication-and-staff-verification",
+    "real-device-live-and-realtime-speech-and-audibility",
+    "deployment-database-and-maintenance-configuration"
+  ]
+}

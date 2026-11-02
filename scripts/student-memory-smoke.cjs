@@ -110,7 +110,7 @@ async function openBinder(page){await page.locator('.binder-cover').click();awai
 
 module.exports={setup,openBinder,subject,studentId};
 if(require.main===module)(async()=>{
- const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox']});let count=0;
+ const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets']});let count=0;
  try{for(const width of [1280,390,320])for(const language of ['en','es']){
   const {page,state}=await setup(browser,{width,language});const tr=(en,es)=>language==='es'?es:en;
   try{

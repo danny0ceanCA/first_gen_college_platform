@@ -45,7 +45,7 @@ export function rankBinderNextSteps(input,{now=Date.now()}={}){
   }
   candidates.push({...item,kind,ranking:{policy:NEXT_STEP_POLICY,score,reasons},_text:fold(text).trim()});
  }
- for(const item of (workspace.actions||[]).slice(0,5))if(['not-started','in-progress'].includes(item.status))add('action',item,60,'accepted-unfinished-step');
+ for(const item of (workspace.actions||[]).slice(0,5))if(!item.followUpControlled&&['not-started','in-progress'].includes(item.status))add('action',item,60,'accepted-unfinished-step');
  for(const item of (workspace.notes||[]).slice(0,6))if(item.kind==='question'&&!(input.role==='student'&&fromParent(item)))add('question',item,50,'saved-unresolved-question');
  const guidance=workspace.relatedCoordinatorGuidance;
  if(input.role==='student'&&scope?.kind==='student'&&guidance&&guidanceProgress(guidance.followThrough).shouldOffer)add('coordinator-guidance',guidance,40,'optional-coordinator-suggestion');
@@ -54,6 +54,7 @@ export function rankBinderNextSteps(input,{now=Date.now()}={}){
 }
 
 export function selectBinderOpening(input,options){
+ if(input.openingDecision!==undefined)return input.openingDecision?.opening||null;
  if(input.onboarding===true||input.routeConversations&&input.targetConfirmed!==true||input.continuing||input.continuity?.length||input.scopeRestart||input.workspaceRefreshOnly||input.workspace?.selection||!(input.experience?.usedApp||input.experience?.usedVoice))return null;
  return rankBinderNextSteps(input,options)[0]||null;
 }

@@ -3,6 +3,7 @@ import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNoti
 import {useGuidanceRequest,type Guidance} from './CoordinatorGuidance';
 import {StudentCommentsProvider,StudentEntryComments,useStudentComments} from './StudentComments';
 import BinderSharing from './BinderSharing';
+import {StudentReviewRequestsProvider,StudentReviewRequests,StudentReviewRequestEntry} from './StudentReviewRequests';
 import {notifyMemoryContext} from './memoryContext.mjs';
 import StudentMemory,{type Memory} from './StudentMemory';
 import {binderMemoryEntries,binderMemorySignalId} from './binderMemory.mjs';
@@ -52,7 +53,7 @@ function subscribeMobileBinder(callback:()=>void){
 export default function TopicNotebook(props:Props){
  const [commentAction,setCommentAction]=useState(0);
  const body=<TopicNotebookContent {...props} commentAction={commentAction}/>;
- return props.role==='student'?<StudentCommentsProvider studentId={props.studentId} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}>{body}</StudentCommentsProvider>:body;
+ return props.role==='student'?<StudentReviewRequestsProvider studentId={props.studentId} language={props.language} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}><StudentCommentsProvider studentId={props.studentId} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}>{body}</StudentCommentsProvider></StudentReviewRequestsProvider>:body;
 }
 function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,initiallyOpen,onAction,renderNextSteps,renderGuide,renderSummary,studentId,name,role,language,t}:Props&{commentAction:number}){
  const comments=useStudentComments();
@@ -277,7 +278,7 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
     {note.organization&&<details className="memory-evidence"><summary>{t('See source','Ver fuente')}</summary><blockquote lang={note.language}>{note.quote}</blockquote><p>{t('From a saved conversation summary, not a verbatim transcript or a verified policy.','De un resumen guardado, no de una transcripción literal ni de una política verificada.')}</p></details>}
    {note.language!==language&&<div className="notebook-translation">{translated?<><span>{t('AI translation · Original preserved','Traducción con IA · Original conservado')}</span><button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:true}))}>{t('Show original','Ver original')}</button></>:note.translations[language]?<button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:false}))}>{t('Show translation','Ver traducción')}</button>:<button type="button" className="text-button" disabled={busy} onClick={()=>void act({action:'translate',id:note.id,version:note.version,language},t('Translation ready. The original is unchanged.','Traducción lista. El original no cambió.'))}><Languages size={15} aria-hidden="true"/>{t('Read in English','Leer en español')}</button>}</div>}
    <div className="notebook-note-actions"><button type="button" className="text-button" disabled={busy} onClick={()=>edit(note)}>{note.language===language?t('Edit','Editar'):t('Edit original','Editar original')}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{if(window.confirm(t('Delete this note? Your original conversation summary will remain.','¿Eliminar esta nota? Se conservará el resumen original de la conversación.')))void act({action:'delete',id:note.id,version:note.version},t('Note deleted.','Nota eliminada.'));}}><Trash2 size={14} aria-hidden="true"/>{note.status==='suggested'?t('Remove','Quitar'):t('Delete','Eliminar')}</button></div>
-   </div><StudentEntryComments id={note.id} topic={note.topic}/>
+   <StudentReviewRequestEntry note={note}/></div><StudentEntryComments id={note.id} topic={note.topic}/>
   </BinderNoteHighlight>;
  }
  const dividers=[...(renderSummary?[{id:'summary' as const,title:t('Summary','Resumen'),icon:MessageCircle}]:[]),...topics];
@@ -344,7 +345,7 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  }
 
  const [noticeTarget,setNoticeTarget]=useState<(NoticeDestination & {sequence:number})>();
- function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':'.binder-sharing')?.scrollIntoView({block:'start'})));}
+ function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='review-request')return;if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':'.binder-sharing')?.scrollIntoView({block:'start'})));}
  function dividerDetail(id:NotebookPage){
   if(id==='summary')return t('What we talked about','Lo que conversamos');
   if(loading||loadError)return '—';
@@ -374,6 +375,7 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  function dividerGlow(id:NotebookPage){return `${id!=='summary'&&discussing.includes(id)?' is-discussing':''}${freshCount(id)&&!liveScopeActive?' has-new-notes':''}`;}
  function dividerSignal(id:NotebookPage){return <span className="notebook-divider-signals">{unreadComments.some(f=>f.topic===id)&&<span className="comment-topic-signal">{unreadComments.filter(f=>f.topic===id).length} {t(unreadComments.filter(f=>f.topic===id).length===1?'new comment':'new comments',unreadComments.filter(f=>f.topic===id).length===1?'comentario nuevo':'comentarios nuevos')}</span>}{id!=='summary'&&discussing.includes(id)&&<span className="notebook-discussing-label"><i aria-hidden="true"/>{t('Discussing now','Conversando ahora')}</span>}{freshCount(id)>0&&(id==='summary'||!discussing.includes(id))&&<span className="notebook-new-label">{freshCount(id)} {t('new','nuevos')}</span>}</span>;}
  return <><ConversationRecovery studentId={target} t={t}/>{role==='student'&&target&&<BinderSharing launchRequest={sharingOpenRequest} key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0} connectionOpenRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/>}
+   <StudentReviewRequests openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='review-request'?{id:noticeTarget.grantId,sequence:noticeTarget.sequence}:undefined}/>
    {indexing&&discussions.length>0&&<p className="notebook-sync-status" role="status">{data?.background?.enabled?t('Your conversation is saved. Key points will appear here when ready.','Tu conversación está guardada. Los puntos clave aparecerán aquí cuando estén listos.'):t('Organizing conversation key points into your topics…','Organizando los puntos clave de tus conversaciones por tema…')}</p>}
    {indexError&&<p className="notebook-sync-status" role="status">{indexError==='notes_ai_limit'?t('Some older conversations still need organizing. Try again later; your saved notes are ready to use.','Aún faltan algunas conversaciones anteriores por organizar. Inténtalo más tarde; tus notas guardadas están listas.'):t('Some conversation points could not be organized yet. Your saved conversations and notes are still here.','Todavía no se pudieron organizar algunos puntos. Tus conversaciones y notas siguen aquí.')} {data?.background?.canRetry!==false&&<button type="button" className="text-button" onClick={()=>{retryOrganization.current=data?.background?.enabled===true;setAttempt(n=>n+1);}}>{t('Try again','Intentar de nuevo')}</button>}</p>}
 {comments.status}{unreadComments.length>0&&<button type="button" className="student-comment-arrival" onClick={()=>jumpToComment(unreadComments[0])}>{unreadComments.length} {t(unreadComments.length===1?'new comment from your coordinator':'new comments from your coordinator',unreadComments.length===1?'comentario nuevo de tu coordinador':'comentarios nuevos de tu coordinador')} <span aria-hidden="true">→</span></button>}

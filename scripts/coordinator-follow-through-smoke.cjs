@@ -31,6 +31,8 @@ const output=process.env.ORIGEN_SMOKE_OUTPUT||'output/playwright/student-first-p
     if(body.action==='student-reply'){assert.equal(body.body,reply);guidance[0].replyCount++;replies.push({id:'reply',body:reply,feedbackVersion:1,createdAt:now});data={status:'saved'};}
     if(body.action.endsWith('-thread'))data={revisions:[{version:1,body:suggestion,kind:'suggested-step',resourceUrl:'',createdAt:now}],replies};
    }
+   if(url.pathname==='/api/student-follow-up-report')data={enabled:false,canSave:false,planVersion:1,reports:[]};
+   else if(url.pathname==='/api/student-follow-up')data={enabled:false,items:[],remaining:0,pending:0};
    if(url.pathname==='/api/plans'){
     if(body.action==='create'){assert.equal(body.fromFeedback.id,guidance[0].id);assert.equal(body.plan.steps[0].action,chosen);planWrites++;plans=[{...body.plan,id:'55555555-5555-4555-8555-555555555555',version:1}];}
     data={plans,creationIds:[],limited:false,supportsActions:true};
@@ -74,8 +76,12 @@ const output=process.env.ORIGEN_SMOKE_OUTPUT||'output/playwright/student-first-p
    await page.locator('.action-editor').waitFor({state:'detached'});assert.equal(planWrites,1);assert.equal(replies.length,0);
    await page.getByRole('button',{name:t('Reply','Responder'),exact:true}).click();await page.locator('.coordinator-guidance textarea').fill(reply);
    await page.getByRole('button',{name:t('Send reply to coordinator','Enviar respuesta al coordinador'),exact:true}).click();await page.locator('.coordinator-guidance textarea').waitFor({state:'detached'});assert.equal(replies.length,1);
-   await page.getByRole('button',{name:'Coordinator view',exact:true}).click();await page.locator('.coordinator-binder-list button').first().click();
-   await page.getByText(/1 (suggested steps|pasos sugeridos)/).waitFor();assert.ok(!(await page.locator('body').textContent()).includes(chosen));
+   await page.getByRole('button',{name:'Coordinator view',exact:true}).click();
+   // Returning to the workspace restores the open divider. Verify the actual
+   // guidance and explicit reply rather than an obsolete summary counter.
+   await page.locator('.guidance-body').filter({hasText:suggestion}).waitFor();
+   await page.getByText(t('Edit history & replies','Historial y respuestas')+' (1)',{exact:true}).click();
+   await page.getByText(reply,{exact:true}).waitFor();assert.ok(!(await page.locator('body').textContent()).includes(chosen));
    if(width===320)await page.screenshot({path:`${output}/${width}-${language}-coordinator.png`,fullPage:true});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
    assert.equal(requests.filter(r=>r.path==='/api/plans'&&r.body.action==='create').length,1);

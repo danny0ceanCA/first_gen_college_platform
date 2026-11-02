@@ -1,3 +1,12 @@
+import {studentFollowUpEnabled} from './student-follow-up.mjs';
+import {followUpVoiceAvailable,followUpVoiceTools,followUpVoiceInstructions,outcomeVoiceAvailable,outcomeVoiceTools,outcomeVoiceInstructions} from './follow-up-voice-tools.mjs';
+import {selectConversationOpening,createOpeningEvidenceRepository} from './conversation-opening.mjs';
+import {openReviewVoiceSession} from './review-request-voice.mjs';
+import {reviewResponseContextEnabled,loadReviewResponseContext,verifyReviewResponseContext} from './review-response-context.mjs';
+import {createReviewResponseChoiceRepository} from './review-response-choices.mjs';
+import {reviewResponseVoiceAvailable,reviewResponseVoiceInstructions,reviewResponseRecallDescription,reviewResponseActionTool} from './review-response-voice.mjs';
+import {reviewRequestVoiceTools,reviewRequestVoiceInstructions,reviewRequestFollowupTool,reviewFollowupVoiceInstructions,studentUpdateVoiceInstructions} from './review-request-voice-tools.mjs';
+import {reviewFollowupsEnabled,studentUpdatesEnabled} from './review-requests.mjs';
 import {loadRelevantCoordinatorGuidance} from './coordinator-voice-context.mjs';
 import {coordinatorFeedbackEnabled} from './coordinator-feedback.mjs';
 import {negotiateStudentLive,studentLiveInstructions,studentVoiceModel} from './student-live-session.mjs';
@@ -60,8 +69,14 @@ export function voiceSession(input, env) {
   if(setup&&!scopePending)session.tools.push({type:'function',name:'review_onboarding_profile',description:'Make the current populated draft ready for final review only after account name and role, student name, education stage (or explicitly unknown), and the optional question answered or declined. First apply every supplied detail with draft tools. Then give a brief recap and ask whether to save. This does not save or grant consent.',parameters:{type:'object',properties:{education_stage_addressed:{type:'boolean',enum:[true]}},required:['education_stage_addressed'],additionalProperties:false}});
   if(input.saveOnboarding===true&&(input.collectAccount===true||input.onboarding===true)&&input.mode==='profile'&&!scopePending)session.tools.push({type:'function',name:'save_onboarding_profile',description:'Save the current onboarding account and student profile only after the user asks to save, in English or Spanish. The live call continues. First propose all details shared in this turn. Do not claim a save until this tool reports success.',parameters:{type:'object',properties:{requested_by_user:{type:'boolean',enum:[true]}},required:['requested_by_user'],additionalProperties:false}});
   if(!scopePending&&!setup&&input.liveMemoryEnabled)session.tools.push(...liveMemoryTools.filter(t=>t.name==='recall_student_context'?input.liveMemoryReadEnabled!==false:input.liveMemoryWriteEnabled!==false));
+  const responseVoice=reviewResponseVoiceAvailable(input);
+  if(followUpVoiceAvailable(input))session.tools.push(...followUpVoiceTools);
+  if(outcomeVoiceAvailable(input))session.tools.push(...outcomeVoiceTools);
+  if(responseVoice)session.tools=session.tools.map(tool=>tool.name==='recall_student_context'?{...tool,description:tool.description+reviewResponseRecallDescription}:tool);
+  if(responseVoice)session.tools=session.tools.map(reviewResponseActionTool);
   if(!scopePending&&!setup&&input.guidedConversation&&input.liveMemoryEnabled)session.tools.push(...guidedConversationTools.filter(t=>t.name==='get_guidance_question'?input.adaptiveEnabled!==false:input.liveMemoryWriteEnabled!==false));
   if(input.coordinatorLinking&&!scopePending&&!setup)session.tools.push(...coordinatorLinkTools);
+  if(input.reviewRequestVoice===true&&input.role==='student'&&!scopePending&&!setup)session.tools.push(...reviewRequestVoiceTools.map(tool=>responseVoice&&input.reviewFollowupVoice===true?reviewRequestFollowupTool(tool,input.studentUpdateVoice===true):tool));
   session.tools.push({type:'function',name:'end_conversation',description:'End this call only when the person clearly concludes or says goodbye. A bare thanks, a pause, or thanks followed by another question is not a request to end. The app will speak a brief farewell and disconnect after playback. Do not say a separate farewell first.',parameters:{type:'object',properties:{requested_by_user:{type:'boolean',enum:[true]}},required:['requested_by_user'],additionalProperties:false}});
   if(setup)session.tools=session.tools.filter(t=>['propose_profile','propose_account','review_onboarding_profile','save_onboarding_profile','set_conversation_language','end_conversation'].includes(t.name));
   const has=name=>session.tools.some(t=>t.name===name);
@@ -90,11 +105,15 @@ export function voiceSession(input, env) {
     parts.push(memoryInstructions(input.studentBrief,{canWrite:has('save_student_memory')}));
     parts.push(retrievalInstructions(input.historicalEvidence),continuityInstructions(input.returnContext));
     if(input.liveMemoryEnabled)parts.push(liveMemoryInstructionsFor(session.tools));
+    if(responseVoice){parts.push(reviewResponseVoiceInstructions);if(input.reviewRequestVoice===true&&input.reviewFollowupVoice===true)parts.push(reviewFollowupVoiceInstructions);if(input.studentUpdateVoice===true&&input.reviewRequestVoice===true&&input.reviewFollowupVoice===true)parts.push(studentUpdateVoiceInstructions);}
     if(input.adaptiveEnabled!==false)parts.push(adaptiveGuidanceInstructions(input));
     if(input.guidedConversation&&input.liveMemoryEnabled)parts.push(guidedInstructionsFor(session.tools));
   }
   if(has('highlight_binder_topics'))parts.push(binderTopicInstructions);
   if(has('lookup_coordinator_code'))parts.push(coordinatorLinkInstructions);
+  if(has('prepare_coordinator_review_request')){parts.push(reviewRequestVoiceInstructions);session.max_output_tokens=3000;}
+  if(has('prepare_student_outcome_evidence'))parts.push(outcomeVoiceInstructions);
+  if(has('prepare_student_check_in')){parts.push(followUpVoiceInstructions);session.max_output_tokens=3000;}
   session.instructions=voiceLanguageInstructions(parts.filter(Boolean).join('\n\n'),input.language);
   return session;
 }
@@ -132,7 +151,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
   return async(req,res,next) => {
     if(req.url?.split('?')[0] !== '/api/profile-voice') return next();
     const started=Date.now();
-    let execution,tracked,upstreamRequestId,storedRole='unknown',teachingAccess,teachingOutcome='failed';
+    let execution,tracked,upstreamRequestId,storedRole='unknown',teachingAccess,teachingOutcome='failed',openingClaim,openingDelivered=false;
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
   const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...body,...(tracked?{guidance:tracked}:{})}));};
@@ -146,7 +165,10 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
       let input; try {input=JSON.parse(raw);} catch {return send(400,{error:'invalid_request'});}
       if(input?.voiceProtocol!==undefined&&input.voiceProtocol!=='live-v1')return send(400,{error:'invalid_request'});
-      if(input&&typeof input==='object'){input.returnContext=undefined;input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
+      if(input?.outcomeProtocol!==undefined&&input.outcomeProtocol!=='student-outcome-v1')return send(400,{error:'invalid_request'});
+      if(input?.followUpProtocol!==undefined&&input.followUpProtocol!=='student-follow-up-v1')return send(400,{error:'invalid_request'});
+      if(input?.responseContextProtocol!==undefined&&input.responseContextProtocol!=='review-response-v1')return send(400,{error:'invalid_request'});
+      if(input&&typeof input==='object'){input.studentOutcomeVoice=false;input.studentUpdateVoice=false;input.studentFollowUpVoice=false;input.openingDecision=undefined;input.returnContext=undefined;input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.reviewRequestVoice=false;input.reviewResponseVoice=false;input.reviewFollowupVoice=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
       const policy=personalizationControls(env,req.origenAuthorized?req.origenIdentity?.sub:undefined);
       const continuity=req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub);
       if(input&&typeof input==='object'){input.adaptiveEnabled=policy.adaptive;input.liveMemoryReadEnabled=policy.retrieval;input.liveMemoryWriteEnabled=policy.writes;}
@@ -221,7 +243,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       // Fetch after preparation/cache reuse: hidden, edited or withdrawn comments
       // must not be restored from a prepared voice snapshot.
       if(input.workspace)delete input.workspace.relatedCoordinatorGuidance;
-      if(req.origenAuthorized&&input.workspace?.available&&input.onboarding!==true&&policy.retrieval&&coordinatorFeedbackEnabled(env)&&!input.workspaceFocus?.kind?.includes('coordinator-guidance')){
+      if(req.origenAuthorized&&input.workspace?.available&&input.onboarding!==true&&policy.retrieval&&coordinatorFeedbackEnabled(env)&&!['coordinator-guidance','review-response'].includes(input.workspaceFocus?.kind)){
         const topics=input.workspace.topic?[input.workspace.topic]:input.mode==='finance'||input.mode==='loans'?['costs']:input.mode==='admissions'?['applications']:['options','transfer'];
         const query=Array.isArray(input.continuity)?input.continuity.filter(t=>t?.role==='user'&&typeof t.text==='string').at(-1)?.text?.slice(0,1000)||'':'';
         try{
@@ -231,26 +253,49 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       input.guidedConversation=guidedConversationEnabled(env);
       input.coordinatorLinking=await coordinatorVoiceAvailable(database,env,input.studentId);
+      const reviewVoiceSession=req.origenAuthorized&&storedRole==='student'&&input.onboarding!==true&&(!input.routeConversations||input.targetConfirmed)?await openReviewVoiceSession(database,env,input.studentId):undefined;
+      input.reviewRequestVoice=!!reviewVoiceSession;
       let liveMemorySession;
       if(req.origenAuthorized&&(policy.retrieval||policy.writes)&&input.enableLiveMemory===true&&input.studentBrief?.available){
         liveMemorySession=await createLiveMemoryRepository(database,env)(req.origenIdentity.sub,{action:'open',studentId:input.studentId,revision:input.studentBrief.revision,sessionId:input.memorySessionId});
         input.liveMemoryEnabled=!!liveMemorySession;
       }
+      // A protocol marker advertises client freshness support; it grants no
+      // access. Re-derive after preparation/cache reuse and on every guide update.
+      input.reviewResponseVoice=!!liveMemorySession&&req.origenAuthorized===true&&storedRole==='student'&&input.responseContextProtocol==='review-response-v1'&&reviewResponseContextEnabled(env,req.origenIdentity?.sub);
+      input.studentFollowUpVoice=input.reviewResponseVoice&&policy.writes&&input.followUpProtocol==='student-follow-up-v1'&&studentFollowUpEnabled(env,req.origenIdentity?.sub);
+      input.studentOutcomeVoice=input.studentFollowUpVoice&&input.outcomeProtocol==='student-outcome-v1'&&env.ORIGEN_OUTCOME_EVIDENCE==='true';
+      input.reviewFollowupVoice=input.reviewResponseVoice&&input.reviewRequestVoice===true&&reviewFollowupsEnabled(env);
+      input.studentUpdateVoice=input.reviewFollowupVoice&&studentUpdatesEnabled(env,req.origenIdentity?.sub);
+      let reviewResponseGuard;
+      if(input.workspaceFocus?.kind==='review-response'){
+        if(!input.reviewResponseVoice||!input.workspace?.available)throw Object.assign(new Error('review_response_context_paused'),{status:403});
+        const focused=await loadReviewResponseContext(database,req.origenIdentity.sub,{studentId:input.studentId,focus:input.workspaceFocus.source},env);
+        if(focused.status!=='retrieved')throw Object.assign(new Error('workspace_item_changed'),{status:409});
+        await createReviewResponseChoiceRepository(database,env)(req.origenIdentity.sub,{action:'bind-focus',studentId:input.studentId,source:input.workspaceFocus.source,sessionId:liveMemorySession.id});
+        const {guard,...context}=focused;reviewResponseGuard=guard;input.workspace.reviewResponse=context;
+      }
       // Keep revision/suppression safeguards active even during rollback; omit the new brief.
       const memoryRevision=input.studentBrief?.revision,memoryPolicy=typeof memoryRevision==='number'?personalizationPolicy(env,req.origenAuthorized?req.origenIdentity?.sub:undefined):undefined;
       if(!policy.enabled)input.studentBrief=undefined;
+      // Reserve the shared allowance after fresh context loads, never during prewarming.
+      input.openingDecision=await selectConversationOpening(database,req.origenIdentity?.sub,input,{conversationId:sessionId,memorySessionId:liveMemorySession?.id,allowFollowUp:input.followUpProtocol==='student-follow-up-v1',env:req.origenAuthorized?env:{}});
+      openingClaim=input.openingDecision?.claim;
+      if(openingClaim){const context=await loadReviewResponseContext(database,req.origenIdentity.sub,{studentId:input.studentId,focus:input.openingDecision.opening.source},env);if(context.status!=='retrieved')throw Object.assign(Error('workspace_item_changed'),{status:409});reviewResponseGuard=context.guard;}
       const config=voiceSession(input,{...env,OPENAI_MODEL_VOICE:studentVoiceModel(input,env)});
       if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',retrieval:'guide',query:teachingSituationQuery(input)},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});config.instructions+=teachingAccess.instructions;}
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.
-        const base=voiceSession({...input,returnContext:input.returnContext?{policy:'continuity-v1'}:undefined,studentBrief:undefined,historicalEvidence:input.historicalEvidence?{items:[]}:undefined,profile:{},students:[],memory:[],plans:[],workspace:input.workspace?.available?{available:true,selection:input.workspace.selection||null,notes:[],actions:[]}:undefined,workspaceFocus:undefined,continuity:undefined},{...env,OPENAI_MODEL_VOICE:studentVoiceModel(input,env)});
+        const base=voiceSession({...input,openingDecision:input.openingDecision?{opening:null,reason:'policy-reference'}:undefined,returnContext:input.returnContext?{policy:'continuity-v1'}:undefined,studentBrief:undefined,historicalEvidence:input.historicalEvidence?{items:[]}:undefined,profile:{},students:[],memory:[],plans:[],workspace:input.workspace?.available?{available:true,selection:input.workspace.selection||null,notes:[],actions:[]}:undefined,workspaceFocus:undefined,continuity:undefined},{...env,OPENAI_MODEL_VOICE:studentVoiceModel(input,env)});
         const version=guidanceConfig(config.model,'voice',base,env);
         const confirmed=input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true);
         tracked=await guidance.begin(req.origenIdentity.sub,{sessionId,segmentId:req.headers['x-origen-segment'],topic:input.mode||'profile',role:storedRole,language:input.language,targetKind:confirmed?(input.studentId===null?'family':'student'):'unresolved',studentId:confirmed?input.studentId:null,pendingStudentId:input.profile?.id},version);
         if(!updating)execution=await guidance.startExecution(req.origenIdentity.sub,tracked,version,'voice');
       }
-      if(updating){teachingOutcome='prepared';return send(200,{...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,...(config.model==='gpt-live-1'?{liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[])}:{})},guidance:tracked});}
+      const verifyFocusedResponse=async()=>{if(input.openingDecision?.claim){const result=await createOpeningEvidenceRepository(database,env)(req.origenIdentity.sub,{action:'verify',studentId:input.studentId,conversationId:sessionId,claimId:input.openingDecision.claim.claimId});if(result.status!=='current')throw Object.assign(new Error('workspace_item_changed'),{status:409});}if(reviewResponseGuard&&(await verifyReviewResponseContext(database,req.origenIdentity.sub,input.studentId,reviewResponseGuard,env)).status!=='current')throw Object.assign(new Error('workspace_item_changed'),{status:409});};
+      await verifyFocusedResponse();
+      if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,...(config.model==='gpt-live-1'?{liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[])}:{})},guidance:tracked});}
       const useLive=config.model==='gpt-live-1';let liveResult;const negotiate=providerOperation('voice.negotiate',request,{model:config.model});
       let response;
       if(useLive){liveResult=await negotiateStudentLive(negotiate,env.OPENAI_API_KEY,config,input,teachingAccess?.entries||[]);response=liveResult.response;}
@@ -266,7 +311,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(typeof sdp!=='string'||!sdp.startsWith('v=0')) return send(502,{error:'voice_unavailable'});
       teachingOutcome='provider_accepted';
       if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
-      return send(200,{sdp,...(useLive?{voiceProvider:'live',voiceSession:{type:'realtime',language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice}}:{}),...(input.coordinatorLinking?{coordinatorLinking:true}:{}),liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
-    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;await teachingAccess?.finish(teachingOutcome);if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
+      await verifyFocusedResponse();
+      openingDelivered=true;
+      return send(200,{sdp,...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(useLive?{voiceProvider:'live',voiceSession:{type:'realtime',language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice}}:{}),...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
+    } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(openingClaim&&!openingDelivered)await createOpeningEvidenceRepository(database,env)(req.origenIdentity.sub,{action:'release',studentId:openingClaim.studentId,conversationId:openingClaim.conversationId,claimId:openingClaim.claimId}).catch(()=>{});await teachingAccess?.finish(teachingOutcome);if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
   };
 }

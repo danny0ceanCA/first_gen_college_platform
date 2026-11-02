@@ -1,0 +1,10 @@
+export type OutcomeDefinitionId='office_contacted'|'document_submitted'|'document_accepted'|'decision_received'|'waiver_approved';
+export type OutcomeEpisode={definitionId:OutcomeDefinitionId;definitionVersion:1;scope:{institution:string;term:string;cycle:string};window:{start:string;end:string;timeZone:string}};
+export type OutcomeReportLink={episode:OutcomeEpisode;report:{id:string;version:number};responseState:'answered'|'declined'|'unknown';claimStatus:'occurred'|'not_occurred'|'pending'|'unknown'|'goal_changed'|null;decision:'approved'|'denied'|'other'|'unknown'|null};
+export const outcomeDefinitions:ReadonlyArray<Readonly<{id:OutcomeDefinitionId;version:1;label:{en:string;es:string};criterion:string;scope:string;observationWindow:{kind:string;maxDays:number;afterWindow:string};freshness:string;bases:readonly string[];doesNotEstablish:readonly string[]}>>;
+export const outcomeEvidenceContract:Readonly<{version:1;origins:readonly string[];bases:readonly string[];assessment:readonly string[];currency:readonly string[];datePrecision:readonly string[];purposes:readonly string[];institutionVerified:false;evaluationAllowed:false}>;
+export const phase3OutcomeCompatibility:Readonly<Record<string,string>>;
+export function outcomeDefinition(id:string,version:number):(typeof outcomeDefinitions)[number]|undefined;
+export function validateOutcomeEpisode(value:unknown):OutcomeEpisode;
+export function validateOutcomeReportLink(value:unknown):OutcomeReportLink;
+export function validateOutcomeEventDate(value:unknown,now?:Date):{on:string|null;precision:'day'|'unknown';timeZone:string};

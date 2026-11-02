@@ -1,3 +1,4 @@
+import {validateReviewResponseReference} from '../src/reviewResponseConnection.mjs';
 import {coordinatorConversationInstructions,guidanceFollowThroughInstructions} from './coordinator-voice-context.mjs';
 import {runFeedbackCommand} from './coordinator-feedback.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
@@ -20,6 +21,10 @@ const id=value=>typeof value==='string'&&value.length>0&&value.length<=128;
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
 export function validateWorkspaceFocus(value){
  if(value===undefined)return undefined;
+ if(value?.kind==='review-response'){
+  if(!id(value.studentId)||!topics.includes(value.topic)||Object.keys(value).some(k=>!['kind','studentId','topic','source','serial'].includes(k)))throw fail(400,'invalid_workspace_focus');
+  return {kind:value.kind,studentId:value.studentId,topic:value.topic,source:validateReviewResponseReference(value.source)};
+ }
  if(!value||!['topic','note','point','action','coordinator-guidance'].includes(value.kind)||!topics.includes(value.topic)||(value.studentId!==null&&!id(value.studentId)))throw fail(400,'invalid_workspace_focus');
  const focus={kind:value.kind,studentId:value.studentId,topic:value.topic};
  if(value.kind!=='topic'){
@@ -92,6 +97,14 @@ export async function loadVoiceWorkspace(database,subject,{studentId,mode,focus,
   result.scope={studentId,kind:studentId===null?'family':'student'};
   for(let i=0;i<result.notes.length;i++)result.notes[i].evidence=binderEvidence('note',chosenNotes[i]);
   for(let i=0;i<result.actions.length;i++)result.actions[i].evidence=binderEvidence('action',chosenActions[i]);
+  // Accepted response-linked actions retain explicit follow-up control even
+  // while the Phase 3 switch is paused. They remain available for direct focus.
+  if(result.actions.length&&(await c.query("SELECT to_regprocedure('origen_conversation_opening_command(jsonb)') AS fn")).rows[0]?.fn){
+   const targets=result.actions.map(a=>({planId:a.evidence.record.planId,stepId:a.evidence.record.id}));
+   const classified=(await c.query('SELECT origen_conversation_opening_command($1::jsonb) AS result',[JSON.stringify({action:'classify',targets})])).rows[0].result;
+   if(!Array.isArray(classified.linked))throw fail(503,'workspace_unavailable');
+   for(const a of result.actions)a.followUpControlled=classified.linked.some(t=>t.planId===a.evidence.record.planId&&t.stepId===a.evidence.record.id);
+  }
   if(result.sourceSummary)result.sourceSummary.evidence=binderEvidence('summary',{id:selected.source_summary_id,student_id:studentId,version:createHash('sha256').update(linkedSummary.summary).digest('hex'),conversation_at:linkedSummary.conversation_at});
   const noteSources=[...new Set(chosenNotes.map(n=>n.source_summary_id).filter(Boolean))];
   if(noteSources.length){

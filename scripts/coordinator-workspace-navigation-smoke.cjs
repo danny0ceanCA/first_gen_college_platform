@@ -7,10 +7,10 @@ const {chromium}=resolve('playwright');
 const origin=new URL(process.env.ORIGEN_PREVIEW_URL||'http://127.0.0.1:5173').origin;
 assert.ok(['127.0.0.1','localhost'].includes(new URL(origin).hostname));
 const audit=process.env.ORIGEN_NAV_AUDIT==='1';
-const folder='output/playwright/coordinator-navigation';
+const folder=process.env.ORIGEN_SMOKE_OUTPUT||'output/playwright/coordinator-navigation';
 (async()=>{
  await mkdir(folder,{recursive:true});
- const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE,args:['--no-sandbox','--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets']});
  const problems=[];
  try{for(const [language,width,height,reducedMotion] of [['en',1864,900,'no-preference'],['en',1024,768,'no-preference'],['es',768,1024,'no-preference'],['en',390,844,'no-preference'],['es',320,740,'no-preference'],['es',844,390,'no-preference'],['en',640,720,'reduce']]){
   const page=await browser.newPage({viewport:{width,height},reducedMotion}),errors=[];
@@ -24,6 +24,7 @@ const folder='output/playwright/coordinator-navigation';
   await page.route('**/*',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname.endsWith('/@auth0_auth0-react.js'))return route.fulfill({contentType:'application/javascript',body:`const auth={user:{sub:'navigation-owner'},getAccessTokenSilently:async()=>'synthetic',isAuthenticated:true,isLoading:false};export function useAuth0(){return auth}`});
+   if(url.origin!==origin)return route.fulfill({status:200,body:''});
    if(!url.pathname.startsWith('/api/'))return route.continue();
    const body=route.request().postDataJSON();let data;
    if(url.pathname==='/api/coordinator-access'){
@@ -33,6 +34,8 @@ const folder='output/playwright/coordinator-navigation';
    }
    if(url.pathname==='/api/coordinator-binders')data=body.action==='read'?grant:{binders:[grant],counts:{all:1,new:0,help:1},nextCursor:null};
    if(url.pathname==='/api/coordinator-feedback')data={feedback:[],writesEnabled:true};
+   if(url.pathname==='/api/coordinator-notifications')data={notifications:[]};
+   if(url.pathname==='/api/coordinator-review-requests')data={enabled:false,requests:[],nextCursor:null};
    if(url.pathname==='/api/coordinator-connections'){
     if(inboxGate)await inboxGate.promise;
     if(denyInbox)return route.fulfill({status:403,json:{error:'connection_denied'}});

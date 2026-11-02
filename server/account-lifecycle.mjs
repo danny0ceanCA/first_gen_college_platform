@@ -49,6 +49,35 @@ export function createLifecycleRepository(database){return async(subject,input,i
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_guidance_questions'")).rows.length)data.guidanceQuestions=await rows('origen_guidance_questions');
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_topic_notes'")).rows.length){data.topicNotes=await rows('origen_topic_notes');data.topicNoteBatches=await rows('origen_topic_note_batches');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_binder_source_lineage'")).rows.length){data.binderSourceLineage=await rows('origen_binder_source_lineage');data.binderSourceEdges=await rows('origen_binder_source_edges');}
+   if(account&&(await c.query("SELECT to_regprocedure('origen_student_follow_up_command(jsonb)') AS fn")).rows[0]?.fn){
+    const followUp=(await c.query('SELECT origen_student_follow_up_command($1::jsonb) AS result',[JSON.stringify({action:'export'})])).rows[0].result;
+    if(followUp.error)throw fail(403,'student_follow_up_export_denied');
+    data.studentFollowUp=followUp;
+   }
+   if(account&&(await c.query("SELECT to_regprocedure('origen_student_outcome_evaluation_command(jsonb)') AS fn")).rows[0]?.fn){
+    const evaluation=(await c.query('SELECT origen_student_outcome_evaluation_command($1::jsonb) AS result',[JSON.stringify({action:'export'})])).rows[0].result;
+    if(evaluation.error)throw fail(403,'outcome_evaluation_export_denied');data.outcomeEvaluationPermissions=evaluation.permissions;
+   }
+   if(account&&(await c.query("SELECT to_regprocedure('origen_outcome_evidence_command(jsonb)') AS fn")).rows[0]?.fn){
+    const outcome=(await c.query('SELECT origen_outcome_evidence_command($1::jsonb) AS result',[JSON.stringify({action:'export'})])).rows[0].result;
+    if(outcome.error)throw fail(403,'outcome_evidence_export_denied');
+    data.outcomeEvidence=outcome;
+   }
+   if(account&&(await c.query("SELECT to_regprocedure('origen_student_outcome_observation_command(jsonb)') AS fn")).rows[0]?.fn){
+    const observations=(await c.query("SELECT origen_student_outcome_observation_command('{\"action\":\"export\"}'::jsonb) AS result")).rows[0].result;
+    if(observations.error)throw fail(403,'outcome_observation_export_denied');data.outcomeObservations=observations.observations;
+   }
+   // Restricted request tables are intentionally invisible to direct reads.
+   if(account&&(await c.query("SELECT to_regprocedure('origen_review_request_command(jsonb)') AS fn")).rows[0]?.fn){
+    const reviews=(await c.query("SELECT origen_review_request_command('{\"action\":\"export\"}'::jsonb) AS result")).rows[0].result;
+    if(reviews.error)throw fail(403,'review_request_export_denied');
+    data.reviewRequests=reviews.requests;data.reviewRequestDeletions=reviews.deletions;
+    if((await c.query("SELECT to_regprocedure('origen_review_response_choice_command(jsonb)') AS fn")).rows[0]?.fn){
+     const choices=(await c.query("SELECT origen_review_response_choice_command('{\"action\":\"export\"}'::jsonb) AS result")).rows[0].result;
+     if(choices.error)throw fail(403,'review_request_export_denied');
+     data.reviewResponseChoices=choices.choices;data.reviewResponsePlanLinks=choices.planLinks;
+    }
+   }
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_plan_creations'")).rows.length){data.planCreationReceipts=await rows('origen_plan_creations');data.planNoteLinks=await rows('origen_plan_note_links');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_workspace_sheets'")).rows.length){data.workspaceSheets=await rows('origen_workspace_sheets');data.workspaceSheetReceipts=await rows('origen_workspace_sheet_receipts');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_institution_affiliation_requests'")).rows.length)data.institutionAffiliationRequests=(await c.query('SELECT parent_name,parent_website,unit_name,unit_type,status,review_note,created_at,updated_at FROM origen_institution_affiliation_requests WHERE auth0_subject=$1',[subject])).rows;

@@ -1,3 +1,4 @@
+import {reviewDeliveryEnabled} from './review-request-delivery.mjs';
 import {runAsCoordinatorActor} from './account-isolation.mjs';
 import {requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {invitationIdentity} from './institution-access.mjs';
@@ -32,18 +33,19 @@ export function createCoordinatorNotificationsHandler(db,env={},fetcher=fetch){r
  try{
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(413,{error:'too_large'});}
   let input;try{input=validateNotificationInput(JSON.parse(raw));}catch{return send(400,{error:'invalid_notification_request'});}
+  const execute=async()=>{const r=await runNotificationCommand(db,input);if(!reviewDeliveryEnabled(env)){if(r.destination==='review-request')throw fail(503,'review_delivery_paused');if(r.notifications)r.notifications=r.notifications.filter(n=>!['review-request','review-response'].includes(n.kind));}return r;};
   const operator=['operations','resolve-report','retry-deliveries'].includes(input.action);
   if(input.audience==='staff'&&env.ORIGEN_COORDINATOR_ACCOUNTS!=='true')return send(503,{error:'coordinator_sharing_unavailable'});
   if(operator||input.audience==='staff'){
    await requireStaffAccess(db,req.origenIdentity,{scope:'institution',action:`notification-${input.action}`,target:input.id||input.organizationId,permission:operator?'manage:institutions':undefined,env,fresh:['resolve-report','retry-deliveries'].includes(input.action)});
    const trusted=await invitationIdentity(req,env,fetcher);
    if(trusted.email_verified!==true||!trusted.email)return send(403,{error:'verified_email_required'});
-   return send(200,await runAsCoordinatorActor(req.origenIdentity.sub,{issuedAt:req.origenIdentity.iat,administrator:operator&&staffPermissions(req.origenIdentity,env).includes('manage:institutions')},()=>runNotificationCommand(db,input)));
+   return send(200,await runAsCoordinatorActor(req.origenIdentity.sub,{issuedAt:req.origenIdentity.iat,administrator:operator&&staffPermissions(req.origenIdentity,env).includes('manage:institutions')},execute));
   }
-  return send(200,await runNotificationCommand(db,input));
+  return send(200,await execute());
  }catch(error){const known=[400,401,403,404,409,503].includes(error.status);return send(known?error.status:503,{error:known?error.message:'notifications_unavailable'});}
 };}
-export async function maintainCoordinators(db){return (await db.query('SELECT origen_coordinator_maintain() AS result')).rows[0].result;}
+export async function maintainCoordinators(db,env=process.env){return (await db.query("WITH policy AS MATERIALIZED (SELECT set_config('origen.review_delivery',$1,true)) SELECT origen_coordinator_maintain() AS result FROM policy",[String(reviewDeliveryEnabled(env))])).rows[0].result;}
 export async function assertCoordinatorLifecycleReady(db,env,maintenance){
  if(env.ORIGEN_COORDINATOR_ACCOUNTS!=='true')return;
  for(const fn of ['origen_coordinator_notification_command(jsonb)','origen_coordinator_export()','origen_coordinator_operations_command(jsonb)']){
