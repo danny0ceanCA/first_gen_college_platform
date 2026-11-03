@@ -1,3 +1,4 @@
+import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
 import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
 import {assertRecommendationContractReady} from './recommendation-contract.mjs';
 import {createOutcomeEvaluationHandler,assertOutcomeEvaluationReady} from './outcome-evaluation.mjs';
@@ -100,7 +101,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
  const handlers=[createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
- handlers.unshift(createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
+ handlers.unshift(createPrivateVoiceCaptureHandler(database,env),createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
  const privacyMonitor=createPrivacyMonitor(database,log);
@@ -151,7 +152,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
   // Frequent diagnostic events must never spend the budget used by permission
   // checks, saves, or research. Both lanes stay bounded before database work.
-  const diagnostic=req.url.split('?')[0]==='/api/voice-diagnostics';
+  const diagnostic=['/api/voice-diagnostics','/api/private-voice-capture'].includes(req.url.split('?')[0]);
   const bucketKey=JSON.stringify([identity.sub,diagnostic?'diagnostics':'application']);
   const bucket=buckets.get(bucketKey)||{count:0,reset:now+60000};buckets.set(bucketKey,bucket);
   if(++bucket.count>(diagnostic?240:120)){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
@@ -213,7 +214,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const cleanupTasks=[
    ['recommendation-previews',purgeRecommendationPreviews],
    ['recommendation-evaluation',purgeRecommendationEvaluation],
-   ['conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}],['permission-data',purgePermissionData],['diagnostic-maps',purgeDiagnosticOperations],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
+   ['conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}],['permission-data',purgePermissionData],['diagnostic-maps',async db=>{await purgeDiagnosticOperations(db);await purgePrivateVoiceCapture(db);}],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
    ['private-summaries',purgePrivateSummaries],['privacy-events',purgePrivacyEvents],['inquiries',purgeInstitutionInquiries],['outreach',purgeInstitutionOutreach],
    ['guidance',purgeGuidanceHistory],['progress',purgeProgressHistory],['report-snapshots',purgeAdminReportSnapshots],['quality',purgeConversationQuality],
    ['onboarding',db=>purgeOnboardingEvents(db,new Date(),process.env)],['admin-reviews',db=>purgeAdminReviews(db,new Date(),process.env)],
