@@ -1,4 +1,3 @@
-export const LOGOUT_COVER_MS=320;
 export const LOGOUT_REVEAL_MS=400;
 const returnKey='origen.logout-transition.v1',returnLifetime=90000;
 
@@ -20,9 +19,11 @@ export function createLogoutTransition({cleanup,stop,redirect,cover,onPhase,stor
    onPhase('leaving');
    pending=Promise.resolve().then(async()=>{
     try{
-     // Cleanup can run during the fade, but private UI is not removed until
-     // the curtain is opaque. Failed cleanup still blocks Auth0 sign-out.
-     await Promise.all([cleaned?undefined:Promise.resolve(cleanup()).then(()=>{cleaned=true;}),cover()]);
+     // Cleanup (including the test-account reset) can stop privacy subscribers
+     // and unmount the workspace. Finish covering it before any cleanup starts.
+     // Failed cleanup still blocks Auth0 sign-out.
+     await cover();
+     if(!cleaned){await cleanup();cleaned=true;}
      stop();stopped=true;
      if(options?.openUrl!==false)try{storage?.setItem(returnKey,String(now()));}catch{}
      await redirect(options);

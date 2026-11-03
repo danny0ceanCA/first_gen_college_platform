@@ -1,12 +1,12 @@
 import {endRecoverySession} from './conversationRecovery';
 import {Auth0Context,useAuth0} from '@auth0/auth0-react';
-import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import AccountOpening from './AccountOpening';
 import {resetTestSession} from './testSessionReset.mjs';
 import {isOnboardingTestAccount} from './testAccount.mjs';
 import LogoutTransition,{type LogoutPhase} from './LogoutTransition';
-import {clearLogoutReturn,createLogoutTransition,readLogoutReturn,LOGOUT_COVER_MS,LOGOUT_REVEAL_MS} from './logoutHandoff.mjs';
+import {clearLogoutReturn,createLogoutTransition,readLogoutReturn,LOGOUT_REVEAL_MS} from './logoutHandoff.mjs';
 
 const tabStorage=()=>{try{return window.sessionStorage;}catch{return undefined;}};
 const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -19,6 +19,8 @@ export default function PrivateSession({children}:{children:ReactNode}){
  const testOpening=useRef<{subject:string;work:Promise<void>;finished?:boolean}|null>(null);
  const [testResetFailed,setTestResetFailed]=useState(false);
  const logoutOptions=useRef<Parameters<typeof auth.logout>[0]>(undefined);
+ const curtain=useRef<{covered:boolean;resolve?:()=>void}>({covered:false});
+ const onCovered=useCallback(()=>{curtain.current.covered=true;curtain.current.resolve?.();curtain.current.resolve=undefined;},[]);
  const flow=useRef<ReturnType<typeof createLogoutTransition>|null>(null);
  const flowSubject=useRef(subject);
  if(!flow.current||subject&&subject!==flowSubject.current&&logoutPhase==='idle'){
@@ -31,7 +33,7 @@ export default function PrivateSession({children}:{children:ReactNode}){
   },
   stop:()=>browserPrivacy.stop('logout'),
   redirect:(options:Parameters<typeof auth.logout>[0])=>latestAuth.current.logout(options),
-  cover:()=>new Promise<void>(resolve=>window.setTimeout(resolve,reducedMotion()?0:LOGOUT_COVER_MS)),
+  cover:()=>new Promise<void>(resolve=>{if(curtain.current.covered)resolve();else curtain.current.resolve=resolve;}),
   onPhase:(phase:LogoutPhase)=>setLogoutPhase(phase),storage:tabStorage(),
   });
  }
@@ -69,11 +71,11 @@ export default function PrivateSession({children}:{children:ReactNode}){
   const timer=window.setTimeout(()=>setLogoutPhase('idle'),reducedMotion()?0:LOGOUT_REVEAL_MS);
   return()=>window.clearTimeout(timer);
  },[logoutPhase]);
- const logout:typeof auth.logout=async options=>{logoutOptions.current=options;await flow.current!.start(options);};
+ const logout:typeof auth.logout=async options=>{if(logoutPhase==='idle')curtain.current.covered=false;logoutOptions.current=options;await flow.current!.start(options);};
  let content=children;
  if(testResetFailed)content=<main className="application-panel"><p role="alert">Your test workspace could not be reset. Sign in again to retry. / No se pudo restablecer tu espacio de prueba. Inicia sesión otra vez para reintentar.</p><button className="button primary" onClick={()=>void auth.loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{prompt:'login'}})}>Sign in again / Iniciar sesión de nuevo</button></main>;
  if((logoutPhase==='leaving'||logoutPhase==='error')&&!flow.current.canReturn)content=null;
  else if(!auth.isLoading&&subject&&!ended&&ready!==subject)content=logoutPhase==='idle'?<AccountOpening/>:null;
  else if(!auth.isLoading&&subject&&ended&&!testResetFailed)content=logoutPhase==='idle'?<main className="application-panel"><p role="status">Your session ended. Unsaved conversation text was cleared. / Tu sesión terminó. Se borró el texto de conversación sin guardar.</p><button className="button primary" onClick={()=>void auth.loginWithRedirect({appState:{returnTo:'#app'},authorizationParams:{prompt:'login'}})}>Sign in again / Iniciar sesión de nuevo</button><button className="button outline" onClick={()=>void logout({logoutParams:{returnTo:window.location.origin}})}>Log out / Cerrar sesión</button></main>:null;
- return <Auth0Context.Provider value={{...auth,logout}}>{content}{logoutPhase!=='idle'&&<LogoutTransition phase={logoutPhase} canReturn={flow.current.canReturn&&browserPrivacy.valid()} onRetry={()=>void logout(logoutOptions.current||{logoutParams:{returnTo:window.location.origin}})} onReturn={()=>setLogoutPhase('idle')}/>}</Auth0Context.Provider>;
+ return <Auth0Context.Provider value={{...auth,logout}}>{content}{logoutPhase!=='idle'&&<LogoutTransition phase={logoutPhase} canReturn={flow.current.canReturn&&browserPrivacy.valid()} onCovered={onCovered} onRetry={()=>void logout(logoutOptions.current||{logoutParams:{returnTo:window.location.origin}})} onReturn={()=>setLogoutPhase('idle')}/>}</Auth0Context.Provider>;
 }
