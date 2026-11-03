@@ -18,17 +18,17 @@ export function capturePayload(event,direction='provider'){
  return null;
 }
 export function createVoiceCapture(post){
- let queue=[],timer,busy=false,enabled=false,sequence=0;
+ let queue=[],timer,busy=false,enabled=false,sequence=0,failures=0,paused=false;
  async function flush(){
-  clearTimeout(timer);timer=undefined;if(busy||!queue.length)return;
+  clearTimeout(timer);timer=undefined;if(busy||paused||!queue.length)return;
   busy=true;const batch=[];
   while(queue.length&&batch.length<8){if(batch.length&&new TextEncoder().encode(JSON.stringify([...batch,queue[0]])).length>48000)break;batch.push(queue.shift());}
-  try{await post(batch);}catch{queue.unshift(...batch);if(queue.length>128)queue=queue.slice(0,128);}
-  finally{busy=false;if(queue.length)timer=setTimeout(()=>void flush(),1500);}
+  try{await post(batch);failures=0;}catch(error){failures++;paused=error?.retryable===false;queue.unshift(...batch);if(queue.length>128)queue=queue.slice(0,128);}
+  finally{busy=false;if(queue.length&&!paused)timer=setTimeout(()=>void flush(),failures?Math.min(30000,1500*2**Math.min(failures-1,5)):300);}
  }
  return {enable(value){enabled=value===true;},event(event,scope){if(!enabled||!scope.sessionId)return;const data=capturePayload(event);if(!data)return;const encoded=JSON.stringify(data),fragmentId=crypto.randomUUID();const chunks=[];for(let i=0;i<encoded.length;i+=8000)chunks.push(encoded.slice(i,i+8000));
   for(let i=0;i<chunks.length;i++)queue.push({...scope,id:crypto.randomUUID(),sequence:++sequence,clientAt:new Date().toISOString(),data:chunks.length===1?data:{type:'capture.fragment',originalType:data.type,fragmentId,index:i,count:chunks.length,text:chunks[i]}});
   if(queue.length>128){const dropped=queue.length-127;queue.splice(0,dropped);queue.push({...scope,id:crypto.randomUUID(),sequence:++sequence,clientAt:new Date().toISOString(),data:{type:'capture.gap',dropped}});}
-  if(!timer)timer=setTimeout(()=>void flush(),300);
+  if(!timer&&!paused)timer=setTimeout(()=>void flush(),300);
  },flush};
 }

@@ -215,7 +215,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const logSequence=useRef(0);
   const [captureStatus,setCaptureStatus]=useState('Waiting for diagnostic events');
   const captureRequested=history.cloud&&user?.email?.trim().toLowerCase()===CAPTURE_EMAIL;
-  const privateCapture=useRef(createVoiceCapture(async events=>{try{const response=await apiFetch('/api/private-voice-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'append',events}),keepalive:true});if(!response.ok)throw Error('capture_unavailable');setCaptureStatus('Latest diagnostic batch saved');}catch(error){setCaptureStatus('Diagnostic upload pending — retrying');throw error;}}));
+  const privateCapture=useRef(createVoiceCapture(async events=>{try{const response=await apiFetch('/api/private-voice-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'append',events}),keepalive:true,signal:AbortSignal.timeout(10000)});if(!response.ok)throw Object.assign(Error('capture_unavailable'),{status:response.status,retryable:![400,401,403,413].includes(response.status)});setCaptureStatus('Latest diagnostic batch saved');}catch(error){setCaptureStatus('Diagnostic upload pending — retrying');throw error;}}));
   privateCapture.current.enable(captureRequested);
   function capture(event:unknown){privateCapture.current.event(event,{subject:user?.sub,sessionId:logSession.current,attemptId:logAttempt.current,studentId:logTarget.current});}
   function log(event:string,details:Record<string,unknown>={}){
@@ -863,7 +863,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       const data=await response.json().catch(()=>null);
       if(response.ok)capture({type:'context.received',instructions:data?.voiceSession?.instructions,model:data?.voiceProvider});
       if(generation.current!==version||closing.current?.active())return;
-      setDiagnosticId(responseReference(response)||'');
+      setDiagnosticId(sessionId);
       guidance.current.accept(data?.guidance);
       if(!response.ok)throw apiFailure(response,data?.error || (response.status===401?'authentication_required':'voice_unavailable'));
       if(typeof data?.sdp!=='string'||!data.sdp.startsWith('v=0'))throw new Error('invalid_voice_response');

@@ -43,3 +43,18 @@ test('large Unicode context is fragmented losslessly into keepalive-safe batches
  const reconstructed=JSON.parse(events.map(e=>e.data.text).join(''));
  assert.equal(reconstructed.instructions,instructions);
 });
+test('operator binding accepts only its authenticated subject without a UserInfo request',async()=>{
+ for(const [sub,expected] of [['bound-subject',503],['other-subject',403]]){
+  let status,lookups=0;const req=Readable.from(['{"action":"read"}']);
+  Object.assign(req,{url:'/api/private-voice-capture',method:'POST',headers:{},origenAuthorized:true,origenIdentity:{sub}});
+  await createPrivateVoiceCaptureHandler(null,{ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT:'bound-subject'},async()=>{lookups++;throw Error('must_not_call');})(req,{writeHead(value){status=value;},end(){}},()=>{});
+  // A matching identity reaches the unavailable database; others are denied before it.
+  assert.equal(status,expected);assert.equal(lookups,0);
+ }
+});
+test('non-retryable authorization failures pause uploads instead of looping',async()=>{
+ let uploads=0;const capture=createVoiceCapture(async()=>{uploads++;throw Object.assign(Error('denied'),{retryable:false});});
+ capture.enable(true);capture.event({type:'diagnostic',event:'test'},{sessionId:crypto.randomUUID()});await capture.flush();
+ capture.event({type:'diagnostic',event:'another'},{sessionId:crypto.randomUUID()});await capture.flush();
+ assert.equal(uploads,1);
+});

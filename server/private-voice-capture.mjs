@@ -20,7 +20,13 @@ export function createPrivateVoiceCaptureHandler(database,env={},fetcher=fetch){
  if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
  let client;
  try{
-  const identity=await invitationIdentity(req,env,fetcher);if(!captureIdentity(identity))return send(403,{error:'capture_not_enabled'});
+  // An operator may bind this opt-in to one existing authenticated subject.
+  // Browser-supplied email or subject can never grant this capability.
+  if(env.ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT){
+   if(req.origenIdentity.sub!==env.ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT)return send(403,{error:'capture_not_enabled'});
+  }else{
+   const identity=await invitationIdentity(req,env,fetcher);if(!captureIdentity(identity))return send(403,{error:'capture_not_enabled'});
+  }
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>400000)return send(413,{error:'capture_too_large'});}
   let input;try{input=validateCapture(JSON.parse(raw));}catch{return send(400,{error:'invalid_capture'});}
   if(input.action==='append'&&input.events.some(e=>e.subject!==req.origenIdentity.sub))return send(403,{error:'capture_identity_changed'});

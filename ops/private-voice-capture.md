@@ -6,6 +6,8 @@ Migration 122 and scoped API/maintenance grants were applied to production on No
 
 The browser requests capture only for this account. The server independently verifies the authenticated subject and verified email through Auth0 UserInfo; a body email or editable profile field cannot enable it. Other accounts receive 403. Reads use the same identity restriction and account scope. Coordinator and reporting policies do not expose this archive.
 
+An operator can instead set `ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT` to this account's existing authenticated Auth0 subject. When configured, the exact subject replaces repeated UserInfo checks; no other subject is accepted, even if its email matches. This binding must come from independently confirmed account identity, never a request body. Permanent authorization/payload rejection pauses uploads; transient failures retry with backoff. The displayed diagnostic ID now identifies the conversation session rather than only its initial HTTP request.
+
 ## Evidence retained
 
 - Completed and available partial provider transcripts from both speakers.
