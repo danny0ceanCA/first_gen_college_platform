@@ -77,6 +77,8 @@
 .notebook-guide-content .segmented{display:flex;flex-wrap:wrap;gap:6px}
 .notebook-guide-content .research-search,.notebook-guide-content .material-form{display:flex;flex-wrap:wrap}
 .notebook-guide-content input{min-width:0}
+.notebook-sync-status{font-size:13px;line-height:1.65;color:#72604f;margin:12px 0 18px}
+.notebook-sync-status .text-button{margin-left:8px}
 .notebook-key-points{margin:28px 0;border:1px solid #e1cfbf;border-radius:16px;padding:20px;background:#faf5ee}
 .notebook-key-points>h4{margin:0 0 8px;font-size:17px;color:#45372f}
 .notebook-key-points>p{margin:0 0 16px;line-height:1.65}
@@ -226,42 +228,3 @@
 .notebook-toolbar .notebook-options{margin-left:auto}
 .student-comment-index button{min-height:60px;display:grid;gap:5px;text-align:left}
 @media(max-width:760px){.notebook-page-navigation{position:sticky;top:0;z-index:8;padding-block:8px;background:#f8efdf;box-shadow:0 6px 8px -8px #74432f66}.notebook-page-navigation>span{font-weight:650;color:#813e2e}.notebook-options-content{width:min(260px,calc(100vw - 70px))}.notebook-toolbar .notebook-options{margin-left:0}.notebook-toolbar .notebook-options-content{left:0;right:auto}}
-/* The connected recap and complete journal share the same reading controls. */
-.notebook-recap-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 0 18px;color:#817466;font-size:12px}
-.notebook-recap-toolbar .text-button{min-height:44px;color:#91452f;text-decoration:underline;text-underline-offset:4px}
-@media(max-width:760px){.notebook-recap-toolbar{align-items:flex-start;gap:2px}.notebook-recap-toolbar>span{padding-block:8px}}
-/* One topic, one reading surface. Secondary categories are quiet page navigation. */
-.notebook-panel .notebook-panel-heading{padding-bottom:6px}
-.notebook-panel .notebook-topic-description{margin:9px 0 0;font-size:13px;line-height:1.7;color:#7b7064}
-.notebook-panel .notebook-toolbar{margin:16px 0 20px;gap:12px}
-.notebook-panel .notebook-toolbar>.button.primary{background:transparent;color:#91452f;border:1px solid #d9c4ae;box-shadow:none;border-radius:10px}
-.notebook-section-box{padding:0;margin:0 0 22px;background:transparent;border:0;border-radius:0;box-shadow:none}
-.notebook-section-tabs{display:flex;gap:20px;border-bottom:1px solid #dfcfbd;overflow-x:auto;scrollbar-width:thin;padding:0 0 1px}
-.notebook-section-tabs>button{flex:0 0 auto;justify-content:flex-start;min-height:48px;padding:9px 0 12px;gap:7px;border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none;background:transparent;color:#817466;font-size:12px;font-weight:500;white-space:nowrap}
-.notebook-section-tabs>button[aria-selected=true]{color:var(--divider-ink,#91452f);background:transparent;border-color:var(--divider-ink,#91452f);box-shadow:none;font-weight:700}
-.notebook-section-tabs>button .notebook-section-count,.notebook-section-tabs>button[aria-selected=true] .notebook-section-count{min-width:0;padding:0;background:transparent;color:inherit;border:0;box-shadow:none;opacity:.75;font-size:10px}
-.notebook-section-tabs>button:hover:not([aria-selected=true]){background:transparent;border-color:#c4ab92;color:#684737}
-.notebook-reading-heading{margin:0 0 5px;padding-bottom:12px;border-bottom:0}
-.notebook-reading-heading h4{font-size:12px;font-weight:650;letter-spacing:.04em;color:#746453}
-.notebook-reading-heading p{font-size:12px;margin-top:5px}
-.notebook-recap-toolbar{padding:0 0 12px;font-size:11px}
-.notebook-details-view .student-memory-paper{margin:0}
-.notebook-details-view .student-memory-paper>h4{font-size:12px;font-weight:650;letter-spacing:.04em;color:#746453;margin:0 0 12px}
-.notebook-details-view .memory-meta{font-size:11px;align-items:center;gap:12px}
-.notebook-details-view .memory-meta .organization-evidence{font-size:11px;margin:0}
-.notebook-details-view .notebook-note{padding-block:20px}
-.notebook-details-view .memory-writing{margin:10px 0 8px}
-.memory-record-tools>summary{font-size:11px;color:#817466;min-height:36px;display:list-item;align-content:center;cursor:pointer;width:fit-content}
-.memory-record-tools[open]{padding-bottom:12px}
-.memory-record-tools .memory-attribution{font-size:12px}
-.memory-record-tools .memory-actions{flex-wrap:wrap;margin:12px 0 0;gap:8px}
-.memory-record-tools .memory-actions button{font-size:12px;min-height:40px}
-@media(max-width:760px){.notebook-section-tabs{gap:18px}.notebook-section-tabs>button{font-size:12px;min-height:48px;padding:8px 0 12px}.notebook-panel .notebook-toolbar{gap:8px}.notebook-section-box{margin-bottom:18px}.notebook-panel .notebook-toolbar>.button.primary{font-size:12px}.notebook-reading-heading{margin-top:0}}
-.notebook-panel-heading .notebook-divider-signals:empty{display:none}
-.notebook-details-view{min-height:240px}
-@keyframes notebook-section-reveal{from{opacity:.65}to{opacity:1}}
-@media(prefers-reduced-motion:no-preference){.notebook-details-view,.notebook-entries{animation:notebook-section-reveal 180ms ease-out}}
-@media(max-width:760px){.notebook-section-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 12px;overflow:visible}.notebook-section-tabs>button{min-width:0;white-space:normal;gap:5px;line-height:1.4;justify-content:flex-start}.notebook-section-tabs>button>span:first-child{overflow-wrap:normal}.notebook-section-tabs .notebook-section-count{flex-shrink:0}}
-/* The selected tab already names this section; keep the recap's heading for assistive navigation without repeating the visual title. */
-.notebook-reading-heading-compact{position:relative;height:0;min-height:0;padding:0;margin:0;border:0}
-.notebook-reading-heading-compact>div{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}

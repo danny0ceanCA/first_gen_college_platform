@@ -34,11 +34,9 @@ export default function SharedVoice({children}:{children:ReactNode}){
    const bounds=surface?.getBoundingClientRect();
    if(bounds&&bounds.width>0){
     setVariable(container,'--shared-voice-left',`${Math.max(0,bounds.left)}px`);
-    // The fixed containing block excludes a reserved scrollbar gutter, while
-    // clientWidth can include it. Avoid subtracting that gutter twice.
-    setVariable(container,'--shared-voice-right',`${Math.max(0,root.getBoundingClientRect().right-bounds.right)}px`);
+    setVariable(container,'--shared-voice-right',`${Math.max(0,root.clientWidth-bounds.right)}px`);
    }else{container.style.removeProperty('--shared-voice-left');container.style.removeProperty('--shared-voice-right');}
-   const height=Math.ceil(Math.max(0,...bars.map(bar=>{const bounds=bar.getBoundingClientRect();return bounds.height+Math.max(0,window.innerHeight-bounds.bottom);} )));
+   const height=Math.ceil(Math.max(0,...bars.map(bar=>bar.getBoundingClientRect().height)));
    setVariable(root,'--shared-voice-height',`${height}px`);
   };
   const observer=new ResizeObserver(measure);
@@ -79,7 +77,7 @@ export default function SharedVoice({children}:{children:ReactNode}){
  return <SharedVoiceContext.Provider value={{start:()=>{if(entry)launch({...entry,mode:guide});},ready:!!entry,talkAbout,configure,profileSaved:()=>{if(!ownerRef.current)return false;setSession(previous=>previous?{...previous,props:{...previous.props,profileSaved:(previous.props.profileSaved||0)+1}}:previous);return true;},syncOnboarding:props=>setSession(previous=>previous?.props.onboarding&&previous.props.recoveryKey===props.recoveryKey?{...previous,props:{...previous.props,...props}}:previous),active,owner,claim,queue:queue.current,saveState:{failed:saveFailed,saving},reportSave:(failed,saving)=>{setSaveFailed(failed);setSaving(saving);},open:()=>setExpanded(true),launch}}>
  {children}
  <div ref={dock} className="shared-voice-dock">
- {!session&&entry&&<aside className="shared-voice voice-ready" aria-label={t('Origen voice guide','Guía de voz Origen')}><div className="shared-voice-heading"><strong>Origen <span className="voice-availability-dot" aria-hidden="true"/></strong><span className="voice-idle-invitation">{t('A little clarity starts with a conversation.','Un poco de claridad empieza con una conversación.')}</span></div><div className="voice-ready-controls"><VoiceStartButton pill label={t('Talk with Origen','Hablar con Origen')} disabled={active} onClick={()=>launch({...entry,mode:guide})}/></div></aside>}
+ {!session&&entry&&<aside className="shared-voice voice-ready" aria-label={t('Origen voice guide','Guía de voz Origen')}><div className="shared-voice-heading"><strong>Origen</strong><span className="voice-current-section">{guideName(entry.mode)}</span></div><div className="voice-ready-controls"><VoiceStartButton label={t('Talk with Origen','Hablar con Origen')} disabled={active} onClick={()=>launch({...entry,mode:guide})}/></div></aside>}
  {!session&&saveFailed&&<aside className="shared-voice"><p role="alert">Conversation summary not saved / Resumen sin guardar</p><button className="button outline" disabled={saving} onClick={()=>void retry()}>Retry / Reintentar</button></aside>}
  {session&&<aside className={`shared-voice compact${expanded?' details-open':''}`} aria-label={t('Live conversation','Conversacion en vivo')}>
  <div className="shared-voice-heading"><strong><AudioLines size={18} aria-hidden="true"/> Origen <span className="voice-guide-tag">{(active?session.props.mode:guide)==='loans'?t('Loans','Préstamos'):(active?session.props.mode:guide)==='finance'?t('College costs','Costos'):(active?session.props.mode:guide)==='admissions'?t('Applications','Solicitudes'):t('Planning','Planificación')}</span></strong><button type="button" className="voice-expand" aria-label={expanded?t('Close conversation details','Cerrar detalles de la conversación'):t('Show conversation details','Mostrar detalles de la conversación')} aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?<ChevronDown size={18}/>:<ChevronUp size={18}/>}</button></div>

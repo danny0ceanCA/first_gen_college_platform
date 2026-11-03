@@ -4,8 +4,6 @@ import {apiFetch} from './api';
 import StaffVerification,{staffVerificationErrors,getStaffAccessToken} from './StaffVerification';
 import WorkspaceModule,{LoadingSurface} from './LoadingSurface';
 import {withRequestDeadline} from './requestDeadline.mjs';
-const CoordinatorReviewRequests=lazy(()=>import('./CoordinatorReviewRequests'));
-import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNotifications';
 const CoordinatorInbox=lazy(()=>import('./CoordinatorInbox'));
 const CoordinatorBinders=lazy(()=>import('./CoordinatorBinders'));
 const InstitutionTeam=lazy(()=>import('./InstitutionTeam'));
@@ -40,12 +38,11 @@ export default function CoordinatorWorkspace(){
  const loadedScope=useRef<{subject:string|undefined;organizationId:string}|null>(null);
  const [view,setView]=useNavigationState<View>('coordinator.view','overview',navigationEnum('overview','binders','connections','profile','team'));
  const [refreshVersion,setRefreshVersion]=useState(0);
- const [reviewTarget,setReviewTarget]=useState<{id:string;sequence:number}>(),[binderTarget,setBinderTarget]=useState<{grantId:string;sequence:number}>(),[hasReviewDraft,setHasReviewDraft]=useState(false);
  const [menuOpen,setMenuOpen]=useState(false),[hasBinderDraft,setHasBinderDraft]=useState(false),[hasTeamDraft,setHasTeamDraft]=useState(false);
  const sidebar=useRef<HTMLElement>(null),menuButton=useRef<HTMLButtonElement>(null),heading=useRef<HTMLHeadingElement>(null),navigationPending=useRef(false);
  const lastEditingField=useRef<HTMLElement|null>(null);
- const unsaved=hasReviewDraft||hasBinderDraft||hasTeamDraft||view==='profile'&&!!profile&&name!==profile.displayName;
- useNavigationGuard(unsaved,{onLeave:()=>{if(profile)setName(profile.displayName);setHasBinderDraft(false);setHasTeamDraft(false);setHasReviewDraft(false);}});
+ const unsaved=hasBinderDraft||hasTeamDraft||view==='profile'&&!!profile&&name!==profile.displayName;
+ useNavigationGuard(unsaved,{onLeave:()=>{if(profile)setName(profile.displayName);setHasBinderDraft(false);setHasTeamDraft(false);}});
  function canNavigate(){if(confirmWorkspaceNavigation())return true;setMenuOpen(false);if(lastEditingField.current?.isConnected)lastEditingField.current.focus({preventScroll:true});return false;}
  function focusContent(){heading.current?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
  function navigate(next:View){
@@ -53,7 +50,6 @@ export default function CoordinatorWorkspace(){
   return navigateWorkspace(()=>{navigationPending.current=true;setView(next);setNotice('');setMenuOpen(false);});
  }
  function openBinders(){navigate('binders');}
- function openUpdate(value:NoticeDestination){if(value.organizationId!==selected)return;if(value.destination==='connections'){navigate('connections');return;}if(view==='binders'?!canNavigate():!navigate('binders'))return;if(value.destination==='review-request')setReviewTarget({id:value.grantId,sequence:Date.now()});else setBinderTarget({grantId:value.grantId,sequence:Date.now()});}
  useLayoutEffect(()=>{if(navigationPending.current){navigationPending.current=false;focusContent();}},[view]);
  useEffect(()=>{
   if(!menuOpen)return;
@@ -157,12 +153,10 @@ export default function CoordinatorWorkspace(){
     <CoordinatorHome loading organizationId="" name={t('coordinator','coordinador')} t={t} request={input=>request(input,false,true)} onBinders={openBinders} onConnections={()=>navigate('connections')} onProfile={()=>navigate('profile')}/>
    </div>}
    {overview&&<>
-    {org&&<div className="coordinator-organization-bar"><Building2 size={20}/>{overview.organizations.length>1?<label>{t('Organization','Organización')}<select value={selected} title={org.name} disabled={busy} onChange={e=>{const next=e.target.value;if(!navigateWorkspace(()=>{setHasBinderDraft(false);setHasTeamDraft(false);setHasReviewDraft(false);setTeam(false);setView('overview');setSelected(next);setMenuOpen(false);navigationPending.current=true;}))e.target.value=selected;}}>{overview.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>:<strong>{org.name}</strong>}<span>{profile?t('Coordinator access enabled','Acceso de coordinador activo'):t('Coordinator access pending','Acceso de coordinador pendiente')}</span></div>}
-    {profile&&<CoordinatorNotifications key={`notices-${selected}-${user?.sub}`} organizationId={selected} t={t} onOpen={openUpdate}/>}
+    {org&&<div className="coordinator-organization-bar"><Building2 size={20}/>{overview.organizations.length>1?<label>{t('Organization','Organización')}<select value={selected} title={org.name} disabled={busy} onChange={e=>{const next=e.target.value;if(!navigateWorkspace(()=>{setHasBinderDraft(false);setHasTeamDraft(false);setTeam(false);setView('overview');setSelected(next);setMenuOpen(false);navigationPending.current=true;}))e.target.value=selected;}}>{overview.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>:<strong>{org.name}</strong>}<span>{profile?t('Coordinator access enabled','Acceso de coordinador activo'):t('Coordinator access pending','Acceso de coordinador pendiente')}</span></div>}
     {!profile&&<section className="coordinator-card coordinator-access-state"><h2>{t('Your coordinator access','Tu acceso de coordinador')}</h2><p>{org?.pilotStatus==='suspended'?t('Coordinator access for this organization is suspended. Contact your organization for help.','El acceso de coordinador de esta organización está suspendido. Contacta a tu organización para obtener ayuda.'):t('Your application or organization access may still need review. Check your application for the next step.','Tu solicitud o el acceso de tu organización puede necesitar revisión. Consulta tu solicitud para conocer el siguiente paso.')}</p><a className="button outline" href="#coordinator-register">{t('View application status','Ver estado de la solicitud')}</a></section>}
     {profile&&view==='overview'&&<CoordinatorHome key={selected} organizationId={selected} refreshVersion={refreshVersion} name={profile.displayName} t={t} request={input=>request(input,false,true)} onBinders={openBinders} onConnections={()=>navigate('connections')} onProfile={()=>navigate('profile')}/>}
-    {profile&&(view==='overview'||view==='binders')&&<WorkspaceModule layout="list"><CoordinatorReviewRequests key={`reviews-${selected}-${user?.sub}`} organizationId={selected} t={t} es={es} refreshVersion={refreshVersion} openRequest={reviewTarget} onDirtyChange={setHasReviewDraft}/></WorkspaceModule>}
-    {profile&&view==='binders'&&<WorkspaceModule layout="list"><CoordinatorBinders key={`binders-${selected}-${user?.sub}`} organizationId={selected} openRequest={binderTarget} refreshVersion={refreshVersion} onDirtyChange={setHasBinderDraft} request={input=>request(input,false,true)} feedbackRequest={input=>request(input,false,false,true)} t={t} es={es}/></WorkspaceModule>}
+    {profile&&view==='binders'&&<WorkspaceModule layout="list"><CoordinatorBinders key={`binders-${selected}-${user?.sub}`} organizationId={selected} refreshVersion={refreshVersion} onDirtyChange={setHasBinderDraft} request={input=>request(input,false,true)} feedbackRequest={input=>request(input,false,false,true)} t={t} es={es}/></WorkspaceModule>}
     {profile&&view==='connections'&&<WorkspaceModule layout="list"><CoordinatorInbox key={selected} organizationId={selected} refreshVersion={refreshVersion} t={t} es={es}/></WorkspaceModule>}
    {profile&&view==='profile'&&<section className="coordinator-card coordinator-profile"><CoordinatorSectionHeader title={t('Your profile','Tu perfil')} description={t('Help students recognize you and find your connection code.','Ayuda a los estudiantes a reconocerte y encontrar tu código de conexión.')}/><div className="coordinator-profile-section"><h3>{t('Your name','Tu nombre')}</h3><p>{profile.organizationName}</p><form onSubmit={e=>{e.preventDefault();void change('save-profile',{displayName:name.trim()});}}><label>{t('Name students will see','Nombre que verán los estudiantes')}<input value={name} maxLength={100} required onChange={e=>setName(e.target.value)}/></label><button className="button outline" disabled={busy||!name.trim()||name.trim()===profile.displayName}>{t('Save name','Guardar nombre')}</button></form></div><div className="coordinator-profile-section">
     <h3>{t('Your connection code','Tu código de conexión')}</h3><p>{t('A code helps students find you. It never grants access to their binder.','Un código ayuda a los estudiantes a encontrarte. Nunca da acceso a su carpeta.')}</p>

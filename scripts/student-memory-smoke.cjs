@@ -17,8 +17,6 @@ async function setup(browser,{width=1280,language='en',reducedMotion='reduce',na
   if(url.pathname.endsWith('/@auth0_auth0-react.js'))return route.fulfill({contentType:'application/javascript',body:`import React from '/node_modules/.vite/deps/react.js';export const Auth0Context=React.createContext({});const auth={isLoading:false,isAuthenticated:true,user:{sub:${JSON.stringify(subject)}},getAccessTokenSilently:async()=> 'e30.'+btoa(JSON.stringify({sub:${JSON.stringify(subject)}}))+'.test',logout:async()=>{},loginWithRedirect:async()=>{}};export function Auth0Provider({children}){return React.createElement(Auth0Context.Provider,{value:auth},children)}export function useAuth0(){return React.useContext(Auth0Context)}`});
   if(url.pathname.startsWith('/api/')){
    const body=route.request().postDataJSON()||{};state.requests.push({path:url.pathname,action:body.action});
-   if(url.pathname==='/api/recommendations')return route.fulfill({json:{enabled:false}});
-   if(url.pathname==='/api/recommendation-evaluation')return route.fulfill({json:{enabled:false,organizations:[],permission:null}});
    if(url.pathname==='/api/eligibility')return route.fulfill({json:{subject,allowed:true,status:'adult',ageBand:'18plus'}});
    if(url.pathname==='/api/conversation-recovery')return route.fulfill({json:body.action==='stop'?{stopped:true}:{enabled:false,items:[]}});
    if(url.pathname==='/api/admin')return route.fulfill({status:403,json:{error:'admin_required'}});
@@ -112,7 +110,7 @@ async function openBinder(page){await page.locator('.binder-cover').click();awai
 
 module.exports={setup,openBinder,subject,studentId};
 if(require.main===module)(async()=>{
- const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets']});let count=0;
+ const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox']});let count=0;
  try{for(const width of [1280,390,320])for(const language of ['en','es']){
   const {page,state}=await setup(browser,{width,language});const tr=(en,es)=>language==='es'?es:en;
   try{

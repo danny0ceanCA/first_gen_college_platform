@@ -1,30 +1,13 @@
 // Adapt Live's continuous speech/delegated tools to the application's existing
 // guarded tool handlers. No tool is executed here and no permission is granted.
-export const liveBackendDeadlineMs=25000;
-export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0}={}){
+export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0;
- let draftTimer,lastDelegatedEpoch=-1,lastAudibleVersion=0,backendBlockedEpoch=-1,ending=false;
+ let draftTimer,lastDelegatedEpoch=-1;
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
- function clearBackendTimers(){for(const response of responses.values())cancel(response.timer);responses.clear();}
- async function expireBackend(responseId){
-  const response=responses.get(responseId);if(closed||!response)return;
-  // Only outstanding model work is cancelled. Tools are dispatched after a
-  // terminal response, when this deadline has already been cleared. Never retry
-  // a write automatically, or let a late completion act on fresh consent.
-  responses.delete(responseId);seenResponses.add(responseId);
-  if(response.epoch===epoch)backendBlockedEpoch=epoch;
-  transmit({type:'response.cancel',event_id:id(),response_id:responseId});
-  await emit({type:'origen.backend.finished',response_id:responseId,outcome:'timed_out',durationMs:now()-response.startedAt});
-  if(closed||response.epoch!==epoch)return;
-  const message=session.language==='es'
-   ? 'Esta solicitud está tardando demasiado y no pude completarla. ¿Puedes intentarlo de nuevo?'
-   : 'This request is taking too long, and I couldn’t finish it. Could you try again?';
-  transmit({type:'session.commentary.append',event_id:id(),delegation_id:null,content:`The application cancelled the pending backend response after its deadline. Briefly tell the caller: ${message} Do not claim success, repeat the request automatically, or invent a result. Then listen.`});
- }
  function append(type,text){
   let part='';const parts=[];for(const character of String(text||'')){if(new TextEncoder().encode(part+character).length>440){parts.push(part);part='';}part+=character;}if(part)parts.push(part);
   return parts.map(content=>{const event_id=id();transmit({type,event_id,delegation_id:null,content});return event_id;});
@@ -52,8 +35,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
   // Continuous Live has no output-audio-done event. This is a conservative idle
   // boundary for UI/drain scheduling, never a claim that a person heard speech.
-  const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
-  await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
+  await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:'idle_estimate'});
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
@@ -75,16 +57,11 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(e.type==='response.event'){
    const event=e.event||{},responseId=event.response?.id||event.response_id||[...responses].find(([,value])=>value.delegationId===e.delegation_id)?.[0];
-   if(event.type==='response.created'){
-    if(seenResponses.has(responseId)||responses.has(responseId))return;
-    if(ending||backendBlockedEpoch===epoch){seenResponses.add(responseId);transmit({type:'response.cancel',event_id:id(),response_id:responseId});return;}
-    lastDelegatedEpoch=epoch;responses.set(responseId,{epoch,turn:null,output:[],delegationId:e.delegation_id,startedAt:now(),timer:schedule(()=>void expireBackend(responseId),liveBackendDeadlineMs)});
-    await emit({type:'origen.backend.started',response_id:responseId});return;
-   }
+   if(event.type==='response.created'){lastDelegatedEpoch=epoch;responses.set(responseId,{epoch,turn:null,output:[],delegationId:e.delegation_id});await emit({type:'origen.backend.started',response_id:responseId});return;}
    const response=responses.get(responseId);
    if(event.type==='response.output_item.done'&&event.item?.type==='function_call'){if(response&&!response.output.some(item=>item.call_id===event.item.call_id))response.output.push(event.item);return;}
    if(['response.completed','response.failed','response.cancelled','response.incomplete'].includes(event.type)){
-    if(!response||seenResponses.has(responseId))return;cancel(response.timer);seenResponses.add(responseId);responses.delete(responseId);
+    if(!response||seenResponses.has(responseId))return;seenResponses.add(responseId);responses.delete(responseId);
     try{
     // Complete transcription before the existing consent and scope handlers run.
     // A later input fragment invalidates all actions from this older response.
@@ -101,18 +78,18 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
      transmit({type:'response.create',event_id:id()});return;
     }
     if(output.length){await emit({type:'response.created',response:{id:responseId,metadata}});await emit({type:'response.done',response:{id:responseId,metadata,status:event.response?.status||(event.type==='response.completed'?'completed':event.type.split('.').at(-1)),output}});}
-    }finally{await emit({type:'origen.backend.finished',response_id:responseId,outcome:event.response?.status||event.type.split('.').at(-1),durationMs:now()-response.startedAt});}
+    }finally{await emit({type:'origen.backend.finished',response_id:responseId});}
     return;
    }
    return;
   }
   if(e.type==='error'){const error={...e.error,event_id:e.error?.client_event_id||e.client_event_id||e.error?.event_id};await emit({...e,error});return;}
-  if(e.type==='session.closed'){clearBackendTimers();await finishSpeech();handlers.onclose?.({});return;}
+  if(e.type==='session.closed'){await finishSpeech();handlers.onclose?.({});return;}
  }
  function send(text){
   if(!live)return raw.send(text);const event=JSON.parse(text);
   if(event.type==='session.update'){
-   const next=event.session||{};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto',reasoning:{effort:'low'},max_output_tokens:Math.max(1800,next.max_output_tokens??session.max_output_tokens??0)};
+   const next=event.session||{};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto'};
    updates.set(event.event_id,{id:event.event_id,session:next});
    if(next.liveInstructions)append('session.instructions.append',next.liveInstructions);
    const language=next.instructions?.match(/Current conversation language: (Spanish|English)/)?.[1];if(language)append('session.instructions.append',`Respond in ${language} from now on. Continue this same conversation without greeting again.`);
@@ -125,15 +102,10 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(event.type==='response.create'){
    const response=event.response||{},special=response.metadata?.topic;
-   if(special==='origen_farewell'){
-    ending=true;
-    for(const responseId of responses.keys()){seenResponses.add(responseId);transmit({type:'response.cancel',event_id:id(),response_id:responseId});}
-    clearBackendTimers();
-   }
    if(special==='origen_farewell'||special==='origen_lookup_progress'||!opening){
     opening=true;outputMetadata=response.metadata||{};
     if(response.instructions)append('session.instructions.append',response.instructions);
-    transmit({type:'session.commentary.append',event_id:event.event_id||id(),delegation_id:null,content:special==='origen_follow_up'?'Speak only the exact application-provided check-in sentence above, then listen. Do not add a greeting, introduction or another question.':special==='origen_farewell'?'Give the application-requested closing message now, then stop speaking. Do not run tools or ask another question.':special==='origen_lookup_progress'?'Give the brief verified progress update requested above, without extra claims.':`Follow the application opening and current conversation flow already supplied. ${session.onboarding?'Give the approved onboarding welcome and first missing setup question.':'Use the familiar context already supplied. Returning callers do not need another AI introduction or intake. If scope is unconfirmed, ask whom this is about before using student details. If continuing the same call, answer the pending request without a greeting; delegate if needed. Preserve the selected-work focus and server opening allowance.'} Speak ${session.language==='es'?'Spanish':'English'}, then listen.`});
+    transmit({type:'session.commentary.append',event_id:event.event_id||id(),delegation_id:null,content:special==='origen_farewell'?'Give the application-requested closing message now, then stop speaking. Do not run tools or ask another question.':special==='origen_lookup_progress'?'Give the brief verified progress update requested above, without extra claims.':`Follow the application opening: greet with Hola and introduce yourself as Origen, an AI college guide, then ask one short ${session.onboarding?'onboarding question following the application setup instructions':'question about what the student wants to discuss today'}. After Hola, speak ${session.language==='es'?'Spanish':'English'}, then listen.`});
    }else if(continuation){continuation=false;transmit({type:'response.create',event_id:event.event_id});}
    else return false; // Continuous speech needs no requested response to wait for.
    return;
@@ -148,6 +120,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  const api={configure(data){live=data.voiceProvider==='live';session=data.voiceSession||{};},flush:async()=>{if(live){await flushInput();await finishSpeech(true);}}};
  raw.onmessage=event=>{try{void receive(JSON.parse(event.data)).catch(()=>void emit({type:'error',error:{code:'live_adapter_failed'}}));}catch{void emit({type:'error',error:{code:'live_event_invalid'}});}};
- raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>{clearBackendTimers();if(draftTimer)cancel(draftTimer);handlers.onclose?.(event);};
- return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;clearBackendTimers();cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
+ raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>{if(draftTimer)cancel(draftTimer);handlers.onclose?.(event);};
+ return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
 }

@@ -1,16 +1,3 @@
-import {createRecommendationDeliveryHandler} from '../recommendation-delivery.mjs';
-import {createRecommendationEvaluationHandler} from '../recommendation-evaluation.mjs';
-import {createOutcomeEvaluationHandler} from '../outcome-evaluation.mjs';
-import {createOutcomeObservationHandler} from '../outcome-observations.mjs';
-import {createOutcomeEvidenceHandler} from '../outcome-evidence.mjs';
-import {createFollowUpConversationHandler} from '../follow-up-conversations.mjs';
-import {createOpeningEvidenceHandler} from '../conversation-opening.mjs';
-import {createStudentFollowUpHandler} from '../student-follow-up.mjs';
-import {createReviewResponseChoicesHandler} from '../review-response-choices.mjs';
-import {createCoordinatorReviewHandler} from '../review-request-delivery.mjs';
-import {createReviewResponseContextHandler} from '../review-response-context.mjs';
-import {createReviewVoiceHandler} from '../review-request-voice.mjs';
-import {createReviewRequestsHandler} from '../review-requests.mjs';
 import {createTestLogin,useTestLogin} from './postgres-test-login.mjs';
 // Disposable test transport only. Never mount this identity shim in the app.
 import {randomUUID,createHash} from 'node:crypto';
@@ -30,13 +17,13 @@ import {MFA_TIME_CLAIM} from '../staff-access.mjs';
 import {AUTH_TIME_CLAIM} from '../recent-auth.mjs';
 import {coordinatorFlags} from '../binder-sharing-policy.mjs';
 
-export async function coordinatorPilotFixture({language='en',permission='adult',runtimePoolSize=3,productionTimeouts=false,followThrough=false,reviewRequests=false,reviewVoice=false,reviewDelivery=false,migrationDirectory}={}){
- const f=await retrievalFixture({runtimePoolSize,productionTimeouts,migrationDirectory}),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
+export async function coordinatorPilotFixture({language='en',permission='adult',runtimePoolSize=3,productionTimeouts=false,followThrough=false}={}){
+ const f=await retrievalFixture({runtimePoolSize,productionTimeouts}),org=randomUUID(),transportSecret=randomUUID();let server,maintenance,maintenanceRole;
  const actors=new Set(['other','reader','owner','staff','colleague','reviewer']);
  const actor=sub=>{if(!/^sharing-stress-\d+$/.test(sub))throw Error('synthetic_actor_required');actors.add(sub);};
  const cleanup=async()=>{if(server)await new Promise(r=>{server.close(r);server.closeAllConnections();});if(maintenance){await maintenance.end();await f.owner.query(`DROP OWNED BY ${maintenanceRole}`);await f.owner.query(`DROP ROLE ${maintenanceRole}`);}await f.close();};
  try{
-  const env={AUTH0_DOMAIN:'synthetic.example',ORIGEN_REVIEW_REQUESTS:reviewRequests?'true':'false',ORIGEN_REVIEW_REQUEST_VOICE:reviewVoice?'true':'false',ORIGEN_REVIEW_REQUEST_DELIVERY:reviewDelivery?'true':'false',...Object.fromEntries(coordinatorFlags.map(k=>[k,'true'])),...(followThrough?{ORIGEN_DERIVED_BINDER_SHARING:'true',ORIGEN_COORDINATOR_FOLLOW_THROUGH:'true'}:{})};
+  const env={AUTH0_DOMAIN:'synthetic.example',...Object.fromEntries(coordinatorFlags.map(k=>[k,'true'])),...(followThrough?{ORIGEN_DERIVED_BINDER_SHARING:'true',ORIGEN_COORDINATOR_FOLLOW_THROUGH:'true'}:{})};
   const account=(await f.owner.query("SELECT id FROM origen_accounts WHERE auth0_subject='other'")).rows[0].id;
   for(const sub of ['owner','reviewer'])await f.owner.query('INSERT INTO origen_institution_representatives(auth0_subject,first_name,work_email,job_role) VALUES($1,$1,$2,$3)',[sub,`${sub}@example.test`,'Synthetic']);
   await f.owner.query("INSERT INTO origen_institutions(id,slug,draft,verification_status) VALUES($1,$2,$3,'verified')",[org,org,{name:'Synthetic Community Center'}]);
@@ -45,7 +32,7 @@ export async function coordinatorPilotFixture({language='en',permission='adult',
   // Exercise actual invitation storage and recipient verification before enabling staff.
   for(const sub of ['staff','colleague']){const inv=await institution('owner',{action:'invite',id:org,email:`${sub}@example.test`,role:'outreach'});await institution(sub,{action:'accept-invite',token:inv.token},{sub,email:`${sub}@example.test`,email_verified:true,given_name:sub});}
   const provider=async(_url,options)=>{const sub=options.headers.Authorization?.replace('Bearer ','')||options.headers.authorization?.replace('Bearer ','');return new Response(JSON.stringify({sub,email:`${sub}@example.test`,email_verified:true}),{status:200,headers:{'Content-Type':'application/json'}});};
-  const handlers=[createRecommendationDeliveryHandler(f.db,env),createRecommendationEvaluationHandler(f.db,env,provider),createOutcomeEvaluationHandler(f.db,env,provider),createOutcomeObservationHandler(f.db,env,provider),createOutcomeEvidenceHandler(f.db,env),createFollowUpConversationHandler(f.db,env),createOpeningEvidenceHandler(f.db,env),createStudentFollowUpHandler(f.db,env),createReviewResponseChoicesHandler(f.db,env),createReviewResponseContextHandler(f.db,env),createCoordinatorReviewHandler(f.db,env,provider),createReviewVoiceHandler(f.db,env),createReviewRequestsHandler(f.db,env),createCoordinatorHandler(f.db,env,provider),createCoordinatorConnectionsHandler(f.db,env,provider),createBinderSharingHandler(f.db,env),createCoordinatorBindersHandler(f.db,env,provider),createCoordinatorFeedbackHandler(f.db,env,provider),createCoordinatorNotificationsHandler(f.db,env,provider)];
+  const handlers=[createCoordinatorHandler(f.db,env,provider),createCoordinatorConnectionsHandler(f.db,env,provider),createBinderSharingHandler(f.db,env),createCoordinatorBindersHandler(f.db,env,provider),createCoordinatorFeedbackHandler(f.db,env,provider),createCoordinatorNotificationsHandler(f.db,env,provider)];
   server=createServer((req,res)=>{
    const sub=req.headers['x-synthetic-actor'];
    if(req.headers['x-synthetic-secret']!==transportSecret||!actors.has(sub)){res.writeHead(401);return res.end();}
@@ -65,7 +52,7 @@ export async function coordinatorPilotFixture({language='en',permission='adult',
   await f.save('private-global','GLOBAL_SUMMARY_SENTINEL',{studentId:'alex',sub:'other'});
   maintenanceRole=`pilot_maint_${randomUUID().replaceAll('-','')}`;await createTestLogin(f.owner,maintenanceRole);await grantMaintenanceAccess(f.owner,maintenanceRole,{schema:f.schema});
   const url=new URL(process.env.DATABASE_TEST_URL);useTestLogin(url,maintenanceRole);maintenance=new pg.Pool({connectionString:url.href,options:`-c search_path=${f.schema}`,max:1});
-  const sweep=()=>runRetentionJob(()=>maintainCoordinators(isolateDatabase(maintenance,{schema:f.schema}),env));
+  const sweep=()=>runRetentionJob(()=>maintainCoordinators(isolateDatabase(maintenance,{schema:f.schema})));
   return {...f,org,env,notes,base,transportSecret,actor,request,call,institution,maintenance,sweep,close:cleanup};
  }catch(error){await cleanup();throw error;}
 }

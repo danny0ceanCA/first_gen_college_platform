@@ -320,21 +320,6 @@ export default function Landing(){
    <section className="landing-closing"><h2>{t('You belong in this conversation.','Tu voz tiene un lugar aquí.')}</h2><button onClick={()=>setLogin(true)}>{t('Let’s get started','Empecemos')}<ArrowRight size={18}/></button></section>
   </main>
   <footer className="landing-footer"><strong>origen.</strong><a href="#institutions">{t('Register your institution','Registra tu institución')}</a>{publicContactEmail&&<a href="#contact">{t('Contact','Contacto')}</a>}<a href="#about">{t('About Origen','Acerca de Origen')}</a><a href="#privacy">{t('Data privacy','Privacidad de datos')}</a><span>{t('Origen Edu is operated by Blueprint Holdings LLC.','Origen Edu es operado por Blueprint Holdings LLC.')}{publicContactEmail&&<> <a href={`mailto:${publicContactEmail}`}>{publicContactEmail}</a></>}</span><button onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowUpRight size={14}/></button></footer>
-  <dialog ref={dialog} {...dialogProps} className="landing-dialog landing-auth-dialog" aria-labelledby={`${sceneId}-welcome`} aria-describedby={`${sceneId}-welcome-description`}>
-   <button type="button" className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>void dismiss()}><X size={20}/></button>
-   <div className="landing-auth-brand" aria-hidden="true"><span>○</span> origen.</div>
-   <div className="landing-auth-intro">
-    <span className="landing-auth-eyebrow">{t('A LITTLE CLARITY. A NEXT STEP.','UN POCO DE CLARIDAD. UN PRÓXIMO PASO.')}</span>
-    <h2 id={`${sceneId}-welcome`}>{t('Let’s begin','Empecemos')}<br/><em>{t('with you.','contigo.')}</em></h2>
-    <p id={`${sceneId}-welcome-description`}>{t('You don’t need all the answers to start. Talk through college, make sense of your options, and find your next step.','No necesitas tener todas las respuestas para empezar. Hablemos de la universidad, de tus opciones y de tu próximo paso.')}</p>
-   </div>
-   <div className="landing-auth-actions">
-    <button type="button" className="landing-primary" disabled={isLoading} onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowRight size={18} aria-hidden="true"/></button>
-    <div className="landing-auth-divider"><span>{t('Already part of Origen?','¿Ya eres parte de Origen?')}</span></div>
-    <button type="button" className="landing-auth-signin" disabled={isLoading} onClick={()=>signIn()}>{t('Sign in','Iniciar sesión')}<ArrowRight size={18} aria-hidden="true"/></button>
-   </div>
-   <p className="landing-auth-footer">{t('Your questions. Your pace. In English or Spanish.','Tus preguntas. A tu ritmo. En español o inglés.')}</p>
-   {(signinError||error)&&<p className="landing-auth-error" role="alert">{t('Could not sign in. Try again.','No se pudo iniciar sesión. Intenta de nuevo.')}</p>}
-  </dialog>
+  <dialog ref={dialog} {...dialogProps} className="landing-dialog landing-auth-dialog" aria-label={t('Sign in or create an account','Iniciar sesión o crear una cuenta')}><button className="dialog-close" aria-label={t('Close','Cerrar')} onClick={()=>void dismiss()}><X size={22}/></button><div className="landing-auth-actions"><button className="landing-primary" disabled={isLoading} onClick={()=>signIn()}>{t('Sign in','Iniciar sesión')}<ArrowRight size={18}/></button><button className="landing-primary" disabled={isLoading} onClick={()=>signIn(true)}>{t('Create an account','Crear una cuenta')}<ArrowRight size={18}/></button></div>{(signinError||error)&&<p role="alert">{t('Could not sign in. Try again.','No se pudo iniciar sesión. Intenta de nuevo.')}</p>}</dialog>
  </div>;
 }

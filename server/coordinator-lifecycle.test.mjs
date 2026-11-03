@@ -125,9 +125,7 @@ test('HTTP requires staff MFA, verified email, operator permission and server fl
  const f=await setup(t);await f.sweep();const now=Math.floor(Date.now()/1000);let identity={sub:'staff',iat:now,[MFA_TIME_CLAIM]:now,[AUTH_TIME_CLAIM]:now},verified=true;
  const handler=createCoordinatorNotificationsHandler(f.db,{...env,AUTH0_DOMAIN:'synthetic.auth0.com'},async()=>({ok:true,json:async()=>({sub:identity.sub,email:'staff@example.test',email_verified:verified})}));
  const server=createServer((req,res)=>{req.origenAuthorized=true;req.origenIdentity=identity;f.as(identity.sub,()=>handler(req,res,()=>{res.writeHead(404);res.end();}));});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
- // Changing the provider identity needs a new synthetic token; userinfo is
- // cached per token, as in the coordinator-binders transport fixture.
- const send=input=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-notifications`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer synthetic-${verified}`},body:JSON.stringify(input)});
+ const send=input=>fetch(`http://127.0.0.1:${server.address().port}/api/coordinator-notifications`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer synthetic'},body:JSON.stringify(input)});
  const input={action:'list',audience:'staff',organizationId:f.org};let response=await send(input);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
  identity={...identity,[MFA_TIME_CLAIM]:undefined};assert.equal((await send(input)).status,403);identity={...identity,[MFA_TIME_CLAIM]:now};verified=false;assert.equal((await send(input)).status,403);verified=true;
  assert.equal((await send({action:'operations',administrator:true})).status,403);

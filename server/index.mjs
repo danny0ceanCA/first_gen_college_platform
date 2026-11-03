@@ -1,18 +1,3 @@
-import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
-import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
-import {assertRecommendationContractReady} from './recommendation-contract.mjs';
-import {createOutcomeEvaluationHandler,assertOutcomeEvaluationReady} from './outcome-evaluation.mjs';
-import {createOutcomeObservationHandler} from './outcome-observations.mjs';
-import {createOutcomeEvidenceHandler,assertOutcomeEvidenceReady} from './outcome-evidence.mjs';
-import {createFollowUpConversationHandler} from './follow-up-conversations.mjs';
-import {createOpeningEvidenceHandler} from './conversation-opening.mjs';
-import {createStudentFollowUpHandler,assertStudentFollowUpReady} from './student-follow-up.mjs';
-import {createReviewResponseChoicesHandler} from './review-response-choices.mjs';
-import {createRecommendationDeliveryHandler,purgeRecommendationPreviews} from './recommendation-delivery.mjs';
-import {createCoordinatorReviewHandler,assertReviewDeliveryReady} from './review-request-delivery.mjs';
-import {createReviewResponseContextHandler,assertReviewResponseContextReady} from './review-response-context.mjs';
-import {createReviewVoiceHandler,assertReviewVoiceReady} from './review-request-voice.mjs';
-import {createReviewRequestsHandler,assertReviewRequestsReady} from './review-requests.mjs';
 import {createAdminVoiceHandler} from './admin-voice.mjs';
 import {createTeachingLibraryHandler} from './teaching-library.mjs';
 import {createCoordinatorNotificationsHandler,maintainCoordinators,assertCoordinatorLifecycleReady} from './coordinator-notifications.mjs';
@@ -54,7 +39,6 @@ import {createLifecycleHandler,accountClosed,purgeExpiredInvites} from './accoun
 import {createMetricsHandler,purgeMetrics} from './institution-metrics.mjs';
 import {createPlanHandler} from './plans.mjs';
 import {createTopicNotesHandler} from './topic-notes.mjs';
-import {createTopicRecapHandler} from './topic-recap.mjs';
 import {createSheetHandler} from './workspace-sheets.mjs';
 import {createServer} from 'node:http';
 import {apiSecurityHeaders} from './browser-security.mjs';
@@ -100,8 +84,8 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const lifecycle=createLifecycleHandler(database,{env});
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
- const handlers=[createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
- handlers.unshift(createPrivateVoiceCaptureHandler(database,env),createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
+ const handlers=[createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ handlers.unshift(createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
  const privacyMonitor=createPrivacyMonitor(database,log);
@@ -148,11 +132,11 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   req.origenIdentity=identity;
   // Provisioning and pilot linking have separate gates. Student sharing uses
   // its own kill switch, preserving stop controls; coordinator reads have a separate switch.
-  if(isCoordinatorRoute(req.url)&&req.url!=='/api/coordinator-outcome-observations'&&req.url!=='/api/coordinator-review-requests'&&req.url!=='/api/review-requests'&&req.url!=='/api/coordinator-notifications'&&req.url!=='/api/binder-sharing'&&req.url!=='/api/coordinator-feedback'&&req.url!=='/api/coordinator-connections'&&!(req.url==='/api/coordinator-binders'&&coordinatorViewingEnabled(env)||req.url==='/api/coordinator-access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'))return send(503,'coordinator_sharing_unavailable');
+  if(isCoordinatorRoute(req.url)&&req.url!=='/api/coordinator-notifications'&&req.url!=='/api/binder-sharing'&&req.url!=='/api/coordinator-feedback'&&req.url!=='/api/coordinator-connections'&&!(req.url==='/api/coordinator-binders'&&coordinatorViewingEnabled(env)||req.url==='/api/coordinator-access'&&env.ORIGEN_COORDINATOR_ACCOUNTS==='true'))return send(503,'coordinator_sharing_unavailable');
   const now=Date.now();for(const [key,value] of buckets)if(value.reset<now)buckets.delete(key);
   // Frequent diagnostic events must never spend the budget used by permission
   // checks, saves, or research. Both lanes stay bounded before database work.
-  const diagnostic=['/api/voice-diagnostics','/api/private-voice-capture'].includes(req.url.split('?')[0]);
+  const diagnostic=req.url.split('?')[0]==='/api/voice-diagnostics';
   const bucketKey=JSON.stringify([identity.sub,diagnostic?'diagnostics':'application']);
   const bucket=buckets.get(bucketKey)||{count:0,reset:now+60000};buckets.set(bucketKey,bucket);
   if(++bucket.count>(diagnostic?240:120)){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
@@ -164,7 +148,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   req.origenPreview=false;
   req.origenIdentity=identity;
   if(req.url==='/api/eligibility')return permission.handle(req,res);
-  const exempt=new Set(['/api/recommendation-evaluation','/api/recommendation-evaluation-report','/api/coordinator-outcome-observations','/api/student-outcome-observations','/api/outcome-evaluation','/api/outcome-evaluation-report','/api/outcome-evidence','/api/student-follow-up-report','/api/student-follow-up-voice','/api/conversation-opening','/api/student-follow-up','/api/coordinator-review-requests','/api/review-request-voice','/api/review-requests','/api/admin-voice','/api/teaching-library','/api/recommendation-library','/api/conversation-recovery','/api/coordinator-notifications','/api/coordinator-feedback','/api/coordinator-binders','/api/binder-sharing','/api/coordinator-connections','/api/coordinator-access','/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
+  const exempt=new Set(['/api/admin-voice','/api/teaching-library','/api/conversation-recovery','/api/coordinator-notifications','/api/coordinator-feedback','/api/coordinator-binders','/api/binder-sharing','/api/coordinator-connections','/api/coordinator-access','/api/account-data','/api/privacy','/api/admin','/api/institutions','/api/institution-campaigns','/api/institution-inquiries/staff','/api/institution-metrics/report']);
   const protectedRequest=!exempt.has(req.url?.split('?')[0]);
   let eligibility;
   if(protectedRequest){
@@ -203,8 +187,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const rawDatabase=createDatabase();
  database=rawDatabase?isolateDatabase(rawDatabase):null;
   if(database)await assertCoordinatorActivationReady(rawDatabase,process.env);
-  await assertRecommendationContractReady(rawDatabase,process.env);
-  if(database){await assertRuntimeIsolation(rawDatabase);await assertCoordinatorProvisioningReady(rawDatabase,process.env);await assertCoordinatorLinkingReady(rawDatabase,process.env);await assertBinderSharingReady(rawDatabase,process.env);await assertReviewRequestsReady(rawDatabase,process.env);await assertReviewVoiceReady(rawDatabase,process.env);await assertReviewDeliveryReady(rawDatabase,process.env);await assertReviewResponseContextReady(rawDatabase,process.env);await assertStudentFollowUpReady(rawDatabase,process.env);await assertOutcomeEvidenceReady(rawDatabase,process.env);await assertOutcomeEvaluationReady(rawDatabase,process.env);await assertCoordinatorViewingReady(rawDatabase,process.env);await assertCoordinatorFeedbackReady(rawDatabase,process.env);if(diagnosticOperationsEnabled(process.env))await assertDiagnosticOperationsReady(rawDatabase);if(process.env.SUPPORT_DIAGNOSTICS_ENABLED==='true')await assertSupportReady(rawDatabase);if(process.env.OBSERVABILITY_EXPORT==='true')await assertTelemetryLifecycle(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');runtimeLog({event:'service.database.verified'});}
+  if(database){await assertRuntimeIsolation(rawDatabase);await assertCoordinatorProvisioningReady(rawDatabase,process.env);await assertCoordinatorLinkingReady(rawDatabase,process.env);await assertBinderSharingReady(rawDatabase,process.env);await assertCoordinatorViewingReady(rawDatabase,process.env);await assertCoordinatorFeedbackReady(rawDatabase,process.env);if(diagnosticOperationsEnabled(process.env))await assertDiagnosticOperationsReady(rawDatabase);if(process.env.SUPPORT_DIAGNOSTICS_ENABLED==='true')await assertSupportReady(rawDatabase);if(process.env.OBSERVABILITY_EXPORT==='true')await assertTelemetryLifecycle(rawDatabase);if(!await databaseReady(database))throw new Error('database_migration_required');runtimeLog({event:'service.database.verified'});}
   else runtimeLog({event:'service.database.unavailable'});
   maintenancePool=createMaintenanceDatabase(process.env);
   if(maintenancePool)await assertMaintenanceAccess(maintenancePool);
@@ -212,9 +195,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(database)await assertCoordinatorLifecycleReady(database,process.env,maintenancePool);
   jobs=maintenancePool?createJobRunner(maintenancePool):null;
   const cleanupTasks=[
-   ['recommendation-previews',purgeRecommendationPreviews],
-   ['recommendation-evaluation',purgeRecommendationEvaluation],
-   ['conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}],['permission-data',purgePermissionData],['diagnostic-maps',async db=>{await purgeDiagnosticOperations(db);await purgePrivateVoiceCapture(db);}],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
+   ['conversation-checkpoints',async db=>{if(await recoveryReady(db))await claimRecoveryJob(db,{claim:false});}],['permission-data',purgePermissionData],['diagnostic-maps',purgeDiagnosticOperations],['metrics',purgeMetrics],['invites',purgeExpiredInvites],
    ['private-summaries',purgePrivateSummaries],['privacy-events',purgePrivacyEvents],['inquiries',purgeInstitutionInquiries],['outreach',purgeInstitutionOutreach],
    ['guidance',purgeGuidanceHistory],['progress',purgeProgressHistory],['report-snapshots',purgeAdminReportSnapshots],['quality',purgeConversationQuality],
    ['onboarding',db=>purgeOnboardingEvents(db,new Date(),process.env)],['admin-reviews',db=>purgeAdminReviews(db,new Date(),process.env)],

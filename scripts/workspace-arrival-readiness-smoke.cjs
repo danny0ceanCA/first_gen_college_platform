@@ -65,7 +65,6 @@ const boot=body=>`<!doctype html><html><meta charset="utf-8"><meta name="viewpor
    if(url.pathname==='/api/coordinator-access'&&input.action==='profile')data={profile:{displayName:'Synthetic coordinator',organizationName:'Synthetic organization'}};
    if(url.pathname==='/api/coordinator-access'&&input.action==='team'){teamRequests++;data={members:[]};}
    if(url.pathname==='/api/coordinator-binders')data={binders:[],counts:{all:0,new:0,help:0},nextCursor:null};
-   if(url.pathname==='/api/coordinator-notifications')data={notifications:[]};
    assert.ok(data,`Unexpected API ${url.pathname}/${input.action}`);return route.fulfill({json:data});
   });
   await page.route('**/arrival-token-review',route=>route.fulfill({contentType:'text/html',body:boot(`

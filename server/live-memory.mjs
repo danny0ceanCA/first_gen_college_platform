@@ -5,10 +5,6 @@ import {guardAccountTransaction} from './account-guard.mjs';
 import {createMemoryRepository,validateMemoryRequest} from './student-memory.mjs';
 import {createPlanRepository,validatePlan} from './plans.mjs';
 import {retrieveStudentHistory,retrievalInstructions} from './history-retrieval.mjs';
-import {loadReviewResponseContext,verifyReviewResponseContext,reviewResponseContextEnabled,reviewResponseSearch} from './review-response-context.mjs';
-import {validateReviewResponseReference} from '../src/reviewResponseConnection.mjs';
-import {enableReviewResponseChoice,runReviewResponseChoice} from './review-response-choices.mjs';
-import {reviewResponseResultInstructions} from './review-response-voice.mjs';
 import {continuityEnabled,loadQuestionContinuity,continuitySnapshot,continuityInstructions} from './conversation-continuity.mjs';
 import {voiceContextVersion} from './voice-preparation.mjs';
 import {memoryIntent,acceptsProposal,normalizeIntent} from './live-memory-intent.mjs';
@@ -23,7 +19,6 @@ const text=(value,max)=>typeof value==='string'&&value.trim().length>0&&value.le
 export function validateLiveChange(value){
  if(!value||!['create','update','delete','next-step'].includes(value.kind))throw fail(400,'invalid_memory_change');
  const out={kind:value.kind};
- if(value.responseSource!==undefined){if(value.kind!=='next-step')throw fail(400,'invalid_memory_change');out.responseSource=validateReviewResponseReference(value.responseSource);}
  if(value.store!==undefined){if(!['memory','note'].includes(value.store)||!['update','delete'].includes(value.kind))throw fail(400,'invalid_memory_change');out.store=value.store;}
  if(['update','delete'].includes(value.kind)){if(!uuid(value.id)||!Number.isSafeInteger(value.version)||value.version<1)throw fail(400,'invalid_memory_change');out.id=value.id;out.version=value.version;}
  if(value.kind!=='delete'){
@@ -38,14 +33,13 @@ export function validateLiveMemoryRequest(input){
  if(!Number.isSafeInteger(input.sequence)||input.sequence<1||!text(input.turnId,128)||typeof input.transcript!=='string'||input.transcript.length>8000)throw fail(400,'invalid_live_memory');
  Object.assign(out,{sequence:input.sequence,turnId:input.turnId,transcript:input.transcript});
  if(out.action==='turn'){if(!['en','es'].includes(input.language))throw fail(400,'invalid_live_memory');out.language=input.language;}
- if(out.action==='read'){if(!text(input.query,1000)||input.responseContextProtocol!==undefined&&input.responseContextProtocol!=='review-response-v1')throw fail(400,'invalid_live_memory');out.query=input.query;if(input.responseContextProtocol)out.responseContextProtocol=input.responseContextProtocol;}
+ if(out.action==='read'){if(!text(input.query,1000))throw fail(400,'invalid_live_memory');out.query=input.query;}
  if(out.action==='write'){if(!uuid(input.requestId))throw fail(400,'invalid_live_memory');out.requestId=input.requestId;out.change=validateLiveChange(input.change);}
  if(out.action==='present'){if(!text(input.presentation,8000))throw fail(400,'invalid_live_memory');out.presentation=input.presentation;out.change=validateLiveChange(input.change);}
  if(out.action==='question'){if(!['options','transfer','costs','applications'].includes(input.topic))throw fail(400,'invalid_live_memory');out.topic=input.topic;}
  if(out.action==='question-present'){if(!Object.hasOwn(guidanceQuestions,input.key)||!text(input.presentation,8000))throw fail(400,'invalid_live_memory');out.key=input.key;out.presentation=input.presentation;}
  return out;
 }
-export const responseActionReadback=(change,author,language)=>language==='es'?`¿Quieres guardar «${change.content}» como un próximo paso privado basado en la respuesta de ${author||'tu coordinador'}? No se compartirá con tu coordinador.`:`Do you want to save “${change.content}” as a private next step based on the response from ${author||'your coordinator'}? It will not be shared with your coordinator.`;
 const saved=receipt=>({status:'saved',kind:receipt.kind,id:receipt.record_id,version:receipt.record_version,revision:receipt.revision,reconnect:true,instruction:'The database committed this change. The app will acknowledge it and reconnect with fresh context. Do not save it again.'});
 
 export function createLiveMemoryRepository(database,env={}){return async(subject,input,{signal}={})=>{
@@ -98,21 +92,9 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
   if(input.action==='question'||input.action==='question-present'){
    const result=await guidanceAction(c,owner,session,input);signal?.throwIfAborted();requireLiveCapability(env,subject,input.action);if(!guidedConversationEnabled(env))throw fail(503,'guided_conversation_disabled');await guardAccountTransaction(c,subject);await c.query('COMMIT');committed=true;return result;
   }
-  if(input.action==='inspect'){await c.query('COMMIT');committed=true;return {studentId:session.student_id,revision:session.revision,...(session.review_response_focus?{responseFocus:{kind:'review-response',requestId:session.review_response_focus,responseVersion:session.review_response_focus_version}}:{})};}
+  if(input.action==='inspect'){await c.query('COMMIT');committed=true;return {studentId:session.student_id,revision:session.revision};}
   if(!['write','present'].includes(input.action))throw fail(400,'invalid_live_memory');
-  const change=input.change;let old,responseSource;
-  // An active recommendation has its own exact source/readback contract. The
-  // generic next-step writer cannot discard that provenance or source guard.
-  if(change.kind==='next-step'&&(await c.query("SELECT to_regprocedure('origen_recommendation_delivery_command(jsonb)') AS fn")).rows[0]?.fn){
-   const gate=(await c.query('SELECT origen_recommendation_delivery_command($1::jsonb) AS result',[JSON.stringify({action:'legacy-check',sessionId:input.sessionId,sequence:input.sequence,turnId:input.turnId,transcript:input.transcript})])).rows[0].result;
-   if(gate.error||gate.blocked)throw fail(409,'recommendation_approval_required');
-  }
-  if(change.responseSource){
-   await enableReviewResponseChoice(c,env,subject);
-   const source=change.responseSource;
-   if(!((session.review_response_request===source.requestId&&session.review_response_version===source.responseVersion)||(session.review_response_focus===source.requestId&&session.review_response_focus_version===source.responseVersion)))throw fail(409,'review_response_context_changed');
-   responseSource=await runReviewResponseChoice(c,{action:'check-source',studentId:session.student_id,source});
-  }
+  const change=input.change;let old;
   if(['update','delete'].includes(change.kind)){
    const note=change.store==='note';
    old=(await c.query(`SELECT * FROM ${note?'origen_topic_notes':'origen_student_memories'} WHERE account_id=$1 AND id=$2${note?'':" AND status IN ('proposed','confirmed')"}`,[owner,change.id])).rows[0];
@@ -128,25 +110,21 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
    const spoken=normalizeIntent(input.presentation),includes=value=>spoken.includes(normalizeIntent(value));
    const question=input.presentation.includes('?')||/^(would|should|shall|can|do you want|quieres|deseas|debo|puedo|te gustaria)\b/.test(spoken);
    const negated=guided&&/\b(not|don t|never|no|nunca) (?:save|delete|remove|forget|guardar|guardes|guarde|borrar|borres|eliminar|elimines)\b/.test(spoken);
-   const valid=!negated&&question&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence&&/\b(save|saved|guardar|guarde|guarda|guardemos|guardarlo|guardamos|borre|borrar|delete|remove|forget)\b/.test(spoken)&&(change.kind==='delete'||includes(change.content))&&(!old||includes(old.content))&&(!responseSource||includes(responseActionReadback(change,responseSource.authorName,session.turn_language)));
+   const valid=!negated&&question&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence&&/\b(save|saved|guardar|guarde|guarda|guardemos|guardarlo|guardamos|borre|borrar|delete|remove|forget)\b/.test(spoken)&&(change.kind==='delete'||includes(change.content))&&(!old||includes(old.content));
    await c.query('UPDATE origen_live_memory_sessions SET proposal_presented=$3 WHERE account_id=$1 AND id=$2 AND proposal_hash=$4 AND proposal_turn=$5',[owner,session.id,valid,fingerprint,input.sequence]);
    await c.query('COMMIT');committed=true;return {status:valid?'presented':'not_presented'};
   }
   const confirmed=acceptsProposal(input.transcript)&&session.proposal_presented&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence-1&&Date.now()-Date.parse(session.proposal_at)<120000;
-  let intent=guided&&old?spokenCorrectionIntent(input.transcript,change,old):memoryIntent(input.transcript,change,old?.content);
-  if(responseSource&&!confirmed){
-   if(/^(yes|yes please|si|si por favor)$/.test(normalizeIntent(input.transcript)))intent='not_requested';
-   else if(intent==='authorized')intent='clarify'; // A linked action always gets a fully delivered readback.
-  }
+  const intent=guided&&old?spokenCorrectionIntent(input.transcript,change,old):memoryIntent(input.transcript,change,old?.content);
   if(!confirmed&&intent!=='authorized'){
    if(intent==='clarify'&&session.proposal_turn===input.sequence&&session.proposal_hash!==fingerprint)throw fail(409,'memory_request_changed');
    if(intent==='clarify')await c.query('UPDATE origen_live_memory_sessions SET proposal_hash=$3,proposal_turn=$4,proposal_at=now(),proposal_presented=false WHERE account_id=$1 AND id=$2',[owner,session.id,fingerprint,input.sequence]);
-   await c.query('COMMIT');committed=true;return {status:intent==='clarify'?'clarification_required':'not_requested',...(intent==='clarify'?{proposal:{...change,...(old?{previousContent:old.content}:{})},...(responseSource?{readback:responseActionReadback(change,responseSource.authorName,session.turn_language)}:{})}:{}),instruction:intent==='clarify'?(responseSource?'Nothing was saved. Speak the complete readback verbatim, then wait for the student’s answer. A partial or interrupted readback is not confirmation. On explicit yes, repeat identical arguments.':'Nothing was saved. Describe this exact change and ask one focused spoken confirmation. On yes, repeat the identical arguments.'):'Nothing was saved. The user did not request a durable change. Continue their question without proposing a save.'};
+   await c.query('COMMIT');committed=true;return {status:intent==='clarify'?'clarification_required':'not_requested',...(intent==='clarify'?{proposal:{...change,...(old?{previousContent:old.content}:{})}}:{}),instruction:intent==='clarify'?'Nothing was saved. Describe this exact change and ask one focused spoken confirmation. On yes, repeat the identical arguments.':'Nothing was saved. The user did not request a durable change. Continue their question without proposing a save.'};
   }
   signal?.throwIfAborted();let recordId,recordVersion,newRevision;
   if(change.kind==='next-step'){
    const stepId='step-1';
-   const plan=validatePlan({action:'create',requestId:input.requestId,...(responseSource?{fromResponse:{source:change.responseSource,stepId,confirmed:true}}:{}),plan:{studentId:session.student_id,title:change.content.slice(0,160),goal:'',category:change.category,status:'active',summaryIds:[],steps:[{id:stepId,title:change.content.slice(0,160),action:change.content,notes:'',status:'not-started',dueDate:null,sources:[]}]}});
+   const plan=validatePlan({action:'create',requestId:input.requestId,plan:{studentId:session.student_id,title:change.content.slice(0,160),goal:'',category:change.category,status:'active',summaryIds:[],steps:[{id:stepId,title:change.content.slice(0,160),action:change.content,notes:'',status:'not-started',dueDate:null,sources:[]}]}});
    await createPlanRepository(database,env)(subject,plan,{client:c});
    const row=(await c.query('SELECT plan_id FROM origen_plan_creations WHERE account_id=$1 AND request_id=$2',[owner,input.requestId])).rows[0];recordId=row.plan_id;recordVersion=1;
    // New plans must refresh other active live scopes too.
@@ -172,20 +150,11 @@ export function createLiveMemoryService(database,env={}){const run=createLiveMem
  const continuity=continuityEnabled(env,subject);
  const contextVersion=continuity?await voiceContextVersion(database,subject):undefined;
  const evidence=await retrieveStudentHistory(database,subject,{studentId:scope.studentId,query:input.query,continuity});options.signal?.throwIfAborted();
- // The registered transcript, not a model-generated search query, determines
- // which coordinator question is relevant. Family scope cannot use this path.
- let reviewResponse;
- if(input.responseContextProtocol==='review-response-v1'&&scope.studentId!==null&&reviewResponseContextEnabled(env,subject))reviewResponse=await loadReviewResponseContext(database,subject,{studentId:scope.studentId,...(scope.responseFocus&&!reviewResponseSearch(input.transcript.slice(-1000)).terms.length?{focus:scope.responseFocus}:{query:input.transcript.slice(-1000)})},env,{...options,voice:input});
  const context=continuity?continuitySnapshot({historicalEvidence:evidence},await loadQuestionContinuity(database,subject,scope.studentId)):undefined;
  const current=await run(subject,{...input,action:'inspect'},options);if(current.revision!==scope.revision)throw fail(409,'memory_changed');
  if(continuity!==continuityEnabled(env,subject))throw fail(409,'memory_changed');
  if(continuity&&contextVersion!==await voiceContextVersion(database,subject))throw fail(409,'memory_changed');
- if(reviewResponse?.status==='retrieved'){
-  const verified=await verifyReviewResponseContext(database,subject,scope.studentId,reviewResponse.guard,env,options);
-  if(verified.status!=='current')throw fail(409,'review_response_context_changed');
- }
- const {guard:reviewResponseGuard,...reviewData}=reviewResponse||{};
- return {status:evidence.available||reviewResponse?.status==='retrieved'?'retrieved':'unavailable',revision:current.revision,items:evidence.items,...(context?{continuity:context}:{}),...(reviewResponse?{reviewResponse:reviewData}:{}),...(reviewResponseGuard?{reviewResponseGuard}:{}),instruction:retrievalInstructions(evidence,{includeItems:false})+continuityInstructions(context)+(reviewResponse?reviewResponseResultInstructions(reviewResponse):'')};
+ return {status:evidence.available?'retrieved':'unavailable',revision:current.revision,items:evidence.items,...(context?{continuity:context}:{}),instruction:retrievalInstructions(evidence,{includeItems:false})+continuityInstructions(context)};
 };}
 export function createLiveMemoryHandler(database,env={}){const run=createLiveMemoryService(database,env);return async(req,res,next)=>{
  if(req.url?.split('?')[0]!=='/api/live-memory')return next();

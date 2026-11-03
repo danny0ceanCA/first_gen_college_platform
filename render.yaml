@@ -20,31 +20,6 @@ services:
         value: "true"
       - key: ORIGEN_BINDER_SHARING
         value: "true"
-      # Structured requests: migrations through 099. Keep off pending release verification.
-      - key: ORIGEN_REVIEW_REQUESTS
-        value: "false"
-      # Requires migration 098 and review requests.
-      - key: ORIGEN_REVIEW_REQUEST_VOICE
-        value: "false"
-      # Migration 099: coordinator delivery/response rollout; enable after release verification.
-      - key: ORIGEN_REVIEW_REQUEST_DELIVERY
-        value: "false"
-      # Phase 2 responses, private choices and linked requests: migration 103 and personalization retrieval.
-      - key: ORIGEN_REVIEW_RESPONSE_CONTEXT
-        value: "false"
-      # Phase 3 private updates and explicit sharing: migrations 104–108; keep off through release verification.
-      - key: ORIGEN_STUDENT_FOLLOW_UP
-        value: "false"
-      # Phase 4 evidence foundation: migration 109; writers and assessment are later steps.
-      - key: ORIGEN_OUTCOME_EVALUATION
-        value: "false"
-      - key: ORIGEN_OUTCOME_EVIDENCE
-        value: "false"
-      # Recommendation Phase 5: migrations 114–120; separate student/reviewer opt-ins.
-      - key: ORIGEN_RECOMMENDATIONS
-        value: "false"
-      - key: ORIGEN_RECOMMENDATION_EVALUATION
-        value: "false"
       # Student-first Phase 7: migration 067; explicit selection and preview only.
       - key: ORIGEN_DERIVED_BINDER_SHARING
         value: "false"

@@ -3,7 +3,6 @@ import CoordinatorNotifications,{type NoticeDestination} from './CoordinatorNoti
 import {useGuidanceRequest,type Guidance} from './CoordinatorGuidance';
 import {StudentCommentsProvider,StudentEntryComments,useStudentComments} from './StudentComments';
 import BinderSharing from './BinderSharing';
-import {StudentReviewRequestsProvider,StudentReviewRequests,StudentReviewRequestEntry} from './StudentReviewRequests';
 import {notifyMemoryContext} from './memoryContext.mjs';
 import StudentMemory,{type Memory} from './StudentMemory';
 import {binderMemoryEntries,binderMemorySignalId} from './binderMemory.mjs';
@@ -26,8 +25,6 @@ import {apiFailure,diagnosticHint} from './diagnosticClient.mjs';
 import {ErrorReference} from './ErrorReference';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import {distinctConversationPoints} from './binderKeyPoints.mjs';
-import TopicRecap from './TopicRecap';
-import useTopicRecaps from './useTopicRecaps';
 import {binderActivity,binderNoteUpdates as noteUpdates} from './binderActivity';
 import BinderNoteHighlight from './BinderNoteHighlight';
 import {binderExportData} from './binderExport.mjs';
@@ -55,7 +52,7 @@ function subscribeMobileBinder(callback:()=>void){
 export default function TopicNotebook(props:Props){
  const [commentAction,setCommentAction]=useState(0);
  const body=<TopicNotebookContent {...props} commentAction={commentAction}/>;
- return props.role==='student'?<StudentReviewRequestsProvider studentId={props.studentId} language={props.language} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}><StudentCommentsProvider studentId={props.studentId} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}>{body}</StudentCommentsProvider></StudentReviewRequestsProvider>:body;
+ return props.role==='student'?<StudentCommentsProvider studentId={props.studentId} t={props.t} onAction={props.onAction?seed=>{setCommentAction(n=>n+1);props.onAction?.(seed);}:undefined}>{body}</StudentCommentsProvider>:body;
 }
 function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,initiallyOpen,onAction,renderNextSteps,renderGuide,renderSummary,studentId,name,role,language,t}:Props&{commentAction:number}){
  const comments=useStudentComments();
@@ -81,9 +78,6 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState(false),[attempt,setAttempt]=useState(0);
  const navKey=`student.notebook.${target||'family'}`;
  const [open,setOpen]=useNavigationState<NotebookPage>(navKey+'.topic',renderSummary?'summary':'options',navigationEnum('summary','options','transfer','costs','applications')),[drafts,setDrafts]=useState<Record<string,Draft|undefined>>({});
- const [binderVisible]=useNavigationState(navKey+'.open',!!initiallyOpen,(v):v is boolean=>typeof v==='boolean');
- const [lastRecapTopic,setLastRecapTopic]=useNavigationState<Topic>(navKey+'.lastRecapTopic','options',navigationEnum('options','transfer','costs','applications'));
- useEffect(()=>{if(open!=='summary')setLastRecapTopic(open);},[open,setLastRecapTopic]);
  const mobile=useSyncExternalStore(subscribeMobileBinder,()=>window.matchMedia(mobileBinderQuery).matches,()=>false);
  const [mobilePage,setMobilePage]=useNavigationState(navKey+'.mobilePage',false,(v):v is boolean=>typeof v==='boolean');
  const showingPage=!mobile||mobilePage;
@@ -94,10 +88,8 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  useNavigationGuard(Object.values(drafts).some(Boolean),{locked:busy,onLeave:()=>setDrafts({})});
  const inFlight=useRef(false),mutationVersion=useRef(0),panel=useRef<HTMLElement>(null),editor=useRef<HTMLTextAreaElement>(null);
  const [originals,setOriginals]=useState<Record<string,boolean>>({});
- const [fullRemember,setFullRemember]=useState<Record<string,boolean>>({});
- const [detailViews,setDetailViews]=useState<Record<string,boolean>>({});
  const [reading,setReading]=useNavigationState<Record<string,{kind:Kind;page:number}>>(navKey+'.reading',{},(v):v is Record<string,{kind:Kind;page:number}>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.values(v).every(r=>r&&['note','explanation','question','decision'].includes(r.kind)&&Number.isSafeInteger(r.page)&&r.page>=0));
- const readingHeading=useRef<HTMLHeadingElement>(null),readingNavigationPending=useRef(false),readingNote=useRef<string|null>(null);
+ const readingHeading=useRef<HTMLHeadingElement>(null),readingNavigationPending=useRef(false);
  const tabs=useRef<HTMLDivElement>(null),notebook=useRef<HTMLElement>(null);
  const consumedFollow=useRef(0);
  const [binderOpenRequest,setBinderOpenRequest]=useState(0);
@@ -133,8 +125,6 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  useEffect(()=>browserPrivacy.subscribe(event=>{
   for(const controller of requests.current)controller.abort();
   mutationVersion.current++;setData(null);setMemoryData({scope:'',entries:[]});setIndexError(null);setAttempt(n=>n+1);
-  setFullRemember({});
-  setDetailViews({});
   if(event.type==='end'){setDrafts({});setOriginals({});setReading({});setMessage(null);}
  }),[]);
  useLayoutEffect(()=>{
@@ -258,8 +248,6 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
     if(clearDraft){
      const savedNote=result.notes.find(note=>note.id===body.id);
      if(savedNote){
-      setDetailViews(previous=>({...previous,[JSON.stringify([actionScope,savedNote.topic])]:false}));
-      setFullRemember(previous=>({...previous,[JSON.stringify([actionScope,savedNote.topic])]:true}));
       const entries=[...result.notes.filter(note=>note.topic===savedNote.topic&&note.status==='saved'),...distinctConversationPoints(result.notes.filter(note=>note.topic===savedNote.topic))].filter(note=>note.kind===savedNote.kind).sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt)||a.id.localeCompare(b.id));
       setReading(previous=>({...previous,[JSON.stringify([actionScope,savedNote.topic])]:{kind:savedNote.kind,page:Math.max(0,Math.floor(entries.findIndex(note=>note.id===savedNote.id)/notesPerPage))}}));
       setOpen(savedNote.topic);if(mobile){navigationPending.current=true;setMobilePage(true);}
@@ -289,7 +277,7 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
     {note.organization&&<details className="memory-evidence"><summary>{t('See source','Ver fuente')}</summary><blockquote lang={note.language}>{note.quote}</blockquote><p>{t('From a saved conversation summary, not a verbatim transcript or a verified policy.','De un resumen guardado, no de una transcripción literal ni de una política verificada.')}</p></details>}
    {note.language!==language&&<div className="notebook-translation">{translated?<><span>{t('AI translation · Original preserved','Traducción con IA · Original conservado')}</span><button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:true}))}>{t('Show original','Ver original')}</button></>:note.translations[language]?<button type="button" className="text-button" onClick={()=>setOriginals(prev=>({...prev,[note.id]:false}))}>{t('Show translation','Ver traducción')}</button>:<button type="button" className="text-button" disabled={busy} onClick={()=>void act({action:'translate',id:note.id,version:note.version,language},t('Translation ready. The original is unchanged.','Traducción lista. El original no cambió.'))}><Languages size={15} aria-hidden="true"/>{t('Read in English','Leer en español')}</button>}</div>}
    <div className="notebook-note-actions"><button type="button" className="text-button" disabled={busy} onClick={()=>edit(note)}>{note.language===language?t('Edit','Editar'):t('Edit original','Editar original')}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{if(window.confirm(t('Delete this note? Your original conversation summary will remain.','¿Eliminar esta nota? Se conservará el resumen original de la conversación.')))void act({action:'delete',id:note.id,version:note.version},t('Note deleted.','Nota eliminada.'));}}><Trash2 size={14} aria-hidden="true"/>{note.status==='suggested'?t('Remove','Quitar'):t('Delete','Eliminar')}</button></div>
-   <StudentReviewRequestEntry note={note}/></div><StudentEntryComments id={note.id} topic={note.topic}/>
+   </div><StudentEntryComments id={note.id} topic={note.topic}/>
   </BinderNoteHighlight>;
  }
  const dividers=[...(renderSummary?[{id:'summary' as const,title:t('Summary','Resumen'),icon:MessageCircle}]:[]),...topics];
@@ -297,64 +285,27 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  const grouped=notes.filter(note=>note.topic===open);
  const topicMemories=memories.filter(item=>item.organization?.topic===open);
  const points=distinctConversationPoints(grouped);
- const sectionLabels:Record<Kind,string>={note:t('My notes','Mis notas'),explanation:t('Key points','Puntos clave'),decision:t('Decisions','Decisiones'),question:t('Questions','Preguntas')};
+ const sectionLabels:Record<Kind,string>={note:t('Notes & ideas','Notas e ideas'),explanation:t('Things to remember','Para recordar'),decision:t('Decisions','Decisiones'),question:t('Questions','Preguntas')};
  const sectionDescriptions:Record<Kind,string>={note:t('Your interests, possibilities, and personal notes.','Tus intereses, posibilidades y notas personales.'),explanation:t('Useful explanations to return to.','Explicaciones útiles para volver a consultar.'),decision:t('Choices you have personally confirmed.','Las decisiones que tú has confirmado.'),question:t('Questions to bring to your next conversation.','Preguntas para tu próxima conversación.')};
  // Keep the existing note categories and exact text. Recaps remain distinct from
  // saved notes; placing them together never turns a suggestion into a decision.
  const sectionNotes=[...grouped.filter(note=>note.status==='saved'),...points].sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt)||a.id.localeCompare(b.id));
- const sections=(['explanation','note','question','decision'] as Kind[]).map(kind=>({kind,notes:sectionNotes.filter(note=>note.kind===kind)}));
+ const sections=(['note','explanation','decision','question'] as Kind[]).map(kind=>({kind,notes:sectionNotes.filter(note=>note.kind===kind)}));
  const readingKey=JSON.stringify([scope,open]);
- const showDetails=detailViews[readingKey]===true;
- const sectionTabs=[{kind:'explanation' as const,label:sectionLabels.explanation,count:sections[0].notes.length},{kind:'details' as const,label:t('Your details','Tus datos'),count:topicMemories.length},...sections.slice(1).map(s=>({kind:s.kind,label:sectionLabels[s.kind],count:s.notes.length}))];
  const activeKind=reading[readingKey]?.kind||sections.find(section=>section.notes.length)?.kind||'note';
  const activeNotes=sections.find(section=>section.kind===activeKind)!.notes;
  const pageCount=Math.max(1,Math.ceil(activeNotes.length/notesPerPage));
  const currentPage=Math.min(reading[readingKey]?.page||0,pageCount-1);
  const visibleNotes=activeNotes.slice(currentPage*notesPerPage,(currentPage+1)*notesPerPage);
- const canRecap=activeKind==='explanation'&&activeNotes.length>0;
- const showingRecap=canRecap&&!fullRemember[readingKey]&&!draft;
- const recaps=useTopicRecaps({studentId:target,language,
-  ready:history.cloud&&!history.loading&&!history.error&&!loading&&!loadError&&!busy&&data?.scope===scope&&memoryData.scope===scope,
-  priority:open==='summary'?lastRecapTopic:open,
-  foreground:binderVisible&&showingPage&&showingRecap&&!showDetails&&open!=='summary'?open:undefined,
-  topics:topics.filter(topic=>notes.some(note=>note.topic===topic.id&&note.kind==='explanation'&&(note.status==='saved'||note.status==='suggested'&&note.origin==='conversation'&&note.summaryId))).map(topic=>({topic:topic.id,revision:JSON.stringify([historyKey,notes.filter(note=>note.topic===topic.id).sort((a,b)=>a.id.localeCompare(b.id)),memories.filter(item=>item.organization?.topic===topic.id).sort((a,b)=>a.id.localeCompare(b.id))])})),
- });
- function showFullRemember(note?:Note){
-  navigateWorkspace(()=>{
-   setDetailViews(previous=>({...previous,[readingKey]:false}));
-   readingNote.current=note?.id||null;
-   setFullRemember(previous=>({...previous,[readingKey]:true}));
-   readingNavigationPending.current=true;
-   const kind=note?.kind||'explanation';
-   const originals=sections.find(section=>section.kind===kind)!.notes;
-   setReading(previous=>({...previous,[readingKey]:{kind,page:note?Math.max(0,Math.floor(originals.findIndex(item=>item.id===note.id)/notesPerPage)):0}}));
-  });
- }
- function showQuickRemember(){navigateWorkspace(()=>{
-  readingNavigationPending.current=true;readingNote.current=null;
-  setFullRemember(previous=>({...previous,[readingKey]:false}));
-  setReading(previous=>({...previous,[readingKey]:{kind:'explanation',page:0}}));
- });}
- function selectSection(kind:Kind|'details'){
-  if(kind===(showDetails?'details':activeKind))return;
-  navigateWorkspace(()=>{
-   setDetailViews(previous=>({...previous,[readingKey]:kind==='details'}));
-   if(kind!=='details')setReading(previous=>({...previous,[readingKey]:{kind,page:0}}));
-  });
- }
+ function selectSection(kind:Kind){if(kind!==activeKind)navigateWorkspace(()=>setReading(previous=>({...previous,[readingKey]:{kind,page:0}})));}
  function changeReadingPage(page:number){navigateWorkspace(()=>{readingNavigationPending.current=true;setReading(previous=>({...previous,[readingKey]:{kind:activeKind,page}}));});}
  useLayoutEffect(()=>{
   if(!readingNavigationPending.current||!readingHeading.current)return;
   readingNavigationPending.current=false;
-  const selectedNote=readingNote.current?notebook.current?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(readingNote.current)}"]`):null;
-  readingNote.current=null;
-  if(selectedNote){selectedNote.tabIndex=-1;selectedNote.focus({preventScroll:true});selectedNote.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});return;}
   const heading=readingHeading.current;
   heading.focus({preventScroll:true});
-  const anchor=heading.closest('.notebook-reading-page')||heading;
-  const top=mobile?24:Math.max(24,(tabs.current?.getBoundingClientRect().bottom||0)+24);
-  if(anchor.getBoundingClientRect().top<top||anchor.getBoundingClientRect().top>window.innerHeight-120)window.scrollTo({top:Math.max(0,window.scrollY+anchor.getBoundingClientRect().top-top),behavior:'instant'});
- },[readingKey,activeKind,currentPage,showingRecap]);
+  if(heading.getBoundingClientRect().top<24)window.scrollTo({top:Math.max(0,window.scrollY+heading.getBoundingClientRect().top-24),behavior:'instant'});
+ },[readingKey,activeKind,currentPage]);
  const scopeLabel=target===null?t('Family notes','Notas familiares'):name;
  async function downloadPdf(topic?:Topic){
   if(exportLock.current||loading||loadError||busy)return;
@@ -383,18 +334,25 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  function exportButton(topic?:Topic){
   const disabled=exporting||loading||loadError||busy||history.loading||history.error;
   return <details key={topic||'summary'} className="notebook-options" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.currentTarget.open=false;e.currentTarget.querySelector('summary')?.focus();}}}>
-   <summary>{t('Binder options','Opciones de la carpeta')} <Download size={16} aria-hidden="true"/></summary>
+   <summary>{t('PDF options','Opciones de PDF')} <Download size={16} aria-hidden="true"/></summary>
    <div className="notebook-options-content">
     {topic&&<button type="button" className="notebook-pdf-button" disabled={disabled} onClick={()=>void downloadPdf(topic)}>{exporting?t('Preparing PDF…','Preparando PDF…'):t('Save this topic as PDF','Guardar este tema en PDF')}</button>}
     <button type="button" className="notebook-pdf-button" disabled={disabled} onClick={()=>void downloadPdf()}>{exporting?t('Preparing PDF…','Preparando PDF…'):t('Save binder as PDF','Guardar carpeta en PDF')}</button>
-    {indexError&&data?.background?.canRetry!==false&&<button type="button" className="notebook-pdf-button" disabled={loading||busy||indexing} onClick={()=>{retryOrganization.current=data?.background?.enabled===true;setAttempt(n=>n+1);}}>{t('Refresh conversation notes','Actualizar notas de conversaciones')}</button>}
     {role==='student'&&target&&<label><input type="checkbox" checked={includeGuidance} onChange={e=>setIncludeGuidance(e.target.checked)}/>{t('Include coordinator guidance in PDF','Incluir orientación del coordinador en el PDF')}</label>}
    </div>
   </details>;
  }
 
  const [noticeTarget,setNoticeTarget]=useState<(NoticeDestination & {sequence:number})>();
- function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='review-request')return;if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':'.binder-sharing')?.scrollIntoView({block:'start'})));}
+ function openCoordinatorUpdate(value:NoticeDestination){if(value.studentId!==target)return;setNoticeTarget({...value,sequence:Date.now()});if(value.destination==='guidance')openTopic('summary');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelector(value.destination==='guidance'?'.coordinator-guidance':'.binder-sharing')?.scrollIntoView({block:'start'})));}
+ function dividerDetail(id:NotebookPage){
+  if(id==='summary')return t('What we talked about','Lo que conversamos');
+  if(loading||loadError)return '—';
+  const saved=notes.filter(note=>note.topic===id&&note.status==='saved').length;
+  const pointCount=distinctConversationPoints(notes.filter(note=>note.topic===id)).length;
+  const personalCount=memories.filter(item=>item.organization?.topic===id).length;
+  return [personalCount?`${personalCount} ${t(personalCount===1?'detail':'details',personalCount===1?'dato':'datos')}`:'',pointCount?`${pointCount} ${t(pointCount===1?'key point':'key points',pointCount===1?'punto clave':'puntos clave')}`:'',saved?`${saved} ${t(saved===1?'note':'notes',saved===1?'nota':'notas')}`:''].filter(Boolean).join(' · ')||t('Ready when you are','Cuando tú quieras');
+ }
  function jumpToComment(f:Guidance){
   const topic=f.topic as Topic;commentFollowPending.current=true;openTopic(topic);setCommentFocus(f);setCommentOpenRequest(Date.now());
  }
@@ -403,12 +361,10 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
   if(!commentFocus||loading||loadError||locatedComment.current===commentOpenRequest)return;
   locatedComment.current=commentOpenRequest;const f=commentFocus,topic=f.topic;
   if(f.anchor?.kind==='note'){
-   setDetailViews(previous=>({...previous,[JSON.stringify([scope,topic])]:false}));
-   setFullRemember(previous=>({...previous,[JSON.stringify([scope,topic])]:true}));
    const group=notes.filter(n=>n.topic===topic),all=[...group.filter(n=>n.status==='saved'),...distinctConversationPoints(group)].sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt)||a.id.localeCompare(b.id));
    const note=all.find(n=>n.id===f.anchor?.id);
    if(note)setReading(prev=>({...prev,[JSON.stringify([scope,topic])]:{kind:note.kind,page:Math.floor(all.filter(n=>n.kind===note.kind).findIndex(n=>n.id===note.id)/notesPerPage)}}));
-  }else if(f.anchor?.kind==='memory')setDetailViews(previous=>({...previous,[JSON.stringify([scope,topic])]:true}));
+  }
  },[commentOpenRequest,loading,loadError,data]);
  function revealComment(){if(!commentFocus||!commentFollowPending.current||loading||memoryData.scope!==scope)return false;const element=notebook.current?.querySelector<HTMLElement>(`[data-comment-id="${CSS.escape(commentFocus.id)}"]`);if(!element||!element.closest('.binder-open'))return false;commentFollowPending.current=false;element.focus({preventScroll:true});element.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});return true;}
  useEffect(()=>{if(!commentFocus)return;const frame=requestAnimationFrame(()=>revealComment());return()=>cancelAnimationFrame(frame);},[commentFocus,reading,open,mobilePage,loading,memoryData]);
@@ -418,7 +374,8 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
  function dividerGlow(id:NotebookPage){return `${id!=='summary'&&discussing.includes(id)?' is-discussing':''}${freshCount(id)&&!liveScopeActive?' has-new-notes':''}`;}
  function dividerSignal(id:NotebookPage){return <span className="notebook-divider-signals">{unreadComments.some(f=>f.topic===id)&&<span className="comment-topic-signal">{unreadComments.filter(f=>f.topic===id).length} {t(unreadComments.filter(f=>f.topic===id).length===1?'new comment':'new comments',unreadComments.filter(f=>f.topic===id).length===1?'comentario nuevo':'comentarios nuevos')}</span>}{id!=='summary'&&discussing.includes(id)&&<span className="notebook-discussing-label"><i aria-hidden="true"/>{t('Discussing now','Conversando ahora')}</span>}{freshCount(id)>0&&(id==='summary'||!discussing.includes(id))&&<span className="notebook-new-label">{freshCount(id)} {t('new','nuevos')}</span>}</span>;}
  return <><ConversationRecovery studentId={target} t={t}/>{role==='student'&&target&&<BinderSharing launchRequest={sharingOpenRequest} key={'sharing-'+target} studentId={target} t={t} openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='sharing'?noticeTarget.sequence:0} connectionOpenRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='connections'?noticeTarget.sequence:0}/>}
-   <StudentReviewRequests openRequest={noticeTarget?.studentId===target&&noticeTarget.destination==='review-request'?{id:noticeTarget.grantId,sequence:noticeTarget.sequence}:undefined}/>
+   {indexing&&discussions.length>0&&<p className="notebook-sync-status" role="status">{data?.background?.enabled?t('Your conversation is saved. Key points will appear here when ready.','Tu conversación está guardada. Los puntos clave aparecerán aquí cuando estén listos.'):t('Organizing conversation key points into your topics…','Organizando los puntos clave de tus conversaciones por tema…')}</p>}
+   {indexError&&<p className="notebook-sync-status" role="status">{indexError==='notes_ai_limit'?t('Some older conversations still need organizing. Try again later; your saved notes are ready to use.','Aún faltan algunas conversaciones anteriores por organizar. Inténtalo más tarde; tus notas guardadas están listas.'):t('Some conversation points could not be organized yet. Your saved conversations and notes are still here.','Todavía no se pudieron organizar algunos puntos. Tus conversaciones y notas siguen aquí.')} {data?.background?.canRetry!==false&&<button type="button" className="text-button" onClick={()=>{retryOrganization.current=data?.background?.enabled===true;setAttempt(n=>n+1);}}>{t('Try again','Intentar de nuevo')}</button>}</p>}
 {comments.status}{unreadComments.length>0&&<button type="button" className="student-comment-arrival" onClick={()=>jumpToComment(unreadComments[0])}>{unreadComments.length} {t(unreadComments.length===1?'new comment from your coordinator':'new comments from your coordinator',unreadComments.length===1?'comentario nuevo de tu coordinador':'comentarios nuevos de tu coordinador')} <span aria-hidden="true">→</span></button>}
 <PersonalBinder navigationKey={navKey} openRequest={Math.max(followValid?binderOpenRequest:0,commentOpenRequest)} onFollowReady={()=>{if(!revealComment())revealFollow();}} discussing={topics.filter(topic=>discussing.includes(topic.id)).map(({id,title})=>({id,title}))} initiallyOpen={initiallyOpen} name={target===null?t('Family','Familia'):name} t={t} onOpen={()=>setMobilePage(false)}><section ref={notebook} className={`topic-notebook${mobile?' notebook-mobile':''}`} aria-label={t('My topics & notes','Mis temas y notas')}>
   {(!mobile||!mobilePage)&&<><div className="home-section-heading"><span className="home-kicker">{mobile?t('IN YOUR BINDER','EN TU CARPETA'):t('MAKE IT YOURS','HAZLO TUYO')}</span><h2 id="notebook-heading">{mobile?t('Choose a topic','Elige un tema'):t('My topics & notes','Mis temas y notas')}</h2></div>
@@ -426,14 +383,14 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
   {role==='student'&&target&&<><CoordinatorNotifications key={'updates-'+target} studentId={target} t={t} onOpen={openCoordinatorUpdate}/></>}
   <p className="notebook-scope">{t('Notebook for: ','Cuaderno de: ')}<strong>{scopeLabel}</strong></p></>}
   {!history.cloud?<p>{t('Sign in to save topic notes to your account.','Inicia sesión para guardar notas en tu cuenta.')}</p>:<>
-   <StudentMemory presentation="loader" key={scope} onEntries={entries=>setMemoryData(entries?{scope,entries}:{scope:'',entries:[]})} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>
+   <StudentMemory presentation="loader" key={scope} onEntries={entries=>setMemoryData({scope,entries})} studentId={target} language={language} t={t} historyKey={JSON.stringify([history.items.filter(item=>item.studentId===target).map(item=>item.id),data?.scope===scope?data.generatedSummaryIds:[]])}/>
    {loading&&<p role="status">{t('Loading your notebook…','Cargando tu cuaderno…')}</p>}
    {loadError&&<p role="alert">{t('Your notebook could not be loaded. Your saved notes have not been replaced.','No se pudo cargar tu cuaderno. Tus notas guardadas no se han reemplazado.')} <button type="button" className="text-button" onClick={()=>setAttempt(n=>n+1)}>{t('Try again','Intentar de nuevo')}</button></p>}
    <div className="notebook-export-toolbar">{exportButton(selected?.id)}</div>
    {exportError&&<p role="alert" className="notebook-export-error">{exportError}</p>}
    <p className="notebook-live-announcement" role="status">{discussing.length>0?t(`Discussing now: ${topics.filter(topic=>discussing.includes(topic.id)).map(topic=>topic.title).join(", ")}.`,`Conversando ahora: ${topics.filter(topic=>discussing.includes(topic.id)).map(topic=>topic.title).join(", ")}.`):""}{freshIds.size>0?t(` ${freshIds.size} new entries in your binder.`,` ${freshIds.size} entradas nuevas en tu carpeta.`):""}</p>
    <div ref={pageView} className="notebook-page-view">
-   {mobile?!mobilePage&&<nav ref={contents} className="notebook-contents" aria-label={t('Binder topics','Temas de la carpeta')}>{dividers.map(({id,title,icon:Icon})=><button type="button" key={id} data-topic={id} className={`notebook-contents-topic divider-${id}${dividerGlow(id)}`} onClick={()=>openTopic(id)}><span className="notebook-contents-icon" aria-hidden="true"><Icon size={21}/></span><span><strong>{title}</strong>{id==='summary'&&<small>{t('What we talked about','Lo que conversamos')}</small>}{dividerSignal(id)}</span><ChevronRight size={19} aria-hidden="true"/></button>)}</nav>:<div ref={tabs} className="notebook-topics" role="tablist" aria-label={t('Notebook topics','Temas del cuaderno')}>{dividers.map(({id,title,icon:Icon},index)=><button type="button" role="tab" data-topic={id} id={`notebook-tab-${id}`} key={id} className={`notebook-topic divider-${id}${dividerGlow(id)}`} aria-selected={open===id} tabIndex={open===id?0:-1} aria-controls="notebook-panel" onClick={()=>openTopic(id)} onKeyDown={event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%dividers.length;else if(event.key==='ArrowLeft')next=(index+dividers.length-1)%dividers.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=dividers.length-1;else return;event.preventDefault();openTopic(dividers[next].id);document.getElementById(`notebook-tab-${dividers[next].id}`)?.focus();}}><span className="notebook-tab-icon" aria-hidden="true"><Icon size={19}/></span><span><strong>{title}</strong>{id==='summary'&&<small>{t('What we talked about','Lo que conversamos')}</small>}{dividerSignal(id)}</span></button>)}</div>}
+   {mobile?!mobilePage&&<nav ref={contents} className="notebook-contents" aria-label={t('Binder topics','Temas de la carpeta')}>{dividers.map(({id,title,icon:Icon})=><button type="button" key={id} data-topic={id} className={`notebook-contents-topic divider-${id}${dividerGlow(id)}`} onClick={()=>openTopic(id)}><span className="notebook-contents-icon" aria-hidden="true"><Icon size={21}/></span><span><strong>{title}</strong><small>{dividerDetail(id)}</small>{dividerSignal(id)}</span><ChevronRight size={19} aria-hidden="true"/></button>)}</nav>:<div ref={tabs} className="notebook-topics" role="tablist" aria-label={t('Notebook topics','Temas del cuaderno')}>{dividers.map(({id,title,icon:Icon},index)=><button type="button" role="tab" data-topic={id} id={`notebook-tab-${id}`} key={id} className={`notebook-topic divider-${id}${dividerGlow(id)}`} aria-selected={open===id} tabIndex={open===id?0:-1} aria-controls="notebook-panel" onClick={()=>openTopic(id)} onKeyDown={event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%dividers.length;else if(event.key==='ArrowLeft')next=(index+dividers.length-1)%dividers.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=dividers.length-1;else return;event.preventDefault();openTopic(dividers[next].id);document.getElementById(`notebook-tab-${dividers[next].id}`)?.focus();}}><span className="notebook-tab-icon" aria-hidden="true"><Icon size={19}/></span><span><strong>{title}</strong><small>{dividerDetail(id)}</small>{dividerSignal(id)}</span></button>)}</div>}
    {mobile&&mobilePage&&discussing.length>0&&<nav className="notebook-live-topics" aria-label={t('Topics being discussed','Temas de la conversación')}>{topics.filter(topic=>discussing.includes(topic.id)).map(topic=><button type="button" key={topic.id} data-topic={topic.id} className={`notebook-topic divider-${topic.id} is-discussing`} onClick={()=>openTopic(topic.id)}><strong>{topic.title}</strong>{dividerSignal(topic.id)}</button>)}</nav>}
    {mobile&&mobilePage&&<div className="notebook-page-navigation"><button type="button" onClick={showContents}><ArrowLeft size={18} aria-hidden="true"/>{t('Topics','Temas')}</button><span>{selected?.title||t('Summary','Resumen')}</span></div>}
    {renderNextSteps&&<div className="notebook-next-steps" hidden={!showingPage||open!=='summary'}>{renderNextSteps(target)}</div>}
@@ -452,17 +409,15 @@ function TopicNotebookContent({commentAction,sharingOpenRequest=0,followRequest,
      <label>{t('Your note','Tu nota')}<textarea ref={editor} required maxLength={2000} rows={5} lang={draft.language} value={draft.content} disabled={busy} onChange={e=>setDrafts(prev=>({...prev,[draftKey]:{...draft,content:e.target.value}}))}/></label><small>{draft.content.length}/2000</small>
      <div className="notebook-toolbar"><button type="submit" className="button primary" disabled={busy||!draft.content.trim()||loading||loadError||draftConflict||draft.kind==='decision'&&!draft.decisionConfirmed}>{t('Save note','Guardar nota')}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{if(!draft.content.trim()||window.confirm(t('Discard this unsaved draft?','¿Descartar este borrador sin guardar?')))setDrafts(prev=>({...prev,[draftKey]:undefined}));}}>{t('Cancel','Cancelar')}</button></div>
     </form>}
-    {!loading&&!loadError&&<><div className="notebook-reading-room">
-     <div className="notebook-section-box"><div className="notebook-section-tabs" role="tablist" aria-label={t('Sections in this topic','Secciones de este tema')}>{sectionTabs.map(({kind,label,count},index)=><button type="button" key={kind} id={`notebook-section-${kind}`} role="tab" aria-selected={kind===(showDetails?'details':activeKind)} aria-controls="notebook-reading-page" tabIndex={kind===(showDetails?'details':activeKind)?0:-1} onClick={()=>selectSection(kind)} onKeyDown={event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%sectionTabs.length;else if(event.key==='ArrowLeft')next=(index+sectionTabs.length-1)%sectionTabs.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=sectionTabs.length-1;else return;event.preventDefault();selectSection(sectionTabs[next].kind);document.getElementById(`notebook-section-${sectionTabs[next].kind}`)?.focus();}}><span>{label}</span>{count>0&&<span className="notebook-section-count">{count}</span>}</button>)}</div></div>
-     <section className="notebook-reading-page" id="notebook-reading-page" role="tabpanel" aria-labelledby={`notebook-section-${showDetails?'details':activeKind}`} tabIndex={0}>
-      {showDetails?<div className="notebook-details-view"><StudentMemory key={`${scope}:${selected.id}`} topic={selected.id} revealId={commentFocus?.anchor?.kind==='memory'?commentFocus.anchor.id:undefined} studentId={target} language={language} t={t} freshIds={freshIds} onRead={id=>noteUpdates.read(scope,id)} historyKey={JSON.stringify([historyKey,data?.generatedSummaryIds,memories.map(item=>[item.id,item.version])])}/></div>:<>
-      <div className={`notebook-reading-heading${showingRecap?' notebook-reading-heading-compact':''}`}><div><h4 ref={readingHeading} tabIndex={-1}>{sectionLabels[activeKind]}</h4><p>{showingRecap?t('Your situation, the ideas we explored, and what remains open.','Tu situación, las ideas que exploramos y lo que queda por resolver.'):sectionDescriptions[activeKind]}</p></div>{!showingRecap&&<span aria-hidden="true" className="notebook-page-number">{String(currentPage+1).padStart(2,'0')}</span>}</div>
-      {canRecap&&<div className="notebook-recap-toolbar"><span>{t('The story so far','Hasta aquí, tu historia')}</span><button type="button" className="text-button" onClick={()=>showingRecap?showFullRemember():showQuickRemember()}>{showingRecap?t('Read all notes','Leer todas las notas'):t('Back to recap','Volver al resumen')}</button></div>}
-      {showingRecap?<TopicRecap state={recaps.read(open)} onRetry={()=>recaps.retry(open)} language={language} openableNoteIds={sectionNotes.map(note=>note.id)} t={t} onOpenNote={id=>{const note=sectionNotes.find(item=>item.id===id);if(note)showFullRemember(note);}}/>:visibleNotes.length?<div className="notebook-entries">{visibleNotes.map(renderNote)}</div>:<p className="notebook-section-empty">{activeKind==='decision'?t('No decisions recorded yet. When you make a choice, you can save a note as a decision.','Aún no hay decisiones guardadas. Cuando tomes una decisión, puedes guardar una nota como decisión.'):t('Nothing here yet. Your notes will appear in this section as you add them.','Todavía no hay nada aquí. Tus notas aparecerán en esta sección cuando las agregues.')}</p>}
-      {!showingRecap&&pageCount>1&&<nav className="notebook-pagination" aria-label={t('Note pages','Páginas de notas')}><button type="button" aria-label={t('Previous page','Página anterior')} disabled={currentPage===0} onClick={()=>changeReadingPage(currentPage-1)}><ChevronLeft size={17} aria-hidden="true"/><span>{t('Previous','Anterior')}</span></button><span role="status">{t(`Page ${currentPage+1} of ${pageCount}`,`Página ${currentPage+1} de ${pageCount}`)}</span><button type="button" aria-label={t('Next page','Página siguiente')} disabled={currentPage===pageCount-1} onClick={()=>changeReadingPage(currentPage+1)}><span>{t('Next','Siguiente')}</span><ChevronRight size={17} aria-hidden="true"/></button></nav>}
-      </>}
+    {selected&&topicMemories.length>0&&<StudentMemory key={`${scope}:${selected.id}`} topic={selected.id} revealId={commentFocus?.anchor?.kind==='memory'?commentFocus.anchor.id:undefined} studentId={target} language={language} t={t} freshIds={freshIds} onRead={id=>noteUpdates.read(scope,id)} historyKey={JSON.stringify([historyKey,data?.generatedSummaryIds,memories.map(item=>[item.id,item.version])])}/>}
+    {!loading&&!loadError&&<>{!grouped.length&&!draft?topicMemories.length?null:<p className="notebook-empty">{t('A fresh page for this part of your journey. Add a note, or talk with Origen and find your conversation points here.','Una página nueva para esta parte de tu camino. Agrega una nota o conversa con Origen y encuentra aquí los puntos de tu conversación.')}</p>:<div className="notebook-reading-room">
+     <div className="notebook-section-box"><h4 id="notebook-sections-title">{t('Topics','Temas')}</h4><div className="notebook-section-tabs" role="tablist" aria-labelledby="notebook-sections-title">{sections.map(({kind,notes:entries},index)=><button type="button" key={kind} id={`notebook-section-${kind}`} role="tab" aria-selected={activeKind===kind} aria-controls="notebook-reading-page" tabIndex={activeKind===kind?0:-1} onClick={()=>selectSection(kind)} onKeyDown={event=>{let next=index;if(event.key==='ArrowRight')next=(index+1)%sections.length;else if(event.key==='ArrowLeft')next=(index+sections.length-1)%sections.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=sections.length-1;else return;event.preventDefault();selectSection(sections[next].kind);document.getElementById(`notebook-section-${sections[next].kind}`)?.focus();}}><span>{sectionLabels[kind]}</span><span className="notebook-section-count">{entries.length}</span></button>)}</div></div>
+     <section className="notebook-reading-page" id="notebook-reading-page" role="tabpanel" aria-labelledby={`notebook-section-${activeKind}`} tabIndex={0}>
+      <div className="notebook-reading-heading"><div><h4 ref={readingHeading} tabIndex={-1}>{sectionLabels[activeKind]}</h4><p>{sectionDescriptions[activeKind]}</p></div><span aria-hidden="true" className="notebook-page-number">{String(currentPage+1).padStart(2,'0')}</span></div>
+      {visibleNotes.length?<div className="notebook-entries">{visibleNotes.map(renderNote)}</div>:<p className="notebook-section-empty">{activeKind==='decision'?t('No decisions recorded yet. When you make a choice, you can save a note as a decision.','Aún no hay decisiones guardadas. Cuando tomes una decisión, puedes guardar una nota como decisión.'):t('Nothing here yet. Your notes will appear in this section as you add them.','Todavía no hay nada aquí. Tus notas aparecerán en esta sección cuando las agregues.')}</p>}
+      {pageCount>1&&<nav className="notebook-pagination" aria-label={t('Note pages','Páginas de notas')}><button type="button" aria-label={t('Previous page','Página anterior')} disabled={currentPage===0} onClick={()=>changeReadingPage(currentPage-1)}><ChevronLeft size={17} aria-hidden="true"/><span>{t('Previous','Anterior')}</span></button><span role="status">{t(`Page ${currentPage+1} of ${pageCount}`,`Página ${currentPage+1} de ${pageCount}`)}</span><button type="button" aria-label={t('Next page','Página siguiente')} disabled={currentPage===pageCount-1} onClick={()=>changeReadingPage(currentPage+1)}><span>{t('Next','Siguiente')}</span><ChevronRight size={17} aria-hidden="true"/></button></nav>}
      </section>
-    </div></>}
+    </div>}</>}
 
     {comments.render(unplacedComments)}
     {renderGuide&&<NotebookGuides key={selected.id} title={t('Guides & resources','Guías y recursos')}>{()=>renderGuide(selected.id)}</NotebookGuides>}

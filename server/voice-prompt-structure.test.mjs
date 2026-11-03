@@ -72,7 +72,7 @@ test('onboarding keeps account collection and saving conditional without gaining
  for(const language of ['en','es'])for(const collectAccount of [false,true])for(const saveOnboarding of [false,true]){
   const session=voiceSession(input({mode:'profile',language,onboarding:true,collectAccount,saveOnboarding,routeConversations:false,
    allowGuideHandoff:true,liveMemoryEnabled:true,guidedConversation:true,coordinatorLinking:true}),{});
-  const expected=['propose_profile','review_onboarding_profile','set_conversation_language','end_conversation'];
+  const expected=['propose_profile','set_conversation_language','end_conversation'];
   if(collectAccount)expected.push('propose_account');
   if(saveOnboarding)expected.push('save_onboarding_profile');
   assert.deepEqual(names(session).sort(),expected.sort());
@@ -148,7 +148,7 @@ test('app control outcomes remain authoritative while embedded context cannot gr
 
 test('release capture source provenance includes every newly shared prompt dependency',async()=>{
  const hashes=await releaseSourceHashes();
- for(const path of ['server/voice-prompts.mjs','server/review-response-voice.mjs','server/review-request-voice.mjs','server/review-request-voice-tools.mjs','src/reviewRequestVoiceTools.mjs','server/student-live-session.mjs','src/voiceStyle.mjs','src/financialAidTeaching.mjs','src/voiceLanguage.mjs']){
+ for(const path of ['server/voice-prompts.mjs','src/voiceStyle.mjs','src/financialAidTeaching.mjs','src/voiceLanguage.mjs']){
   const content=await readFile(new URL('../'+path,import.meta.url),'utf8');
   assert.equal(hashes[path],hash(content),path);
  }

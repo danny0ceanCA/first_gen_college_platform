@@ -1,24 +1,15 @@
 import {createPortal} from 'react-dom';
-import {useLayoutEffect,useState} from 'react';
+import {useState} from 'react';
 import {useDialogSurface} from './useDialogSurface';
 import './LogoutTransition.css';
 
 export type LogoutPhase='idle'|'leaving'|'returning'|'revealing'|'error';
-export default function LogoutTransition({phase,canReturn,onRetry,onReturn,onCovered}:{phase:Exclude<LogoutPhase,'idle'>;canReturn:boolean;onRetry:()=>void;onReturn:()=>void;onCovered:()=>void}){
+export default function LogoutTransition({phase,canReturn,onRetry,onReturn}:{phase:Exclude<LogoutPhase,'idle'>;canReturn:boolean;onRetry:()=>void;onReturn:()=>void}){
  const spanish=localStorage.getItem('origen.language')==='es';
  const t=(en:string,es:string)=>spanish?es:en;
  const {ref,dialogProps}=useDialogSurface({onDismiss:()=>{},blocked:true,animateDismiss:false});
  const failed=phase==='error';
  const [enter]=useState(phase==='leaving');
- useLayoutEffect(()=>{
-  const node=ref.current;if(!node||phase!=='leaving')return;
-  let active=true;
-  // Observe the actual curtain, not a timer started before React has painted.
-  // Reduced motion and retries on an already-opaque curtain resolve immediately.
-  const covering=node.getAnimations().filter(animation=>animation instanceof CSSAnimation&&animation.animationName==='logout-cover');
-  void Promise.all(covering.map(animation=>animation.finished.catch(()=>{}))).then(()=>{if(active)onCovered();});
-  return()=>{active=false;};
- },[phase,onCovered,ref]);
  return createPortal(<dialog ref={ref} {...dialogProps} className="logout-transition" data-phase={phase} data-enter={enter} aria-labelledby="logout-heading" aria-describedby="logout-status" aria-busy={!failed&&phase!=='revealing'}>
   <div className="logout-transition-content">
    <span className="logout-transition-brand" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15"/></svg>origen.</span>
