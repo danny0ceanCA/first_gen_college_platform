@@ -24,7 +24,8 @@ import {privateRecovery} from './privateRecovery';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import {voiceLanguageControl,voiceLanguageTools,spokenLanguageFromText} from './voiceLanguage.mjs';
 import {onboardingWelcome,homeVoiceIntroduction} from './voiceWelcome.mjs';
-import VoiceWave from './VoiceWave';
+import VoicePresence from './VoicePresence';
+import {voicePresenceState} from './voicePresenceState.mjs';
 import VoiceStartButton from './VoiceStartButton';
 import {SharedVoiceContext} from './SharedVoiceContext';
 import {voiceResearchCache,voiceResearchBudget,wantsFreshLookup} from './voiceResearchCache.mjs';
@@ -175,6 +176,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const [state,setState]=useState<'idle'|'connecting'|'live'>('idle');
   useEffect(()=>{if(state==='idle'&&screenLanguage.current!==language){screenLanguage.current=language;spokenLanguage.current=language;}},[language,state]);
   const [muted,setMuted]=useState(false);
+  const [userSpeaking,setUserSpeaking]=useState(false);
   const [activity,setActivity]=useState<'listening'|'thinking'|'speaking'>('listening');
   const [latestAnswer,setLatestAnswer]=useState('');
 
@@ -282,7 +284,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     },onChange:()=>{if(!liveMemorySaving.current&&memoryRevisionRef.current===memoryRevision)invalidateRememberedContext();},onUnavailable:()=>{if(!liveMemorySaving.current)invalidateRememberedContext(true);}});
   },[state,memoryRevision]);
   useEffect(()=>{if(state==='live'&&workspaceFocus&&workspaceSeen.current!==workspaceFocus.serial&&resources.current.workspace){workspaceSeen.current=workspaceFocus.serial;resources.current.workspace.select(workspaceFocus);}},[workspaceFocus?.serial,state]);
-  function end(){setFinishing(false);resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
+  function end(){setUserSpeaking(false);setFinishing(false);resources.current.workspace?.stop();saveCompletion.current?.ended(onboardingEndReason.current);cleanup();preserveLogicalSession.current=false;setResearching(false);setState('idle');setNotice('');setMuted(false);scopePending.current=false;setTarget(previous=>({...previous,confirmed:false}));onActive(false);shared?.claim(ownerId,false);}
   function closeWithFarewell(instructions?:string){
     if(closing.current?.active())return;
     if(!closing.current||resources.current.dc?.readyState!=='open'){end();return;}
@@ -339,7 +341,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     log('session_start',{mode,language:sessionLanguage});
     const carriedRequest=spokenRequest||(!memoryResume&&continuity&&scope.id===continuity.studentId?[...continuity.turns].reverse().find(turn=>turn.role==='user')?.text:'')||'';
     sessionTurns.current=carriedRequest&&(!routing||scope.confirmed)?[{role:'user',text:carriedRequest}]:[];sessionSources.current=[];memorySaved.current=!summaryScope.current.confirmed;setSources([]);
-    setSummarySaved(false);setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
+    setSummarySaved(false);setUserSpeaking(false);setActivity('listening');setLatestAnswer('');setError('');setFailureCode('');setNotice('');setAudioBlocked(false);setSeconds(0);setState('connecting');onActive(true);onBusy?.(true);
     const version=++generation.current;
     binderSource.current=crypto.randomUUID();
     // A confirmed student can follow along while the connection is starting.
@@ -476,7 +478,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         }catch{transitioned.current=false;trackOnboarding('home_introduction_failed',{reason:'request_failed'});setNotice(t('Your profile is saved, but home could not open yet. Please try again.','Tu perfil está guardado, pero no se pudo abrir el inicio. Intenta de nuevo.'));}finally{release();}
       };
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
-      const turns=voiceTurns(event=>{responseIgnored=false;const eventId=send(event);return responseIgnored?false:eventId;},()=>log('empty_interruption_recovered'),{onBusy,onMissing:itemId=>{onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
+      const turns=voiceTurns(event=>{responseIgnored=false;const eventId=send(event);return responseIgnored?false:eventId;},()=>log('empty_interruption_recovered'),{onBusy,onMissing:itemId=>{setUserSpeaking(false);onboardingVoice.current?.transcript(itemId,'timeout');setActivity('listening');awaitingTranscription.current.delete(itemId);log('transcription_timeout');setNotice(t('I could not hear part of that. Please repeat any missing detail.','No pude escuchar una parte. Repite cualquier detalle que falte.'));}});resources.current.stopTurns=()=>turns.stop();resources.current.turnsBusy=()=>turns.busy();
       resources.current.studentSelection=voiceWorkspaceQueue<string|null>({
         busy:()=>turns.busy()||changingGuide,
         apply:async id=>{
@@ -555,14 +557,14 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         saveCompletion.current?.event(e);
         if(generation.current!==version||closing.current?.active())return;
         if(languageControl.event(e))return;
-        if(e.type==='output_audio_buffer.started')setActivity('speaking');
+        if(e.type==='output_audio_buffer.started'){setUserSpeaking(false);setActivity('speaking');}
         if(playWelcome&&liveMode.current!=='profile'&&!welcomeResponseId&&e.type==='response.created')welcomeResponseId=e.response?.id;
         if(playWelcome&&!welcomeRecorded&&e.type==='input_audio_buffer.speech_started')welcomeInterrupted=true;
         if(playWelcome&&e.type==='response.done'&&e.response?.id===welcomeResponseId)welcomeCompleted=e.response?.status==='completed';
         if(playWelcome&&welcomeCompleted&&!welcomeInterrupted&&!welcomeRecorded&&e.type==='output_audio_buffer.stopped'&&e.response_id===welcomeResponseId){welcomeRecorded=true;void family.recordVoiceExperience?.(true).catch(()=>{welcomeRecorded=false;log('welcome_save_failed');});}
         if(e.type==='output_audio_buffer.stopped'||e.type==='output_audio_buffer.cleared')setActivity('listening');
-        if(e.type==='input_audio_buffer.speech_started')setActivity('listening');
-        if(e.type==='input_audio_buffer.speech_stopped')setActivity('thinking');
+        if(e.type==='input_audio_buffer.speech_started'){setUserSpeaking(true);setActivity('listening');}
+        if(e.type==='input_audio_buffer.speech_stopped'){setUserSpeaking(false);setActivity('thinking');}
         // Status audio is outside the conversation: never save it as an answer.
         if(turns.progressEvent(e))return;
         if(e.type==='origen.backend.started'){if(!backendReplyHolds.has(e.response_id))backendReplyHolds.set(e.response_id,turns.holdReply());return;}
@@ -846,8 +848,8 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     {connectionCard&&<CoordinatorConfirm card={connectionCard} t={t} onClose={()=>setConnectionCard(undefined)} onSent={()=>setNotice(t('Request sent. Your binder is still private.','Solicitud enviada. Tu carpeta sigue privada.'))}/>}
     <div className="voice-controls">
       {state==='idle'?<VoiceStartButton label={t('Talk with Origen','Hablar con Origen')} onClick={()=>{trackOnboarding('voice_button_pressed',{language});onRestart?onRestart():void start();}}/>:<>
-        <span className={`voice-activity activity-${activity}`} role="status"><VoiceWave speaking={state==='live'&&activity==='speaking'&&!audioBlocked&&!finishing}/>{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):switchingGuide?t('Following your question…','Siguiendo tu pregunta…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):activity==='speaking'?t('Origen is speaking','Origen está hablando'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}<small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
-        {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{trackOnboarding(muted?'microphone_unmuted':'microphone_muted');resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
+        <span className={`voice-activity activity-${activity}`} role="status"><VoicePresence state={voicePresenceState({state,activity,userSpeaking,muted,audioBlocked,finishing,researching,switchingGuide})}/><span className="voice-activity-copy">{finishing?t('Finishing conversation…','Terminando la conversación…'):state==='connecting'?t('Connecting…','Conectando…'):audioBlocked?t('Tap Play to hear Origen','Toca Reproducir para escuchar a Origen'):userSpeaking&&!muted?t('You’re speaking · I’m listening','Estás hablando · Te escucho'):activity==='speaking'?t('Origen is speaking','Origen está hablando'):researching?(mode==='loans'||mode==='finance'?t('Checking official financial aid sources…','Consultando fuentes oficiales de ayuda económica…'):t('Checking official sources…','Consultando fuentes oficiales…')):switchingGuide?t('Following your question…','Siguiendo tu pregunta…'):activity==='thinking'?t('Preparing an answer…','Preparando una respuesta…'):muted?t('Microphone muted','Micrófono silenciado'):t('Listening · You can speak naturally','Escuchando · Habla con naturalidad')}</span><small aria-hidden="true"> {Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</small></span>
+        {state==='live'&&<button type="button" className="button outline voice-mute" aria-label={t(muted?'Unmute microphone':'Mute microphone',muted?'Activar micrófono':'Silenciar micrófono')} disabled={finishing} aria-pressed={muted} onClick={()=>{trackOnboarding(muted?'microphone_unmuted':'microphone_muted');resources.current.stream?.getAudioTracks().forEach(track=>track.enabled=muted);setUserSpeaking(false);setMuted(!muted);}}>{muted?<MicOff size={18}/>:<Mic size={18}/>} <span className="voice-control-label">{t(muted?'Unmute':'Mute',muted?'Activar micrófono':'Silenciar')}</span></button>}
         <button type="button" className="button outline voice-end" aria-label={finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')} onClick={()=>{onboardingEndReason.current='user_end';if(closing.current?.active())closing.current.force();else closeWithFarewell();}}><PhoneOff size={18}/><span className="voice-control-label">{finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')}</span></button>
       </>}
       {state==='live'&&audioBlocked&&<button type="button" className="button outline voice-audio-recovery" onClick={resumeAudio}>{t('Play Origen audio','Reproducir audio de Origen')}</button>}
