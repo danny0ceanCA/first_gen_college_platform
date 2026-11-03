@@ -6,17 +6,19 @@ import {mkdir,open,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {outcomeBrowserComplete,outcomeReleaseComplete,outcomeExternalChecks} from '../ops/outcome-release-verification.mjs';
+import {recommendationBrowserComplete,recommendationReleaseComplete,recommendationReleaseVersions,recommendationExternalChecks,summarizeRecommendationReferences} from '../ops/recommendation-release-verification.mjs';
 import {coordinatorSourceFingerprint} from '../ops/coordinator-readiness.mjs';
 import {reviewVerificationEnvironment,reviewVerificationCounts,reviewBrowserComplete,reviewResponseBrowserComplete,followUpBrowserComplete} from '../ops/review-request-verification.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),args=process.argv.slice(2),directory=args[args.indexOf('--output')+1];
 let env;try{if(!args.includes('--disposable-database')||!args.includes('--output')||!directory||directory.startsWith('--'))throw Error();env=reviewVerificationEnvironment(process.env);}catch{console.error('Use --disposable-database --output <new-directory> and a dedicated loopback DATABASE_TEST_URL.');process.exit(1);}
 const output=resolve(directory);await mkdir(output); // Never overwrite old evidence.
 const report={kind:'outcome-evidence-local-verification',schemaVersion:1,localOnly:true,startedAt:new Date().toISOString(),sourceFingerprint:await coordinatorSourceFingerprint(),disposablePostgres:true,syntheticIdentity:true,syntheticSpeech:true,browserConcurrency:2,suites:{},browsers:{},typecheck:false,build:false,logging:false,sourceUnchanged:false,passed:false,productionEnabled:false};
+const recommendationReport={kind:'recommendation-local-verification',schemaVersion:1,localOnly:true,startedAt:report.startedAt,sourceFingerprint:report.sourceFingerprint,versions:{...recommendationReleaseVersions},browsers:{},productionEnabled:false,passed:false};
 async function run(id,argv,extra={}){
  const path=resolve(output,`${id}.log`),file=await open(path,'wx');
  const code=await new Promise(resolve=>{
   const child=spawn(process.execPath,argv,{cwd:root,env:{...env,...extra},stdio:['ignore',file.fd,file.fd]});let done=false,killTimer;
-  const timer=setTimeout(()=>{child.kill('SIGTERM');killTimer=setTimeout(()=>child.kill('SIGKILL'),5000);},(id==='browser-outcome-connected'?15:10)*60*1000);
+  const timer=setTimeout(()=>{child.kill('SIGTERM');killTimer=setTimeout(()=>child.kill('SIGKILL'),5000);},(['browser-outcome-connected','browser-recommendation-connected'].includes(id)?15:10)*60*1000);
   const finish=code=>{if(done)return;done=true;clearTimeout(timer);clearTimeout(killTimer);resolve(code);};child.on('error',()=>finish(1));child.on('close',finish);
  });await file.close();const data=await readFile(path,'utf8');console.log(`${id}: ${code===0?'completed':'failed'}`);return {code,data};
 }
@@ -33,15 +35,28 @@ async function startPreview(){
 }
 try{
  const pool=new pg.Pool({connectionString:env.DATABASE_TEST_URL,max:1});try{report.runtime={node:process.version,postgres:(await pool.query('SHOW server_version')).rows[0].server_version,playwright:JSON.parse(await readFile(resolve(root,'node_modules/playwright/package.json'),'utf8')).version};}finally{await pool.end();}
- const serverFiles=['review-requests','review-request-submission','review-request-notebook','review-request-voice','review-request-voice-client','review-request-delivery','review-request-release','review-response-connections','review-response-context','review-response-context-client','review-response-voice','review-response-choices','review-response-followups','student-follow-up','outcome-evidence','outcome-recording','outcome-observations','outcome-assessment','outcome-evaluation','outcome-quality','outcome-release','follow-up-conversations','student-shared-updates','conversation-opening','binder-next-step','adaptive-guidance','voice-workspace','conversation-continuity','voice-prompt-structure','personalization-release','coordinator-lifecycle','coordinator-feedback','coordinator-pilot','account-lifecycle','binder-sharing-policy','production-config','profile-voice','student-live-session'].map(name=>`server/${name}.test.mjs`);
- for(const [id,files] of [['server',[...serverFiles,'src/studentLiveChannel.test.mjs','src/followUpOpening.test.mjs','src/followUpVoiceTools.test.mjs','src/studentLivePlayback.test.mjs']],['operations',['ops/review-request-verification.test.mjs','ops/coordinator-readiness.test.mjs','ops/outcome-release-verification.test.mjs','ops/outcome-definition-review.test.mjs']]]){
+ const serverFiles=['review-requests','review-request-submission','review-request-notebook','review-request-voice','review-request-voice-client','review-request-delivery','review-request-release','review-response-connections','review-response-context','review-response-context-client','review-response-voice','review-response-choices','review-response-followups','student-follow-up','outcome-evidence','outcome-recording','outcome-observations','outcome-assessment','outcome-evaluation','outcome-quality','outcome-release','recommendation-evaluation','recommendation-evaluation-quality','recommendation-contract','recommendation-library','recommendation-policy','recommendation-selection','recommendation-delivery','recommendation-voice-client','follow-up-conversations','student-shared-updates','conversation-opening','binder-next-step','adaptive-guidance','voice-workspace','conversation-continuity','voice-prompt-structure','personalization-release','coordinator-lifecycle','coordinator-feedback','coordinator-pilot','account-lifecycle','binder-sharing-policy','production-config','profile-voice','student-live-session'].map(name=>`server/${name}.test.mjs`);
+ for(const [id,files] of [['server',[...serverFiles,'src/studentLiveChannel.test.mjs','src/followUpOpening.test.mjs','src/followUpVoiceTools.test.mjs','src/studentLivePlayback.test.mjs']],['operations',['ops/review-request-verification.test.mjs','ops/coordinator-readiness.test.mjs','ops/outcome-release-verification.test.mjs','ops/outcome-definition-review.test.mjs','ops/recommendation-release-verification.test.mjs']]]){
   const result=await run(id,['--test','--test-concurrency=2','--test-reporter=tap',...files]);report.suites[id]=reviewVerificationCounts(result.data,result.code);
  }
  const definitions=await run('outcome-definitions',['scripts/review-outcome-definitions.mjs',resolve(output,'outcome-definitions.json')]);
  try{report.caseReview=JSON.parse(await readFile(resolve(output,'outcome-definitions.json'),'utf8'));if(definitions.code!==0)report.caseReview.passed=false;}catch{report.caseReview={passed:false};}
+ const recommendations=await run('recommendation-policy',['scripts/evaluate-recommendations.mjs',resolve(output,'recommendation-policy.json')]);
+ if(recommendations.code!==0)throw Error('recommendation_policy_review_failed');
+ const comparison=await run('recommendation-comparison',['scripts/compare-recommendation-policies.mjs',resolve(output,'recommendation-comparison.json')]);
+ if(comparison.code!==0)throw Error('recommendation_comparison_failed');
+ recommendationReport.references=summarizeRecommendationReferences(JSON.parse(await readFile(resolve(output,'recommendation-policy.json'),'utf8')),JSON.parse(await readFile(resolve(output,'recommendation-comparison.json'),'utf8')),report.sourceFingerprint);
  report.logging=(await run('logging',['scripts/check-logging-policy.mjs'])).code===0;
  const types=await run('typecheck',['node_modules/typescript/bin/tsc','-b']);report.typecheck=types.code===0;report.build=report.typecheck&&(await run('build',['--input-type=module','-e',"import{build}from'vite';await build({configFile:false,envDir:false});"])).code===0;
  const origin=await startPreview();
+ // Phase 5 has its own closed, content-free release contract. Preserve the
+ // earlier Phase 1–4 record and require it alongside the complete new matrix.
+ const recommendationChecks=[['library','recommendation-library-smoke.cjs',[]],['acceptance','recommendation-acceptance-smoke.cjs',[]],['evaluation','recommendation-evaluation-smoke.cjs',[]],['connected','student-follow-up-release-smoke.cjs',['--recommendation-evidence']]];
+ async function checkRecommendationBrowser([id,script,argv]){
+  const folder=resolve(output,'recommendation-'+id),result=await run('browser-recommendation-'+id,['scripts/'+script,...argv],{ORIGEN_PREVIEW_URL:origin,ORIGEN_SMOKE_OUTPUT:folder});
+  let record;try{record=JSON.parse(await readFile(resolve(folder,'results.json'),'utf8'));}catch{}
+  recommendationReport.browsers[id]={passed:result.code===0&&recommendationBrowserComplete(record,id),journeys:record?.journeys?.length||0};
+ }
  const browserChecks=[['outcome-connected','student-follow-up-release-smoke.cjs',12],['outcome-evaluation','outcome-evaluation-smoke.cjs',6],['outcome-observation','outcome-observation-smoke.cjs',6],['outcome-evidence','outcome-evidence-smoke.cjs',6],['workflow','review-request-release-smoke.cjs',12],['notebook','review-request-notebook-smoke.cjs',6],['delivery','review-request-delivery-smoke.cjs',6],['navigation','coordinator-workspace-navigation-smoke.cjs',7],['connected','review-response-release-smoke.cjs',8],['choices','review-response-choices-smoke.cjs',6],['followups','review-response-followups-smoke.cjs',6],['student-follow-up','student-follow-up-smoke.cjs',6],['private-follow-up','private-follow-up-smoke.cjs',6],['shared-updates','student-shared-update-smoke.cjs',6],['follow-up-connected','student-follow-up-release-smoke.cjs',12]];
  async function checkBrowser([id,script,expected]){
   const folder=resolve(output,id),r=await run(`browser-${id}`,[`scripts/${script}`,...(id==='outcome-connected'?['--outcome-evidence']:[])],{ORIGEN_PREVIEW_URL:origin,ORIGEN_SMOKE_OUTPUT:folder});
@@ -66,8 +81,12 @@ try{
    report.browsers[id]={passed:r.code===0&&count===expected&&completed,journeys:count};
   }
  }
+ // Every fixture owns its database and browser context. Share the existing
+ // two-worker limit across all phases, starting the long connected journeys
+ // first so new coverage does not leave one worker idle for many minutes.
+ const jobs=[...recommendationChecks.filter(r=>r[0]==='connected').map(check=>({recommendation:true,check})),...browserChecks.filter(r=>['outcome-connected','follow-up-connected'].includes(r[0])).map(check=>({check})),...recommendationChecks.filter(r=>r[0]!=='connected').map(check=>({recommendation:true,check})),...browserChecks.filter(r=>!['outcome-connected','follow-up-connected'].includes(r[0])).map(check=>({check}))];
  let nextBrowser=0;
- async function browserWorker(){while(nextBrowser<browserChecks.length)await checkBrowser(browserChecks[nextBrowser++]);}
+ async function browserWorker(){while(nextBrowser<jobs.length){const job=jobs[nextBrowser++];await (job.recommendation?checkRecommendationBrowser(job.check):checkBrowser(job.check));}}
  const workers=await Promise.allSettled([browserWorker(),browserWorker()]);
  if(workers.some(r=>r.status==='rejected'))throw Error('browser_verification_incomplete');
 }catch{report.failure='verification_could_not_complete';}
@@ -76,5 +95,8 @@ finally{
  report.sourceUnchanged=report.sourceFingerprint===await coordinatorSourceFingerprint();report.checkedAt=new Date().toISOString();
  report.externalChecksNotPerformed=[...outcomeExternalChecks];
  report.passed=!report.failure&&outcomeReleaseComplete(report);
- await writeFile(resolve(output,'verification.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(report,null,2));if(!report.passed)process.exitCode=1;
+ await writeFile(resolve(output,'verification.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'});
+ Object.assign(recommendationReport,{sourceUnchanged:report.sourceUnchanged,checkedAt:report.checkedAt,priorPhases:report,externalChecksNotPerformed:[...recommendationExternalChecks]});
+ recommendationReport.passed=recommendationReleaseComplete(recommendationReport);
+ await writeFile(resolve(output,'recommendation-verification.json'),JSON.stringify(recommendationReport,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(recommendationReport,null,2));if(!recommendationReport.passed)process.exitCode=1;
 }

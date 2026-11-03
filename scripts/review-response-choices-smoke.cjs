@@ -20,7 +20,9 @@ const output=process.env.ORIGEN_SMOKE_OUTPUT||'/tmp/origen-response-step4-browse
   await page.route('**/*',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname.endsWith('/@auth0_auth0-react.js'))return route.fulfill({contentType:'application/javascript',body:"export function useAuth0(){return {user:{sub:'synthetic'},isAuthenticated:true,isLoading:false,getAccessTokenSilently:async()=> 'e30.'+btoa(JSON.stringify({sub:'synthetic'}))+'.test'}}"});
-   if(url.pathname.startsWith('/api/')){
+   if(url.pathname==='/api/recommendations')return route.fulfill({json:{enabled:false}});
+    if(url.pathname==='/api/recommendation-evaluation')return route.fulfill({json:{enabled:false,organizations:[],permission:null}});
+    if(url.pathname.startsWith('/api/')){
     const body=route.request().postDataJSON();calls.push({path:url.pathname,...body});let data,status=200;
     if(url.pathname==='/api/review-requests')data=body.action==='get'?{request:record()}:{enabled:true,available:true,deliveryEnabled:true,requests:[record()],activity:[],nextCursor:null};
     else if(url.pathname==='/api/student-follow-up-report')data={enabled:false,canSave:false,planVersion:1,reports:[]};

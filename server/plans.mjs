@@ -6,6 +6,7 @@ import {progressEnabled,recordPlanRevision} from './progress-history.mjs';
 import {safeErrorCode} from './api-logging.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {createHash} from 'node:crypto';
+import {recommendationsEnabled} from './recommendation-contract.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const text=(value,max,required=false)=>{if(typeof value!=='string'||value.length>max||(required&&!value.trim()))throw fail(400,'invalid_plan');return value.trim();};
 const id=value=>text(value,128,true);
@@ -50,6 +51,8 @@ export function createPlanRepository(database,env=process.env){return async(subj
   let planId=input.id;
   const fingerprint=input.requestId?createHash('sha256').update(JSON.stringify({plan:input.plan,fromNote:input.fromNote,...(input.fromFeedback?{fromFeedback:input.fromFeedback}:{}),...(input.fromResponse?{fromResponse:input.fromResponse}:{})})).digest('hex'):null;
   const responseLinksReady=!!(await c.query("SELECT to_regprocedure('origen_review_response_choice_command(jsonb)') AS fn")).rows[0]?.fn;
+  const recommendationLinksReady=!!(await c.query("SELECT to_regprocedure('origen_recommendation_delivery_command(jsonb)') AS fn")).rows[0]?.fn;
+  const recommendationCommand=async body=>{const result=(await c.query('SELECT origen_recommendation_delivery_command($1::jsonb) AS result',[JSON.stringify(body)])).rows[0].result;if(result.error)throw fail(403,result.error);return result;};
   const receipt=input.requestId?(await c.query('SELECT * FROM origen_plan_creations WHERE account_id=$1 AND request_id=$2',[owner,input.requestId])).rows[0]:null;
   if(receipt){
    if(receipt.fingerprint!==fingerprint)throw fail(409,'create_request_changed');
@@ -118,6 +121,7 @@ export function createPlanRepository(database,env=process.env){return async(subj
     if(feedback)await runFeedbackCommand(c,{action:'student-link',studentId:p.studentId,feedbackId:feedback.id,version:feedback.version,planId,stepId:input.fromFeedback.stepId});
     if(input.fromResponse)await runReviewResponseChoice(c,{action:'attach-plan',studentId:p.studentId,source:input.fromResponse.source,planId,stepId:input.fromResponse.stepId});
     if(responseLinksReady)await runReviewResponseChoice(c,{action:'prune-plan',planId});
+    if(recommendationLinksReady)await recommendationCommand({action:'prune',planId});
     if(input.requestId)await c.query('INSERT INTO origen_plan_creations(account_id,request_id,plan_id,fingerprint) VALUES($1,$2,$3,$4)',[owner,input.requestId,planId,fingerprint]);
     if(progressEnabled(env))await recordPlanRevision(c,owner,planId,current?current.version+1:1,p,previous);
    }
@@ -130,9 +134,11 @@ export function createPlanRepository(database,env=process.env){return async(subj
   const sources=ids.length?(await c.query(`SELECT * FROM origen_plan_sources WHERE account_id=$1 AND plan_id IN (${slots}) ORDER BY position`,params)).rows:[];
   const summaries=ids.length?(await c.query(`SELECT plan_id,summary_id FROM origen_plan_conversations WHERE account_id=$1 AND plan_id IN (${slots})`,params)).rows:[];
   const plans=[];
+  if(recommendationLinksReady)await c.query("SELECT set_config('origen.recommendations',$1,true)",[String(recommendationsEnabled(env,subject))]);
+  const recommendationLinks=recommendationLinksReady?(await recommendationCommand({action:'sources'})).links:[];
   const responseLinks=responseLinksReady?(await runReviewResponseChoice(c,{action:'plan-sources'})).links.map(link=>({...link,source:reviewResponseContextEnabled(env,subject)?link.source:null})):[];
   for(const row of rows){
-   plans.push({id:row.id,studentId:row.student_id,title:row.title,goal:row.goal,category:row.category,status:row.status,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at,summaryIds:summaries.filter(s=>s.plan_id===row.id).map(s=>s.summary_id),steps:steps.filter(s=>s.plan_id===row.id).map(s=>({id:s.id,title:s.title,action:s.action,notes:s.notes,status:s.status,dueDate:s.due_date?s.due_date.slice(0,10):null,sources:sources.filter(x=>x.plan_id===row.id&&x.step_id===s.id).map(x=>({title:x.title,url:x.url})),...(responseLinks.some(l=>l.planId===row.id&&l.stepId===s.id)?{responseSource:responseLinks.find(l=>l.planId===row.id&&l.stepId===s.id)}:{})}))});
+   plans.push({id:row.id,studentId:row.student_id,title:row.title,goal:row.goal,category:row.category,status:row.status,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at,summaryIds:summaries.filter(s=>s.plan_id===row.id).map(s=>s.summary_id),steps:steps.filter(s=>s.plan_id===row.id).map(s=>({id:s.id,title:s.title,action:s.action,notes:s.notes,status:s.status,dueDate:s.due_date?s.due_date.slice(0,10):null,sources:sources.filter(x=>x.plan_id===row.id&&x.step_id===s.id).map(x=>({title:x.title,url:x.url})),...(recommendationLinks.some(l=>l.planId===row.id&&l.stepId===s.id)?{recommendationSource:recommendationLinks.find(l=>l.planId===row.id&&l.stepId===s.id)}:{}),...(responseLinks.some(l=>l.planId===row.id&&l.stepId===s.id)?{responseSource:responseLinks.find(l=>l.planId===row.id&&l.stepId===s.id)}:{})}))});
   }
   const creations=extended?(await c.query('SELECT request_id FROM origen_plan_creations WHERE account_id=$1',[owner])).rows.map(row=>row.request_id):[];
   if(input.fromResponse&&!receipt&&!reviewResponseContextEnabled(env,subject))throw fail(503,'review_response_context_paused');

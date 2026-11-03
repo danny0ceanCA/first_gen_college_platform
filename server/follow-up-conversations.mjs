@@ -20,10 +20,12 @@ export function validatePrivateUpdate(input){
  return {...input,report:validateFollowUpReport(input.report)};
 }
 export function validateFollowUpConversation(input,voice=false,privateKind='report'){
+ const provenance=input?.recommendationProtocol!==undefined;
+ if(provenance&&(input.recommendationProtocol!=='recommendation-provenance-v1'||input.action!=='prepare'||(voice?input.kind!=='outcome':privateKind!=='outcome')))throw fail(400,'invalid_follow_up');
  if(voice){
   const extra={choices:[],'outcome-reports':['target'],prepare:['kind','target','payload','operationId','timeZone'],confirm:[],present:['presentation'],stop:['operationId']};
   if(!Object.hasOwn(extra,input?.action))throw fail(400,'invalid_follow_up');
-  strict(input,['action','sessionId','sequence','turnId','transcript',...extra[input.action]]);
+  strict(input,['action','sessionId','sequence','turnId','transcript',...extra[input.action],...(provenance?['recommendationProtocol']:[])]);
   if(!uuid(input.sessionId)||!number(input.sequence)||!string(input.turnId,128)||!string(input.transcript,8000))throw fail(400,'invalid_follow_up');
   if(input.action==='outcome-reports')input={...input,target:validateFollowUpTarget(input.target)};
   if(input.action==='prepare'){
@@ -36,7 +38,7 @@ export function validateFollowUpConversation(input,voice=false,privateKind='repo
  }else{
   const extra={load:['target'],prepare:['target','operationId','planVersion','payload','language'],confirm:['previewId','digest','confirmed']};
   if(!Object.hasOwn(extra,input?.action))throw fail(400,'invalid_follow_up');
-  strict(input,['action','studentId',...extra[input.action]]);
+  strict(input,['action','studentId',...extra[input.action],...(provenance?['recommendationProtocol']:[])]);
   if(!string(input.studentId,128))throw fail(400,'invalid_follow_up');
   if(input.target)input={...input,target:validateFollowUpTarget(input.target)};
   if(input.action==='prepare'){
@@ -60,6 +62,7 @@ export function createFollowUpConversationRepository(database,env={},privateKind
  const c=await database.connect();
  try{
   await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='5000ms'");await guardAccountTransaction(c,subject);
+  await c.query("SELECT set_config('origen.recommendation_provenance',$1,true)",[String(input.recommendationProtocol==='recommendation-provenance-v1')]);
   if(studentFollowUpEnabled(env,subject))await c.query("SELECT set_config('origen.student_follow_up','true',true)");
   if(outcomes())await c.query("SELECT set_config('origen.outcome_evidence','true',true)");
   const command=async body=>{const r=(await c.query('SELECT origen_follow_up_conversation_command($1::jsonb) AS result',[JSON.stringify(body)])).rows[0].result;if(r.error)throw fail(r.error.endsWith('_changed')?409:r.error.endsWith('_paused')?503:r.error.endsWith('_unavailable')?404:r.error.startsWith('invalid_')?400:403,r.error);return r;};

@@ -1,0 +1,15 @@
+.recommendation-suggestion{margin:1rem 0;max-width:100%;overflow-wrap:anywhere}
+.recommendation-suggestion section{border-top:1px solid var(--border,#d9d5ce);padding-top:1rem}
+.recommendation-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-bottom:1rem}
+.recommendation-suggestion label{display:flex;flex-direction:column;gap:.4rem;margin:.7rem 0}
+.recommendation-suggestion select{width:100%;min-width:0;max-width:100%;padding:.65rem;border:1px solid #b9b4aa;border-radius:.5rem;background:white;color:#262626;font:inherit}
+.recommendation-suggestion .action-accept{flex-direction:row;align-items:flex-start;gap:.6rem}
+.recommendation-suggestion .action-accept input{flex:none;margin-top:.3rem}
+.recommendation-suggestion fieldset{min-width:0;border:1px solid #d9d5ce;border-radius:.6rem;padding:.8rem;margin:1rem 0}
+.recommendation-suggestion button{white-space:normal;max-width:100%;margin:.35rem .5rem .35rem 0}
+.recommendation-disclosure{font-size:.9rem;line-height:1.5}
+@media(max-width:520px){.recommendation-fields{grid-template-columns:1fr;gap:0}}
+
+.recommendation-evaluation{max-width:100%;overflow-wrap:anywhere;margin:.6rem 0}
+.recommendation-evaluation select{max-width:100%;min-width:0;font:inherit;padding:.5rem}
+.recommendation-evaluation label{display:block;margin:.7rem 0}

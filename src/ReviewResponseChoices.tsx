@@ -1,3 +1,4 @@
+import RecommendationSuggestion from './RecommendationSuggestion';
 import {useContext,useEffect,useRef,useState} from 'react';
 import {apiFetch} from './api';
 import {browserPrivacy} from './browserPrivacy.mjs';
@@ -44,6 +45,7 @@ export default function ReviewResponseChoices({studentId,source,question,suggest
    {!!suggestedAction&&onAction&&<button type="button" className="text-button" disabled={busy} onClick={()=>{onAction({serial:crypto.randomUUID(),studentId,content:'',topic,responseSource:source});}}>{t('Add to my next steps','Agregar a mis próximos pasos')}</button>}
   </div>{later&&<div className="review-response-later"><label>{t('Review date (optional)','Fecha para revisar (opcional)')}<input type="date" min={new Date().toISOString().slice(0,10)} max="9999-12-31" value={reviewOn} disabled={busy} onChange={e=>setReviewOn(e.target.value)}/></label><p>{t('This is private. It does not create a reminder or send an update.','Esto es privado. No crea un recordatorio ni envía una actualización.')}</p><button type="button" className="button outline" disabled={busy} onClick={()=>void choose('defer')}>{t('Keep for later','Dejar para después')}</button></div>}</>}
   {data?.canFollowUp&&onFollowUp&&<button type="button" className="text-button" disabled={busy} onClick={onFollowUp}>{t('Ask my coordinator a follow-up','Pedir una aclaración a mi coordinador')}</button>}
+  {data?.enabled&&<RecommendationSuggestion studentId={studentId} language={t('en','es')==='es'?'es':'en'} t={t} focus={source} blocked={busy} onSaved={()=>window.dispatchEvent(new Event('origen-recommendation-saved'))}/>}
   {error&&<p role="status">{error}</p>}
  </div>;
 }

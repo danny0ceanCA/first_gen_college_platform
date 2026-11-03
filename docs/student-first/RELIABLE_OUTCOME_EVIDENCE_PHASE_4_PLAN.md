@@ -127,3 +127,5 @@ If Alex declines evaluation use, the permitted student/coordinator experience st
 ## Execution order
 
 Step 1 establishes the shared definitions and authority rules; later steps must not bypass them by inferring verification or consent from prose. Step 2 connects student-approved evidence recording. Step 3 adds explicitly attributed coordinator observations and student-controlled disagreements. Step 4 adds deterministic assessment and guarded voice context while preserving separate private/shared records. Step 5 adds permitted evidence-quality and evaluation preparation. Step 6 completes the connected local verifier and release guide, preserving all earlier regression checks. All six local implementation steps now have implementation notes and validation; production enablement remains separate.
+
+The next phase is [Phase 5: evidence-informed recommendations](EVIDENCE_INFORMED_RECOMMENDATIONS_PHASE_5_PLAN.md), whose contract foundation is implemented locally. Its remaining steps extend the existing selection rules and reviewed teaching library before adding a separately permitted recommendation-evaluation loop.

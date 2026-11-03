@@ -1,3 +1,4 @@
+import {recommendationVoiceTools} from './recommendationVoiceTools.mjs';
 import {followUpOpeningPlayback,type OpeningClaim} from './followUpOpening.mjs';
 import {followUpVoiceTools} from './followUpVoiceTools.mjs';
 import {studentLivePlayback} from './studentLivePlayback.mjs';
@@ -358,9 +359,10 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     window.addEventListener('online',verifyResponses);window.addEventListener('offline',verifyResponses);document.addEventListener('visibilitychange',verifyResponses);
     let opening:ReturnType<typeof followUpOpeningPlayback>|undefined,openingClaim:OpeningClaim|undefined;
     let followUpTools:ReturnType<typeof followUpVoiceTools>|undefined;
+    let recommendationTools:ReturnType<typeof recommendationVoiceTools>|undefined;
     const followUpChanged=()=>window.dispatchEvent(new Event('origen-follow-up-changed'));
     const memoryTools=voiceMemoryTools({signal:abort.signal,isCurrent:()=>generation.current===version&&!closing.current?.active(),canHear:()=>onboardingVoice.current?.ready()===true,
-      beforeRegister:async()=>{await opening?.settled();await followUpTools?.settled();},
+      beforeRegister:async()=>{await opening?.settled();await followUpTools?.settled();await recommendationTools?.settled();},
       beforeInvoke:()=>responseContext.verifyAll(),onResponseContext:guard=>responseContext.accept(guard),
       post:async(body,signal)=>{const response=await apiFetch('/api/live-memory',{method:'POST',headers:{'Content-Type':'application/json',...(summaryToken.current?{Authorization:`Bearer ${summaryToken.current}`}:{})},body:JSON.stringify(body),signal});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'live_memory_unavailable'),{status:response.status});return data;},
       onWriting:value=>{liveMemorySaving.current=value;setCheckingMemorySave(value);},
@@ -393,9 +395,15 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       onUncertain:()=>setNotice(t('The change could not be confirmed. Check your private updates and check-in settings in the binder.','No se pudo confirmar el cambio. Consulta tus actualizaciones privadas y seguimientos en la carpeta.')),
       onSaved:async result=>{followUpChanged();if(['report','outcome'].includes(String(result.kind))){const nextScope={id:summaryScope.current.id,confirmed:true},nextLanguage=spokenLanguage.current;await saveSummary();if(generation.current!==version)return;end();if(user?.sub)notifyMemoryContext(user.sub,nextScope.id);await start(nextScope,nextLanguage,'',sessionId,true);}setNotice(t('Saved privately. Nothing was shared with your coordinator.','Guardado de forma privada. No se compartió nada con tu coordinador.'));},
     });
+    recommendationTools=recommendationVoiceTools({signal:abort.signal,evidence:()=>memoryTools.evidence(),sequence:()=>memoryTools.sequence(),
+      isCurrent:()=>generation.current===version&&!closing.current?.active()&&!scopePending.current&&summaryScope.current.confirmed&&privacyLease.valid(),canHear:()=>onboardingVoice.current?.ready()===true&&audio.current?.paused===false&&!audio.current.muted,
+      post:async(body,signal)=>{const response=await apiFetch('/api/recommendation-voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});const data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'recommendation_unavailable'),{status:response.status});return data;},
+      onStale:()=>invalidateRememberedContext(true),onUncertain:()=>setNotice(t('Check My next steps in your binder. The save result could not be confirmed.','Revisa Mis próximos pasos en tu carpeta. No se pudo confirmar el guardado.')),
+      onSaved:async()=>{const nextScope={id:summaryScope.current.id,confirmed:true},nextLanguage=spokenLanguage.current;await saveSummary();if(generation.current!==version)return;end();if(user?.sub)notifyMemoryContext(user.sub,nextScope.id);await start(nextScope,nextLanguage,'',sessionId,true);setNotice(t('Your next step was saved privately.','Tu próximo paso se guardó de forma privada.'));},
+    });
     const linkTools=coordinatorVoiceTools({post:connectionRequest,studentId:scope.id,onPrepared:card=>setConnectionCard(card),onClear:()=>setConnectionCard(undefined),onCode:()=>{const last=[...sessionTurns.current].reverse().find(turn=>turn.role==='user');if(last)last.text='[Connection code omitted]';checkpointSummary();}});connectionController.current=linkTools;
-    resources.current.stopMemory=()=>{responseContext.stop();window.removeEventListener('online',verifyResponses);window.removeEventListener('offline',verifyResponses);document.removeEventListener('visibilitychange',verifyResponses);opening?.stop();followUpTools?.stop();memoryTools.stop();linkTools.stop();reviewTools.stop();};
-    invalidateMemoryPlayback.current=()=>{opening?.event({type:'output_audio_buffer.cleared'});followUpTools?.event({type:'output_audio_buffer.cleared'});memoryTools.event({type:'output_audio_buffer.cleared'});reviewTools.event({type:'output_audio_buffer.cleared'});};
+    resources.current.stopMemory=()=>{responseContext.stop();window.removeEventListener('online',verifyResponses);window.removeEventListener('offline',verifyResponses);document.removeEventListener('visibilitychange',verifyResponses);opening?.stop();followUpTools?.stop();recommendationTools?.stop();memoryTools.stop();linkTools.stop();reviewTools.stop();};
+    invalidateMemoryPlayback.current=()=>{opening?.event({type:'output_audio_buffer.cleared'});followUpTools?.event({type:'output_audio_buffer.cleared'});recommendationTools?.event({type:'output_audio_buffer.cleared'});memoryTools.event({type:'output_audio_buffer.cleared'});reviewTools.event({type:'output_audio_buffer.cleared'});};
     const memoryResponseTurns=new Map<string,number>();
     const reviewResponseTurns=new Map<string,number>();
     const linkResponseTurns=new Map<string,number>();
@@ -405,7 +413,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     try {
       if(summaryQueue.current.size){setNotice(t('Your previous conversation is still saving. You can start talking while it finishes.','Tu conversación anterior sigue guardándose. Puedes empezar a hablar mientras termina.'));void retrySummaries();}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
-      const voiceInput={voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
+      const voiceInput={voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud&&informational,continuing:memoryResume,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
       const startup=await voiceStartup({signal:abort.signal,
         getToken:async()=>history.cloud?getAccessTokenSilently():undefined,
         getMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;}),
@@ -457,7 +465,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         logTarget.current=updateScope.confirmed?updateScope.id:undefined;setSwitchingGuide(true);log('guide_update_start',{mode:next});
         try{
           await languageControl.configure(currentLanguage=>withRequestDeadline(async signal=>{
-            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud,memorySessionId:memoryTools.session()?.id,workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
+            const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud,memorySessionId:memoryTools.session()?.id,workspaceFocus:contextFocus,workspaceRefreshOnly:!focus,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
             const data=await response.json();if(!response.ok)setErrorReference(responseReference(response));if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
             if(data.reviewResponseGuard&&!await responseContext.accept(data.reviewResponseGuard))throw new Error('workspace_item_changed');
             signal.throwIfAborted();
@@ -465,7 +473,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
             if(isCurrent&&!isCurrent())throw new Error('topic_superseded');
             if(memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryPolicyRef.current=data.memoryPolicy;
             if(typeof data.memoryRevision==='number'){if(memoryRevisionRef.current!==null&&memoryRevisionRef.current!==data.memoryRevision){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
-            followUpTools?.configure(data.followUpVoiceControls===true,data.studentOutcomeVoice===true);memoryTools.configure(data.liveMemorySession);reviewTools.configure(data.reviewVoiceSession);linkTools.configure(data.coordinatorLinking===true);
+            followUpTools?.configure(data.followUpVoiceControls===true,data.studentOutcomeVoice===true);recommendationTools?.configure(data.recommendationVoice===true);memoryTools.configure(data.liveMemorySession);reviewTools.configure(data.reviewVoiceSession);linkTools.configure(data.coordinatorLinking===true);
             nextGuidance=data.guidance;
             return data.session;
           },{signal:abort.signal}),()=>{
@@ -597,12 +605,12 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         if(turns.progressEvent(e))return;
         if(e.type==='origen.backend.started'){if(!backendReplyHolds.has(e.response_id))backendReplyHolds.set(e.response_id,turns.holdReply());return;}
         if(e.type==='origen.backend.finished'){backendReplyHolds.get(e.response_id)?.();backendReplyHolds.delete(e.response_id);return;}
-        opening?.event(e);followUpTools?.event(e);memoryTools.event(e);reviewTools.event(e);
+        opening?.event(e);followUpTools?.event(e);recommendationTools?.event(e);memoryTools.event(e);reviewTools.event(e);
         if(['output_audio_buffer.started','output_audio_buffer.stopped','output_audio_buffer.cleared','error','response.created','response.done','input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','conversation.item.input_audio_transcription.completed','conversation.item.input_audio_transcription.failed'].includes(e.type))
           log('server_event',{operation:e.type,eventId:e.event_id,responseId:e.response?.id,status:e.response?.status,reason:e.response?.status_details?.reason});
         if(e.type==='response.created'){assistantSpeaking.current=true;setActivity('thinking');turns.created();void guidance.current.event('response.started')?.catch(()=>{});}
         if(e.type==='response.done'){assistantSpeaking.current=false;setActivity(current=>current==='thinking'?'listening':current);if(['completed','failed','cancelled','incomplete'].includes(e.response?.status))void guidance.current.event('response.finished',{status:e.response.status})?.catch(()=>{});}
-        if(e.type==='input_audio_buffer.speech_started'){saveConsent.begin(e.item_id);followUpTools?.begin();memoryTools.begin(e.item_id,spokenLanguage.current);reviewTools.begin(e.item_id,spokenLanguage.current);linkTools.begin(e.item_id);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
+        if(e.type==='input_audio_buffer.speech_started'){saveConsent.begin(e.item_id);followUpTools?.begin();recommendationTools?.begin();memoryTools.begin(e.item_id,spokenLanguage.current);reviewTools.begin(e.item_id,spokenLanguage.current);linkTools.begin(e.item_id);speechInProgress.current=true;if(e.item_id)awaitingTranscription.current.add(e.item_id);}
         if(e.type==='input_audio_buffer.speech_stopped'){speechInProgress.current=false;turns.speechStopped(e.item_id);}
         if(e.type==='conversation.item.input_audio_transcription.completed'||e.type==='conversation.item.input_audio_transcription.failed')awaitingTranscription.current.delete(e.item_id);
         if(finishPromise.current&&e.type==='error'&&e.error?.code==='input_audio_buffer_commit_empty')return;
@@ -638,6 +646,8 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
             if(userTurn){linkTools.begin(e.item_id);memoryTools.transcript(e.item_id,e.transcript,spokenLanguage.current);reviewTools.transcript(e.item_id,e.transcript,spokenLanguage.current);
               const captured=await memoryTools.evidence();if(generation.current!==version||closing.current?.active())return;
               if(captured&&await opening?.notNow(captured)){followUpChanged();setNotice(t('Your check-in is paused.','Tu seguimiento está en pausa.'));}
+              const recommendationControl=await recommendationTools?.spokenTurn();if(generation.current!==version||closing.current?.active())return;
+              if(recommendationControl)send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'Application recommendation control result: '+JSON.stringify(recommendationControl)}]}});
               const control=await followUpTools?.spokenTurn();if(generation.current!==version||closing.current?.active())return;
               if(control){send({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:'Application check-in control result: '+JSON.stringify(control)}]}});if(control.status==='stopped')setNotice(t('Your requested check-ins stopped.','Se detuvieron los seguimientos que pediste.'));}
             }
@@ -702,6 +712,10 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
             }
             if(reviewTools.isTool(item.name)){
               const output=await reviewTools.invoke(item,reviewResponseTurns.get(e.response?.id)??reviewTools.sequence());if(generation.current!==version||closing.current?.active())return;
+              send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
+            }
+            if(recommendationTools?.isTool(item.name)){
+              const output=await recommendationTools.invoke(item,memoryTurn);if(generation.current!==version||closing.current?.active())return;
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;
             }
             if(followUpTools?.isTool(item.name)){
@@ -843,7 +857,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       if(typeof data.playWelcome==='boolean')playWelcome=data.playWelcome;
       if(generation.current!==version||closing.current?.active())return;
       if(data.reviewResponseGuard&&!await responseContext.accept(data.reviewResponseGuard))return;
-      followUpTools?.configure(data.followUpVoiceControls===true,data.studentOutcomeVoice===true);memoryTools.configure(data.liveMemorySession);reviewTools.configure(data.reviewVoiceSession);linkTools.configure(data.coordinatorLinking===true);
+      followUpTools?.configure(data.followUpVoiceControls===true,data.studentOutcomeVoice===true);recommendationTools?.configure(data.recommendationVoice===true);memoryTools.configure(data.liveMemorySession);reviewTools.configure(data.reviewVoiceSession);linkTools.configure(data.coordinatorLinking===true);
       memoryPolicyRef.current=data.memoryPolicy;
       if(typeof data.memoryRevision==='number'){memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
       if(data.openingClaim){
