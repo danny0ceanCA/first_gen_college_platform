@@ -1,0 +1,11 @@
+.voice-presence{position:relative;display:inline-grid;place-items:center;width:56px;height:56px;flex:0 0 56px;color:#ad543f;isolation:isolate}
+.voice-presence-halo{position:absolute;inset:4px;border-radius:50%;background:#f4e5d9;opacity:.6;transition:background .4s,opacity .4s}
+.voice-presence-ring{position:relative;width:56px;height:56px;overflow:visible;fill:none;stroke:currentColor;transform:rotate(-90deg)}
+.presence-track{stroke-width:1.5;opacity:.3}.presence-orbit{stroke-width:2.8;stroke-linecap:round;stroke-dasharray:145 145;transition:stroke-dasharray .5s,opacity .4s}.presence-inner{stroke-width:1;opacity:0;transition:opacity .4s}
+.voice-presence-wave{position:absolute;inset:17px 10px;display:grid;place-items:center;opacity:0;transition:opacity .3s}.voice-presence-wave .voice-radio-wave{width:36px;height:22px;margin:0;color:inherit}
+.voice-presence[data-state=user-speaking] .presence-orbit{stroke-dasharray:38 107;animation:presence-orbit 1.6s linear infinite;transform-origin:32px 32px}.voice-presence[data-state=user-speaking] .voice-presence-halo{animation:presence-breathe 1.8s ease-in-out infinite}
+.voice-presence[data-state=thinking],.voice-presence[data-state=connecting]{color:#a67738}.voice-presence[data-state=thinking] .presence-orbit,.voice-presence[data-state=connecting] .presence-orbit{stroke-dasharray:16 22 48 59;animation:presence-orbit 3.6s linear infinite;transform-origin:32px 32px}.voice-presence[data-state=thinking] .presence-inner{opacity:.45;stroke-dasharray:18 89;animation:presence-orbit 4.8s linear infinite reverse;transform-origin:32px 32px}
+.voice-presence[data-state=speaking]{color:#4f8074}.voice-presence[data-state=speaking] .voice-presence-halo{background:#dfede6}.voice-presence[data-state=speaking] .presence-orbit{opacity:.55}.voice-presence[data-state=speaking] .voice-presence-wave{opacity:1}
+.voice-presence[data-state=muted],.voice-presence[data-state=ending],.voice-presence[data-state=blocked]{color:#857971}.voice-presence[data-state=muted] .presence-orbit{stroke-dasharray:3 6;opacity:.6}
+@keyframes presence-orbit{to{transform:rotate(360deg)}}@keyframes presence-breathe{50%{transform:scale(1.13);opacity:.3}}
+@media(prefers-reduced-motion:reduce){.voice-presence *{animation:none!important;transition:none!important}}

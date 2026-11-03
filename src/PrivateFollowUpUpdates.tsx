@@ -1,4 +1,4 @@
-import {OutcomeEvidence} from './OutcomeEvidence';
+import {OutcomeEvidence} from './OutcomeEvidence.tsx';
 import {StudentUpdateShare} from './StudentReviewRequests';
 import type {ReviewResponseReference} from './reviewResponseConnection.mjs';
 import {useCallback,useEffect,useRef,useState} from 'react';

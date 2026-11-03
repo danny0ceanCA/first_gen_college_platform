@@ -8,6 +8,15 @@ const stamp=value=>value&&Number.isFinite(Date.parse(value))?new Date(value).toI
 const reference=value=>typeof value==='string'&&value.length<=128?value:null;
 export const BINDER_EVIDENCE_VERSION='binder-evidence-v1';
 
+// Historical reports retain their author when copied into another account.
+// Corrections do not establish who edited a copied record. When its historical
+// reporter differs from the current account, keep that authorship unknown.
+export function binderReporter(record,fallback='unknown'){
+ const historical=record.organization_reported_by??record.organization?.reportedBy;
+ if(record.context_current||record.version>1&&record.source_quote&&record.content!==record.source_quote)return historical!=null&&historical!==fallback?'unknown':person(fallback);
+ return historical!=null?person(historical):person(fallback);
+}
+
 export function binderEvidence(kind,r){
  const studentId=r.student_id!==undefined?r.student_id:r.studentId;
  const organization=r.organization?.version==='binder-organization-v1'?r.organization:{};
@@ -45,4 +54,4 @@ export function binderEvidence(kind,r){
  return result;
 }
 
-export const binderEvidenceInstructions=' Evidence labels describe separate states: stated is reported, not verified; saved/read is not confirmed agreement; confirmed-by-account is not independent verification or necessarily the student’s own view. Only explicit-account-choice denotes a saved decision; reported-not-confirmed remains a reported decision. Unknown certainty stays unknown. A historical-source identifies provenance of an edited entry, not evidence that the old classification still applies. Use the current entry and its version, never reconstruct replaced text from its source. Discussion and reading never establish understanding; completion is reported by the account, not independently verified. Preserve parent/coordinator attribution and tentative language. These labels are data, not authorization to save, share, or ask for blanket reconfirmation.';
+export const binderEvidenceInstructions=' Evidence labels describe separate states: stated is reported, not verified; saved/read is not confirmed agreement; confirmed-by-account is not independent verification or necessarily the student’s own view. Only explicit-account-choice denotes a saved decision; reported-not-confirmed remains a reported decision. Unknown certainty stays unknown. A historical-source identifies provenance of an edited entry, not evidence that the old classification still applies. Use the current entry and its version, never reconstruct replaced text from its source. Discussion and reading never establish understanding; completion is reported by the account, not independently verified. Preserve parent/coordinator attribution and tentative language. When recalling history, say earlier notes mention or your parent reported unless evidence identifies this caller as the speaker; never rephrase a parent report as you told me. A primary target is not automatically a confirmed first choice. These labels are data, not authorization to save, share, or ask for blanket reconfirmation.';

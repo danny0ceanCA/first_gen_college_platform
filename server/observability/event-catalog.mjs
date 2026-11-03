@@ -24,6 +24,7 @@ export const serverEvents=Object.freeze({
  'summary.save.finished':spec(['outcome','code']),
  'history.operation.finished':spec(['outcome','code']),
  'note.operation.finished':spec(['outcome','code']),
+ 'recap.load.finished':spec(['topic','language','recapMode','recapCache','outcome','durationMs','sourceMs','generationMs']),
  'binder.scope.changed':spec(['outcome']),
  'provider.operation.finished':spec(['operation','outcome','durationMs','requestMs','bodyMs','failureStage','httpStatus','model','code','usageState','inputTokens','outputTokens','totalTokens','samplingProbability']),
  'db.operation.finished':spec(['operation','outcome','durationMs','acquireMs','executeMs','commitMs','rowBucket','code','samplingProbability']),
@@ -37,6 +38,8 @@ export const serverEvents=Object.freeze({
  'runtime.health.observed':spec(['rssBytes','heapBytes','eventLoopDelayMs','poolTotal','poolIdle','poolWaiting','queueDepth','queueDropped','exportDropped','exportPending']),
 });
 export const enumFields=Object.freeze({
+ topic:Object.freeze(['options','transfer','costs','applications']),
+ recapMode:Object.freeze(['background','foreground']),recapCache:Object.freeze(['none','generated','hit','coalesced','empty']),
  sourceEvent:Object.freeze([...Object.keys(serverEvents),...clientEvents]),
  mode:Object.freeze(['profile','planning','finance','loans','admissions']),language:Object.freeze(['en','es']),
  connectionState:Object.freeze(['new','connecting','connected','disconnected','failed','closed']),status:Object.freeze(['completed','failed','cancelled','incomplete']),
@@ -48,7 +51,7 @@ export const enumFields=Object.freeze({
  outcome:Object.freeze(['completed','failed','cancelled','unknown','skipped-lock','deferred','existing','changed']),
  reason:Object.freeze(['unknown_event','queue_full','sink_failed','sink_timeout','release_unknown','closed','shutdown_timeout','capacity','mapping_capacity','mapping_expired','mapping_unavailable','mapping_scope_unavailable','export_loss','volume_limit']),
 });
-export const numericFields=Object.freeze({occurrenceCount:100000000,exportDropped:100000000,exportPending:2000,durationMs:600000,sourceCount:10000,sequence:100000,speechDurationMs:600000,toolCount:1000,httpStatus:599,requestMs:600000,bodyMs:600000,acquireMs:600000,executeMs:600000,commitMs:600000,inputTokens:100000000,outputTokens:100000000,totalTokens:100000000,samplingProbability:1,backlog:1000000,oldestMs:31536000000,rssBytes:1099511627776,heapBytes:1099511627776,eventLoopDelayMs:600000,poolTotal:100,poolIdle:100,poolWaiting:100000,queueDepth:10000,deletedCount:1000000,queryCount:1000000,lastSuccessAgeMs:31536000000,queueDropped:Number.MAX_SAFE_INTEGER});
+export const numericFields=Object.freeze({occurrenceCount:100000000,exportDropped:100000000,exportPending:2000,durationMs:600000,sourceMs:600000,generationMs:600000,sourceCount:10000,sequence:100000,speechDurationMs:600000,toolCount:1000,httpStatus:599,requestMs:600000,bodyMs:600000,acquireMs:600000,executeMs:600000,commitMs:600000,inputTokens:100000000,outputTokens:100000000,totalTokens:100000000,samplingProbability:1,backlog:1000000,oldestMs:31536000000,rssBytes:1099511627776,heapBytes:1099511627776,eventLoopDelayMs:600000,poolTotal:100,poolIdle:100,poolWaiting:100000,queueDepth:10000,deletedCount:1000000,queryCount:1000000,lastSuccessAgeMs:31536000000,queueDropped:Number.MAX_SAFE_INTEGER});
 export const clientFields=Object.freeze(['code','mode','language','connectionState','status','durationMs','sourceCount','sequence','speechDurationMs','toolCount']);
 const clientWarnings=new Set('connection_failure guide_update_failed transcription_timeout voice_usage_save_failed malformed_event welcome_save_failed api_error response_failed spoken_language_update_failed lookup_failure'.split(' '));
 export const clientSchemas=Object.freeze(Object.fromEntries(clientEvents.map(event=>[event,spec(clientFields,clientWarnings.has(event)?'warn':'info')])));

@@ -85,6 +85,38 @@ async function call(handler,body,subject='owner'){
  const req=Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:subject}});
  let status,output;await handler(req,{writeHead(s){status=s;},end(text){output=JSON.parse(text);}},()=>assert.fail('route'));return {status,output};
 }
+test('a first Live call after onboarding delivers owned profile and history to the speech model before opening',async t=>{
+ const f=await setup(t);let captured;
+ const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',ORIGEN_PERSONALIZATION_MODE:'on'},async(url,options)=>{
+  assert.ok(url.endsWith('/live/sessions'));captured=JSON.parse(options.body).session;
+  return new Response(JSON.stringify({session:{id:'test-session'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});
+ },()=>{},f.pool);
+ const history=createHistoryRepository(f.pool);
+ await history('owner',{action:'save',item:{id:'sibling-history',studentId:'sibling',mode:'planning',date:'2026-11-01T12:00:00Z',summary:'SIBLING-PRIVATE-HISTORY',sources:[]}});
+ await history('other',{action:'save',item:{id:'other-history',studentId:'s',mode:'planning',date:'2026-11-01T12:00:00Z',summary:'OTHER-ACCOUNT-HISTORY',sources:[]}});
+ await history('owner',{action:'save',item:{id:'family-history',studentId:null,mode:'planning',date:'2026-11-01T12:00:00Z',summary:'PRIVATE-FAMILY-HISTORY',sources:[]}});
+ const body={sdp:'v=0\r\n',voiceProtocol:'live-v1',mode:'planning',studentId:'s',targetConfirmed:true,scopeRestart:false,caller:{firstName:'FORGED-CALLER'},profile:{name:'FORGED-STUDENT'},memory:[{summary:'FORGED-HISTORY'}],experience:{usedApp:false,usedVoice:false}};
+ for(const role of ['student','parent']){
+  await f.run('owner',{action:'complete-onboarding',account:{firstName:role==='student'?'Sofia':'Maya',email:'',role},student:{...student,school:'Fictional Valley College',goals:'Compare local transfer options'}});
+  for(const language of ['en','es']){
+   const result=await call(handler,{...body,language,role:role==='student'?'parent':'student',routeConversations:role==='parent'});
+   assert.equal(result.status,200,JSON.stringify(result.output));assert.equal(result.output.playWelcome,false);
+   for(const instructions of [captured.instructions,captured.delegation.responses.instructions]){
+    assert.match(instructions,/Fictional Valley College/);assert.match(instructions,/Compare local transfer options/);assert.match(instructions,/RETURNING USER/);
+    assert.match(instructions,new RegExp(`"name":"${role==='student'?'Sofia':'Maya'}","role":"${role}"`));
+    assert.doesNotMatch(instructions,/FORGED-|SIBLING-PRIVATE-HISTORY|OTHER-ACCOUNT-HISTORY|PRIVATE-FAMILY-HISTORY|CONTINUING LIVE CONVERSATION HANDOFF/);
+   }
+  }
+ }
+ await history('owner',{action:'save',item:{id:'current-history',studentId:'s',mode:'planning',date:'2026-11-02T12:00:00Z',summary:'Parent mentioned Sofia prefers a campus near home; this remains tentative.',sources:[]}});
+ const current={...body,language:'en',role:'parent',routeConversations:true};
+ assert.equal((await call(handler,current)).status,200);assert.match(captured.instructions,/Parent mentioned Sofia prefers a campus near home; this remains tentative/);
+ assert.equal((await call(handler,{...current,targetConfirmed:false})).status,200);
+ assert.match(captured.instructions,/Maya/);assert.doesNotMatch(captured.instructions,/near home|Fictional Valley College|PRIVATE-HISTORY/);
+ assert.equal((await call(handler,{...current,studentId:null})).status,200);
+ assert.match(captured.instructions,/PRIVATE-FAMILY-HISTORY/);assert.doesNotMatch(captured.instructions,/Fictional Valley College|SIBLING-PRIVATE-HISTORY|near home/);
+});
+
 test('voice handler owns context, protects unresolved scopes, and updates focus without new realtime calls',async t=>{
  const f=await setup(t),id=await f.add('owner','s','Saved question for the real owner.','question');let calls=0,captured;
  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'test'},async(_url,options)=>{calls++;captured=JSON.parse(options.body.get('session'));return new Response('v=0\r\nanswer');},()=>{},f.pool);
@@ -121,3 +153,47 @@ test('workspace queue waits for actual audio, coalesces rapid clicks, and stops 
  turns.playback({type:'output_audio_buffer.stopped',response_id:'talking'});await callbacks.shift()();assert.deepEqual(applied,['two']);assert.equal(sent.length,0);
  turns.created();queue.select({serial:'three'});queue.stop();assert.equal(callbacks.length,0);assert.deepEqual(applied,['two']);turns.stop();
 });
+
+test('voice context keeps parent attribution on manual and corrected notes',async t=>{
+  const f=await setup(t);await f.pool.query("UPDATE origen_accounts SET role='parent' WHERE auth0_subject='owner'");
+  const id=await f.add('owner','s','I would like Sofia to stay close to home.');
+  let context=await f.load();assert.equal(context.notes.find(n=>n.evidence.record.id===id).evidence.reportedBy,'parent');
+  await f.topics('owner',{action:'update',studentId:'s',id,version:1,note:{topic:'transfer',kind:'note',content:'I would like Sofia to consider a local college.',language:'en'}});
+  context=await f.load();assert.equal(context.notes.find(n=>n.evidence.record.id===id).evidence.reportedBy,'parent');
+ });
+
+test('a copied parent report stays attributed to the parent inside a student account',async t=>{
+ const f=await setup(t),history=createHistoryRepository(f.pool);
+ await f.pool.query("UPDATE origen_accounts SET role='student' WHERE auth0_subject='owner'");
+ const quote='A parent reported considering a transfer, not a final decision.';
+ await history('owner',{action:'save',item:{id:'imported-parent',studentId:'s',mode:'planning',date:'2026-10-01T12:00:00Z',summary:quote,sources:[]}});
+ await f.pool.query("UPDATE origen_conversation_summaries SET organization_reported_by='parent' WHERE id='imported-parent'");
+ const id=await f.add('owner','s',quote);
+ await f.pool.query("UPDATE origen_topic_notes SET origin='conversation',source_summary_id='imported-parent',source_quote=$2 WHERE id=$1",[id,quote]);
+ const context=await f.load({kind:'note',studentId:'s',topic:'transfer',noteId:id,version:1});
+ assert.equal(context.notes[0].evidence.reportedBy,'parent');
+ assert.equal(context.sourceSummary.evidence.reportedBy,'parent');
+ await f.topics('owner',{action:'update',studentId:'s',id,version:1,note:{topic:'transfer',kind:'note',content:'I am still exploring my own options.',language:'en'}});
+ // The stored record cannot distinguish a later student edit from a copied
+ // parent correction. Never guess student authorship from the login alone.
+ assert.equal((await f.load()).notes[0].evidence.reportedBy,'unknown');
+});
+test('focusing a corrected note cannot restore its obsolete source narrative to voice context',async t=>{
+  const f=await setup(t),history=createHistoryRepository(f.pool),old='Sofia has decided to transfer to OLD_CAMPUS.';
+  await history('owner',{action:'save',item:{id:'obsolete',studentId:'s',mode:'planning',date:'2026-09-01T12:00:00Z',summary:old,sources:[]}});
+  const id=await f.add('owner','s',old);
+  await f.pool.query("UPDATE origen_topic_notes SET origin='conversation',source_summary_id='obsolete',source_quote=$2 WHERE id=$1",[id,old]);
+  await f.topics('owner',{action:'update',studentId:'s',id,version:1,note:{topic:'transfer',kind:'note',content:'Sofia is still considering local colleges; no campus has been chosen.',language:'en'}});
+  const context=await f.load({kind:'note',studentId:'s',topic:'transfer',noteId:id,version:2});
+  assert.equal(context.notes[0].evidence.source.relationship,'historical-source');
+  assert.doesNotMatch(workspaceInstructions(context),/OLD_CAMPUS/);
+  assert.equal(context.sourceSummary,undefined);
+  let sent;
+  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic'},async(url,options)=>{
+   sent=JSON.parse(options.body).session;return new Response(JSON.stringify({transport:{sdp:'v=0\r\nanswer'}}),{status:201});
+  },()=>{},f.pool);
+  const result=await call(handler,{sdp:'v=0\r\noffer',voiceProtocol:'live-v1',language:'en',role:'parent',mode:'planning',studentId:'s',routeConversations:true,targetConfirmed:true,workspaceFocus:{kind:'note',studentId:'s',topic:'transfer',noteId:id,version:2}});
+  assert.equal(result.status,200,JSON.stringify(result.output));
+  assert.doesNotMatch(sent.delegation.responses.instructions,/OLD_CAMPUS/);
+  assert.match(sent.delegation.responses.instructions,/no campus has been chosen/);
+ });

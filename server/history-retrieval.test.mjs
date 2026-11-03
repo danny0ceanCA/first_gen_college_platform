@@ -115,3 +115,18 @@ test('history retrieval with real PostgreSQL and restricted RLS',{skip:!process.
   });
  }finally{await f.close();}
 });
+
+// Exercise the wire payload without a paid provider call or a production database.
+test('recall preserves unknown historical authorship and the reporter of stored memories',async()=>{
+ const rows=['note','summary','memory'].map((kind,i)=>({kind,id:String(i),student_id:'alex',version:'1',content:`Transfer context ${kind}`,content_hash:'hash',recorded_at:'2026-10-01T12:00:00Z',status:kind==='memory'?'confirmed':'saved',speaker:'unknown',reported_by:kind==='memory'?'student':'unknown',topic:'transfer',note_kind:'question'}));
+ const database={connect:async()=>({release(){},async query(sql){
+  if(sql.includes('FROM origen_accounts WHERE auth0_subject'))return {rows:[{id:'owner',role:'parent'}]};
+  if(sql.includes('FROM origen_students WHERE'))return {rows:[{id:'alex'}]};
+  if(sql.includes("name='045_historical_retrieval.sql'"))return {rows:[{ready:true}]};
+  if(sql.startsWith('WITH search AS'))return {rows};
+  return {rows:[]};
+ }})};
+ const result=await retrieveStudentHistory(database,'owner',{studentId:'alex',query:'transfer'});
+ assert.equal(result.available,true,JSON.stringify(result));assert.equal(result.items.length,3);
+ for(const item of result.items){assert.equal(item.reportedBy,item.kind==='memory'?'student':'unknown');assert.equal(item.evidence.reportedBy,item.reportedBy);assert.equal(item.speaker,'unknown');}
+});

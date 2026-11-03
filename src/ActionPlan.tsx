@@ -1,5 +1,5 @@
 import RecommendationSuggestion from './RecommendationSuggestion';
-import RecommendationEvaluation from './RecommendationEvaluation';
+import RecommendationEvaluation from './RecommendationEvaluation.tsx';
 import {PrivateFollowUpUpdates} from './PrivateFollowUpUpdates';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import type {ReviewResponseReference} from './reviewResponseConnection.mjs';
@@ -12,7 +12,7 @@ import {ArrowRight,CheckCircle2,Plus,RefreshCw} from 'lucide-react';
 import {apiFetch} from './api';
 import {legacyCreationId,legacyPlanBatches} from './planImport.mjs';
 import './ActionPlan.css';
-import {StudentFollowUpProvider,StudentFollowUpSettings,StudentFollowUpAction} from './StudentFollowUp';
+import {StudentFollowUpProvider,StudentFollowUpSettings,StudentFollowUpAction} from './StudentFollowUp.tsx';
 import {useNavigationGuard,useNavigationState,navigateWorkspace} from './workspaceNavigation';
 import {useBinderNavigationGuard} from './useBinderFollow';
 

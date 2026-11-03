@@ -21,6 +21,16 @@ test('duplicate clicks share one logout; privacy purge and redirect wait for cle
  assert.equal(readLogoutReturn(f.storage,100001),true);
  assert.deepEqual([...f.records.values()],['100000']);
 });
+
+test('test-account cleanup cannot unmount the workspace before the exit curtain covers it',async()=>{
+ const cover=deferred(),events=[];
+ const f=fixture({cover:()=>cover.promise,cleanup:async()=>events.push('test-reset-and-purge'),stop:()=>events.push('stop'),redirect:async()=>events.push('redirect')});
+ const pending=f.flow.start();
+ await Promise.resolve();await Promise.resolve();
+ assert.deepEqual(events,[],'Cleanup itself may stop the privacy session, so it must wait too');
+ cover.resolve();await pending;
+ assert.deepEqual(events,['test-reset-and-purge','stop','redirect']);
+});
 test('failed cleanup never purges or redirects, and a retry can complete',async()=>{
  let fail=true;const f=fixture({cleanup:async()=>{if(fail)throw new Error('offline');}});
  await f.flow.start();assert.equal(f.flow.canReturn,true);assert.equal(f.records.size,0);

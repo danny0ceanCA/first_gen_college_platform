@@ -5,6 +5,7 @@ for(const language of ['en','es'])for(const mode of ['profile','planning','admis
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
  const legacy=voiceSession(input,{OPENAI_MODEL_VOICE:'gpt-realtime-2.1'}),live=studentLiveSession(legacy,input,[teaching]);
  assert.equal(live.model,'gpt-live-1');assert.equal(live.store,false);assert.equal(live.delegation.responses.instructions,legacy.instructions);
+ assert.deepEqual(live.delegation.responses.reasoning,{effort:'low'});
  assert.deepEqual(live.delegation.responses.tools.map(({strict,...tool})=>tool),legacy.tools);assert.ok(live.delegation.responses.tools.every(tool=>tool.strict===false));
  assert.match(live.instructions,/Origen/);assert.match(live.instructions,/Warm, patient and encouraging/);assert.match(live.instructions,/Acknowledge uncertainty/);
  if(input.onboarding)assert.match(live.instructions,/This call is onboarding/);
@@ -21,7 +22,14 @@ test('New student clients default to Live; older tabs and explicit rollback reta
  let calls=0;const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic'},async(url,options)=>{calls++;assert.ok(url.endsWith('/live/sessions'));assert.equal(JSON.parse(options.body).session.model,'gpt-live-1');return new Response(JSON.stringify({session:{id:'isolated'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});});
  let status,data;const input={sdp:'v=0\r\noffer',voiceProtocol:'live-v1',language:'en',role:'student',mode:'planning',profile:{name:'Synthetic',stage:'Community college'}};
  const invoke=async body=>{await handler(Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json'}}),{writeHead:value=>status=value,end:value=>data=JSON.parse(value)},()=>assert.fail());};
- await invoke(input);assert.equal(status,200);assert.equal(data.voiceProvider,'live');assert.equal(data.voiceSession.language,'en');assert.ok(!JSON.stringify(data).includes('Bearer'));assert.equal(calls,1);
- await invoke({...input,action:'update-guide',mode:'finance'});assert.equal(status,200);assert.match(data.session.liveInstructions,/Origen/);assert.equal(calls,1);
+ await invoke(input);assert.equal(status,200);assert.equal(data.voiceProvider,'live');assert.equal(data.voiceSession.language,'en');assert.equal(data.voiceSession.max_output_tokens,1500);assert.ok(!JSON.stringify(data).includes('Bearer'));assert.equal(calls,1);
+ await invoke({...input,action:'update-guide',mode:'finance'});assert.equal(status,200);assert.match(data.session.liveInstructions,/Origen/);assert.equal(data.session.max_output_tokens,1500);assert.equal(calls,1);
  await invoke({...input,voiceProtocol:'other'});assert.equal(status,400);assert.equal(calls,1);
 });
+
+test('Live preserves the larger delegated response budget required by sharing and follow-through',()=>{
+  const config=voiceSession({mode:'planning',language:'en',role:'student',reviewRequestVoice:true,profile:{}},{});
+  assert.ok(config.tools.some(tool=>tool.name==='prepare_coordinator_review_request'));
+  assert.equal(config.max_output_tokens,3000);
+  assert.equal(studentLiveSession(config,{language:'en'}).delegation.responses.max_output_tokens,3000);
+ });

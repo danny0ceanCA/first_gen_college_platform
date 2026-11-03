@@ -1,1 +1,2 @@
 export function studentLiveChannel(channel:RTCDataChannel,options?:{getTurn?:()=>string;schedule?:typeof setTimeout;cancel?:typeof clearTimeout;isPlaybackIdle?:()=>boolean;getPlaybackVersion?:()=>number}):Omit<RTCDataChannel,'send'>&{send:(data:string|Blob|ArrayBuffer|ArrayBufferView)=>void|false;configure:(data:{voiceProvider?:string;voiceSession?:Record<string,unknown>})=>void;flush:()=>Promise<void>};
+export const liveBackendDeadlineMs: number;

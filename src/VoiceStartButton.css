@@ -10,3 +10,5 @@
 .voice-launcher>.voice-start-control:only-child{grid-column:1;grid-row:auto}
 @media(max-width:600px){.voice-launcher>.voice-start-control{grid-column:1;grid-row:auto}.voice-origen-button{width:52px;height:52px;flex-basis:52px}.voice-start-label{font-size:12px;max-width:16ch}}
 @media(prefers-reduced-motion:reduce){.voice-origen-button{transition:none}}
+
+.voice-start-pill{border:0;font:inherit;cursor:pointer;text-align:start}.voice-start-pill:focus-visible{outline:3px solid #813e2e;outline-offset:4px}.voice-start-pill:disabled{opacity:.5;cursor:default}.shared-voice .voice-start-pill:hover:not(:disabled) .voice-origen-button{background:#863e2c;box-shadow:0 5px 14px #813e2e30}

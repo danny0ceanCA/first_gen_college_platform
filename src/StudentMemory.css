@@ -22,3 +22,21 @@
 .student-memory-paper{border:0;background:transparent;padding:0;margin:24px 0}.student-memory-paper>.student-memory-body{padding:0}.student-memory-paper .memory-toolbar:empty{display:none}.student-memory-paper .memory-management>summary{font:inherit;font-size:.78rem;color:#756b63;cursor:pointer;padding:6px 0;width:fit-content}.student-memory-paper .memory-management .memory-actions{margin-top:5px}.student-memory-paper .memory-management button{font-size:.8rem;min-height:36px;background:transparent;border-color:#d8d0c2}.memory-saved-notice{font-size:.85rem;color:#526745;padding:8px 0;margin:10px 0}
 
 .memory-processing-status:empty{display:none}.student-memory-paper .memory-entry.notebook-suggestion{border-style:solid;background:transparent}
+.memory-overview-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 20px;padding-bottom:14px;border-bottom:1px solid #e6d9c8}
+.memory-overview-toolbar p{margin:0;color:#7e7063;font-size:12px;line-height:1.6}
+.student-memory .memory-overview-toolbar button{flex-shrink:0;font-size:12px;background:transparent;border-color:#dfcbb6;color:#874631;padding:7px 12px}
+.memory-overview{display:grid;gap:22px}
+.memory-overview-group{display:grid;grid-template-columns:132px minmax(0,1fr);column-gap:20px;border-bottom:1px solid #eee2d3;padding-bottom:20px;min-width:0}
+.memory-overview-group:last-child{border-bottom:0;padding-bottom:0}
+.memory-overview-group h5{display:flex;align-items:baseline;gap:8px;margin:12px 0 0;font:600 12px/1.5 var(--body-font,sans-serif);color:#705b48}
+.memory-overview-group h5>span{font-size:10px;font-weight:400;color:#8b7a69}
+.memory-overview-group ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+.student-memory .memory-overview-detail{display:block;text-align:start;width:100%;padding:10px 12px;background:transparent;border:1px solid transparent;border-radius:9px;font-weight:400;color:inherit;transition:background-color 160ms ease,border-color 160ms ease}
+.student-memory .memory-overview-detail:hover{background:#f8f2e8;border-color:#e6d9c8}
+.memory-overview-writing{display:block;font-family:var(--binder-writing-font),cursive;font-size:21px;line-height:1.5;overflow-wrap:anywhere}
+.memory-overview-meta{display:flex;align-items:center;flex-wrap:wrap;column-gap:10px;row-gap:4px;margin-top:7px;color:#7d7064;font-size:10px;line-height:1.5}
+.memory-overview-open{color:#91452f;white-space:nowrap;margin-inline-start:auto}
+.memory-overview-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font:500 10px/1.5 var(--body-font,sans-serif);color:#507b68}
+.memory-overview-comments{color:#ae3429}
+@media(max-width:760px){.memory-overview-toolbar{align-items:flex-start;flex-direction:column;gap:8px;margin-bottom:18px}.memory-overview-group{grid-template-columns:minmax(0,1fr);gap:6px;padding-bottom:16px}.memory-overview-group h5{margin-top:0}.student-memory .memory-overview-detail{padding:8px 0}.memory-overview-writing{font-size:20px}.memory-overview-open{margin-inline-start:0}.memory-overview{gap:18px}}
+@media(prefers-reduced-motion:reduce){.student-memory .memory-overview-detail{transition:none}}

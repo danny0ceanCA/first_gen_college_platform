@@ -1,4 +1,4 @@
-import OutcomeEvaluation,{type EvaluationPermission} from './OutcomeEvaluation';
+import OutcomeEvaluation,{type EvaluationPermission} from './OutcomeEvaluation.tsx';
 import OutcomeAssessmentSummary,{type OutcomeAssessment} from './OutcomeAssessmentSummary';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {apiFetch} from './api';

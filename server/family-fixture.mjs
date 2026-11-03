@@ -20,6 +20,7 @@ export async function fixture(){
  db.public.none((await readFile(new URL('./migrations/039_guardian_permission.sql',import.meta.url),'utf8')).split('ALTER TABLE')[0]);
  db.public.none((await readFile(new URL('./migrations/041_permission_hangup_progress.sql',import.meta.url),'utf8')).split('CREATE INDEX')[0]);
  db.public.registerFunction({name:'to_char',args:[DataType.date,DataType.text],returns:DataType.text,implementation:value=>new Date(value).toISOString().slice(0,10)});
+ db.public.none("ALTER TABLE origen_conversation_summaries ADD COLUMN organization_reported_by text NOT NULL DEFAULT 'unknown'");
  const {Pool}=db.adapters.createPg();const pool=new Pool();
  // pg-mem does not parse savepoints. Production rollback behavior is checked
  // separately with a failing client; successful fixture operations need no rollback.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {binderEvidence,binderEvidenceInstructions} from './binder-context.mjs';
+import {binderEvidence,binderEvidenceInstructions,binderReporter} from './binder-context.mjs';
 import {briefMemorySelection,memoryInstructions} from './student-memory.mjs';
 import {loadVoiceWorkspace,workspaceInstructions} from './voice-workspace.mjs';
 import {binderFixture} from './binder-jobs-fixture.mjs';
@@ -10,6 +10,13 @@ import {createCorrectionService,correctionSnapshot} from './binder-corrections.m
 
 const organization=(category,certainty)=>({version:'binder-organization-v1',category,certainty,reportedBy:'parent',sourceVersion:'source-v1',evidenceKind:'saved_summary'});
 const row={id:'test-entry',version:1,student_id:'alex',content:'A possibility.',source_quote:'A possibility.',source_summary_id:'summary',source_at:'2026-10-01T10:00:00Z',status:'proposed',speaker:'parent',reported_by:'parent'};
+
+test('unknown history and copied corrections never become student statements from account role alone',()=>{
+ assert.equal(binderReporter({organization_reported_by:'unknown'},'student'),'unknown');
+ assert.equal(binderReporter({...row,organization_reported_by:'parent',version:2,content:'A revised possibility.'},'student'),'unknown');
+ assert.equal(binderReporter({...row,organization_reported_by:'parent',version:2,content:'A revised possibility.'},'parent'),'parent');
+ assert.equal(binderReporter({content:'A manual note.'},'student'),'student');
+});
 
 test('review never promotes tentative parent reports into student wishes or verified facts',()=>{
  const original={...row,category:'goal',organization:organization('goal','tentative')};

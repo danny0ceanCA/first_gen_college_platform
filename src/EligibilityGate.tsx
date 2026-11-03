@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import {useAuth0} from '@auth0/auth0-react';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {browserPrivacy} from './browserPrivacy.mjs';
+import {useArrivalPending} from './arrivalReadiness';
 import './EligibilityGate.css';
 type Screen={ageBand:string;audience:string};
 type Status={status:string;allowed:boolean;ageBand?:string;requestId?:string;delivery?:string;permissionExpiresAt?:string};
@@ -16,6 +17,9 @@ export function EligibilityQuestions({es,onSubmit,busy=false}:{es:boolean;onSubm
 }
 export default function EligibilityGate({children,onAllowed,hideSignOut=false}:{children?:ReactNode;onAllowed?:()=>void;hideSignOut?:boolean}){
  const auth=useAuth0(),subject=auth.user?.sub;const [state,setState]=useState<Status>(),[error,setError]=useState(false),[busy,setBusy]=useState(false),[email,setEmail]=useState(''),[es,setEs]=useState(()=>document.documentElement.lang==='es');
+ // Keep the initial permission lookup in the same arrival as the subsequent
+ // profile load. Actual questions and retry actions must still be revealed.
+ useArrivalPending(!state&&!error);
  const active=useRef(true),allowed=useRef(false),unavailable=useRef(false),sequence=useRef(0),callback=useRef(onAllowed);callback.current=onAllowed;
  const t=(en:string,sp:string)=>es?sp:en;
  const check=async(body:Record<string,unknown>,signal?:AbortSignal)=>{

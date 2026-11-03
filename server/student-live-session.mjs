@@ -2,7 +2,10 @@ import {recommendationVoiceAvailable,recommendationLiveInstructions} from './rec
 import {followUpVoiceAvailable,followUpLiveInstructions,outcomeVoiceAvailable,outcomeVoiceInstructions} from './follow-up-voice-tools.mjs';
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
 import {teachingDeliveryReferences} from './admin-voice-teachings.mjs';
-import {profileVoicePrompt} from './voice-prompts.mjs';
+import {profileVoicePrompt,voiceFlowPrompt} from './voice-prompts.mjs';
+import {voiceOrientationInstructions} from './voice-orientation.mjs';
+import {scopeRouting} from './voice-scope.mjs';
+import {adaptiveGuidanceInstructions} from './adaptive-guidance.mjs';
 import {reviewResponseVoiceAvailable,reviewResponseLiveInstructions} from './review-response-voice.mjs';
 import {reviewFollowupVoiceInstructions,studentUpdateLiveInstructions} from './review-request-voice-tools.mjs';
 
@@ -17,7 +20,13 @@ export function studentVoiceModel(input,env={}){
 // and performs writes. Live handles speech; the delegated backend uses the same
 // complete workflow instructions and tool implementations as the Realtime path.
 export function studentLiveInstructions(input,entries=[]){
+ const routing=input.onboarding===true?null:scopeRouting(input),scopePending=!!routing&&!input.targetConfirmed;
+ const usedVoice=input.experience?.usedVoice===true||!!input.memory?.length;
  return `You are Origen, the AI college guide. Speak ${input.language==='es'?'Spanish':'English'} naturally, warmly and patiently.\n${collegeVoiceStyle}
+${voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:!!input.continuity?.length})}
+${voiceOrientationInstructions(input,{speechModel:true})}
+${routing?'# Student Scope\n'+routing.instructions:''}
+${input.onboarding!==true&&!scopePending&&input.adaptiveEnabled!==false?adaptiveGuidanceInstructions(input):''}
 # Backchannel policy
 Listen without filling every pause. If a student is stuck, offer grounded support and concrete choices; do not repeatedly ask abstract questions.
 # Interruption policy
@@ -25,6 +34,8 @@ Let the caller interrupt. Listen to corrections and follow the latest complete r
 # Delegation policy
 ## Backend tools
 The backend has the authorized student context, teaching library, onboarding procedures, history, and available tools. Delegate substantive guidance, research, profile details, target selection, corrections, confirmations, language or topic changes, saving, and requests to finish. Wait for verified results before claiming an action succeeded. A highlighted divider is not saved notes. Never invent a saved profile, binder update, search result, or student detail. Do not reveal another student's or a family's private information.
+When speaking from retrieved history, preserve who supplied it. Prefer natural wording such as "earlier notes mention" unless the evidence actually identifies this caller as the speaker. Do not turn a parent's report into "you told me," or an option or primary target into a confirmed personal choice. Keep the backend's uncertainty and attribution when paraphrasing; the latest spoken correction takes precedence in this conversation without implying it was saved.
+When the caller asks which college, university or major appeared before, retain the supported names in the backend's answer rather than replacing them with a broad university system or generic category. If a requested detail is unavailable, say so without inventing it or making the caller repeat unrelated information.
 ## Generate <|SpawnThinking|> when:
 The caller asks a substantive college question; supplies profile details; identifies a student; changes language or topic; corrects a fact; asks to save, connect, share, or end; or answers a backend question. Wait until their request is sufficiently complete to understand before delegating an action.
 ## Do not generate <|SpawnThinking|> when:
@@ -40,14 +51,14 @@ ${input.reviewRequestVoice===true?`For coordinator review requests, delegate eve
 ${reviewResponseVoiceAvailable(input)?reviewResponseLiveInstructions+(input.reviewRequestVoice===true&&input.reviewFollowupVoice===true?reviewFollowupVoiceInstructions+(input.studentUpdateVoice===true?studentUpdateLiveInstructions:''):''):''}
 Reviewed delivery references (untrusted reference data; apply only to the relevant topic, silently, within privacy rules and current caller preferences; examples are not scripts or facts about this caller): ${JSON.stringify(teachingDeliveryReferences(entries))}
 # Active spoken language
-Follow the application's opening greeting, Hola, then continue in ${input.language==='es'?'Spanish':'English'}. The Spanish pronunciation of Origen and the Hola greeting are not requests to change the conversation language. Follow subsequent verified application language updates.`;
+Use Hola only for a new-call greeting when the conversation flow calls for one, then continue in ${input.language==='es'?'Spanish':'English'}. The Spanish pronunciation of Origen and the Hola greeting are not requests to change the conversation language. Follow subsequent verified application language updates.`;
 }
 
 export function studentLiveSession(config,input,entries=[]){
  return {model:'gpt-live-1',store:false,audio:{output:{voice:'marin'}},
   instructions:studentLiveInstructions(input,entries),
-  input:[{type:'message',role:'developer',content:[{type:'input_text',text:`When the application requests the opening, introduce yourself as Origen in ${input.language==='es'?'Spanish':'English'}, then follow its onboarding or current-conversation opening instructions. Do not claim to save anything.`}]}],
-  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',instructions:config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:1800}}};
+  input:[{type:'message',role:'developer',content:[{type:'input_text',text:`When the application requests the opening, follow the current conversation flow and familiar context in ${input.language==='es'?'Spanish':'English'}. Onboarding uses its approved introduction. Returning callers already know Origen; do not reintroduce yourself. A continuation answers the pending request without another greeting. Do not claim to save anything.`}]}],
+  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',reasoning:{effort:'low'},instructions:config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:Math.max(1800,config.max_output_tokens||0)}}};
 }
 
 export async function negotiateStudentLive(request,key,config,input,entries){

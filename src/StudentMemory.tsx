@@ -1,4 +1,4 @@
-import {StudentEntryComments} from './StudentComments';
+import {StudentEntryComments,useStudentComments} from './StudentComments';
 import {useEffect,useRef,useState} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
 import {useFamily} from './FamilyStore';
@@ -13,20 +13,23 @@ import BinderNoteHighlight from './BinderNoteHighlight';
 import {binderMemoryEntries,binderMemorySignalId,binderMemorySummaryEntries} from './binderMemory.mjs';
 import type {BinderTopic} from './binderSignals.mjs';
 import {useBinderNavigationGuard} from './useBinderFollow';
+import {memoryExcerpt,memoryOverview} from './binderMemoryOverview.mjs';
 type Category='goal'|'constraint'|'preference'|'question';
 export type Memory={id:string;version:number;studentId:string|null;category:Category;content:string;language:'en'|'es';speaker:'student'|'parent'|'family'|'unknown';reportedBy:string;status:'proposed'|'confirmed';conversationAt?:string|null;summaryId:string|null;sourceVersion:string|null;quote:string;updatedAt:string;organization?:OrganizationInfo};
 type Data={available:boolean;correctionsEnabled?:boolean;extractionEnabled?:boolean;organizationManaged?:boolean;memories:Memory[];pendingCount:number};
 type Draft=Omit<Memory,'version'|'status'|'reportedBy'|'summaryId'|'sourceVersion'|'quote'|'updatedAt'>&{version?:number};
-type Props={presentation?:'loader'|'summary';revealId?:string;topic?:BinderTopic;onEntries?:(entries:Memory[])=>void;freshIds?:Set<string>;onRead?:(id:string)=>void;studentId:string|null;language:'en'|'es';historyKey:string;t:(en:string,es:string)=>string};
+type Props={presentation?:'loader'|'summary';revealId?:string;topic?:BinderTopic;onEntries?:(entries:Memory[]|null)=>void;freshIds?:Set<string>;onRead?:(id:string)=>void;studentId:string|null;language:'en'|'es';historyKey:string;t:(en:string,es:string)=>string};
 export default function StudentMemory({studentId,language,historyKey,t,topic,presentation,onEntries,freshIds,onRead,revealId}:Props){
  const {user}=useAuth0(),family=useFamily();
  const loadingOnly=presentation==='loader',paper=!!topic||presentation==='summary';
  const corrections=useBinderCorrections('memory',studentId);
+ const comments=useStudentComments();
+ const [originals,setOriginals]=useState(false),[focusDetail,setFocusDetail]=useState<string>();
  const [data,setData]=useState<Data>(),[draft,setDraft]=useState<Draft>(),[category,setCategory]=useState<Category>('goal'),[page,setPage]=useState(0);
  const [busy,setBusy]=useState(false),[organizing,setOrganizing]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[syncError,setSyncError]=useState(false),[attempt,setAttempt]=useState(0);
  const entriesListener=useRef(onEntries);entriesListener.current=onEntries;
  useBinderNavigationGuard(!!draft||busy);
- useEffect(()=>{if(data)entriesListener.current?.(data.memories||[]);},[data]);
+ useEffect(()=>{entriesListener.current?.(data?.memories||null);},[data]);
  const pending=useRef(false),generation=useRef(0),requests=useRef(new Set<AbortController>()),heading=useRef<HTMLHeadingElement>(null),editor=useRef<HTMLTextAreaElement>(null);
  const labels:Record<Category,string>={goal:t('Goals','Metas'),constraint:t('Practical needs','Necesidades prácticas'),preference:t('Preferences','Preferencias'),question:t('Open questions','Preguntas pendientes')};
  const speakers:Record<Memory['speaker'],string>={student:t('Student','Estudiante'),parent:t('Parent or guardian','Madre, padre o tutor'),family:t('Family','Familia'),unknown:t('Not specified','Sin especificar')};
@@ -41,11 +44,12 @@ export default function StudentMemory({studentId,language,historyKey,t,topic,pre
  }
  useEffect(()=>()=>{generation.current++;for(const c of requests.current)c.abort();},[]);
  useEffect(()=>browserPrivacy.subscribe(event=>{
-  generation.current++;for(const c of requests.current)c.abort();setData(undefined);setDraft(undefined);setMessage('');setError('');if(event.type!=='end')setAttempt(n=>n+1);
+  generation.current++;for(const c of requests.current)c.abort();setData(undefined);setDraft(undefined);setOriginals(false);setFocusDetail(undefined);setMessage('');setError('');if(event.type!=='end')setAttempt(n=>n+1);
  }),[]);
  useEffect(()=>subscribeMemoryContext(user?.sub,target=>{if(target===studentId&&!pending.current)setAttempt(n=>n+1);}),[user?.sub,studentId]);
  useEffect(()=>{
   const version=++generation.current;let active=true;
+  entriesListener.current?.(null);
   void request({action:'load'}).then(async result=>{
    if(!active||version!==generation.current)return;setData(result);setError('');
    // One resumable proposal batch after a history change. Existing pages remain usable.
@@ -75,7 +79,22 @@ export default function StudentMemory({studentId,language,historyKey,t,topic,pre
  const visibleCategories=topic?Object.keys(labels).filter(key=>scopedEntries.some(entry=>entry.category===key)):Object.keys(labels);
  const activeCategory=topic&&!visibleCategories.includes(category)?visibleCategories[0] as Category||'goal':category;
  const entries=paper?scopedEntries:scopedEntries.filter(m=>m.category===activeCategory),pages=Math.max(1,Math.ceil(entries.length/3)),currentPage=Math.min(page,pages-1);
- useEffect(()=>{if(!revealId||!data)return;const entry=scopedEntries.find(m=>m.id===revealId);if(entry){setCategory(entry.category);setPage(Math.floor((paper?scopedEntries:scopedEntries.filter(m=>m.category===entry.category)).findIndex(m=>m.id===revealId)/3));requestAnimationFrame(()=>{const element=document.querySelector<HTMLElement>(`[data-memory-id="${CSS.escape(revealId)}"] [data-comment-id]`);element?.focus({preventScroll:true});element?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});});}},[revealId,data]);
+ const overview=paper&&!originals&&!draft&&entries.length>0;
+ const groups=overview?memoryOverview(data?.memories,{studentId,topic}):[];
+ function openDetail(id:string){
+  const index=entries.findIndex(m=>m.id===id);if(index<0)return;
+  setOriginals(true);setPage(Math.floor(index/3));setFocusDetail(id);
+ }
+ useEffect(()=>{if(!revealId||!data)return;const entry=scopedEntries.find(m=>m.id===revealId);if(entry){setCategory(entry.category);setOriginals(true);setPage(Math.floor((paper?scopedEntries:scopedEntries.filter(m=>m.category===entry.category)).findIndex(m=>m.id===revealId)/3));setFocusDetail(revealId);}},[revealId,data]);
+ useEffect(()=>{
+  if(!focusDetail||overview)return;
+  const frame=requestAnimationFrame(()=>{
+   const record=document.querySelector<HTMLElement>(`[data-memory-id="${CSS.escape(focusDetail)}"]`);
+   const target=focusDetail===revealId?record?.querySelector<HTMLElement>('[data-comment-id]')||record:record;
+   if(target){target.tabIndex=-1;target.focus({preventScroll:true});target.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
+   setFocusDetail(undefined);
+  });return()=>cancelAnimationFrame(frame);
+ },[focusDetail,overview,currentPage,revealId]);
  const undoControl=data?.correctionsEnabled&&corrections.undo&&<div className="memory-actions"><button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'undo'})}>{t('Undo last change','Deshacer último cambio')}</button><span>{t('Available here for 10 minutes. Restores only this detail.','Disponible aquí durante 10 minutos. Solo restaura este dato.')}</span></div>;
  const changed=!!draft?.version&&data?.memories.find(m=>m.id===draft.id)?.version!==draft.version;
  if(loadingOnly)return <div className="memory-processing-status">
@@ -85,7 +104,7 @@ export default function StudentMemory({studentId,language,historyKey,t,topic,pre
  </div>;
 
  const Container=paper?'section':'details';
- return <Container className={`student-memory${paper?' student-memory-topic student-memory-paper':''}`}>{paper?<h4 ref={heading} tabIndex={-1}>{topic?t('Details from your conversations','Datos de tus conversaciones'):studentId===null?t('About your family','Sobre tu familia'):t('About you','Sobre ti')}</h4>:<summary>{t('What Origen remembers','Lo que Origen recuerda')}<span>{t('Review and update','Revisar y actualizar')}</span></summary>}
+ return <Container className={`student-memory${paper?' student-memory-topic student-memory-paper':''}`}>{paper?<h4 ref={heading} tabIndex={-1}>{topic?(overview?t('At a glance','De un vistazo'):t('Your details','Tus datos')):studentId===null?t('About your family','Sobre tu familia'):t('About you','Sobre ti')}</h4>:<summary>{t('What Origen remembers','Lo que Origen recuerda')}<span>{t('Review and update','Revisar y actualizar')}</span></summary>}
   <div className="student-memory-body">{!paper&&<h3 tabIndex={-1} ref={heading}>{t('Your story, in your words','Tu historia, en tus palabras')}</h3>}
    {!paper&&<p>{t('Keep the details that help Origen understand you. Conversation suggestions need your review. Saving a detail confirms it for this account; a parent’s report stays attributed to the parent.','Conserva los detalles que ayudan a Origen a comprenderte. Revisa las sugerencias de las conversaciones. Guardar un dato lo confirma para esta cuenta; lo informado por un padre sigue atribuido a él.')}</p>}
    {(!paper||!!draft)&&<p className="memory-call-note">{t('Editing or removing a detail ends an active call so the next one uses current information. That interrupted call is not saved.','Editar o eliminar un dato termina una llamada activa para que la próxima use información actualizada. Esa llamada interrumpida no se guarda.')}</p>}
@@ -103,20 +122,28 @@ export default function StudentMemory({studentId,language,historyKey,t,topic,pre
     {changed&&<p>{t('A newer version is available. Close this draft and edit the current detail below.','Hay una versión más reciente. Cierra este borrador y edita el dato actual abajo.')}</p>}
     <div className="memory-actions"><button type="submit" disabled={busy||changed||!draft.content.trim()}>{t('Save detail','Guardar dato')}</button><button type="button" disabled={busy} onClick={()=>setDraft(undefined)}>{t('Cancel','Cancelar')}</button></div>
    </form>}
-   <div className="memory-entries">{entries.slice(currentPage*3,currentPage*3+3).map(m=><BinderNoteHighlight key={m.id} id={m.id} topic={topic||'options'} memory fresh={!!topic&&!!freshIds?.has(binderMemorySignalId(m.id))} suggested={m.status==='proposed'} onRead={()=>onRead?.(binderMemorySignalId(m.id))}>
-    <div className="student-note-writing"><div className="memory-meta"><span>{m.status==='proposed'?t('From a conversation summary','De un resumen de conversación'):t('Confirmed in this account','Confirmado en esta cuenta')}</span><time dateTime={m.updatedAt}>{new Date(m.updatedAt).toLocaleDateString(language)}</time></div>
-    {m.status==='proposed'&&<OrganizationEvidence value={m.organization} t={t} reviewOptional={paper}/>}
-    <p className="memory-writing" lang={m.language}>{m.content}</p><p className="memory-attribution">{speakers[m.speaker]} · {t('Shared by: ','Compartido por: ')}{speakers[m.reportedBy as Memory['speaker']]||speakers.unknown}</p>
+   {paper&&entries.length>0&&<div className="memory-overview-toolbar"><p>{overview?t('A few highlights from your saved details.','Algunos puntos destacados de tus datos guardados.'):t('Your original details, with sources and comments.','Tus datos originales, con fuentes y comentarios.')}</p><button type="button" disabled={busy||!!draft} onClick={()=>{setOriginals(!originals);setPage(0);heading.current?.focus({preventScroll:true});}}>{overview?t(`Read all details (${entries.length})`,`Leer todos los datos (${entries.length})`):t('Back to highlights','Volver a los puntos destacados')}</button></div>}
+   {overview?<div className="memory-overview">{groups.map(group=><section className="memory-overview-group" key={group.category} aria-label={labels[group.category]}><h5>{labels[group.category]}<span>{group.count}</span></h5><ul>{group.highlights.map(m=>{
+    const excerpt=memoryExcerpt(m.content),commentCount=comments.items.filter(c=>c.anchor?.kind==='memory'&&c.anchor.id===m.id&&c.topic===topic).length;
+    return <li key={m.id}><button type="button" className="memory-overview-detail" onClick={()=>openDetail(m.id)}><span className="memory-overview-writing" lang={m.language}>{excerpt.text}</span><span className="memory-overview-meta"><span>{m.status==='confirmed'?t('Confirmed in this account','Confirmado en esta cuenta'):m.organization?.certainty==='tentative'?t('Still exploring','Por explorar'):t('From a conversation','De una conversación')}{m.reportedBy==='parent'?t(' · Parent report',' · Informe del padre o tutor'):m.reportedBy==='unknown'?t(' · Speaker unconfirmed',' · Autor sin confirmar'):''}</span>{excerpt.truncated&&<span>{t('Excerpt','Fragmento')}</span>}<span className="memory-overview-open">{t('Read detail','Leer dato')} <span aria-hidden="true">↗</span></span></span>{(!!commentCount||freshIds?.has(binderMemorySignalId(m.id)))&&<span className="memory-overview-badges">{freshIds?.has(binderMemorySignalId(m.id))&&<span>{t('New','Nuevo')}</span>}{!!commentCount&&<span className="memory-overview-comments">{t(`${commentCount} coordinator comment${commentCount===1?'':'s'}`,`${commentCount} comentario${commentCount===1?'':'s'} del coordinador`)}</span>}</span>}</button></li>;
+   })}</ul></section>)}</div>:<div className="memory-entries">{entries.slice(currentPage*3,currentPage*3+3).map(m=><BinderNoteHighlight key={m.id} id={m.id} topic={topic||'options'} memory fresh={!!topic&&!!freshIds?.has(binderMemorySignalId(m.id))} suggested={m.status==='proposed'} onRead={()=>onRead?.(binderMemorySignalId(m.id))}>
+    <div className="student-note-writing"><div className="memory-meta">{paper&&m.status==='proposed'&&m.organization?<OrganizationEvidence value={m.organization} t={t} reviewOptional/>:<span>{m.status==='proposed'?t('From a conversation summary','De un resumen de conversación'):t('Confirmed in this account','Confirmado en esta cuenta')}</span>}<time dateTime={m.updatedAt}>{new Date(m.updatedAt).toLocaleDateString(language)}</time></div>
+    {!paper&&m.status==='proposed'&&<OrganizationEvidence value={m.organization} t={t} reviewOptional={paper}/>}
+    <p className="memory-writing" lang={m.language}>{m.content}</p><MemoryRecordTools paper={paper} t={t}><p className="memory-attribution">{speakers[m.speaker]} · {t('Shared by: ','Compartido por: ')}{speakers[m.reportedBy as Memory['speaker']]||speakers.unknown}</p>
     {m.summaryId&&<details className="memory-evidence"><summary>{t('See source','Ver fuente')}</summary>{m.conversationAt&&<time dateTime={m.conversationAt}>{new Date(m.conversationAt).toLocaleDateString(language)}</time>}<blockquote lang={m.language}>{m.quote}</blockquote><p>{t('From a saved summary, not a verbatim transcript. Deleting that conversation also removes this linked memory. A correction or removal excludes that summary and its linked notes from future calls; it stays in your binder.','De un resumen guardado, no de una transcripción literal. Eliminar esa conversación también elimina este recuerdo vinculado. Corregir o quitar un dato excluye ese resumen y sus notas vinculadas de las futuras llamadas; sigue en tu carpeta.')}</p></details>}
-    {paper?<details className="memory-management"><summary>{t('Options','Opciones')}</summary><div className="memory-actions">{m.status==='proposed'&&<button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'confirm',id:m.id,version:m.version})}>{t('Confirm detail','Confirmar dato')}</button>}<button type="button" disabled={busy||!!draft} onClick={()=>setDraft({...m})}>{t('Edit detail','Editar dato')}</button><button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'delete',id:m.id,version:m.version})}>{t('Remove detail','Quitar dato')}</button></div></details>:<div className="memory-actions">{m.status==='proposed'&&<button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'confirm',id:m.id,version:m.version})}>{t('Confirm detail','Confirmar dato')}</button>}<button type="button" disabled={busy||!!draft} onClick={()=>setDraft({...m})}>{t('Edit detail','Editar dato')}</button><button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'delete',id:m.id,version:m.version})}>{t('Remove detail','Quitar dato')}</button></div>}
+    <div className="memory-actions">{m.status==='proposed'&&<button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'confirm',id:m.id,version:m.version})}>{t('Confirm detail','Confirmar dato')}</button>}<button type="button" disabled={busy||!!draft} onClick={()=>setDraft({...m})}>{t('Edit detail','Editar dato')}</button><button type="button" disabled={busy||!!draft} onClick={()=>void act({action:'delete',id:m.id,version:m.version})}>{t('Remove detail','Quitar dato')}</button></div></MemoryRecordTools>
     </div>{topic&&<StudentEntryComments id={m.id} kind="memory" topic={topic}/>}
-   </BinderNoteHighlight>)}</div>
+   </BinderNoteHighlight>)}</div>}
    {!entries.length&&<p>{t('Nothing saved in this topic yet. Add something that would help your next conversation.','Aún no hay datos en este tema. Agrega algo que ayude en tu próxima conversación.')}</p>}
-   {pages>1&&<nav className="memory-actions" aria-label={t('Memory pages','Páginas de recuerdos')}><button type="button" disabled={currentPage===0} onClick={()=>setPage(currentPage-1)}>{t('Previous','Anterior')}</button><span>{currentPage+1} / {pages}</span><button type="button" disabled={currentPage===pages-1} onClick={()=>setPage(currentPage+1)}>{t('Next','Siguiente')}</button></nav>}
+   {!overview&&pages>1&&<nav className="memory-actions" aria-label={t('Memory pages','Páginas de recuerdos')}><button type="button" disabled={currentPage===0||!!draft||busy} onClick={()=>{setPage(currentPage-1);heading.current?.focus();}}>{t('Previous','Anterior')}</button><span>{currentPage+1} / {pages}</span><button type="button" disabled={currentPage===pages-1||!!draft||busy} onClick={()=>{setPage(currentPage+1);heading.current?.focus();}}>{t('Next','Siguiente')}</button></nav>}
    {organizing&&<p role="status">{t('Preparing suggestions from one conversation…','Preparando sugerencias de una conversación…')}</p>}
    {syncError&&<p role="status">{t('Conversation suggestions could not be prepared. Your saved conversations and details are still here.','No se pudieron preparar las sugerencias. Tus conversaciones y datos guardados siguen aquí.')}</p>}
     {data.pendingCount>0&&(data.organizationManaged?<p role="status">{t('Your conversation is saved. Origen is organizing the useful details.','Tu conversación está guardada. Origen está organizando los datos útiles.')}</p>:<button type="button" disabled={busy||organizing} onClick={()=>setAttempt(n=>n+1)}>{syncError?t('Retry suggestions','Reintentar sugerencias'):t(`Review older conversations (${data.pendingCount})`,`Revisar conversaciones anteriores (${data.pendingCount})`)}</button>)}
    </>}
   </div>
  </Container>;
+}
+
+function MemoryRecordTools({paper,t,children}:{paper:boolean;t:(en:string,es:string)=>string;children:React.ReactNode}){
+ return paper?<details className="memory-record-tools"><summary>{t('Source & options','Fuente y opciones')}</summary>{children}</details>:<>{children}</>;
 }

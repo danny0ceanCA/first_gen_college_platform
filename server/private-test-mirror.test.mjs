@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {retrievalFixture} from './history-retrieval-fixture.mjs';
+
+test('private test mirror follows source changes, preserves attribution, isolates test edits and honors erasure', {skip:!process.env.DATABASE_TEST_URL},async t=>{
+ const f=await retrievalFixture();t.after(()=>f.close());
+ const rows=(await f.owner.query("SELECT id,auth0_subject FROM origen_accounts WHERE auth0_subject IN ('reader','other')")).rows;
+ const source=rows.find(x=>x.auth0_subject==='reader').id,target=rows.find(x=>x.auth0_subject==='other').id;
+ await f.owner.query("UPDATE origen_accounts SET email='student-test@example.test' WHERE id=$1",[target]);
+ await f.owner.query('INSERT INTO origen_private_test_mirrors(source_account_id,target_account_id) VALUES($1,$2)',[source,target]);
+ await assert.rejects(f.runtime.query('SELECT * FROM origen_private_test_mirrors'),{code:'42501'});
+ await assert.rejects(f.runtime.query('UPDATE origen_private_test_mirrors SET enabled=false'),{code:'42501'});
+ await f.family('reader',{action:'save-student',student:{id:'mirror',name:'Fictional Student',stage:'Community college',goals:'Compare options'}});
+ const record=async(table,id)=>(await f.owner.query(`SELECT * FROM ${table} WHERE account_id=$1 AND id=$2`,[target,id])).rows[0];
+ assert.ok(await record('origen_students','mirror'),JSON.stringify((await f.owner.query('SELECT last_error FROM origen_private_test_mirrors')).rows));
+ assert.equal((await record('origen_students','mirror')).goals,'Compare options');
+ await f.family('other',{action:'save-student',student:{id:'mirror',name:'Fictional Student',stage:'Community college',goals:'Test only'}});
+ assert.equal((await f.family('reader',{action:'load'})).students.find(x=>x.id==='mirror').goals,'Compare options');
+ await f.family('reader',{action:'save-student',student:{id:'mirror',name:'Fictional Student',stage:'Community college',goals:'Revised original'}});
+ assert.equal((await record('origen_students','mirror')).goals,'Revised original');
+ await f.save('mirror-summary','A parent reported exploring transfer options.',{studentId:'mirror'});
+ assert.equal((await record('origen_conversation_summaries','mirror-summary')).organization_reported_by,'parent');
+ assert.equal((await record('origen_conversation_summaries','mirror-summary')).sharing_student_scope,false);
+ const history=await f.retrieve('transfer',{studentId:'mirror'},'other');
+ assert.ok(history.items.some(i=>i.kind==='summary'&&i.evidence.reportedBy==='parent'));
+ const id=randomUUID();await f.note({action:'create',id,studentId:'mirror',note:{topic:'transfer',kind:'note',language:'en',content:'Parent reported a possible transfer.'}});
+ assert.equal((await record('origen_topic_notes',id)).content,'Parent reported a possible transfer.');
+ await f.note({action:'update',id,studentId:'mirror',version:1,note:{topic:'transfer',kind:'note',language:'en',content:'No college has been chosen.'}});
+ assert.equal((await record('origen_topic_notes',id)).content,'No college has been chosen.');
+ const lineage=(await f.owner.query('SELECT complete,active,classification FROM origen_binder_source_lineage WHERE account_id=$1 AND source_id=$2',[target,id])).rows[0];
+ assert.equal(lineage.complete,false);assert.equal(lineage.active,false);assert.equal(lineage.classification,'parent');
+ const memoryId=randomUUID();
+ await f.owner.query("INSERT INTO origen_student_memories(account_id,id,version,student_id,category,content,language,speaker,reported_by,last_action,status) VALUES($1,$2,1,'mirror','goal','Reported goal','en','parent','parent','create','confirmed')",[source,memoryId]);
+ assert.equal((await record('origen_student_memories',memoryId)).reported_by,'parent');
+ await f.owner.query("UPDATE origen_student_memories SET status='superseded',content='',source_quote='' WHERE account_id=$1 AND id=$2",[source,memoryId]);
+ await f.owner.query("INSERT INTO origen_student_memories(account_id,id,version,student_id,category,content,language,speaker,reported_by,last_action,status) VALUES($1,$2,2,'mirror','goal','Corrected goal','en','parent','parent','update','confirmed')",[source,memoryId]);
+ assert.equal((await f.owner.query("SELECT content FROM origen_student_memories WHERE account_id=$1 AND id=$2 AND status='confirmed'",[target,memoryId])).rows[0].content,'Corrected goal');
+ await f.note({action:'delete',id,studentId:'mirror',version:2},'other');
+ // A user's explicit test-side erasure is not undone by a later source update,
+ // and a failed mirror never makes the original save fail.
+ await f.note({action:'update',id,studentId:'mirror',version:2,note:{topic:'transfer',kind:'note',language:'en',content:'Latest original'}});
+ assert.equal(await record('origen_topic_notes',id),undefined);
+ assert.match((await f.owner.query('SELECT last_error FROM origen_private_test_mirrors')).rows[0].last_error,/origen_topic_notes:/);
+ await f.history({action:'delete',id:'mirror-summary'});
+ assert.equal(await record('origen_conversation_summaries','mirror-summary'),undefined);
+ await f.family('reader',{action:'delete-student',id:'mirror'});
+ assert.equal(await record('origen_students','mirror'),undefined);
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_binder_connections WHERE account_id=$1',[target])).rows[0].n,0);
+ await f.family('reader',{action:'save-student',student:{id:'erase-owner',name:'Erase copy',stage:'Community college'}});
+ await f.owner.query('DELETE FROM origen_accounts WHERE id=$1',[source]);
+ assert.equal(await record('origen_students','erase-owner'),undefined);
+ assert.equal((await f.owner.query('SELECT count(*)::int n FROM origen_private_test_mirrors')).rows[0].n,0);
+});

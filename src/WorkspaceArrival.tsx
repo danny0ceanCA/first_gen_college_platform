@@ -8,7 +8,7 @@ export const WORKSPACE_ARRIVAL_TIMEOUT_MS=15000;
 
 // Children stay mounted while covered, so access checks and profile requests
 // run during the introduction. Internal loading gates do not restart it.
-export function WorkspaceArrival({active,children}:{active:boolean;children:ReactNode}){
+export function WorkspaceArrival({active,pending=false,children}:{active:boolean;pending?:boolean;children:ReactNode}){
  const [stalled,setStalled]=useState(false);
  const [revealed,setRevealed]=useState(false),[departed,setDeparted]=useState(false);
  const [waiting,setWaiting]=useState<Set<symbol>>(()=>new Set());
@@ -25,10 +25,10 @@ export function WorkspaceArrival({active,children}:{active:boolean;children:Reac
  // Give replacement gates and lazy modules two frames to register. This is a
  // readiness handoff, not a minimum viewing time for the welcome animation.
  useLayoutEffect(()=>{
-  if(!active||revealed||waiting.size)return;
+  if(!active||pending||revealed||waiting.size)return;
   let second=0;const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>setRevealed(true));});
   return()=>{cancelAnimationFrame(first);cancelAnimationFrame(second);};
- },[active,revealed,waiting]);
+ },[active,pending,revealed,waiting]);
  useEffect(()=>{
   if(!revealed)return;
   const timer=window.setTimeout(()=>setDeparted(true),motionDuration('arrival'));
@@ -46,5 +46,5 @@ export default function LoginArrival({children}:{children:ReactNode}){
  const [route,setRoute]=useState(()=>window.location.hash);
  useEffect(()=>{const update=()=>setRoute(window.location.hash);window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  const workspaceRoute=/^#(?:app|personal|welcome|mobile-design|admin|institutions|coordinators|coordinator-register)$/.test(route)||/^#(?:invite|institution-invite)\//.test(route)||new URLSearchParams(window.location.search).has('code');
- return <WorkspaceArrival active={workspaceRoute&&(isLoading||isAuthenticated)}>{children}</WorkspaceArrival>;
+ return <WorkspaceArrival active={workspaceRoute&&(isLoading||isAuthenticated)} pending={isLoading}>{children}</WorkspaceArrival>;
 }

@@ -23,7 +23,7 @@ export async function grantRuntimeAccess(pool,role,{schema='public'}={}){
    // only by source triggers, never by a request or model-supplied classification.
    if(coordinatorTables.includes(tablename)||['origen_admin_voice_runs','origen_teachings','origen_teaching_revisions','origen_teaching_access','origen_teaching_access_totals'].includes(tablename))continue;
    if(lineageTables.includes(tablename)){await client.query(`GRANT SELECT ON TABLE ${table} TO ${who}`);continue;}
-   if(['origen_telemetry_erasure_outbox','origen_support_case_actors'].includes(tablename))continue;
+   if(['origen_telemetry_erasure_outbox','origen_support_case_actors','origen_private_test_mirrors'].includes(tablename))continue;
    if(tablename==='origen_support_cases'){await client.query(`GRANT SELECT,INSERT ON TABLE ${table} TO ${who}`);await client.query(`GRANT UPDATE(status) ON TABLE ${table} TO ${who}`);continue;}
    const permissions=['origen_privacy_events','origen_diagnostic_operations','origen_diagnostic_request_refs'].includes(tablename)?'SELECT,INSERT,DELETE':tablename==='origen_privileged_access_audit'?'INSERT':['origen_schema_migrations','origen_student_links','origen_staff_access_controls','origen_deletion_journal','origen_identity_closures'].includes(tablename)?'SELECT':tablename==='origen_closed_accounts'?'SELECT,INSERT':tablename==='origen_subject_locks'?'SELECT,INSERT,UPDATE':'SELECT,INSERT,UPDATE,DELETE';
    await client.query(`GRANT ${permissions} ON TABLE ${table} TO ${who}`);

@@ -2,7 +2,7 @@ import {guardAccountTransaction} from './account-guard.mjs';
 import {databaseQueryOperation} from './observability/dependencies.mjs';
 import {withRequestDeadline} from '../src/requestDeadline.mjs';
 import {savedSourceEvidence} from './conversation-continuity.mjs';
-import {binderEvidence,binderEvidenceInstructions} from './binder-context.mjs';
+import {binderEvidence,binderEvidenceInstructions,binderReporter} from './binder-context.mjs';
 
 export const RETRIEVAL_VERSION='postgres-keyword-v3';
 export const RETRIEVAL_BUDGET=6500;
@@ -34,7 +34,7 @@ function candidateSql(studentId,continuity){
  return `WITH search AS (SELECT ${parsed('$3')} AS query,$2::text AS scope), candidates AS (
   SELECT 'summary'::text AS kind,s.id,s.student_id,s.summary AS content,'und'::text AS language,
    encode(sha256(convert_to(s.summary,'UTF8')),'hex') AS version,s.id AS summary_id,s.conversation_at AS recorded_at,
-   'unreviewed'::text AS status,'unknown'::text AS speaker,'unknown'::text AS reported_by,s.mode AS topic,${document('s.summary')} AS document,${continuity?'s.sources':"'[]'::jsonb"} AS sources,NULL::text AS note_kind,
+   'unreviewed'::text AS status,'unknown'::text AS speaker,s.organization_reported_by AS reported_by,s.mode AS topic,${document('s.summary')} AS document,${continuity?'s.sources':"'[]'::jsonb"} AS sources,NULL::text AS note_kind,
    NULL::jsonb AS organization,NULL::text AS source_quote,NULL::text AS source_version,s.conversation_at AS source_at,false AS context_current
   FROM origen_conversation_summaries s,search WHERE s.account_id=$1 AND ${scope('s')} AND ${suppressed('s.id')} AND ${document('s.summary')} @@ search.query
   UNION ALL
@@ -45,7 +45,7 @@ function candidateSql(studentId,continuity){
    AND (m.status='confirmed' OR coalesce((to_jsonb(m)->>'context_current')::boolean,false) OR ${suppressed('m.source_summary_id')}) AND ${document('m.content')} @@ search.query
   UNION ALL
   SELECT 'note',n.id::text,n.student_id,n.content,n.language,n.version::text,n.source_summary_id,n.updated_at,
-   'saved','unknown','unknown',n.topic,${document('n.content')},${sources('n')},n.kind,
+   'saved','unknown',(SELECT source.organization_reported_by FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=n.source_summary_id AND ${scope('source')}),n.topic,${document('n.content')},${sources('n')},n.kind,
    to_jsonb(n)->'organization',n.source_quote,NULL::text,(SELECT source.conversation_at FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=n.source_summary_id AND ${scope('source')}),coalesce((to_jsonb(n)->>'context_current')::boolean,false)
   FROM origen_topic_notes n,search
   WHERE n.account_id=$1 AND ${scope('n')} AND n.status='saved' AND ${sourceScope('n')} AND (coalesce((to_jsonb(n)->>'context_current')::boolean,false) OR ${suppressed('n.source_summary_id')}) AND ${document('n.content')} @@ search.query
@@ -97,13 +97,14 @@ export async function retrieveStudentHistory(database,subject,{studentId,query,e
    // Bound SQL too: a Promise timeout alone would leave work occupying the pool.
    await c.query(`SET LOCAL statement_timeout='${Math.max(1,Math.ceil(deadline-(performance.now()-started)))}ms'`);
    await guardAccountTransaction(c,subject);check();
-   const account=(await c.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0];
+   const account=(await c.query('SELECT id,role FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0];
    if(!account)throw fail(404,'account_not_found');
    if(studentId!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account.id,studentId])).rows.length)throw fail(404,'student_not_found');
    check();const ready=(await c.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql') AS ready")).rows[0]?.ready;
    if(!ready){await c.query('COMMIT');transaction=false;return empty('migration_pending');}
    check();const rows=(await c.query(candidateSql(studentId,continuity),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
-   const items=selectItems(rows,retrievalTerms(concepts.join(' ')),continuity);await c.query('COMMIT');transaction=false;check();
+   const reportedBy=['parent','student'].includes(account.role)?account.role:'unknown';
+   const items=selectItems(rows.map(row=>['note','summary'].includes(row.kind)?{...row,reported_by:binderReporter({...row,organization_reported_by:row.reported_by},reportedBy)}:row),retrievalTerms(concepts.join(' ')),continuity);await c.query('COMMIT');transaction=false;check();
    return {available:true,method:RETRIEVAL_VERSION,reason:items.length?'matched':'no_relevant_history',items};
   }finally{if(transaction)await c.query('ROLLBACK').catch(()=>{});c.release();}
  },{timeoutMs:deadline}));}
