@@ -101,6 +101,12 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
   if(input.action==='inspect'){await c.query('COMMIT');committed=true;return {studentId:session.student_id,revision:session.revision,...(session.review_response_focus?{responseFocus:{kind:'review-response',requestId:session.review_response_focus,responseVersion:session.review_response_focus_version}}:{})};}
   if(!['write','present'].includes(input.action))throw fail(400,'invalid_live_memory');
   const change=input.change;let old,responseSource;
+  // An active recommendation has its own exact source/readback contract. The
+  // generic next-step writer cannot discard that provenance or source guard.
+  if(change.kind==='next-step'&&(await c.query("SELECT to_regprocedure('origen_recommendation_delivery_command(jsonb)') AS fn")).rows[0]?.fn){
+   const gate=(await c.query('SELECT origen_recommendation_delivery_command($1::jsonb) AS result',[JSON.stringify({action:'legacy-check',sessionId:input.sessionId,sequence:input.sequence,turnId:input.turnId,transcript:input.transcript})])).rows[0].result;
+   if(gate.error||gate.blocked)throw fail(409,'recommendation_approval_required');
+  }
   if(change.responseSource){
    await enableReviewResponseChoice(c,env,subject);
    const source=change.responseSource;

@@ -1,0 +1,16 @@
+export type RecommendationSource = {kind:'accepted-action';planId:string;stepId:string;planVersion:number}|{kind:'review-response';requestId:string;responseVersion:number;organizationId:string}|{kind:'reviewed-template';teachingId:string;revision:number};
+export type RecommendationScope = {campus:{state:'unknown';id:null}|{state:'confirmed';id:string};term:{state:'unknown';value:null}|{state:'confirmed';value:string};organizationId:string|null};
+export type RecommendationCandidate = {contractVersion:1;source:RecommendationSource;action:{en:string;es:string};goal:'understand_requirement'|'prepare_document'|'submit_document'|'check_decision';process:'office_contact'|'aid_documents'|'insurance_waiver';prerequisites:string[];exclusions:string[];scope:RecommendationScope;support:{kind:'official-policy';id:string;version:number}[];reviewedAt:string;expiresAt:string;explanation:{en:string;es:string}};
+export type RecommendationDecision = {contractVersion:1;policyVersion:typeof RECOMMENDATION_POLICY_VERSION;status:'recommended';candidate:RecommendationCandidate;reason:'current_goal'|'accepted_work'|'relevant_prerequisite';sourceRevision:string}|{contractVersion:1;policyVersion:typeof RECOMMENDATION_POLICY_VERSION;status:'clarification_required'|'no_applicable_candidate'|'unavailable';candidate:null;reason:string;sourceRevision:null};
+export type RecommendationActionLink = {contractVersion:1;policyVersion:typeof RECOMMENDATION_POLICY_VERSION;source:RecommendationSource;sourceRevision:string;target:{planId:string;stepId:string;planVersion:number}};
+export type RecommendationCommand = {action:'resolve-source';contractVersion:1;purpose:'personal_guidance';studentId:string;source:RecommendationSource};
+export const RECOMMENDATION_CONTRACT_VERSION:1;
+export const RECOMMENDATION_POLICY_VERSION:'evidence-informed-v1';
+export const RECOMMENDATION_EVALUATION_PURPOSE:'recommendation_evaluation';
+export const recommendationContract:Readonly<{version:1;policyVersion:string;sourceKinds:readonly string[];decisionStates:readonly string[];purposes:Readonly<{guidance:string;evaluation:string}>;limits:Readonly<{candidates:number;supportingSources:number;conditions:number;statementTimeoutMs:number;retainedUnacceptedDecisions:0}>;authority:Readonly<{canRecommend:false;canAccept:false;canPublish:false;canEvaluate:false}>;excludedFeatures:readonly string[];permissions:Readonly<Record<string,string>>;lifecycle:Readonly<Record<string,string>>;evidenceMeaning:Readonly<Record<string,string>>}>;
+export function validateRecommendationSource(value:unknown):RecommendationSource;
+export function validateRecommendationScope(value:unknown):RecommendationScope;
+export function validateRecommendationCandidate(value:unknown):RecommendationCandidate;
+export function validateRecommendationDecision(value:unknown):RecommendationDecision;
+export function validateRecommendationActionLink(value:unknown):RecommendationActionLink;
+export function validateRecommendationCommand(value:unknown):RecommendationCommand;

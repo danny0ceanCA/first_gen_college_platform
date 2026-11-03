@@ -1,5 +1,6 @@
 import {retrievalTerms} from './history-retrieval.mjs';
 import {guidanceProgress} from '../src/guidanceFollowThrough.mjs';
+import {decideRecommendation,preserveStudentPriority,recommendationSourceKey} from './recommendation-policy.mjs';
 
 export const NEXT_STEP_POLICY='binder-next-step-v1';
 const day=86400000;
@@ -57,4 +58,22 @@ export function selectBinderOpening(input,options){
  if(input.openingDecision!==undefined)return input.openingDecision?.opening||null;
  if(input.onboarding===true||input.routeConversations&&input.targetConfirmed!==true||input.continuing||input.continuity?.length||input.scopeRestart||input.workspaceRefreshOnly||input.workspace?.selection||!(input.experience?.usedApp||input.experience?.usedVoice))return null;
  return rankBinderNextSteps(input,options)[0]||null;
+}
+
+// Step 3 extends the same selection module. Explicit recommendation requests
+// are evaluated separately from the existing reserved opening; this function
+// cannot create, replace or consume a conversation-opening allowance.
+export function recommendationRequestAllowed(input,request){
+ if(!input||input.trigger!=='student_request'||input.role!=='student'||input.studentId!==request.studentId||input.targetConfirmed!==true||input.intent!==request.intent||input.goal!==request.goal||input.process!==request.process)return false;
+ if(input.onboarding||input.scopeRestart||input.workspaceRefreshOnly||input.reconnecting||input.declined||input.deferred||input.questionChanged)return false;
+ if(input.focus===undefined)return false;
+ try{if(input.focus===null?request.focus!==null:request.focus===null||recommendationSourceKey(input.focus)!==recommendationSourceKey(request.focus))return false;}catch{return false;}
+ // Notes and unreviewed recaps are discussion focus, not authority to generate
+ // a replacement action. A current direct question continues to take priority.
+ if(input.selection&&['note','point','coordinator-guidance'].includes(input.selection))return false;
+ return true;
+}
+export function selectBinderRecommendation(input,context,options){
+ if(!recommendationRequestAllowed(input,context))return preserveStudentPriority();
+ return decideRecommendation(context,options);
 }

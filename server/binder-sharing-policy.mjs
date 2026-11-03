@@ -3,11 +3,15 @@
 // subset transactionally in migration 053; migration 054 adds separately gated coordinator reads.
 // Student-first Phase 7's separate derived-excerpt policy is enforced by migration
 // 067. It never certifies whole summaries or changes this manual-note serializer.
+import {recommendationConfigurationIssues} from './recommendation-settings.mjs';
 export const BINDER_SHARING_POLICY_VERSION='coordinator-sharing-v1';
 export const sharingTopics=Object.freeze(['options','transfer','costs','applications']);
 export const coordinatorFlags=Object.freeze(['ORIGEN_COORDINATOR_ACCOUNTS','ORIGEN_COORDINATOR_LINKING','ORIGEN_BINDER_SHARING','ORIGEN_COORDINATOR_FEEDBACK','ORIGEN_COORDINATOR_VOICE_LINKING','ORIGEN_COORDINATOR_BINDER_VIEWING']);
 export const reviewRequestFlags=Object.freeze(['ORIGEN_REVIEW_REQUESTS','ORIGEN_REVIEW_REQUEST_VOICE','ORIGEN_REVIEW_REQUEST_DELIVERY','ORIGEN_REVIEW_RESPONSE_CONTEXT','ORIGEN_STUDENT_FOLLOW_UP','ORIGEN_OUTCOME_EVIDENCE','ORIGEN_OUTCOME_EVALUATION']);
 export const coordinatorTables=Object.freeze([
+ 'origen_recommendation_evaluation_permissions','origen_recommendation_evaluation_previews','origen_recommendation_evaluation_receipts','origen_recommendation_evaluation_capabilities','origen_recommendation_evaluation_report_budget',
+ 'origen_recommendation_previews','origen_plan_recommendations','origen_outcome_recommendation_links',
+ 'origen_recommendation_library_capabilities','origen_recommendation_templates','origen_recommendation_template_revisions',
  'origen_outcome_evaluation_permissions','origen_outcome_evaluation_previews','origen_outcome_evaluation_capabilities',
  'origen_outcome_review_capabilities','origen_outcome_observations','origen_outcome_observation_disputes','origen_outcome_observation_previews',
  'origen_outcome_definitions','origen_outcome_episodes','origen_outcome_evidence',
@@ -30,7 +34,7 @@ export const coordinatorTables=Object.freeze([
 ]);
 export const lineageTables=Object.freeze(['origen_binder_source_lineage','origen_binder_source_edges']);
 export function coordinatorConfigurationIssues(env={}){
- const derivedIssues=[];
+ const derivedIssues=[...recommendationConfigurationIssues(env)];
  if(env.ORIGEN_OUTCOME_EVALUATION&&!['true','false'].includes(env.ORIGEN_OUTCOME_EVALUATION))derivedIssues.push('ORIGEN_OUTCOME_EVALUATION: use true or false');
  if(env.ORIGEN_OUTCOME_EVIDENCE&&!['true','false'].includes(env.ORIGEN_OUTCOME_EVIDENCE))derivedIssues.push('ORIGEN_OUTCOME_EVIDENCE: use true or false');
  if(env.ORIGEN_OUTCOME_EVIDENCE==='true'&&env.ORIGEN_STUDENT_FOLLOW_UP!=='true')derivedIssues.push('ORIGEN_OUTCOME_EVIDENCE: requires student follow-up');

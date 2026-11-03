@@ -10,12 +10,16 @@ assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(origin).hostname));
 const folder=process.env.ORIGEN_SMOKE_OUTPUT||'/tmp/origen-followup-release-browser';
 
 const {installSyntheticPlayback,played}=require('./synthetic-voice-playback.cjs');
-const outcomeMode=process.argv.includes('--outcome-evidence');
+const recommendationMode=process.argv.includes('--recommendation-evidence');
+const outcomeMode=recommendationMode||process.argv.includes('--outcome-evidence');
+const recommendation=require('./recommendation-connected.cjs');
 const {recordOutcome,observeOutcome,verifyOutcome}=require('./outcome-evidence-connected.cjs');
 (async()=>{
  const [{coordinatorPilotFixture},{createProfileVoiceHandler},{createLiveMemoryHandler},{createPlanHandler,createPlanRepository,validatePlan},{personalizationPolicy}]=await Promise.all([
   import('../server/fixtures/coordinator-pilot.mjs'),import('../server/profile-voice.mjs'),import('../server/live-memory.mjs'),import('../server/plans.mjs'),import('../server/personalization-controls.mjs')]);
  const {outcomeReleaseStages}=await import('../ops/outcome-release-verification.mjs');
+ const {recommendationReleaseStages}=await import('../ops/recommendation-release-verification.mjs');
+ const {createRecommendationDeliveryHandler}=await import('../server/recommendation-delivery.mjs');
  await mkdir(folder,{recursive:true});const browser=await chromium.launch({headless:true,executablePath:process.env.ORIGEN_BROWSER_EXECUTABLE,args:['--no-sandbox','--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets']});const journeys=[];
  try{for(const width of [390,320,1280])for(const language of ['en','es'])for(const entry of ['live','realtime']){
   const f=await coordinatorPilotFixture({reviewRequests:true,reviewVoice:true,reviewDelivery:true,language});let page,staffPage;const protocol=[];
@@ -29,27 +33,29 @@ const {recordOutcome,observeOutcome,verifyOutcome}=require('./outcome-evidence-c
    const plans=()=>f.as('other',()=>createPlanRepository(f.db,f.env)('other',validatePlan({action:'load',studentId})));
    const question=t('Which insurance waiver documents are accepted?','¿Qué documentos aceptan para la exención del seguro?');
    const guidance=t('Your work coverage may qualify if it meets campus requirements. Confirm with the insurance office.','La cobertura de tu trabajo podría ser válida si cumple los requisitos del campus. Confirma con la oficina del seguro.');
-   const action=t('Ask which proof of coverage is accepted.','Preguntar qué comprobante de cobertura aceptan.');
+   let action=t('Ask which proof of coverage is accepted.','Preguntar qué comprobante de cobertura aceptan.');
    const draft=(await student({action:'create',requestKey:randomUUID(),connectionId,origin:'notebook',language,kind:'question',originalQuestion:question,entries:[]})).request;
    const preview=(await student({action:'preview',id:draft.id,version:1,wording:'original'})).preview;
    const parent=(await student({action:'submit',id:draft.id,version:1,previewId:preview.id,digest:preview.digest,confirmed:true})).request;await f.sweep();
    await staff({action:'respond',id:parent.id,publicationId:parent.publication.id,version:0,operationId:randomUUID(),guidance,suggestedAction:action});await f.sweep();
    if(outcomeMode)Object.assign(f.env,{ORIGEN_OUTCOME_EVIDENCE:'true',ORIGEN_OUTCOME_EVALUATION:'true'});
    const source={kind:'review-response',requestId:parent.id,responseVersion:1},configs=[];
-   const plan=(await f.as('other',()=>createPlanRepository(f.db,f.env)('other',validatePlan({action:'create',requestId:randomUUID(),fromResponse:{source,stepId:'accepted',confirmed:true},plan:{studentId,title:t('My insurance next step','Mi próximo paso sobre el seguro'),goal:'',category:'financial',status:'active',summaryIds:[],steps:[{id:'accepted',title:action,action,notes:'PRIVATE_PLAN_NOT_SHARED',status:'not-started',dueDate:null,sources:[]}]}})))).plans[0],target={planId:plan.id,stepId:'accepted'};
+   if(recommendationMode)await recommendation.prepareLibrary(f,studentId,language);
+   const plan=recommendationMode?null:(await f.as('other',()=>createPlanRepository(f.db,f.env)('other',validatePlan({action:'create',requestId:randomUUID(),fromResponse:{source,stepId:'accepted',confirmed:true},plan:{studentId,title:t('My insurance next step','Mi próximo paso sobre el seguro'),goal:'',category:'financial',status:'active',summaryIds:[],steps:[{id:'accepted',title:action,action,notes:'PRIVATE_PLAN_NOT_SHARED',status:'not-started',dueDate:null,sources:[]}]}})))).plans[0],initialTarget=plan?{planId:plan.id,stepId:'accepted'}:null;let target=initialTarget;
    const follow=()=>f.call('other','/api/student-follow-up',{action:'load',studentId,target});
    const voice=createProfileVoiceHandler(f.env,async(url,options)=>{configs.push(entry==='live'?JSON.parse(options.body).session:JSON.parse(options.body.get('session')));return entry==='live'?Response.json({transport:{sdp:'v=0\r\n'},session:{id:'synthetic-live'}}):new Response('v=0\r\n');},()=>{},f.db);
    const ui=await setup(browser,{width,language,configurePage:async p=>{
     page=p;p.on('pageerror',e=>console.error('browser: '+e.message));
     await installSyntheticPlayback(p);
-    for(const [path,handler] of [['profile-voice',voice],['live-memory',createLiveMemoryHandler(f.db,f.env)],['plans',createPlanHandler(f.db,f.env)]])await p.route('**/api/'+path,async route=>{
+    for(const [path,handler] of [['profile-voice',voice],['live-memory',createLiveMemoryHandler(f.db,f.env)],['plans',createPlanHandler(f.db,f.env)],['recommendations',createRecommendationDeliveryHandler(f.db,f.env)],['recommendation-voice',createRecommendationDeliveryHandler(f.db,f.env)]])await p.route('**/api/'+path,async route=>{
      const req=Object.assign(Readable.from([JSON.stringify(route.request().postDataJSON())]),{url:'/api/'+path,method:'POST',headers:{...route.request().headers(),host:new URL(origin).host,origin,'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'other'}});let status,body;
      await f.as('other',()=>handler(req,{writeHead:s=>status=s,end:s=>body=JSON.parse(s)},()=>assert.fail('unhandled fixture route')));if(path==='profile-voice'&&body?.sdp)protocol.push(body);await route.fulfill({status,json:body});
     });
-    for(const path of ['review-response-context','review-response-choices','review-request-voice','review-requests','coordinator-connections','coordinator-notifications','student-follow-up','student-follow-up-report','student-follow-up-voice','conversation-opening','outcome-evidence','student-outcome-observations','outcome-evaluation'])await p.route('**/api/'+path,async route=>{const r=await f.request('other','/api/'+path,route.request().postDataJSON());await route.fulfill({status:r.status,json:r.body});});
+    for(const path of ['review-response-context','review-response-choices','review-request-voice','review-requests','coordinator-connections','coordinator-notifications','student-follow-up','student-follow-up-report','student-follow-up-voice','conversation-opening','outcome-evidence','student-outcome-observations','outcome-evaluation','recommendation-evaluation'])await p.route('**/api/'+path,async route=>{const r=await f.request('other','/api/'+path,route.request().postDataJSON());await route.fulfill({status:r.status,json:r.body});});
     await p.route('**/api/student-memory',async route=>{const b=route.request().postDataJSON(),r=await f.memory({...b,action:b.action==='sync'?'load':b.action},'other');await route.fulfill({json:{...r,pendingCount:0,memoryPolicy:personalizationPolicy(f.env,'other')}});});
     await p.route('**/api/topic-notes',async route=>route.fulfill({json:{...await f.note(route.request().postDataJSON(),'other'),pendingCount:0}}));
    }});page=ui.page;await openBinder(page);
+   if(recommendationMode)({target,action}=await recommendation.acceptRecommendation({page,f,studentId,language,guidance,action,plans}));
    await page.locator('.personal-binder [data-topic=summary]').first().click();
    await page.getByRole('button',{name:t('See all my steps','Ver todos mis pasos'),exact:true}).click();
    const actionCard=page.locator('.saved-actions > li').first();await actionCard.getByText(action,{exact:true}).first().waitFor();
@@ -77,6 +83,7 @@ const {recordOutcome,observeOutcome,verifyOutcome}=require('./outcome-evidence-c
    assert.equal(protocol.at(-1).openingClaim,undefined,'Reconnect cannot repeat the consumed check-in.');
    const privateState=await follow();assert.equal(privateState.reports.length,1);const report=privateState.reports[0];assert.equal(report.detail,privateDetail);assert.equal(report.reported_action,'completed');assert.equal(report.reported_outcome,'pending');assert.equal(report.helpfulness,'partly_helpful');assert.equal((await plans()).plans[0].steps[0].status,'not-started');assert.deepEqual(await staff({action:'read',id:parent.id}),coordinatorBefore);
    const outcomeRecord=outcomeMode?await recordOutcome({page,f,entry,language,studentId,target,action,report}):null;
+   if(recommendationMode)await recommendation.verifyLinkedOutcome(f,outcomeRecord);
    await userTurn(page,entry,'return-to-source',t('Can you explain the insurance waiver response?','¿Puedes explicarme la respuesta sobre la exención del seguro?'));
    const recalled=await tool(page,entry,'recall-source','recall_student_context',{query:'insurance waiver'});assert.equal(recalled.reviewResponse.status,'retrieved');assert.deepEqual(recalled.reviewResponse.response.source,source);
    const followup=outcomeRecord?.wording||t('I contacted the office. They requested a letter from my employer.','Me comuniqué con la oficina. Pidieron una carta de mi trabajo.');
@@ -99,14 +106,15 @@ const {recordOutcome,observeOutcome,verifyOutcome}=require('./outcome-evidence-c
    if(outcomeMode)await page.locator('.review-request-sheet').getByText(observed.observation,{exact:true}).waitFor();
    await page.getByRole('button',{name:t('Close requests','Cerrar solicitudes'),exact:true}).click();
    if(outcomeMode)await verifyOutcome({page,f,entry,language,studentId,actionCard,record:outcomeRecord,observed,configs,source});
+   if(recommendationMode)await recommendation.verifyCorrectionAndWithdrawal({page,f,language,plans});
    // Editing the source invalidates the active voice guard, detaches the shared
    // update and preserves the student's independently accepted action.
    await page.bringToFront();await staff({action:'respond',id:parent.id,publicationId:parent.publication.id,version:1,operationId:randomUUID(),guidance:t('Confirm the revised requirements with the campus.','Confirma los requisitos actualizados con el campus.')});
    await page.waitForFunction(()=>window.connections.at(-1)?.connectionState==='closed',null,{timeout:15000});
    await assert.rejects(staff({action:'read',id:child.id}),{status:404});const retained=(await plans()).plans;assert.equal(retained.length,1);assert.equal(retained[0].steps[0].action,action);assert.equal(retained[0].steps[0].responseSource.source,null);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(ui.state.errors,[]);assert.deepEqual(coordinator.errors,[]);await page.screenshot({path:`${folder}/${label}.png`});
-   journeys.push({width,language,entry,passed:true,stages:outcomeMode?[...outcomeReleaseStages]:['accepted-action','check-in-choice','heard-opening','optional-answer','private-save','approved-share','coordinator-response','source-invalidation']});console.log(`PASS ${label}: check-in, optional answer, private report, approved snapshot, coordinator reply and source invalidation.`);
+   journeys.push({width,language,entry,passed:true,stages:recommendationMode?[...recommendationReleaseStages]:outcomeMode?[...outcomeReleaseStages]:['accepted-action','check-in-choice','heard-opening','optional-answer','private-save','approved-share','coordinator-response','source-invalidation']});console.log(`PASS ${label}: check-in, optional answer, private report, approved snapshot, coordinator reply and source invalidation.`);
   }catch(error){if(page){await writeFile(`${folder}/${label}-failure.txt`,await page.locator('body').innerText().catch(()=>''));await page.screenshot({path:`${folder}/${label}-failure.png`}).catch(()=>{});}throw error;}
   finally{for(const p of [page,staffPage]){await p?.unrouteAll({behavior:'wait'});await p?.close();}await f.close();}
- }}finally{await browser.close();await writeFile(`${folder}/results.json`,JSON.stringify({kind:outcomeMode?'outcome-evidence-connected-browser-verification':'student-follow-up-connected-browser-verification',schemaVersion:1,browserVersion:browser.version(),syntheticIdentity:true,syntheticSpeech:true,disposablePostgres:true,journeys,passed:journeys.length===12},null,2)+'\n');}
+ }}finally{await browser.close();await writeFile(`${folder}/results.json`,JSON.stringify({kind:recommendationMode?'recommendation-connected-browser-verification':outcomeMode?'outcome-evidence-connected-browser-verification':'student-follow-up-connected-browser-verification',schemaVersion:1,browserVersion:browser.version(),syntheticIdentity:true,syntheticSpeech:true,disposablePostgres:true,journeys,passed:journeys.length===12},null,2)+'\n');}
 })().catch(error=>{console.error(error);process.exitCode=1;});

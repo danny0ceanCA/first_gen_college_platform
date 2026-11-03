@@ -14,6 +14,8 @@ assert.equal(new URL(origin).hostname,'127.0.0.1');
   await page.route('**/*',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname.endsWith('/@auth0_auth0-react.js'))return route.fulfill({contentType:'application/javascript',body:'export function useAuth0(){return {user:{sub:"synthetic"},isAuthenticated:true}}'});
+   if(url.pathname==='/api/recommendation-evaluation')return route.fulfill({json:{enabled:false,organizations:[],permission:null}});
+   if(url.pathname==='/api/recommendations')return route.fulfill({json:{enabled:false}});
    if(url.pathname.startsWith('/api/')){
     const body=route.request().postDataJSON();calls.push({path:url.pathname,...body});assert.equal(body.studentId,'alex');let result=snapshot();
     if(url.pathname==='/api/outcome-evidence')return route.fulfill({json:{enabled:false,canRecord:false,episodes:[],evidence:[]}});

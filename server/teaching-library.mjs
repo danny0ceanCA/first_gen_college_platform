@@ -1,6 +1,7 @@
 import {adminCapabilities,requireStaffAccess} from './staff-access.mjs';
 import {runAsAnalytics} from './account-isolation.mjs';
 import {randomUUID} from 'node:crypto';
+import {createActionLibraryHandler} from './recommendation-library.mjs';
 
 const topics=['general','profile','planning','finance','loans','admissions'];
 const fields={title:120,explanation:6000,deliveryStyle:1500,conversationApproach:1500,concern:1000,useWhen:1000,skipFollowUp:1000,keywords:300,campus:160,academicYear:7,sourceUrl:2000,reviewBy:10,example:3000,followUp:1000,referral:1000};
@@ -28,7 +29,9 @@ export function validateTeachingRequest(input){
  return result;
 }
 export function createTeachingLibraryHandler(database,env){
+ const actions=createActionLibraryHandler(database,env);
  return async(req,res,next)=>{
+  if(req.url?.split('?')[0]==='/api/recommendation-library')return actions(req,res,next);
   if(req.url?.split('?')[0]!=='/api/teaching-library')return next();
   const send=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});

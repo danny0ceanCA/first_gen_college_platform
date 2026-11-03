@@ -130,6 +130,9 @@ export async function replayDeletionManifest(pool,manifest){
    await c.query('SELECT origen_outcome_observation_after_restore()');
   }
   if((await c.query("SELECT to_regprocedure('origen_outcome_evaluation_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_outcome_evaluation_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_recommendation_library_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_recommendation_library_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_recommendation_evaluation_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_recommendation_evaluation_after_restore()');
+  if((await c.query("SELECT to_regprocedure('origen_recommendation_acceptance_after_restore()') AS fn")).rows[0]?.fn)await c.query('SELECT origen_recommendation_acceptance_after_restore()');
   const coordinatorReady=(await c.query("SELECT to_regprocedure('origen_coordinator_export()') AS fn")).rows[0]?.fn;
   if(coordinatorReady){
    await c.query("UPDATE origen_coordinator_organizations SET status='suspended',revision=revision+1 WHERE status='active'");

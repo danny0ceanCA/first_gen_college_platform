@@ -30,13 +30,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Verify outcome evidence and all earlier coordinator journeys without application credentials
-        run: npm run outcome-evidence:verify -- --disposable-database --output "$RUNNER_TEMP/review-request-release"
-      - name: Save outcome evidence release verification results
+      - name: Verify recommendations and all earlier coordinator journeys without application credentials
+        run: npm run recommendations:verify -- --disposable-database --output "$RUNNER_TEMP/review-request-release"
+      - name: Save recommendation release verification results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: outcome-evidence-release-evidence
+          name: recommendations-release-evidence
           path: ${{ runner.temp }}/review-request-release/
           if-no-files-found: error
   student-first-regression:

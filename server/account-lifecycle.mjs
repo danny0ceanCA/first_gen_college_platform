@@ -49,6 +49,12 @@ export function createLifecycleRepository(database){return async(subject,input,i
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_guidance_questions'")).rows.length)data.guidanceQuestions=await rows('origen_guidance_questions');
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_name='origen_topic_notes'")).rows.length){data.topicNotes=await rows('origen_topic_notes');data.topicNoteBatches=await rows('origen_topic_note_batches');}
    if((await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='origen_binder_source_lineage'")).rows.length){data.binderSourceLineage=await rows('origen_binder_source_lineage');data.binderSourceEdges=await rows('origen_binder_source_edges');}
+   if(account&&(await c.query("SELECT to_regprocedure('origen_student_recommendation_evaluation(jsonb)') AS fn")).rows[0]?.fn)data.recommendationEvaluation=(await c.query("SELECT origen_student_recommendation_evaluation('{\"action\":\"export\"}'::jsonb) AS result")).rows[0].result;
+   if(account&&(await c.query("SELECT to_regprocedure('origen_recommendation_delivery_command(jsonb)') AS fn")).rows[0]?.fn){
+    const provenance=(await c.query("SELECT origen_recommendation_delivery_command('{\"action\":\"export\"}'::jsonb) AS result")).rows[0].result;
+    if(provenance.error)throw fail(403,'recommendation_export_denied');data.recommendationActions=provenance.links;
+    if((await c.query("SELECT to_regprocedure('origen_recommendation_outcomes_export()') AS fn")).rows[0]?.fn)data.recommendationOutcomeLinks=(await c.query('SELECT origen_recommendation_outcomes_export() AS links')).rows[0].links;
+   }
    if(account&&(await c.query("SELECT to_regprocedure('origen_student_follow_up_command(jsonb)') AS fn")).rows[0]?.fn){
     const followUp=(await c.query('SELECT origen_student_follow_up_command($1::jsonb) AS result',[JSON.stringify({action:'export'})])).rows[0].result;
     if(followUp.error)throw fail(403,'student_follow_up_export_denied');

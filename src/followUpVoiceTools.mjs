@@ -54,7 +54,8 @@ export function followUpVoiceTools({post,evidence,sequence,isCurrent=()=>true,ca
    const allowed=['prepare_student_check_in','list_student_outcome_reports'].includes(item.name)?['target']:['prepare_private_follow_up_update','prepare_student_outcome_evidence'].includes(item.name)?['target','payload']:[];
    if(!args||Array.isArray(args)||Object.keys(args).some(k=>!allowed.includes(k)))return {status:'invalid_request'};
    const kind=item.name==='prepare_student_check_in'?'check-in':item.name==='prepare_student_outcome_evidence'?'outcome':'report';
-   const body=item.name==='list_student_outcome_reports'?{action:'outcome-reports',target:args.target}:item.name==='list_student_follow_up_actions'?{action:'choices'}:item.name==='confirm_student_follow_up'?{action:'confirm'}:{action:'prepare',kind,target:args.target,payload:kind==='check-in'?{}:args.payload,operationId:crypto.randomUUID(),timeZone};
+   let body=item.name==='list_student_outcome_reports'?{action:'outcome-reports',target:args.target}:item.name==='list_student_follow_up_actions'?{action:'choices'}:item.name==='confirm_student_follow_up'?{action:'confirm'}:{action:'prepare',kind,target:args.target,payload:kind==='check-in'?{}:args.payload,operationId:crypto.randomUUID(),timeZone};
+   if(kind==='outcome'&&body.action==='prepare')body={...body,recommendationProtocol:'recommendation-provenance-v1'};
    return invokeBody(`${n}:${item.call_id}`,body,n,!['choices','outcome-reports'].includes(body.action));
   },
   stop(){stopped=true;for(const c of controllers)c.abort();controllers.clear();playback.clear();proposal=undefined;},

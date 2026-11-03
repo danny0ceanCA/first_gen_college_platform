@@ -51,6 +51,7 @@ if(require.main===module)(async()=>{
    const env={...f.env,OPENAI_API_KEY:'synthetic',OPENAI_MODEL_VOICE:entry==='live'?'gpt-live-1':'gpt-realtime-2.1',ORIGEN_PERSONALIZATION_MODE:'off',ALLOWED_ORIGINS:origin};
    const voice=createProfileVoiceHandler(env,async()=>entry==='live'?Response.json({transport:{sdp:'v=0\r\n'},session:{id:'synthetic-live'}}):new Response('v=0\r\n'),()=>{},f.db);
    const ui=await setup(browser,{width,language,configurePage:async p=>{
+    page=p;
     await installSyntheticPlayback(p);
     await p.route('**/api/profile-voice',async route=>{
      const req=Object.assign(Readable.from([JSON.stringify(route.request().postDataJSON())]),{url:'/api/profile-voice',method:'POST',headers:{origin,'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'other'}});let status,body;
@@ -85,7 +86,7 @@ if(require.main===module)(async()=>{
    await detail.getByRole('button',{name:t('Share response with student','Compartir respuesta con estudiante'),exact:true}).click();await staffPage.getByRole('status').filter({hasText:/Response saved|Respuesta guardada/}).waitFor();
    await f.sweep();await page.bringToFront();await page.reload({waitUntil:'domcontentloaded'});await page.locator('.personal-binder').waitFor();if(await page.locator('.binder-cover').isVisible())await openBinder(page);else await page.locator('.binder-open').waitFor();
    // On mobile, updates live on the binder's topic index, not inside a topic page.
-   if(width<700&&await page.locator('.coordinator-updates-heading').count()===0)await page.getByRole('button',{name:t('Topics','Temas'),exact:true}).first().click();
+   if(width<700){const topics=page.locator('.notebook-page-navigation').getByRole('button',{name:t('Topics','Temas'),exact:true}),updates=page.locator('.coordinator-updates-heading');await topics.or(updates).first().waitFor();if(await topics.isVisible())await topics.click();}
    await page.locator('.coordinator-updates-heading').click();await page.locator('.coordinator-updates li').filter({hasText:/responded to your review request|respondió a tu solicitud/}).getByRole('button',{name:t('Open update','Abrir novedad'),exact:true}).click();
    const sheet=page.locator('.review-request-sheet');await sheet.waitFor();await sheet.getByText(guidance,{exact:true}).waitFor();assert.ok((await sheet.innerText()).includes(action));assert.match(await sheet.innerText(),/stays private|es privado/);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.ok(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.screenshot({path:`${folder}/${label}-receipt.png`});

@@ -1,3 +1,6 @@
+import {assertRecommendationEvaluationReady} from '../server/recommendation-evaluation.mjs';
+import {assertRecommendationContractReady} from '../server/recommendation-contract.mjs';
+import {recommendationFlags} from '../server/recommendation-settings.mjs';
 import {assertOutcomeEvaluationReady} from '../server/outcome-evaluation.mjs';
 import {assertOutcomeEvidenceReady} from '../server/outcome-evidence.mjs';
 import {assertStudentFollowUpReady} from '../server/student-follow-up.mjs';
@@ -57,7 +60,9 @@ export async function checkCoordinatorDatabase(runtime,maintenance,{schema='publ
  for(const [id,fn] of [['provisioning',assertCoordinatorProvisioningReady],['linking',assertCoordinatorLinkingReady],['publication',assertBinderSharingReady],['viewing',assertCoordinatorViewingReady],['guidance',assertCoordinatorFeedbackReady]])await check(id,()=>fn(runtime,all));
  await check('lifecycle',()=>assertCoordinatorLifecycleReady(runtime,all,maintenance));
  for(const [id,fn] of [['review-requests',assertReviewRequestsReady],['review-voice',assertReviewVoiceReady],['review-delivery',assertReviewDeliveryReady],['review-response-context',assertReviewResponseContextReady],['student-follow-up',assertStudentFollowUpReady],['outcome-evidence',assertOutcomeEvidenceReady],['outcome-evaluation',assertOutcomeEvaluationReady]])await check(id,()=>fn(runtime,all));
- return {kind:'coordinator-database-check',schemaVersion:1,checkedAt:new Date().toISOString(),passed:checks.every(c=>c.passed),checks,flags:Object.fromEntries([...coordinatorFlags,...reviewRequestFlags].map(k=>[k,env[k]==='true'])),changesApplied:false};
+ await check('recommendation-evaluation',()=>assertRecommendationEvaluationReady(runtime,{...all,ORIGEN_RECOMMENDATION_EVALUATION:'true'}));
+ await check('recommendation-contract',()=>assertRecommendationContractReady(runtime,{...all,ORIGEN_RECOMMENDATIONS:'true'}));
+ return {kind:'coordinator-database-check',schemaVersion:1,checkedAt:new Date().toISOString(),passed:checks.every(c=>c.passed),checks,flags:Object.fromEntries([...coordinatorFlags,...reviewRequestFlags,...recommendationFlags].map(k=>[k,env[k]==='true'])),changesApplied:false};
 }
 
 export function assessCoordinatorPilot(record,verification,{sourceFingerprint,now=new Date()}={}){
