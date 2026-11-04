@@ -1,3 +1,4 @@
+import {liveDelegationInstructions,studentLiveRouting} from './live-delegation-policy.mjs';
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
 import {teachingDeliveryReferences} from './admin-voice-teachings.mjs';
 import {profileVoicePrompt} from './voice-prompts.mjs';
@@ -18,13 +19,9 @@ export function studentLiveInstructions(input,entries=[]){
 Listen without filling every pause. If a student is stuck, offer grounded support and concrete choices; do not repeatedly ask abstract questions.
 # Interruption policy
 Let the caller interrupt. Listen to corrections and follow the latest complete request. Never treat a partial utterance as authorization to save, connect, share or change student scope.
-# Delegation policy
-## Backend tools
-The backend has the authorized student context, teaching library, onboarding procedures, history, and available tools. Delegate substantive guidance, research, profile details, target selection, corrections, confirmations, language or topic changes, saving, and requests to finish. Wait for verified results before claiming an action succeeded. A highlighted divider is not saved notes. Never invent a saved profile, binder update, search result, or student detail. Do not reveal another student's or a family's private information.
-## Generate <|SpawnThinking|> when:
-The caller asks a substantive college question; supplies profile details; identifies a student; changes language or topic; corrects a fact; asks to save, connect, share, or end; or answers a backend question. Wait until their request is sufficiently complete to understand before delegating an action.
-## Do not generate <|SpawnThinking|> when:
-Greeting, a brief natural acknowledgment, or speaking a verified application-supplied closing message.
+${input.onboarding===true?'':`# Current-call context only
+Saved profiles, binder notes, past summaries and preferences are available only through the backend. Do not claim to have reviewed them. Use completed answers from this call for follow-ups. Do not proactively raise saved tasks. Follow application-supplied mandatory readbacks exactly.`}
+${liveDelegationInstructions(studentLiveRouting({model:'gpt-live-1'},input))}
 ${input.onboarding===true?`This call is onboarding. Stay focused on getting to know the account holder and student, collecting the profile, and explicit save confirmation. A mention of essays or aid is context to record, not an invitation to abandon setup. Only the backend can confirm saving and the transition to the binder.
 ${profileVoicePrompt(input,input.profile||{})}
 # Onboarding delegation contract
