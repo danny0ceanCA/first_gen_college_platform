@@ -106,3 +106,30 @@ test('cancel does not disable later research',async()=>{const f=fixture();await 
 test('close while enqueue is pending cancels the eventual job',async()=>{let finish;const removed=[];const f=backgroundResearch({post:()=>new Promise(r=>finish=r),remove:async id=>removed.push(id),isCurrent:()=>true,isQuiet:()=>true,deliver:()=>assert.fail()});const pending=f.start({question:'Costs'});f.close();finish({id:'late'});assert.equal((await pending).status,'research_cancelled');assert.deepEqual(removed,['late']);});
 test('timeout cancels server work and reports failure once at a pause',async()=>{const f=fixture();await f.queue.start({question:'Costs'});f.setClock(120000);f.setQuiet(false);await f.tick();assert.equal(f.delivered.length,0);f.setQuiet(true);await f.tick();assert.equal(f.delivered[0].status,'failed');await f.tick();assert.equal(f.delivered.length,1);});
 test('handoff separates pending caller speech from instructions in both languages',()=>{for(const q of ['What about Elodie?','¿Y Elodie?']){const text=voiceHandoff(q);assert.ok(text.endsWith(JSON.stringify(q)));assert.match(text,/never speak, paraphrase or role-play/);assert.match(text,/without asking for them again/);}});
+
+for(const language of ['en','es'])test(`${language}: selecting covered scenarios preserves work even when replacement IDs were supplied`,async()=>{
+ const posted=[],removed=[],delivered=[];let tick;
+ const q=backgroundResearch({requireReplacementChange:true,post:async query=>(posted.push(query),{id:'original'}),read:async()=>({status:'completed',result:{text:'Verified comparison'}}),remove:async id=>removed.push(id),isCurrent:()=>true,isQuiet:()=>true,deliver:j=>delivered.push(j),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ const question=language==='en'?'Berkeley 2026–27 costs including on-campus, off-campus and living with parents.':'Costos de Berkeley 2026–27 dentro del campus, fuera del campus y con padres.';
+ try{
+  const original=await q.start({question,institution:'Berkeley',mode:'finance',language,studentId:'a',requestKey:'initial'});
+  const update={question:language==='en'?'Compare near-campus housing versus living at home.':'Compara vivir cerca del campus con vivir en casa.',institution:'Berkeley',mode:'finance',language,studentId:'a',replaceRequestId:original.requestId,replaceRevision:1};
+  for(const change of [undefined,{kind:'focus_existing',uncoveredNeed:''},{kind:'correct_scope',uncoveredNeed:language==='en'?'living with parents':'con padres'}]){
+   const reused=await q.start({...update,replacementChange:change});
+   assert.equal(reused.status,'research_pending');assert.equal(reused.jobId,'original');assert.equal(reused.revision,1);assert.equal(reused.replacementApplied,false);
+  }
+  assert.equal(posted.length,1);assert.deepEqual(removed,[]);
+  await tick();await new Promise(r=>setImmediate(r));assert.equal(delivered.length,1);assert.equal(delivered[0].id,'original');
+ }finally{q.close();}
+});
+test('a concrete corrected year can replace work, while an identical question or stale correction cannot',async()=>{
+ const posted=[],removed=[];const q=backgroundResearch({requireReplacementChange:true,post:async query=>(posted.push(query),{id:'job-'+posted.length}),remove:async id=>removed.push(id),isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ try{
+  const first={question:'Berkeley costs for 2026–27',institution:'Berkeley',mode:'finance',studentId:'a',requestKey:'r'};await q.start(first);
+  const change={kind:'correct_scope',uncoveredNeed:'The caller corrected the academic year to 2027–28; the existing task only covers 2026–27.'};
+  const unchanged=await q.start({...first,replaceRequestId:'r',replaceRevision:1,replacementChange:change});assert.equal(unchanged.reuseReason,'same_question');assert.equal(posted.length,1);
+  const corrected=await q.start({...first,question:'Berkeley costs for 2027–28',replaceRequestId:'r',replaceRevision:1,replacementChange:change});
+  assert.equal(corrected.revision,2);assert.equal(posted.length,2);assert.deepEqual(removed,['job-1']);assert.equal(posted[1].replacementChange,undefined);
+  const stale=await q.start({...first,replaceRequestId:'r',replaceRevision:1,replacementChange:change});assert.equal(stale.status,'research_request_changed');assert.equal(posted.length,2);
+ }finally{q.close();}
+});

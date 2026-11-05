@@ -18,7 +18,7 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
- const research=backgroundResearch({post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
+ const research=backgroundResearch({requireReplacementChange:researchDeliveryV2,post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
   read:id=>jobRequest('GET',id),remove:id=>jobRequest('DELETE',id),now,
   isCurrent:query=>!closed&&query.studentId===scope.studentId&&query.sessionId===scope.sessionId,isQuiet:()=>true,
   onRequest:request=>{if(request.state==='requesting')reportRecord=undefined;send({type:'origen.research.state',request});},onState:active=>emit({type:'origen.research.active',active}),

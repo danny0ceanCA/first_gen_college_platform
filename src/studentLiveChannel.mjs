@@ -3,7 +3,7 @@
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
-export const liveChannelRevision='natural-conversation-research-delivery-2026-11-05';
+export const liveChannelRevision='natural-conversation-research-reuse-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;

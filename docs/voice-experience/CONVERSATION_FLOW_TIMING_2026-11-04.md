@@ -295,3 +295,37 @@ Set **`ORIGEN_RESEARCH_DELIVERY_V2=true` on the API process** and start a fresh 
 English and Spanish regression scenarios exercise delayed completion, ordinary follow-ups, backchannels, duplicate completion, interruption, stale acknowledgments, failures, report comparisons, and scope isolation. The integration tests cross a real local WebSocket using the browser control facade and simulated provider events/playback. They do **not** call the live model or measure production conversational quality. No new paid calls were made.
 
 Local evidence: `tmp/research-delivery-validation.log` and `tmp/research-delivery-build.log`. The timing-report utility now separates context acknowledgment from commentary request, commentary acknowledgment, and observed answer overlap; absent speech evidence remains null. A paid live English/Spanish comparison against V1 remains necessary before drawing conclusions about naturalness or production latency.
+
+## Research reuse and paraphrase recognition — 2026-11-05
+
+Local follow-up on **v1.1**, based on `ceb71eb`. No commit, push, deployment, production configuration change, or new paid model call was made for this follow-up. The V1 tag remains unchanged. Student-selection recaps remain a separate change.
+
+### Guidance reviewed before implementation
+
+- [OpenAI delegation guidance](https://developers.openai.com/api/docs/guides/live-delegation): keep speech independent of backend work, reuse valid results, avoid duplicate actions, and keep operation IDs and revisions. The replacement comparison below is an application design, not a new OpenAI API requirement.
+- [GPT-Live prompting](https://developers.openai.com/api/docs/guides/live-prompting): answer from conversation or current results without delegation; delegate corrections when they change the work. Keep task procedures in the backend and conversational behavior in the voice prompt.
+- [Context delivery timing](https://developers.openai.com/api/docs/guides/live-conversations#understand-when-context-reaches-the-model): context acknowledgments do not prove that a finding was used or played. Live may begin using context before its acknowledgment arrives.
+- [Responses overview](https://developers.openai.com/api/reference/responses/overview): retain the existing Responses integration. These fixes add no second model, research rewrite, or extra synchronous API step.
+
+### Changes
+
+The duplicate guard previously required six consecutive words from the research answer and almost identical vocabulary. A natural spoken comparison therefore left an unsolicited delivery opportunity pending. The new local matcher compares quantities, distinctive words, and names; it accommodates English/Spanish whole-number speech, grouped digits, academic-year shorthand, reordered clauses, and common inflections. Questions and pending verification statements do not count as an explanation. Matching still requires an uninterrupted reply with observed playback activity; it retires only the optional announcement, not the retained report.
+
+With `ORIGEN_RESEARCH_DELIVERY_V2=true`, an attempted replacement also needs a structured `replacementChange`: `focus_existing`, `correct_scope`, or `expand_scope`, plus the specific evidence the accepted question cannot supply. Focusing on covered scenarios, identical questions, missing change details, and exact already-covered facets preserve the job and its revision. Real corrections can replace it; stale revisions and scope mismatches remain rejected. Replacement metadata stays in the application and is not forwarded to the worker's research request. The model receives the accepted question and clear English/Spanish examples, and is instructed to use retained reports before searching again for a detail.
+
+This is not a general semantic classifier: the backend still judges whether a newly stated need is actually outside the original question. A misleading replacement description can still be misclassified. Likewise, paraphrase overlap is duplicate suppression, not verification of factual correctness or proof the caller heard or understood the answer. Unsupported paraphrases may remain unrecognized. These limits require live conversation review.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Replay of the recorded public comparison against the old/new matcher | Old: unrecognized. New: recognized; the pending duplicate announcement is retired. |
+| English and Spanish socket scenarios: broad search → covered clarification → native paraphrase → acknowledgment | One worker job, no replacement DELETE, no redundant commentary, no audio mute or cancellation. |
+| Genuine year correction, stale replacement, interruption, wrong/missing quantities, wrong campus, pending verification | Allowed or rejected according to the corresponding guard. |
+| Regression suite | 240 passed, zero failures or skips. Includes server/browser WebSockets with simulated provider events and playback. |
+| Disposable local PostgreSQL tests | 5 passed, zero failures or skips. Negotiated tool schema, rollback contract, job lifecycle and account boundaries verified. |
+| Build | Passed; existing bundle-size advisory remains. |
+
+The recorded-answer matcher took **0.088 ms median / 0.128 ms p95** over 1,000 local iterations. This measures local comparison work only, not Live latency. No new model, worker, or database round trip is added to speech delivery. The original research job is preserved when a covered clarification arrives, avoiding a restart; this does not establish a new live research completion time.
+
+Local evidence: `tmp/research-reuse-recorded-replay.json`, `tmp/research-reuse-validation.log`, `tmp/research-reuse-database.log`, and `tmp/research-reuse-build.log`. No new paid English/Spanish calls were made. Start a fresh call after deployment to receive the updated prompt/tool contract. The existing API flag controls the delivery matcher and replacement guard; no worker setting or migration is required. Setting it to `false` restores the previous delivery and replacement mechanics; the improved prompt guidance remains.

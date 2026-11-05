@@ -6,6 +6,7 @@ import WebSocket from 'ws';
 import {voiceControlSession,createVoiceControl} from './voice-control.mjs';
 import {studentLiveSession} from './student-live-session.mjs';
 import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
+import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -238,5 +239,44 @@ for(const language of ['en','es'])test(`delivery v2 crosses the real browser con
   assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs[0].body.language,language);
   assert.equal(primaryWrites.length,0);assert.ok(!provider.sent.some(e=>['response.cancel','session.input_audio.mute','session.instructions.append'].includes(e.type)));
   assert.ok(f.logs.some(e=>e.deliveryStage==='reply_observed'));assert.equal(f.logs.filter(e=>e.deliveryStage==='commentary_requested').length,1);assert.ok(!JSON.stringify(f.logs).includes('12345'));
+ }finally{channel.close();await f.close();}
+});
+
+for(const [language,{answer,spoken}] of Object.entries(discussionExamples))test(`${language}: covered clarification keeps one worker job and its native paraphrase is not announced again over the control socket`,async()=>{
+ const events=[],jobs=[],primaryWrites=[];let idle=false,sound=0,complete=false;
+ const f=await transportFixture({env:{ORIGEN_RESEARCH_DELIVERY_V2:'true'},config:{language},request:async(token,method,path,body)=>{
+  jobs.push({method,body});return method==='POST'?{id:'job-original',status:'queued'}:method==='GET'?{status:complete?'completed':'running',...(complete?{result:{text:answer,sources:[]}}:{})}:{status:'cancelled'};
+ }});
+ const raw={readyState:'open',send:text=>primaryWrites.push(JSON.parse(text)),close(){this.readyState='closed';this.onclose?.({});}};
+ const channel=studentVoiceChannel(raw,{isPlaybackIdle:()=>idle,getPlaybackVersion:()=>sound});channel.onmessage=e=>events.push(JSON.parse(e.data));
+ class BrowserSocket extends WebSocket{constructor(url){super(url,{origin:'http://allowed.test'});}}
+ try{
+  await channel.configure({voiceControl:f.receipt()},{token:'owner',url:f.base,WebSocketClass:BrowserSocket});
+  const provider=f.providers[0],native=e=>provider.emit('message',Buffer.from(JSON.stringify(e)));
+  const lookup=(callId,args)=>{for(const event of [{type:'response.created',response:{id:callId}},{type:'response.output_item.done',response_id:callId,item:tool('lookup_financial_aid',callId,args)},{type:'response.completed',response:{id:callId}}])native({type:'response.event',delegation_id:'delegation-'+callId,event});};
+  const question=language==='en'?'Berkeley 2026–27 budgets comparing living on campus, off campus and with parents.':'Presupuestos de Berkeley 2026–27 dentro del campus, fuera del campus y con padres.';
+  lookup('initial',{question,institution:'Berkeley'});
+  await until(()=>provider.sent.some(e=>e.item?.call_id==='initial'));
+  native({type:'session.input_transcript.delta',delta:language==='en'?'He is considering near campus, not on campus, compared with home.':'Quiere comparar vivir cerca del campus, no dentro, con vivir en casa.'});
+  lookup('focus',{question:language==='en'?'Compare near-campus living and home.':'Compara vivir cerca del campus y en casa.',institution:'Berkeley',replaceRequestId:'initial',replaceRevision:1,replacementChange:{kind:'focus_existing',uncoveredNeed:''}});
+  await until(()=>provider.sent.some(e=>e.item?.call_id==='focus'));
+  const receipt=JSON.parse(provider.sent.find(e=>e.item?.call_id==='focus').item.output);
+  assert.equal(receipt.jobId,'job-original');assert.equal(receipt.revision,1);assert.equal(receipt.reuseReason,'already_covered');assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs.filter(j=>j.method==='DELETE').length,0);
+  complete=true;await until(()=>events.some(e=>e.type==='origen.research.supplied'));
+  await until(()=>events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'));
+  // Native conversation starts using the finding before the estimated context
+  // injection ACK, just as it did in the reported production session.
+  native({type:'session.output_transcript.delta',delta:spoken});sound++;
+  for(const e of provider.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='untrusted-research-evidence'))native({type:'session.thinking.appended',client_event_id:e.event_id});
+  await pause(1900);idle=true;
+  await until(()=>events.some(e=>e.deliveryStage==='evidence_overlap_observed'),3000);
+  native({type:'session.input_transcript.delta',delta:language==='en'?'Yes, that was very informative.':'Sí, eso me ayuda mucho.'});
+  await pause(500);idle=false;native({type:'session.output_transcript.delta',delta:language==='en'?'Mm-hmm.':'Claro.'});sound++;
+  await pause(1900);idle=true;await pause(4000);
+  assert.equal(provider.sent.filter(e=>e.type==='session.commentary.append').length,0,'no redundant result or caveat after the acknowledgment');
+  assert.equal(provider.sent.filter(e=>e.type==='response.create').length,2,'one continuation per actual tool batch, none for delivery');
+  assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs.filter(j=>j.method==='DELETE').length,0);
+  assert.equal(primaryWrites.length,0,'no browser provider writes during research or speech');
+  assert.ok(!provider.sent.some(e=>['response.cancel','session.input_audio.mute','session.instructions.append'].includes(e.type)));
  }finally{channel.close();await f.close();}
 });

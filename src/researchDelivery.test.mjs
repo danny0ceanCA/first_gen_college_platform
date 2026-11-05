@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchDelivery,researchAnswerOverlap} from './researchDelivery.mjs';
 import {capturePayload} from './voiceCapture.mjs';
+import {discussionExamples} from './researchDiscussion.fixture.mjs';
 
 const examples={
  en:{answer:'The published annual tuition is 12345 dollars at Example University.',qualification:'Housing is separate, and this is not a personalized aid award.',reply:'We can take this one step at a time.',caller:'Can we talk about the essays while you check?',ack:'Mm-hmm.'},
@@ -107,6 +108,15 @@ test('private delivery diagnostics retain correlation and stage without copied c
 test('ordinary conversation without completed research creates no model work or timed speech',()=>{
  const f=fixture();f.delivery.caller();f.delivery.callerStopped();f.advance(60000);f.delivery.reply(examples.en.reply,{audible:true});f.advance(60000);
  assert.equal(f.sent.length,0);assert.equal(f.tasks.size,0);
+});
+for(const [language,{answer,spoken}] of Object.entries(discussionExamples))test(`${language}: a paraphrased native answer before context ack retires the opportunity without a redundant caveat`,()=>{
+ const f=fixture();f.ready(language,{result:{text:answer}}, {awaitingReply:true});
+ // Live can use context before its final acknowledgment. Recognition must work
+ // on that actual reply, not depend on the order of the context ACK.
+ f.delivery.reply(spoken,{audible:true});f.ack();f.advance(4000);
+ f.delivery.caller();f.delivery.callerStopped();f.delivery.reply(examples[language].ack,{audible:true});f.advance(10000);
+ assert.equal(f.announcements().length,0);assert.equal(f.events.filter(e=>e.deliveryStage==='evidence_overlap_observed').length,1);
+ assert.equal(f.tasks.size,0);assert.ok(f.sent.every(e=>e.type==='session.thinking.append'));
 });
 for(const reason of ['cancelled','scope_changed','call_ended'])test(`${reason} clears a pending delivery and rejects its late acknowledgment`,()=>{
  const f=fixture();f.ready();f.delivery.clear(reason);f.ack();f.advance(60000);

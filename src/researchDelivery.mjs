@@ -1,20 +1,13 @@
 import {researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
+import {researchAnswerOverlap} from './researchDiscussion.mjs';
+export {researchAnswerOverlap} from './researchDiscussion.mjs';
 
 // A delivery opportunity is separate from a completed job. This controller never
 // starts research, cancels speech, requests a backend response, or changes scope.
 // Transcript overlap is conservative duplicate suppression, NOT a semantic
 // grader or proof the listener heard/understood the answer.
 const words=text=>String(text||'').replace(/\[\d+\]/gu,'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
-export function researchAnswerOverlap(answer,spoken){
- const a=words(answer),s=words(spoken);
- if(a.length<6||s.length<6)return false;
- const spokenWords=new Set(s),numbers=a.filter(w=>/^\d+$/u.test(w));
- if(numbers.some(n=>!spokenWords.has(n)))return false;
- const unique=[...new Set(a)],coverage=unique.filter(w=>spokenWords.has(w)).length/unique.length;
- const phrase=' '+s.join(' ')+' ';
- return coverage>=0.75&&a.some((_,i)=>i+6<=a.length&&phrase.includes(' '+a.slice(i,i+6).join(' ')+' '));
-}
 
 export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=setTimeout,cancel=clearTimeout,id=()=>globalThis.crypto.randomUUID()}){
  const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline;

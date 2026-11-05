@@ -6,7 +6,7 @@ import {createProfileVoiceHandler} from './profile-voice.mjs';
 
 test('authorized prepared calls and updates use the scoped opening brief and preserve account boundaries',{skip:!process.env.DATABASE_TEST_URL,timeout:120000},async()=>{
  const f=await retrievalFixture();let sent,headers;
- const env={OPENAI_API_KEY:'synthetic',NODE_ENV:'development',ORIGEN_LIVE_FOLLOWUPS:'true',ORIGEN_VOICE_PREPARATION:'true',ORIGEN_PERSONALIZATION_MODE:'on',ORIGEN_BACKGROUND_RESEARCH:'true'};
+ const env={OPENAI_API_KEY:'synthetic',NODE_ENV:'development',ORIGEN_LIVE_FOLLOWUPS:'true',ORIGEN_VOICE_PREPARATION:'true',ORIGEN_PERSONALIZATION_MODE:'on',ORIGEN_BACKGROUND_RESEARCH:'true',ORIGEN_RESEARCH_DELIVERY_V2:'true'};
  const handler=createProfileVoiceHandler(env,async(_url,options)=>{sent=JSON.parse(options.body).session;return new Response(JSON.stringify({session:{id:'fake-provider'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});},()=>{},f.db);
  const base={mode:'planning',studentId:'alex',role:'parent',language:'en',routeConversations:true,targetConfirmed:true,voiceProtocol:'live-v1'};
  async function call(body){
@@ -28,6 +28,9 @@ test('authorized prepared calls and updates use the scoped opening brief and pre
     assert.equal(tool.parameters.properties.replaceRequestId.type,'string');
     assert.equal(tool.parameters.properties.replaceRevision.type,'integer');
     assert.ok(!tool.parameters.required.includes('replaceRequestId'),'ordinary research needs no revision to start');
+    assert.deepEqual(tool.parameters.properties.replacementChange.properties.kind.enum,['focus_existing','correct_scope','expand_scope']);
+    assert.deepEqual(tool.parameters.properties.replacementChange.required,['kind','uncoveredNeed']);
+    assert.ok(!tool.parameters.required.includes('replacementChange'),'new research does not need replacement metadata');
    }
    assert.ok(sent.delegation.responses.tools.some(t=>t.name==='cancel_background_research'));
    assert.match(sent.delegation.responses.instructions,/FICTIONAL_HISTORY/);
@@ -47,5 +50,8 @@ test('authorized prepared calls and updates use the scoped opening brief and pre
   assert.match(sent.instructions,/FICTIONAL_HISTORY/,'the authorized opening brief supplies relevant history');
   assert.doesNotMatch(JSON.stringify(sent),/PRIVATE_OTHER_STUDENT|PRIVATE_OTHER_ACCOUNT/);
   assert.match(sent.delegation.responses.instructions,/FICTIONAL_HISTORY/);
+  env.ORIGEN_RESEARCH_DELIVERY_V2='false';
+  await call({sdp:'v=0'});
+  for(const tool of sent.delegation.responses.tools.filter(t=>t.name.startsWith('lookup_')))assert.equal(tool.parameters.properties.replacementChange,undefined,'rollback keeps the original tool contract');
  }finally{await f.close();}
 });
