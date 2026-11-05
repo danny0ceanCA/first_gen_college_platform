@@ -322,7 +322,9 @@ test('closing drain has a bounded fallback without declaring unfinished audio co
 
 test('student handoff is context to answer, never a thinking transcript',()=>{
  const f=fixture();f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:voiceHandoff('What about Elodie?')}]}}));
- assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('pending caller question')));
+ const handoff=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content).join('');
+ assert.ok(handoff.includes('Pending caller question: '+JSON.stringify('What about Elodie?')));
+ assert.ok(handoff.includes('listen until they finish, then answer it directly'));
  assert.ok(!f.sent.some(e=>e.type==='session.thinking.append'));f.channel.close();
 });
 test('background evidence waits for a quiet boundary before a natural continuation',async()=>{

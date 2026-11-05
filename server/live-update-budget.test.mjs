@@ -15,7 +15,7 @@ for(const language of ['en','es'])test(`same-call ${language} update removes rep
   if(full.includes(text))assert.ok(JSON.stringify(update).includes(text),text);
  }
  assert.doesNotMatch(compact,/Do not restrict this to the immediately preceding answer/,'unchanged conversation policy stays in startup context');
- assert.match(full,/without another greeting, confirmation or invitation/);
+ assert.match(full,/Context packets alone do not request speech or authorize the selection recap/);
  const ordinary=studentLiveUpdate(input,teachings,[]);
  assert.equal(ordinary.liveInstructions,'','ordinary selection uses no trusted append');
  assert.ok(JSON.stringify(ordinary).length<3000,'small complete brief and teaching references');

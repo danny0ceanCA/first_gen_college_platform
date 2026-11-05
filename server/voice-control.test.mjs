@@ -8,6 +8,7 @@ import {studentLiveSession,studentLiveUpdate} from './student-live-session.mjs';
 import {buildOpeningBrief} from './voice-opening-brief.mjs';
 import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
+import {voiceTargetResult} from '../src/voiceTargetResult.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -21,27 +22,61 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
-for(const language of ['en','es'])test(`${language}: initial selection sends quiet facts, preserves caller speech and resumes one native continuation`,async()=>{
+for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${language}: selection acknowledgment and ${callerAsks?'an arriving caller question':'a name-only selection'} keep one native continuation through later refresh`,async()=>{
  const input={mode:'planning',role:'parent',language,studentId:'aiden',targetConfirmed:true,routeConversations:true,profile:{id:'aiden',name:'Aiden',school:'Synthetic Community College'}};
  input.openingBrief=buildOpeningBrief(input);
  const f=fixture({config:{language,tools:[{name:'request_conversation_target'}]},scope:{sessionId:'physical-call',studentId:null,confirmed:false}});
  try{
+  f.engine.receive({type:'session.input_transcript.delta',delta:'Aiden'});
+  await until(()=>f.events.some(e=>e.type==='input_audio_buffer.speech_started'));
+  await f.engine.flush();
   f.call([tool('request_conversation_target','choose',{scope:'student:aiden'})]);
   await until(()=>f.events.some(e=>e.controlLease));const lease=f.events.find(e=>e.controlLease).controlLease;
-  f.engine.receive({type:'session.output_transcript.delta',delta:language==='en'?'What would you like to focus on?':'¿En qué te gustaría enfocarte?'});
+  const acknowledgment=language==='en'?'Thanks.':'Gracias.';
+  f.engine.receive({type:'session.output_transcript.delta',delta:acknowledgment});
+  await until(()=>f.events.some(e=>e.type==='response.output_audio_transcript.delta'&&e.delta===acknowledgment));
   await f.engine.configure({...config,language,...studentLiveUpdate(input)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'first-selection');
-  const packets=f.sent.filter(e=>['session.thinking.append','session.instructions.append'].includes(e.type));
-  assert.equal(packets.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
-  assert.ok(!packets.filter(e=>e.type==='session.instructions.append').some(e=>e.content.includes(input.profile.school)));
+  const packets=f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='selected-student-context');
+  assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
+  assert.deepEqual(JSON.parse(packets.map(e=>JSON.parse(e.content).text).join('')).openingBrief,input.openingBrief);
   f.engine.receive({type:'session.updated',client_event_id:'first-selection'});
-  f.engine.receive({type:'session.input_transcript.delta',delta:language==='en'?'His college options.':'Sus opciones universitarias.'});
+  const questionParts=language==='en'?['How can he choose ','between colleges?']:['¿Cómo puede elegir ','entre universidades?'];
+  if(callerAsks){
+   f.engine.receive({type:'session.input_transcript.delta',delta:questionParts[0]});
+   await until(()=>f.events.filter(e=>e.type==='input_audio_buffer.speech_started').length===2);
+  }
   await pause(0);assert.ok(!f.events.some(e=>e.type==='session.updated'));
   for(const packet of packets)f.engine.receive({type:packet.type+'ed',client_event_id:packet.event_id});
   await until(()=>f.events.some(e=>e.type==='session.updated'));
-  assert.equal(f.engine.command({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify({status:'target_confirmed'})}},lease),true);
+  assert.equal(f.sent.filter(e=>e.type==='response.create').length,0,'context delivery alone cannot open a second speaking turn');
+  const receipt=voiceTargetResult(true,'Aiden');
+  assert.equal(f.engine.command({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(receipt)}},lease),true);
   await until(()=>f.sent.some(e=>e.type==='response.create'));
   assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
-  assert.ok(!f.sent.some(e=>['session.commentary.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
+  assert.deepEqual(JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output),receipt);
+  if(callerAsks){
+   // The caller still owns the microphone when the receipt returns. Their
+   // remaining words stay in the native conversation, never a replayed prompt.
+   assert.equal(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').length,1);
+   f.engine.receive({type:'session.input_transcript.delta',delta:questionParts[1]});await pause(0);
+  }
+  await f.engine.flush();
+  assert.deepEqual(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').map(e=>e.transcript),callerAsks?['Aiden',questionParts.join('')]:['Aiden']);
+  assert.deepEqual(f.events.filter(e=>e.type==='response.output_audio_transcript.done').map(e=>e.transcript),[acknowledgment]);
+  assert.equal(f.sent.filter(e=>e.type==='response.item.create').length,1,'only the tool receipt is returned; no caller transcript is replayed');
+
+  // A later brief refresh is factual context, not another invitation or recap.
+  const refreshed={...input,profile:{...input.profile,interest:'Political science'}};
+  refreshed.openingBrief=buildOpeningBrief(refreshed);
+  const beforeRefresh=f.sent.length;
+  await f.engine.configure({...config,language,...studentLiveUpdate(refreshed)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'same-student-refresh');
+  f.engine.receive({type:'session.updated',client_event_id:'same-student-refresh'});
+  const refreshPackets=f.sent.slice(beforeRefresh).filter(e=>e.type==='session.thinking.append');
+  assert.ok(refreshPackets.length>0);
+  for(const packet of refreshPackets)f.engine.receive({type:'session.thinking.appended',client_event_id:packet.event_id});
+  await until(()=>f.events.filter(e=>e.type==='session.updated').length===2);
+  assert.equal(f.sent.filter(e=>e.type==='response.create').length,1,'a same-scope refresh does not restart the continuation');
+  assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
   assert.equal(f.jobs.length,0,'student selection must not start public research');
  }finally{f.engine.close();}
 });

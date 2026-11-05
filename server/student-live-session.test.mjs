@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,studentLiveUpdate,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
 import {buildOpeningBrief} from './voice-opening-brief.mjs';
+import {confirmedTargetContinuation} from '../src/voiceHandoff.mjs';
 const teaching={id:'published-teaching',revision:14,content:{topic:'admissions',title:'Student background',deliveryStyle:'Warm, patient and encouraging.',conversationApproach:'Acknowledge uncertainty, then offer concrete choices.',example:'Your experiences are worth exploring.'}};
 for(const language of ['en','es'])for(const mode of ['profile','planning','admissions','finance','loans'])test(`Live retains ${language} ${mode} backend instructions and tool contracts`,()=>{
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
@@ -48,19 +49,36 @@ for(const language of ['en','es'])test(`${language} scope and later configuratio
   assert.equal(instructions,'','ordinary scope update never appends speech-interrupting instructions');
  }
  assert.match(first,/successful target_confirmed receipt satisfies the initial scope question/);
- assert.match(first,/without another greeting, confirmation or invitation/);
+ assert.match(first,/Context packets alone do not request speech or authorize the selection recap/);
+ assert.ok(first.includes(confirmedTargetContinuation),'the receipt and initial speech policy use the same continuation rules');
 });
 
 for(const language of ['en','es'])test(`${language}: first selection stays conversational while private context is still unconfirmed`,()=>{
  const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:false,students:[{id:'a',name:'Aiden'},{id:'e',name:'Elodie'}]};
  const config=voiceSession(input,{}),live=studentLiveSession(config,input);
- assert.match(live.instructions,/for a name-only answer, ask one warm, short question/);
+ assert.match(live.instructions,/Open with one scope question only/);
+ assert.match(live.delegation.responses.instructions,/Open with one scope question only/);
+ assert.match(live.instructions,/For a name-only first selection, give one quick, warm acknowledgment/);
+ assert.match(live.instructions,/Do not ask what they need help with before the selection receipt/);
+ assert.doesNotMatch(live.instructions,/ask one warm, short question about what they want help with|single conversational invitation above while/);
  assert.match(live.instructions,/If they already gave their question/);
  assert.match(live.instructions,/Do not use private student details before confirmation/);
  assert.match(live.instructions,/Scope precedence: conversational permission does not grant student access/);
  assert.match(live.instructions,/Research alongside conversation/,'seed stable policy before first selection');
  assert.deepEqual(live.delegation.responses.tools.map(({strict,...tool})=>tool),config.tools,'speech policy never broadens the guarded tool set');
  assert.doesNotMatch(live.instructions,/Listen while configuration completes/);
+});
+
+for(const language of ['en','es'])test(`${language}: a caller question takes precedence over the selection recap in both model prompts`,()=>{
+ const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:true,studentId:'a',profile:{id:'a',name:'Aiden',school:'Community college'},continuing:true};
+ input.openingBrief=buildOpeningBrief(input);
+ const live=studentLiveSession(voiceSession(input,{}),input);
+ assert.match(live.instructions,/listen until they finish, then answer it directly and weave in only relevant brief details/);
+ assert.match(live.instructions,/skip a separate recap and generic invitation/);
+ assert.match(live.instructions,/one short recap of at most two relevant facts in one or two connected sentences/);
+ assert.match(live.instructions,/If an invitation was already asked, leave the floor with the caller/);
+ assert.match(live.delegation.responses.instructions,/target-selection receipt may request one short recap when the caller has not yet asked a question/);
+ assert.match(live.instructions,/this brief arriving never starts one/);
 });
 
 for(const language of ['en','es'])test(`${language}: selection sends complete bounded facts without a speech-interrupting instruction`,()=>{
