@@ -12,7 +12,7 @@ export const serverEvents=Object.freeze({
  'voice.control.callback_timeout':spec(['sourceCount'],'warn'),
  'voice.control.close_failed':spec([],'error'),
  'voice.research.finished':spec(['outcome','durationMs','sourceCount','model','inputTokens','outputTokens']),
- 'voice.research.delivery':spec(['deliveryStage','durationMs','packetCount','contextBytes','evidenceFormat']),
+ 'voice.research.delivery':spec(['deliveryStage','deliveryReason','durationMs','packetCount','contextBytes','evidenceFormat']),
  api_request:spec(http),api_aborted:spec(http,'warn'),api_error:spec(errors,'error'),
  database_error:spec(errors,'error'),upstream_error:spec(errors,'error'),
  upstream_response:spec(['httpStatus','operation']),
@@ -46,7 +46,8 @@ export const serverEvents=Object.freeze({
 });
 export const enumFields=Object.freeze({
  evidenceFormat:Object.freeze(['brief-v1','full-report']),
- deliveryStage:Object.freeze(['supplied','context_acknowledged','context_failed','commentary_requested','native_reply_observed']),
+ deliveryStage:Object.freeze(['supplied','context_acknowledged','context_failed','commentary_requested','native_reply_observed','enabled','deferred','commentary_acknowledged','delivery_unconfirmed','interrupted','superseded','reply_observed','evidence_overlap_observed']),
+ deliveryReason:Object.freeze(['context_timeout','context_error','commentary_error','speech_not_observed','opportunity_expired','caller_turn','new_result','new_request','scope_changed','call_ended','cancelled','answer_overlap']),
  routingPolicy:Object.freeze(['backend-first','bounded-follow-up-v1','mixed','unavailable']),
  routingObservation:Object.freeze(['backend_observed','no_backend_observed','unavailable']),
  topic:Object.freeze(['options','transfer','costs','applications']),

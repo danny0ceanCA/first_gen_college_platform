@@ -2,9 +2,10 @@
 // guarded tool handlers. No tool is executed here and no permission is granted.
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
-export const liveChannelRevision='natural-conversation-step-3-2026-11-05';
+import {researchDelivery} from './researchDelivery.mjs';
+export const liveChannelRevision='natural-conversation-research-delivery-2026-11-05';
 export const liveBackendDeadlineMs=25000;
-export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0}={}){
+export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',turnItemId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0,recentInput=null,repliedSinceInput=false;
@@ -18,9 +19,13 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  // timed speech prompts compete with its native delegation and listening.
  let researchState=null;
  let continuationRequested=false,emptyRecoveryEpoch=-1;
+ let outputInterrupted=false;
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
+ const deliveryTracker=researchDelivery({send:transmit,emit:event=>void emit(event),now,schedule,cancel,id,
+  canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&
+   (!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))&&quietBoundary(/[?？]["”’')]*\s*$/u.test(lastOutputText)?6000:600)});
  function clearBackendTimers(){for(const response of responses.values())cancel(response.timer);responses.clear();}
  async function expireBackend(responseId){
   const response=responses.get(responseId);if(closed||!response)return;
@@ -53,7 +58,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   if(sound!==lastSoundVersion){lastSoundVersion=sound;lastSoundAt=now();}
   return !inputId&&!outputId&&isPlaybackIdle()&&now()-Math.max(lastInput,lastOutputAt,lastSoundAt)>=holdMs;
  }
- function clearResearch(){cancel(researchTimer);researchTimer=null;researchReady=null;researchAcknowledgments.clear();researchDeliveries.clear();}
+ function clearResearch(reason='scope_changed'){deliveryTracker.clear(reason);cancel(researchTimer);researchTimer=null;researchReady=null;researchAcknowledgments.clear();researchDeliveries.clear();}
  function supplyResearch(job){
   const key=job.jobId||job.requestId||id();
   if(researchDeliveries.has(key))return researchDeliveries.get(key);
@@ -103,13 +108,14 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    };check();
   });
  }
- function stopBoundaries(){researchVersion++;researchState=null;clearResearch();for(const finish of [...boundaryWaiters])finish(false);}
+ function stopBoundaries(){researchVersion++;researchState=null;clearResearch('call_ended');for(const finish of [...boundaryWaiters])finish(false);}
  async function flushInput(){
   if(inputTimer)cancel(inputTimer);inputTimer=null;if(!inputId||!input)return;
   const item_id=inputId,transcript=input;input='';inputId='';
   recentInput=repliedSinceInput?null:{transcript,lastInput};
   await emit({type:'input_audio_buffer.speech_stopped',item_id,liveBoundary:'transcript_quiet_estimate'});
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
+  if(researchDeliveryV2)deliveryTracker.callerStopped();
   // Live can acknowledge a profile answer without delegating it. Give natural
   // delegation a brief head start, then ask the same guarded backend to process
   // this complete answer. This never parses or saves a profile in the adapter.
@@ -123,18 +129,22 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  async function finishSpeech(force=false){
   if(outputTimer)cancel(outputTimer);outputTimer=null;if(!outputId)return;
   if(!force&&!isPlaybackIdle()){outputTimer=schedule(()=>void finishSpeech(),250);return;}
-  const response_id=outputId,text=output,metadata=outputMetadata;outputId='';output='';outputMetadata={};
+  const response_id=outputId,text=output,metadata=outputMetadata,interrupted=outputInterrupted;outputId='';output='';outputMetadata={};
   if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
   // Continuous Live has no output-audio-done event. This is a conservative idle
   // boundary for UI/drain scheduling, never a claim that a person heard speech.
   const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
   await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
+  if(researchDeliveryV2)deliveryTracker.reply(text,{audible,forced:force,interrupted});
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
+  if(researchDeliveryV2)deliveryTracker.receive(e);
   if(e.type==='session.started'){
-   started=true;await emit({type:'origen.client.revision',revision:liveChannelRevision});await emit({type:'session.created',session});const pending=queue;queue=[];pending.forEach(transmit);return;
+   started=true;await emit({type:'origen.client.revision',revision:liveChannelRevision});
+   if(researchDeliveryV2)await emit({type:'origen.research.delivery',deliveryStage:'enabled',durationMs:0});
+   await emit({type:'session.created',session});const pending=queue;queue=[];pending.forEach(transmit);return;
   }
   if(e.type==='session.thinking.appended'){
    const delivery=researchAcknowledgments.get(e.client_event_id);
@@ -147,6 +157,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(e.type==='session.input_transcript.delta'&&typeof e.delta==='string'){
    if(ending)return;
+   if(researchDeliveryV2){deliveryTracker.caller();if(outputId)outputInterrupted=true;}
    // Live already has the facts. Let it use them in this caller-led exchange
    // without an additional application-requested announcement afterward.
    if(researchReady){researchReady.quietOnly=true;cancel(researchTimer);researchTimer=null;}
@@ -173,7 +184,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    }
    lastOutputAt=now();lastOutputText=outputId?lastOutputText+e.delta:e.delta;
    repliedSinceInput=true;recentInput=null;
-   if(!outputId){outputId=id();await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});}
+   if(!outputId){outputInterrupted=!!inputId;outputId=id();await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});}
    output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta});
    if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }
@@ -243,19 +254,22 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(ending)return;
    if(researchState?.jobId&&event.jobId&&researchState.jobId!==event.jobId)return;
    if(event.revision!==undefined&&researchState?.revision!==undefined&&event.revision!==researchState.revision)return;
+   if(researchDeliveryV2){deliveryTracker.ready(event,{awaitingReply:!!inputId||!!recentInput&&!repliedSinceInput});return;}
    const delivery=supplyResearch(event);if(delivery.announced||delivery.quietOnly)return;
    researchReady=delivery;cancel(researchTimer);researchTimer=schedule(checkResearch,250);return;
   }
   if(event.type==='origen.research.state'){
-   if(researchState?.requestId!==event.request?.requestId||researchState?.revision!==event.request?.revision){researchVersion++;clearResearch();}
+   if(researchState?.requestId!==event.request?.requestId||researchState?.revision!==event.request?.revision){researchVersion++;if(researchDeliveryV2)deliveryTracker.supersede();else clearResearch();}
    const changed=JSON.stringify({...researchState,elapsedMs:undefined})!==JSON.stringify({...event.request,elapsedMs:undefined});
    researchState=event.request;
    if(changed){quietContext('research-state',researchState?.requestId||'current',{...researchState,elapsedMs:undefined});
     void emit({type:'origen.research.state_changed',requestId:event.request?.requestId,revision:event.request?.revision,jobId:event.request?.jobId,state:event.request?.state});}return;
   }
-  if(event.type==='origen.research.cancel'){researchVersion++;researchState=null;clearResearch();quietContext('research-state','current',{state:'cancelled',acceptedActiveJob:false});return;}
+  if(event.type==='origen.research.cancel'){researchVersion++;researchState=null;clearResearch(event.reason==='scope_changed'?'scope_changed':'cancelled');quietContext('research-state','current',{state:'cancelled',acceptedActiveJob:false});return;}
   if(event.type==='session.update'){
-   configurationVersion++;researchVersion++;clearResearch();
+   // Server-side scope changes explicitly cancel delivery first. Language and
+   // same-scope configuration updates must not discard completed findings.
+   configurationVersion++;researchVersion++;if(!researchDeliveryV2)clearResearch();
    const next=event.session||{};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto',reasoning:{effort:'low'},text:{verbosity:'low'},max_output_tokens:Math.max(1800,next.max_output_tokens??session.max_output_tokens??0)};
    updates.set(event.event_id,{id:event.event_id,session:next,startedAt:now()});
    if(next.liveInstructions)append('session.instructions.append',next.liveInstructions);

@@ -18,3 +18,13 @@ test('speech already underway during the question is not a fast answer candidate
  const r=liveConversationTiming({runs:[{language:'es',steps:[{startedAt:100,audioEnded:200}],finishedAt:1000,events:[{type:'session.output_transcript.delta',at:150,delta:'PRIVATE prior speech '.repeat(10)}]}]});
  assert.equal(r.calls[0].turns[0].firstTranscriptMs,-50);assert.equal(r.calls[0].turns[0].candidateTranscriptMs,null);
 });
+test('delivery timing separates receipt from speech evidence and excludes mismatched revisions',()=>{
+ const event=(at,deliveryStage,extra={})=>({type:'origen.research.delivery',at,deliveryStage,jobId:'PRIVATE_JOB',revision:2,...extra});
+ const r=liveConversationTiming({runs:[{events:[{type:'origen.research.supplied',at:100,jobId:'PRIVATE_JOB',revision:2},
+  {type:'origen.research.context_acknowledged',at:200,jobId:'PRIVATE_JOB',revision:2,durationMs:100},
+  event(300,'deferred'),event(400,'reply_observed'),event(500,'commentary_requested'),event(600,'commentary_acknowledged'),
+  event(700,'evidence_overlap_observed',{revision:1}),event(800,'PRIVATE_STAGE'),event(900,'delivery_unconfirmed')]}]});
+ const delivery=r.calls[0].delivery[0];assert.equal(delivery.acknowledgmentMs,100);assert.equal(delivery.commentaryRequestedMs,400);
+ assert.equal(delivery.commentaryAcknowledgedMs,500);assert.equal(delivery.evidenceOverlapObservedMs,null);assert.equal(delivery.lastDeliveryStage,'delivery_unconfirmed');assert.equal(delivery.deferredCount,1);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE/);
+});

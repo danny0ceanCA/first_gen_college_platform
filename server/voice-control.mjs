@@ -9,19 +9,21 @@ import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000}){
+export function voiceControlSession({provider,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
+ const reports=new Map();
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
  const raw={get readyState(){return provider.readyState===undefined||provider.readyState===WebSocket.OPEN?'open':'closed';},send:text=>{if(raw.readyState==='open')provider.send(text);},close:()=>{}};
  const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,
-  isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version});
+  isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
  const research=backgroundResearch({post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
   read:id=>jobRequest('GET',id),remove:id=>jobRequest('DELETE',id),now,
   isCurrent:query=>!closed&&query.studentId===scope.studentId&&query.sessionId===scope.sessionId,isQuiet:()=>true,
   onRequest:request=>{if(request.state==='requesting')reportRecord=undefined;send({type:'origen.research.state',request});},onState:active=>emit({type:'origen.research.active',active}),
-  deliver:job=>{if(closed)return;if(job.status==='completed'&&job.result){cache.put(job.query,job.result);reportRecord={job,studentId:scope.studentId};}
+  deliver:job=>{if(closed)return;if(job.status==='completed'&&job.result){cache.put(job.query,job.result);reportRecord={job,studentId:scope.studentId};
+    if(researchDeliveryV2){reports.set(job.id,reportRecord);if(reports.size>8)reports.delete(reports.keys().next().value);}}
    emit({type:'origen.research.result',jobId:job.id,status:job.status,sources:job.result?.sources||[]});
    send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,question:job.question,result:job.status==='completed'?researchEvidence(job.result,false):{status:'research_failed'}});
   }});
@@ -29,8 +31,10 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
  async function researchCall(item){
   if(item.name==='cancel_background_research'){reportRecord=undefined;const receipt=await research.cancel();send({type:'origen.research.cancel'});return receipt;}
   if(item.name==='read_research_details'){
-   const args=JSON.parse(item.arguments),record=reportRecord;
-   if(!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.id!==args.jobId||record.job.revision!==args.revision)return {status:'research_details_unavailable',instruction:'The requested report is not the current completed result in this scope. Do not invent details, claim a new search, or automatically repeat research.'};
+   const args=JSON.parse(item.arguments),record=researchDeliveryV2?reports.get(args.jobId):reportRecord;
+   if(!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.id!==args.jobId||record.job.revision!==args.revision)return {status:'research_details_unavailable',
+    ...(researchDeliveryV2&&scope.confirmed?{availableReports:[...reports.values()].filter(r=>r.studentId===scope.studentId).map(r=>({jobId:r.job.id,revision:r.job.revision,question:r.job.question}))}:{}),
+    instruction:'The requested report is not a retained completed result in this scope. Do not invent details, claim a new search, or automatically repeat research.'};
    return {status:'cached_research_details',text:record.job.result.text,sources:record.job.result.sources,checkedAt:record.job.result.checkedAt,instruction:'This is the retained report from the completed check, not fresh research. Answer only the requested detail, preserving scope, dates, uncertainty and source citations.'};
   }
   const args=JSON.parse(item.arguments),mode=researchModeForTool(item.name);
@@ -43,7 +47,8 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
  channel.onmessage=async message=>{
   const event=JSON.parse(message.data);if(closed)return;
   const deliveryStages={'origen.research.supplied':'supplied','origen.research.context_acknowledged':'context_acknowledged','origen.research.context_failed':'context_failed','origen.research.announced':'commentary_requested','origen.research.native_reply_observed':'native_reply_observed'};
-  if(deliveryStages[event.type])log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
+  if(deliveryStages[event.type]&&!(researchDeliveryV2&&event.type==='origen.research.announced'))log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
+  if(event.type==='origen.research.delivery')log({event:'voice.research.delivery',deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs});
   if(event.type==='input_audio_buffer.speech_started')turn++;
   const tools=event.type==='response.done'?(event.response?.output||[]).filter(item=>item.type==='function_call'):[];
   if(!tools.length){emit(event);return;}
@@ -102,9 +107,9 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   },
   playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version)playback={idle:value.idle,version:value.version,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
-  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;await research.cancel();send({type:'origen.research.cancel'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
+  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;closed=true;for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
+  close(){if(closed)return;closed=true;reports.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
  };
 }
 
@@ -172,7 +177,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
         const attachTimer=setTimeout(()=>dispose(run,'attach_timeout'),8000);run.attachTimer=attachTimer;attachTimer.unref();
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
-         run.engine=voiceControlSession({provider:run.provider,config:run.config,scope:run.scope,emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
+         run.engine=voiceControlSession({provider:run.provider,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
           jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });

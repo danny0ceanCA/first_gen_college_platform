@@ -11,6 +11,29 @@ test('private diagnostics preserve request state without copying the question',(
  const payload=capturePayload({type:'origen.research.state_changed',requestId:'r',jobId:'j',state:'running',question:'PRIVATE'});
  assert.equal(payload.state,'running');assert.equal(payload.jobId,'j');assert.ok(!JSON.stringify(payload).includes('PRIVATE'));
 });
+for(const language of ['en','es'])test(`${language}: delivery v2 waits through an ordinary reply and then introduces completed research once`,async()=>{
+ const clock=fakeClock();let audible=0;
+ const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>audible});
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Can we discuss essays?':'¿Podemos hablar de los ensayos?'});await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',requestId:'request',revision:1,question:'Costs',result:{text:'The verified annual tuition is 12345 dollars.\nHousing is separate.'}}));
+ clock.advance(1100);await pause(0);clock.advance(1000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'We can start with the story you want to share.':'Podemos empezar con la historia que quieres compartir.'});await pause(0);audible++;
+ clock.advance(1800);await pause(0);clock.advance(1000);await pause(0);clock.advance(1000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+ assert.ok(f.events.some(e=>e.deliveryStage==='reply_observed'));
+ assert.ok(!f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'));
+ clock.advance(10000);await pause(0);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+ assert.ok(!f.sent.some(e=>['response.cancel','response.create','session.instructions.append'].includes(e.type)));f.channel.close();
+});
+test('delivery v2 survives a same-scope language update but waits for its acknowledgment',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
+ f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',question:'Costs',result:{text:'The verified annual tuition is 12345 dollars.'}}));await pause(0);
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'language',session:{instructions:'Current conversation language: Spanish',tools:[]}}));
+ clock.advance(5000);await pause(0);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+ f.receive({type:'session.updated',client_event_id:'language'});await pause(0);clock.advance(1000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+});
 for(const text of ['How much does it cost to go to UC Santa Cruz?','How much is that?','What does residency mean?','Okay.','Yes.','¿Cuánto cuesta ir a UC Santa Cruz?','¿Cuánto es?','¿Qué significa residencia?','Gracias.'])test('native conversation has no keyword or silence-triggered second decision: '+text,async()=>{
  const clock=fakeClock(),f=fixture(clock);
  f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});

@@ -275,3 +275,23 @@ Final automated verification: **206 tests passed, zero failures or skips**, incl
 The final-summary provider endpoint was excluded by the test budget gate; expected summary-save failures in this harness are outside this conversation/research comparison. No production records were accessed for writes.
 
 Sanitized measurements: [timing summary](../../output/playwright/natural-step3-final/timing-summary.json). Recordings: [English full report](../../output/playwright/natural-step3-final/full-en.webm), [English brief](../../output/playwright/natural-step3-final/brief-en.webm), [Spanish brief](../../output/playwright/natural-step3-spanish-complete/brief-es.webm). Raw local traces and the budget ledger are under `output/playwright/natural-step3*` and `tmp/natural-step3/`; they remain uncommitted. The offline timing utility is `scripts/live-conversation-timing-report.mjs`.
+
+## Completed research delivery follow-up — 2026-11-05
+
+Branch: **v1.1**, based on the restored V1 tree at `0fdd253`. This change is local and uncommitted. Student-selection recaps are excluded.
+
+### Activation and rollback
+
+Set **`ORIGEN_RESEARCH_DELIVERY_V2=true` on the API process** and start a fresh call to exercise this delivery policy. It uses the existing server-control connection and research worker; the worker needs no new setting or migration. The flag defaults off. Removing it or setting it to `false` restores V1 delivery for new calls. No production configuration was changed.
+
+### Behavior and evidence
+
+- Completed findings remain available while ordinary conversation continues. The application permits one optional spoken contribution at a quiet playback boundary, after context acknowledgment, and while no backend/tool/configuration work is pending.
+- New caller speech postpones an unsent contribution. The caller gets the first opportunity to receive a native answer. After the caller transcript settles, a three-second allowance prevents a backchannel alone from stranding a finished result; this does not mute audio or start model work. Active speech and backend work still block the contribution.
+- Once a contribution is requested, interruption does not enqueue a replay. Context errors, missing acknowledgments, cancellation, changed scope, and end-of-call clear pending delivery safely. A two-minute opportunity limit retires unsolicited speech while retaining the completed facts/report.
+- The server retains up to eight reports for the current student and physical call. Supporting-detail and comparison requests can read earlier reports without another external lookup. Scope changes clear that collection.
+- Diagnostics separate context acknowledgment, deferred opportunities, commentary request/acknowledgment, observed replies, interruptions, and unconfirmed delivery. Literal answer overlap plus observed playback suppresses likely duplicate announcements. This is a conservative heuristic, not semantic verification or proof that the caller heard the findings. Paraphrases still require audio/transcript review.
+
+English and Spanish regression scenarios exercise delayed completion, ordinary follow-ups, backchannels, duplicate completion, interruption, stale acknowledgments, failures, report comparisons, and scope isolation. The integration tests cross a real local WebSocket using the browser control facade and simulated provider events/playback. They do **not** call the live model or measure production conversational quality. No new paid calls were made.
+
+Local evidence: `tmp/research-delivery-validation.log` and `tmp/research-delivery-build.log`. The timing-report utility now separates context acknowledgment from commentary request, commentary acknowledgment, and observed answer overlap; absent speech evidence remains null. A paid live English/Spanish comparison against V1 remains necessary before drawing conclusions about naturalness or production latency.

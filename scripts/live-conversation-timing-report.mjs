@@ -7,13 +7,19 @@ const terminal=new Set(['response.completed','response.failed','response.cancell
 const paths=new Map([['/api/profile-voice','context'],['/api/live-memory','memory'],['/api/conversation-history','history'],['/api/student-memory','memory'],['/api/education-planning','research']]);
 const tools=new Set(['switch_college_guide','highlight_binder_topics','recall_student_context','lookup_education_planning','lookup_financial_aid','lookup_college_applications','read_research_details','request_conversation_target','set_conversation_language','select_conversation_student']);
 const round=n=>Math.round(n);
+const deliveryStages=new Set(['deferred','commentary_requested','commentary_acknowledged','delivery_unconfirmed','interrupted','superseded','reply_observed','evidence_overlap_observed']);
 export function liveConversationTiming(report){
  return {calls:(report.runs||[]).map(run=>({language:['en','es'].includes(run.language)?run.language:'unknown',...(typeof run.brief==='boolean'?{variant:run.brief?'brief':'full-report'}:{}),failed:!!run.failure,
   callbackTimeouts:(report.diagnostics||[]).filter(e=>e.run===run.id&&e.event==='voice.control.callback_timeout').length,
   research:(report.research||[]).filter(e=>e.run===run.id&&e.kind==='research-finished').map(e=>({durationMs:round(e.durationMs),httpStatus:e.status})),
   delivery:(run.events||[]).filter(e=>e.type==='origen.research.supplied').map(e=>{
-   const ack=e.jobId&&(run.events||[]).find(a=>a.type==='origen.research.context_acknowledged'&&a.jobId===e.jobId&&a.at>=e.at);
-   return {evidenceFormat:['brief-v1','full-report'].includes(e.evidenceFormat)?e.evidenceFormat:'unknown',packetCount:e.packetCount??null,contextBytes:e.contextBytes??null,acknowledgmentMs:ack?.durationMs??null};
+   const same=a=>e.jobId&&a.jobId===e.jobId&&(e.revision===undefined||a.revision===e.revision)&&a.at>=e.at;
+   const ack=(run.events||[]).find(a=>a.type==='origen.research.context_acknowledged'&&same(a));
+   const stages=(run.events||[]).filter(a=>a.type==='origen.research.delivery'&&same(a)&&deliveryStages.has(a.deliveryStage));
+   const elapsed=stage=>{const event=stages.find(a=>a.deliveryStage===stage);return event?round(event.durationMs??event.at-e.at):null;};
+   return {evidenceFormat:['brief-v1','full-report'].includes(e.evidenceFormat)?e.evidenceFormat:'unknown',packetCount:e.packetCount??null,contextBytes:e.contextBytes??null,acknowledgmentMs:ack?.durationMs??null,
+    commentaryRequestedMs:elapsed('commentary_requested'),commentaryAcknowledgedMs:elapsed('commentary_acknowledged'),evidenceOverlapObservedMs:elapsed('evidence_overlap_observed'),
+    lastDeliveryStage:stages.at(-1)?.deliveryStage??null,deferredCount:stages.filter(a=>a.deliveryStage==='deferred').length};
   }),turns:(run.steps||[]).map((step,index)=>{
   const start=step.after??step.startedAt,end=step.at??run.steps[index+1]?.startedAt??run.finishedAt??Infinity;
   const inside=e=>Number.isFinite(e.at)&&e.at>=start&&e.at<=end;
@@ -42,7 +48,7 @@ export function liveConversationTiming(report){
   return {turn:index+1,firstAudibleMs:audible===undefined?null:round(audible-step.audioEnded),freshResearchCalls:lookups.length,firstTranscriptMs:groups.length?round(groups[0].start-step.audioEnded):null,candidateTranscriptMs:candidate?round(candidate.start-step.audioEnded):null,backendResponses:modelSpans,unfinishedBackendResponses:pending.size,
    http:(report.requests||[]).filter(e=>inside(e)&&paths.has(e.path)&&Number.isFinite(e.durationMs)&&e.action!=='revision').map(e=>({stage:paths.get(e.path),startMs:round(e.at-step.audioEnded),durationMs:round(e.durationMs),status:e.status})),
    contextUpdates:updates,toolCalls:events.filter(e=>e.type==='response.event'&&e.event?.type==='response.output_item.done'&&e.event.item?.type==='function_call').map(e=>({tool:tools.has(e.event.item.name)?e.event.item.name:'workflow',startMs:round(e.at-step.audioEnded)}))};
- })})),limitations:['Boundaries are the end of synthetic input WAV playback, not production microphone VAD.','First audible is observed sound, which can be an acknowledgment; it is not proof of a useful answer.','Candidate transcript is a length/gap heuristic; inspect the recording for substantive speech. It is not first audible sound.','HTTP and model stages can overlap; do not sum them as a critical path.','Context acknowledgment is injection confirmation, not spoken or heard delivery.','Unmatched context acknowledgments are not assigned to another update.','Small local samples do not establish production percentiles.']};
+ })})),limitations:['Boundaries are the end of synthetic input WAV playback, not production microphone VAD.','First audible is observed sound, which can be an acknowledgment; it is not proof of a useful answer.','Candidate transcript is a length/gap heuristic; inspect the recording for substantive speech. It is not first audible sound.','HTTP and model stages can overlap; do not sum them as a critical path.','Context acknowledgment is injection confirmation, not spoken or heard delivery.','Evidence overlap is a conservative transcript/playback observation, not a semantic grade or proof the user heard the findings.','Delivery stage timings are elapsed from evidence supply, not from the original research request.','Unmatched context acknowledgments are not assigned to another update.','Small local samples do not establish production percentiles.']};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const report=JSON.parse(await readFile(process.argv[2],'utf8'));console.log(JSON.stringify(liveConversationTiming(report),null,2));

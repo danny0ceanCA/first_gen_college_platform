@@ -17,8 +17,8 @@ export function liveContextPackets(kind,resultId,value){
  return parts.map((text,index)=>JSON.stringify({kind,resultId,part:index+1,total:parts.length,text}));
 }
 
-export function researchContextPackets(job,resultId){
+export function researchContextPackets(job,resultId,{completedState=false}={}){
  const original=job.result||{},result=researchBriefSelection(original);
  return liveContextPackets('untrusted-research-evidence',resultId,{question:job.question,checkedAt:result.checkedAt,
-  status:original.status,text:result.text,sources:result.sources,evidenceFormat:result.evidenceFormat,...(result.verification?{verification:result.verification}:{}),...(result.detailAvailable?{detailAvailable:true}:{})});
+  status:original.status,...(completedState?{taskState:original.status==='research_failed'?'failed':'completed',researchPending:false}:{}),text:result.text,sources:result.sources,evidenceFormat:result.evidenceFormat,...(result.verification?{verification:result.verification}:{}),...(result.detailAvailable?{detailAvailable:true}:{})});
 }

@@ -7,7 +7,7 @@ import {voiceControlSession,createVoiceControl} from './voice-control.mjs';
 import {studentLiveSession} from './student-live-session.mjs';
 import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(check){for(let n=0;n<100;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
+async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
 const config={language:'en',instructions:'Authorized context',tools:[{name:'lookup_financial_aid'},{name:'propose_profile'}],routingPolicy:'bounded-follow-up-v1'};
 function fixture(options={}){
@@ -87,9 +87,9 @@ class Provider extends EventEmitter{
 }
 async function transportFixture(options={}){
  let revision=1;const providers=[],urls=[],logs=[];
- const control=createVoiceControl({env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test'},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
+ const control=createVoiceControl({env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
  const server=createServer();control.attach(server);await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const receipt=()=>control.register({subject:'owner',permissionRevision:1,providerId:'live_session_prefixed',sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config});
+ const receipt=()=>control.register({subject:'owner',permissionRevision:1,providerId:'live_session_prefixed',sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config:{...config,...options.config}});
  const connect=async(origin='http://allowed.test')=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}/api/voice-control`,{origin});ws.on('error',()=>{});const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');return {ws,messages};};
  return {control,receipt,connect,providers,urls,logs,base:`http://127.0.0.1:${server.address().port}`,revoke:()=>revision++,async close(){control.close();await new Promise(r=>server.close(r));}};
 }
@@ -177,4 +177,66 @@ test('browser disconnect closes provider with no replay or second owner',async()
  const f=await transportFixture();try{const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));ws.close();await once(ws,'close');await until(()=>f.providers[0].readyState===WebSocket.CLOSED);
   const next=await f.connect();next.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await once(next.ws,'close');assert.equal(f.providers.length,1);
  }finally{await f.close();}
+});
+
+test('delivery v2 retains both completed reports for a comparison, fenced by revision and student',async()=>{
+ let posts=0;const full=id=>`Detailed verified report for ${id}.`,tools=[...config.tools,{name:'read_research_details'}];
+ const f=fixture({researchDeliveryV2:true,config:{tools},jobRequest:async(method,id)=>method==='POST'?{id:'job-'+(++posts),status:'queued'}:method==='GET'?{status:'completed',result:{text:full(id),sources:[]}}:{status:'cancelled'}});
+ try{
+  for(const [index,institution] of [[1,'Berkeley'],[2,'Davis']]){
+   f.call([tool('lookup_financial_aid','lookup-'+index,{question:'Published cost at '+institution,institution})],'response-'+index);
+   await until(()=>f.events.filter(e=>e.type==='origen.research.result').length===index);
+  }
+  for(const index of [1,2]){
+   f.call([tool('read_research_details','details-'+index,{jobId:'job-'+index,revision:1})],'read-'+index);
+   await until(()=>f.sent.some(e=>e.item?.call_id==='details-'+index));
+   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='details-'+index).item.output).text,full('job-'+index));
+  }
+  assert.equal(posts,2,'a comparison must not launch new research');
+  f.call([tool('read_research_details','stale',{jobId:'job-1',revision:2})],'stale');await until(()=>f.sent.some(e=>e.item?.call_id==='stale'));
+  const unavailable=JSON.parse(f.sent.find(e=>e.item?.call_id==='stale').item.output);
+  assert.equal(unavailable.status,'research_details_unavailable');assert.equal(unavailable.availableReports.length,2);
+  await f.engine.configure({...config,tools},{sessionId:'physical-call',studentId:'other',confirmed:true},'scope');
+  f.call([tool('read_research_details','cross-scope',{jobId:'job-1',revision:1})],'cross-scope');await until(()=>f.sent.some(e=>e.item?.call_id==='cross-scope'));
+  assert.deepEqual(JSON.parse(f.sent.find(e=>e.item?.call_id==='cross-scope').item.output).availableReports,[]);
+ }finally{f.engine.close();}
+});
+
+for(const language of ['en','es'])test(`delivery v2 crosses the real browser control socket without cutting into speech (${language})`,async()=>{
+ const answer=language==='en'?'The published annual tuition is 12345 dollars at Example University.':'La matrícula anual publicada es de 12345 dólares en la Universidad Ejemplo.';
+ const qualification=language==='en'?'Housing is separate.':'La vivienda es aparte.';
+ const events=[],jobs=[],primaryWrites=[];let idle=false,sound=0;
+ const f=await transportFixture({env:{ORIGEN_RESEARCH_DELIVERY_V2:'true'},config:{language},request:async(token,method,path,body)=>{
+  jobs.push({method,body});return method==='POST'?{id:'job-delivery',status:'queued'}:method==='GET'?{status:'completed',result:{text:answer+'\n'+qualification,sources:[]}}:{status:'cancelled'};
+ }});
+ const raw={readyState:'open',send:text=>primaryWrites.push(JSON.parse(text)),close(){this.readyState='closed';this.onclose?.({});}};
+ const channel=studentVoiceChannel(raw,{isPlaybackIdle:()=>idle,getPlaybackVersion:()=>sound});
+ channel.onmessage=event=>events.push(JSON.parse(event.data));
+ class BrowserSocket extends WebSocket{constructor(url){super(url,{origin:'http://allowed.test'});}}
+ try{
+  await channel.configure({voiceControl:f.receipt()},{token:'owner',url:f.base,WebSocketClass:BrowserSocket});
+  const provider=f.providers[0],native=event=>provider.emit('message',Buffer.from(JSON.stringify(event)));
+  const backend=event=>native({type:'response.event',delegation_id:'delegation',event});
+  native({type:'session.input_transcript.delta',delta:language==='en'?'Can we discuss essays while you check?':'¿Podemos hablar de los ensayos mientras investigas?'});
+  backend({type:'response.created',response:{id:'lookup'}});
+  backend({type:'response.output_item.done',response_id:'lookup',item:tool('lookup_financial_aid','lookup',{question:'Published tuition',institution:'Example'})});
+  backend({type:'response.completed',response:{id:'lookup'}});
+  await until(()=>events.some(e=>e.type==='origen.research.supplied'));
+  for(const e of provider.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='untrusted-research-evidence'))native({type:'session.thinking.appended',client_event_id:e.event_id});
+  await until(()=>events.some(e=>e.type==='origen.research.context_acknowledged'));
+  assert.equal(provider.sent.filter(e=>e.type==='session.commentary.append').length,0);
+  await pause(450); // Caller transcript has settled; playback is still busy.
+  native({type:'session.output_transcript.delta',delta:language==='en'?'We can start with the story you want to share.':'Podemos empezar con la historia que quieres compartir.'});sound++;
+  await pause(1900);assert.equal(provider.sent.filter(e=>e.type==='session.commentary.append').length,0,'no commentary while audio is playing');
+  idle=true;await until(()=>provider.sent.some(e=>e.type==='session.commentary.append'),6000);
+  const contribution=provider.sent.find(e=>e.type==='session.commentary.append');native({type:'session.commentary.appended',client_event_id:contribution.event_id});
+  await until(()=>events.some(e=>e.deliveryStage==='commentary_acknowledged'));
+  assert.ok(!events.some(e=>e.deliveryStage==='evidence_overlap_observed'),'acknowledgment is not evidence of speech');
+  idle=false;native({type:'session.output_transcript.delta',delta:answer+' '+qualification});sound++;
+  await pause(1900);idle=true;await until(()=>events.some(e=>e.deliveryStage==='evidence_overlap_observed'),3000);
+  assert.equal(provider.sent.filter(e=>e.type==='session.commentary.append').length,1);
+  assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs[0].body.language,language);
+  assert.equal(primaryWrites.length,0);assert.ok(!provider.sent.some(e=>['response.cancel','session.input_audio.mute','session.instructions.append'].includes(e.type)));
+  assert.ok(f.logs.some(e=>e.deliveryStage==='reply_observed'));assert.equal(f.logs.filter(e=>e.deliveryStage==='commentary_requested').length,1);assert.ok(!JSON.stringify(f.logs).includes('12345'));
+ }finally{channel.close();await f.close();}
 });
