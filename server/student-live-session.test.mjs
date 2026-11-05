@@ -37,10 +37,11 @@ test('Live preserves the larger delegated response budget required by sharing an
 for(const language of ['en','es'])test(`${language} scope and later configuration updates do not independently restart the opening`,()=>{
  const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:true,studentId:'aiden',students:[{id:'aiden',name:'Aiden'}],profile:{name:'Aiden'},continuing:true};
  const first=studentLiveInstructions({...input,targetConfirmed:false,continuing:false});
- assert.match(first,/# Backchannel policy\nMostly quiet listening/);
+ assert.match(first,/# Backchannel policy\nDo not produce backchannel interjections/);
  assert.match(first,/Acknowledgments before an answer are separate/);
- assert.match(first,/usually begin directly with the useful answer/);
- assert.match(first,/Do not produce consecutive or standalone hmm\/mm-hmm/);
+ assert.match(first,/begin with the useful answer or one concrete clarification/);
+ assert.match(first,/without hmm, mm-hmm, uh/);
+ assert.match(first,/This listening rule does not delay your response after they finish/);
  for(const updateInput of [input,{...input,mode:'finance'},{...input,language:language==='en'?'es':'en'}]){
   const instructions=studentLiveInstructions(updateInput,[],[],undefined,{update:true});
   assert.match(instructions,/configuration is silent context/);

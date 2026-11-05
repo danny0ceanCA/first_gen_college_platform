@@ -18,6 +18,35 @@ test('comparison reuses supported Berkeley findings and searches only the missin
  assert.deepEqual(input.lookupInstitutions,['UC Santa Cruz']);assert.match(request.instructions,/Do not re-search a covered institution/);
 });
 
+for(const language of ['en','es'])test(`${language}: a new-campus comparison retains a qualified prior finding whose original question omitted the year`,()=>{
+ const previous=structuredClone(row);
+ previous.input.question=language==='en'?'Current undergraduate tuition and mandatory fees for California residents at UC Berkeley':'Matrícula y cuotas de pregrado para residentes de California en UC Berkeley';
+ previous.result.voiceBrief.findings[0].subject='UC Berkeley — new undergraduate transfers, 2026–27';
+ const question=language==='en'?'Compare 2026–27 undergraduate tuition and mandatory fees for California residents at UC Santa Cruz with the verified UC Berkeley figures':'Compara matrícula y cuotas de pregrado 2026–27 para residentes de California de UC Santa Cruz con UC Berkeley';
+ const reuse=selectResearchReuse({mode:'finance',institution:'UC Santa Cruz',question},[previous],{now});
+ assert.equal(reuse.reusedEvidence.length,1);assert.equal(reuse.reusedEvidence[0].findings[0].status,'verified');
+ assert.deepEqual(reuse.lookupInstitutions,['UC Santa Cruz']);assert.match(reuse.reusedEvidence[0].findings[0].qualification,/California-resident/);
+ const request=reuseResearchRequest({input:'{}',instructions:''},reuse);assert.match(request.instructions,/check the newly requested campus first/);
+ const wrongYear=structuredClone(previous);wrongYear.result.voiceBrief.findings[0].subject='UC Berkeley — 2025–26';wrongYear.result.voiceBrief.findings[0].answer=wrongYear.result.voiceBrief.findings[0].answer.replace('2026–27','2025–26');
+ assert.deepEqual(selectResearchReuse({mode:'finance',institution:'UC Santa Cruz',question},[wrongYear],{now}),{});
+ const missingYear=structuredClone(previous);missingYear.result.voiceBrief.findings[0].subject='UC Berkeley';missingYear.result.voiceBrief.findings[0].answer=missingYear.result.voiceBrief.findings[0].answer.replace('2026–27','');
+ assert.deepEqual(selectResearchReuse({mode:'finance',institution:'UC Santa Cruz',question},[missingYear],{now}),{});
+});
+
+test('qualified campus subjects and both residency categories preserve evidence without confusing another campus',()=>{
+ const previous=structuredClone(row);previous.input.question=question+' and nonresidents';previous.result.voiceBrief.findings[0].subject='University of California, Berkeley — entering undergraduates, 2026–27';
+ const reuse=selectResearchReuse({...query,question:query.question+' and nonresidents'},[previous],{now});assert.equal(reuse.reusedEvidence[0].findings[0].status,'verified');
+ previous.result.voiceBrief.findings[0].subject='UC Santa Cruz — entering undergraduates, 2026–27';
+ assert.deepEqual(selectResearchReuse({...query,question:query.question+' and nonresidents'},[previous],{now}),{});
+});
+
+test('retained source IDs survive a filtered source list',()=>{
+ const previous=structuredClone(row);previous.result.sources[0].id=7;
+ previous.result.voiceBrief.answer=previous.result.voiceBrief.answer.replace('[1]','[7]');previous.result.voiceBrief.qualification=previous.result.voiceBrief.qualification.replace('[1]','[7]');
+ previous.result.voiceBrief.findings[0].answer=previous.result.voiceBrief.findings[0].answer.replace('[1]','[7]');previous.result.voiceBrief.findings[0].qualification=previous.result.voiceBrief.findings[0].qualification.replace('[1]','[7]');
+ assert.equal(selectResearchReuse(query,[previous],{now}).reusedEvidence[0].sources[0].url,result.sources[0].url);
+});
+
 test('refresh, changed year, population, age of evidence and unmatched institution prevent reuse',()=>{
  for(const changed of [{forceRefresh:true},{question:query.question.replaceAll('2026–27','2027–28')},{question:'Compare current undergraduate tuition for California residents at UC Berkeley and UC Santa Cruz'},{question:query.question.replace('California residents','international students')},{question:query.question.replace('undergraduate','graduate')},{institution:'UC Davis'}])assert.deepEqual(selectResearchReuse({...query,...changed},[row],{now}),{});
  assert.deepEqual(selectResearchReuse(query,[{...row,finished_at:new Date(now-300000).toISOString()}],{now}),{});

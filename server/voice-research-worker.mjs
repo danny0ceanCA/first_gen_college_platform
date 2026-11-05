@@ -4,13 +4,14 @@ import {runtimeLog} from './observability/logger.mjs';
 import {researchBriefRequest,parseResearchBrief} from './research-brief.mjs';
 import {researchRecoveryPlan,recoveryResearchRequest,researchAttemptDiagnostics,mergeRecoveryResearch,parseUnverifiedResearch} from './research-recovery.mjs';
 import {mergeReusedResearchSources,reuseResearchRequest,parseReusedOnlyResearch,cachedResearchForCoverage} from './research-reuse.mjs';
+import {researchBriefSelection} from '../src/researchBrief.mjs';
 export async function processResearchJob(database,env,{request=fetch,signal,now=Date.now}={}){
  // Atomic claim; a crashed job is failed, never retried automatically at extra cost.
  await database.query("UPDATE origen_voice_research_jobs SET status='failed',finished_at=now() WHERE status='running' AND started_at<now()-interval '3 minutes'");
  await database.query('DELETE FROM origen_voice_research_jobs WHERE expires_at<now()');
  const job=(await database.query("UPDATE origen_voice_research_jobs SET status='running',started_at=now() WHERE id=(SELECT id FROM origen_voice_research_jobs WHERE status='queued' AND expires_at>now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,input")).rows[0];
  if(!job)return false;
- const started=now(),attempts=[];
+ const started=now(),attempts=[];let publishedResult;
  const controller=new AbortController();
  // Every pass shares this deadline and cancellation. A recovery never buys
  // another 90 seconds or repeats the durable job.
@@ -51,6 +52,16 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
     // spending its remaining recovery allowance.
     const state=await database.query('SELECT status FROM origen_voice_research_jobs WHERE id=$1',[job.id]);
     if(state.rows[0]?.status!=='running')controller.abort();
+    jobSignal.throwIfAborted();
+    // The initial pass is a complete checked response, not streaming JSON or
+    // speculative tokens. Publish useful cited findings before optional work.
+    if((researchBriefSelection(result).findings||[]).some(f=>f.status!=='unverified'&&f.sourceIds.length)){
+     const initial={...result,evidenceVersion:1,researchPending:true,researchDiagnostics:{recoveryStatus:'running',attempts:[...attempts]}};
+     const published=await database.query("UPDATE origen_voice_research_jobs SET result=$2 WHERE id=$1 AND status='running' AND expires_at>now()",[job.id,initial]);
+     if(published.rowCount===0){controller.abort();jobSignal.throwIfAborted();}
+     publishedResult=initial;
+     runtimeLog({event:'voice.research.initial_ready',outcome:'completed',durationMs:now()-started,sourceCount:initial.sources.length});
+    }
     const recovered=await run(recoveryResearchRequest(body,result,plan),'recovery');
     const merged=mergeRecoveryResearch(result,recovered,job.input.language);
     if(merged!==result){result=merged;recoveryStatus=researchRecoveryPlan(result)?'partial':'recovered';}
@@ -58,12 +69,15 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
   }else if(plan)recoveryStatus='deadline';
   // A cancelled/shutdown job must not publish even an earlier partial answer.
   if(controller.signal.aborted||signal?.aborted)throw new Error('cancelled');
-  result={...result,researchDiagnostics:{recoveryStatus,attempts}};
+  result={...result,evidenceVersion:publishedResult?2:1,researchPending:false,researchDiagnostics:{recoveryStatus,attempts}};
   const saved=await database.query("UPDATE origen_voice_research_jobs SET status='completed',result=$2,finished_at=now() WHERE id=$1 AND status='running' AND expires_at>now()",[job.id,result]);
   if(saved.rowCount===0)return true;
   runtimeLog({event:'voice.research.finished',outcome:'completed',durationMs:now()-started,sourceCount:result.sources.length,model:latestData?.model,...usage});
  }catch{
-  await database.query("UPDATE origen_voice_research_jobs SET status='failed',result=$2,finished_at=now() WHERE id=$1 AND status='running'",[job.id,{researchDiagnostics:{recoveryStatus:jobSignal.aborted?'aborted':'failed',attempts}}]);
+  // Preserve facts already published if recovery is interrupted. Cancellation
+  // still wins through the durable status predicate and clears its own result.
+  const retained=publishedResult?{...publishedResult,evidenceVersion:2,researchPending:false,researchDiagnostics:{recoveryStatus:jobSignal.aborted?'aborted':'failed',attempts}}:{researchDiagnostics:{recoveryStatus:jobSignal.aborted?'aborted':'failed',attempts}};
+  await database.query("UPDATE origen_voice_research_jobs SET status='failed',result=$2,finished_at=now() WHERE id=$1 AND status='running'",[job.id,retained]);
   runtimeLog({event:'voice.research.finished',outcome:'failed',durationMs:now()-started,sourceCount:0});
  }
  finally{clearInterval(watch);}

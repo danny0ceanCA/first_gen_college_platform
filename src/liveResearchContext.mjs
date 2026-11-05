@@ -19,18 +19,20 @@ export function liveContextPackets(kind,resultId,value){
 
 export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings}={}){
  const original=job.result||{},result=researchBriefSelection(original);
+ const researchPending=job.researchPending??original.researchPending??false;
+ const taskState=original.status==='research_failed'?'failed':researchPending?'running':'completed';
  if(result.findings?.length){
   // Supply only complete, relevant answer units; don't inject both the brief
   // and all of its repeated claims. The complete report stays in the backend.
   const candidates=priorityFindings?.length?priorityFindings:result.findings;
-  const findings=[...candidates].sort((a,b)=>Number(b.status==='unverified')-Number(a.status==='unverified')).slice(0,3);
+  const findings=[...candidates].sort((a,b)=>(researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified'))).slice(0,3);
   const ids=new Set(findings.flatMap(f=>f.sourceIds));
   return liveContextPackets('untrusted-research-evidence',resultId,{checkedAt:result.checkedAt,status:original.status,
-   taskState:original.status==='research_failed'?'failed':'completed',researchPending:false,
+   taskState,researchPending,evidenceVersion:job.evidenceVersion||original.evidenceVersion||1,...(original.recoveryUnavailable?{recoveryUnavailable:true}:{}),
    focus,findings,remainingFindings:result.findings.length-findings.length,
    sources:result.sources.filter((s,index)=>ids.has(s.id??index+1)),verification:result.verification,detailAvailable:true,evidenceFormat:'brief-v1'});
  }
  return liveContextPackets('untrusted-research-evidence',resultId,{question:job.question,checkedAt:result.checkedAt,
-  status:original.status,...(completedState?{taskState:original.status==='research_failed'?'failed':'completed',researchPending:false}:{}),
+  status:original.status,...(completedState||researchPending?{taskState,researchPending}:{}),
   text:result.text,sources:result.sources,evidenceFormat:result.evidenceFormat,...(result.verification?{verification:result.verification}:{}),...(result.detailAvailable?{detailAvailable:true}:{})});
 }

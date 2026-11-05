@@ -76,6 +76,26 @@ test('detail follow-ups read the retained report without another external job an
   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='wrong-scope').item.output).status,'research_details_unavailable');assert.equal(posts,1);
  }finally{f.engine.close();}
 });
+
+for(const language of ['en','es'])test(`${language}: server forwards first checked findings while recovery continues, then the final version`,async()=>{
+ let posts=0,complete=false;
+ const initial={text:'Checked tuition is USD 12000 per year [1].',sources:[{url:'https://example.edu/fees'}],evidenceVersion:1,researchPending:true};
+ const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,{name:'read_research_details'}]},jobRequest:async method=>method==='POST'?(posts++,{id:'job-1',status:'queued'}):{status:complete?'completed':'running',result:{...initial,text:complete?'Checked tuition is USD 12000 per year; housing is USD 15000 [1].':initial.text,evidenceVersion:complete?2:1,researchPending:!complete}}});
+ try{
+  f.call([tool('lookup_financial_aid','lookup',{question:'Costs',institution:'Example'})]);
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.status==='running'),1500);
+  assert.equal(f.events.filter(e=>e.type==='origen.research.active').at(-1).active,true);
+  f.call([tool('read_research_details','initial-detail',{jobId:'job-1',revision:1})],'detail');
+  await until(()=>f.sent.some(e=>e.item?.call_id==='initial-detail'));
+  const details=JSON.parse(f.sent.find(e=>e.item?.call_id==='initial-detail').item.output);
+  assert.equal(details.text,initial.text);assert.equal(details.researchPending,true);assert.equal(posts,1);
+  complete=true;
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.status==='completed'),1500);
+  assert.equal(f.events.filter(e=>e.type==='origen.research.result').length,2);
+  assert.equal(f.events.filter(e=>e.type==='origen.research.active').at(-1).active,false);
+  assert.equal(posts,1);
+ }finally{f.engine.close();}
+});
 test('provider session ACL blocks primary tool/control writes only when negotiated',()=>{
  const base={instructions:'policy',tools:[]},input={language:'en',voiceControlProtocol:'server-v1'};
  assert.equal(studentLiveSession(base,input).client,undefined);

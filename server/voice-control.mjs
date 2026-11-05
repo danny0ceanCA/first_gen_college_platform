@@ -19,14 +19,16 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
- const research=backgroundResearch({requireReplacementChange:researchDeliveryV2,post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
+ const research=backgroundResearch({requireReplacementChange:researchDeliveryV2,progressive:researchDeliveryV2,post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
   read:id=>jobRequest('GET',id),remove:id=>jobRequest('DELETE',id),now,
   isCurrent:query=>!closed&&query.studentId===scope.studentId&&query.sessionId===scope.sessionId,isQuiet:()=>true,
   onRequest:request=>{if(request.state==='requesting')reportRecord=undefined;send({type:'origen.research.state',request});},onState:active=>emit({type:'origen.research.active',active}),
-  deliver:job=>{if(closed)return;if(job.status==='completed'&&job.result){cache.put(job.query,job.result);reportRecord={job,studentId:scope.studentId};
+  deliver:job=>{if(closed)return;const hasEvidence=job.result&&(job.status==='completed'||researchDeliveryV2&&job.result.evidenceVersion>0&&job.result.sources?.length);
+   if(hasEvidence){if(job.status==='completed')cache.put(job.query,job.result);reportRecord={job,studentId:scope.studentId};
     if(researchDeliveryV2){reports.set(job.id,reportRecord);if(reports.size>8)reports.delete(reports.keys().next().value);}}
    emit({type:'origen.research.result',jobId:job.id,status:job.status,sources:job.result?.sources||[]});
-   send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,question:job.question,result:job.status==='completed'?researchEvidence(job.result,false):{status:'research_failed'}});
+   const researchPending=job.status==='running',evidenceVersion=job.result?.evidenceVersion||1;
+   send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,question:job.question,evidenceVersion,researchPending,result:hasEvidence?{...researchEvidence(job.result,false),evidenceVersion,researchPending,...(job.result.recoveryUnavailable?{recoveryUnavailable:true}:{}),...(researchPending?{status:'source_check_partial'}:{})}:{status:'research_failed'}});
   }});
  const output=(item,result)=>send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(result)}});
  async function researchCall(item){
@@ -36,7 +38,7 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
    if(!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.id!==args.jobId||record.job.revision!==args.revision)return {status:'research_details_unavailable',
     ...(researchDeliveryV2&&scope.confirmed?{availableReports:[...reports.values()].filter(r=>r.studentId===scope.studentId).map(r=>({jobId:r.job.id,revision:r.job.revision,question:r.job.question}))}:{}),
     instruction:'The requested report is not a retained completed result in this scope. Do not invent details, claim a new search, or automatically repeat research.'};
-   return {status:'cached_research_details',text:record.job.result.text,sources:record.job.result.sources,checkedAt:record.job.result.checkedAt,instruction:'This is the retained report from the completed check, not fresh research. Answer only the requested detail, preserving scope, dates, uncertainty and source citations.'};
+   return {status:'cached_research_details',text:record.job.result.text,sources:record.job.result.sources,checkedAt:record.job.result.checkedAt,researchPending:record.job.status==='running',instruction:'This is the retained report from a finished source-check pass, not a fresh search. Optional recovery may still be active when researchPending is true. Answer only the requested detail, preserving scope, dates, uncertainty and source citations.'};
   }
   const args=JSON.parse(item.arguments),mode=researchModeForTool(item.name);
   if(!scope.confirmed||typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw Error('invalid_research');

@@ -133,3 +133,46 @@ test('a concrete corrected year can replace work, while an identical question or
   const stale=await q.start({...first,replaceRequestId:'r',replaceRevision:1,replacementChange:change});assert.equal(stale.status,'research_request_changed');assert.equal(posted.length,2);
  }finally{q.close();}
 });
+
+for(const language of ['en','es'])test(`${language}: progressive polling delivers initial facts once while keeping recovery active`,async()=>{
+ let tick,status='running',version=1;const delivered=[],active=[],posted=[];
+ const q=backgroundResearch({progressive:true,post:async input=>(posted.push(input),{id:'job'}),read:async()=>({status,result:{text:'Checked facts',sources:[{url:'https://example.edu'}],evidenceVersion:version,researchPending:status==='running'}}),remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:j=>delivered.push(j),onState:value=>active.push(value),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ try{
+  const receipt=await q.start({question:'Costs',language,requestKey:'request'});
+  await tick();await tick();assert.equal(delivered.length,1);assert.equal(delivered[0].status,'running');assert.equal(active.at(-1),true);
+  assert.equal((await q.start({question:'And housing?',language})).requestId,receipt.requestId);assert.equal(posted.length,1);
+  status='completed';version=2;await tick();assert.equal(delivered.length,2);assert.equal(delivered[1].result.evidenceVersion,2);assert.equal(active.at(-1),false);
+  await tick();assert.equal(delivered.length,2);
+ }finally{q.close();}
+});
+
+test('provisional evidence is discarded when student scope changes during its read',async()=>{
+ let tick,current=true;const delivered=[],removed=[];
+ const q=backgroundResearch({progressive:true,post:async()=>({id:'job'}),read:async()=>{current=false;return {status:'running',result:{evidenceVersion:1,researchPending:true,text:'Private scope'}};},remove:async id=>removed.push(id),isCurrent:()=>current,isQuiet:()=>true,deliver:j=>delivered.push(j),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ await q.start({question:'Costs'});await tick();assert.equal(delivered.length,0);assert.deepEqual(removed,['job']);q.close();
+});
+
+test('legacy polling does not expose running findings to completed-only clients',async()=>{
+ let tick;const delivered=[];
+ const q=backgroundResearch({post:async()=>({id:'job'}),read:async()=>({status:'running',result:{evidenceVersion:1,researchPending:true,text:'Initial'}}),remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:j=>delivered.push(j),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ await q.start({question:'Costs'});await tick();assert.equal(delivered.length,0);q.close();
+});
+
+for(const failure of ['deadline','read_404','read_503_deadline','worker_crash','worker_failed'])test(`initial findings survive ${failure} with a newer terminal context`,async()=>{
+ let tick,clock=0,reads=0;const delivered=[];
+ const initial={text:'Verified initial fact [1].',sources:[{url:'https://example.edu'}],evidenceVersion:1,researchPending:true};
+ const q=backgroundResearch({progressive:true,now:()=>clock,post:async()=>({id:'job'}),read:async()=>{
+  if(++reads===1)return {status:'running',result:initial};
+  if(failure.startsWith('read'))throw Object.assign(Error('unavailable'),{status:failure==='read_404'?404:503});
+  return {status:'failed',...(failure==='worker_crash'?{result:initial}:{})};
+ },remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:j=>delivered.push(j),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ try{
+  await q.start({question:'Costs'});await tick();assert.equal(delivered.length,1);
+  if(failure==='deadline')clock=120000;
+  await tick();
+  if(failure==='read_503_deadline')clock=120000;
+  await tick();await tick();
+  assert.equal(delivered.length,2);assert.equal(delivered[1].status,'failed');assert.equal(delivered[1].result.text,initial.text);
+  assert.equal(delivered[1].result.evidenceVersion,2);assert.equal(delivered[1].result.researchPending,false);assert.equal(delivered[1].result.recoveryUnavailable,true);
+ }finally{q.close();}
+});

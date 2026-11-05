@@ -26,7 +26,7 @@ export function researchFocus(text){
 }
 export function findingSubjectMentioned(subject,text){
  const normalize=value=>fold(value).replace(/\b(?:university of california|universidad de california)\b/gu,'uc');
- const normalized=normalize(text),name=normalize(subject);
+ const normalized=normalize(text),name=normalize(String(subject).split(/\s+[—–]\s+|\s*\(/u)[0]);
  const parts=name.split(' ').filter(w=>!['university','universidad','college','of','de','the','california','uc','csu'].includes(w));
  const acronym=name.split(' ').map(w=>['uc','csu'].includes(w)?w:w[0]).join('');
  return !!normalized&&(normalized.includes(name)||(parts.length&&normalized.includes(parts.join(' ')))||

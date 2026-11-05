@@ -135,3 +135,33 @@ test('attempt diagnostics retain observed actions and official URLs without sear
  assert.equal(detail.toolCalls,1);assert.deepEqual(detail.consultedSources,['https://registrar.ucsc.edu/fees']);
  assert.equal(detail.actions[0].url,'https://registrar.ucsc.edu/fees');assert.ok(!JSON.stringify(detail).includes('secret'));assert.ok(!JSON.stringify(detail).includes('query'));
 });
+
+for(const language of ['en','es'])test(`${language}: initial cited findings are durable before recovery is allowed to finish`,async()=>{
+ const db=fixture(language);let finishRecovery,calls=0;
+ const processing=processResearchJob(db,{}, {request:async()=>{
+  if(++calls===1)return new Response(JSON.stringify(output({language})));
+  return new Promise(resolve=>{finishRecovery=()=>resolve(new Response(JSON.stringify(output({language,recovered:true}))));});
+ }});
+ while(!finishRecovery)await new Promise(resolve=>setImmediate(resolve));
+ const early=db.writes.find(w=>w.sql.includes('SET result=$2'));
+ assert.ok(early);assert.match(early.sql,/status='running'.*expires_at>now\(\)/);
+ assert.equal(early.args[1].evidenceVersion,1);assert.equal(early.args[1].researchPending,true);
+ assert.equal(early.args[1].voiceBrief.findings[0].status,'verified');assert.equal(saved(db),undefined);
+ finishRecovery();await processing;
+ assert.equal(saved(db).evidenceVersion,2);assert.equal(saved(db).researchPending,false);
+ assert.equal(early.args[1].researchDiagnostics.attempts.length,1);
+});
+
+test('an entirely unverified initial pass is not published as useful findings',async()=>{
+ const db=fixture();let calls=0;
+ await processResearchJob(db,{}, {request:async()=>new Response(JSON.stringify(output({allUnknown:++calls===1,recovered:calls===2})))});
+ assert.equal(db.writes.filter(w=>w.sql.includes('SET result=$2')).length,0);
+ assert.equal(saved(db).evidenceVersion,1);assert.equal(saved(db).researchPending,false);
+});
+
+test('a cancellation winning the provisional write prevents recovery and further evidence publication',async()=>{
+ const db=fixture(),query=db.query.bind(db);let calls=0;
+ db.query=(sql,args)=>sql.includes('SET result=$2')?Promise.resolve({rows:[],rowCount:0}):query(sql,args);
+ await processResearchJob(db,{}, {request:async()=>{calls++;return new Response(JSON.stringify(output()));}});
+ assert.equal(calls,1);assert.equal(saved(db),undefined);
+});

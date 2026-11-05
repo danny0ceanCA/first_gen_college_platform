@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {researchAnswerOverlap} from './researchDiscussion.mjs';
+import {researchAnswerOverlap,researchPortionObserved} from './researchDiscussion.mjs';
 
 import {discussionExamples} from './researchDiscussion.fixture.mjs';
 
@@ -29,4 +29,22 @@ test('questions and pending verification are not an explanation even when they r
  for(const text of ['I am still checking whether the annual tuition at Example University is 12345 dollars.','Is the annual tuition at Example University 12345 dollars?','I have not confirmed that the annual tuition at Example University is 12345 dollars.'])assert.equal(researchAnswerOverlap(answer,text),false);
  const spanish='La matrícula anual de la Universidad Ejemplo es de 12345 dólares.';
  for(const text of ['Estoy verificando si la matrícula anual de la Universidad Ejemplo es de 12345 dólares.','¿La matrícula anual de la Universidad Ejemplo es de 12345 dólares?','No he confirmado que la matrícula anual de la Universidad Ejemplo es de 12345 dólares.'])assert.equal(researchAnswerOverlap(spanish,text),false);
+});
+
+for(const [language,reply] of Object.entries({en:'UC Santa Cruz tuition is about seventeen thousand four hundred dollars for the year, but I could not verify every fee.',es:'La matrícula de UC Santa Cruz es de unos diecisiete mil cuatrocientos dólares al año, pero no pude verificar cada cuota.'})){
+ test(`${language}: a rounded relevant portion suppresses optional repetition without asserting the entire report was delivered`,()=>{
+  const f={subject:'UC Santa Cruz — new undergraduate transfers, 2026–27',aspect:'tuition_fees',status:'partial',answer:'Annual tuition is $17,490 and supplemental tuition is $39,270. [1]'};
+  assert.equal(researchPortionObserved(f,reply),true);
+  assert.equal(researchPortionObserved(f,reply.replace('Santa Cruz','Berkeley')),false);
+  assert.equal(researchPortionObserved({...f,answer:'Annual tuition is $28,000. [1]'},reply),false);
+  assert.equal(researchPortionObserved({...f,aspect:'housing'},reply),false);
+ });
+}
+
+test('optional announcement suppression binds the amount to the same campus and an affirmative claim',()=>{
+ const f={subject:'UC Berkeley — entering undergraduates',aspect:'tuition_fees',status:'verified',answer:'Annual tuition is $18,214. [1]'};
+ for(const text of ['Berkeley tuition is still pending. UCSC tuition is about eighteen thousand dollars.',
+  'UC Berkeley tuition might be about eighteen thousand dollars, but I have not verified that.',
+  'La matrícula de Berkeley está pendiente. La matrícula de UCSC es de unos dieciocho mil dólares.',
+  'La matrícula de UC Berkeley podría ser de unos dieciocho mil dólares, pero no he confirmado eso.'])assert.equal(researchPortionObserved(f,text),false,text);
 });

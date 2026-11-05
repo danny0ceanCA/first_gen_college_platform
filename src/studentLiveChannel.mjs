@@ -3,7 +3,7 @@
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
-export const liveChannelRevision='natural-conversation-focused-research-2026-11-05';
+export const liveChannelRevision='natural-conversation-progressive-research-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -60,7 +60,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  function clearResearch(reason='scope_changed'){deliveryTracker.clear(reason);cancel(researchTimer);researchTimer=null;researchReady=null;researchAcknowledgments.clear();researchDeliveries.clear();}
  function supplyResearch(job){
-  const key=job.jobId||job.requestId||id();
+  const key=JSON.stringify([job.jobId||job.requestId||id(),job.evidenceVersion||job.result?.evidenceVersion||1]);
   if(researchDeliveries.has(key))return researchDeliveries.get(key);
   const delivery={...job,key,pending:new Set(),acknowledged:false,announced:false,quietOnly:!!inputId,suppliedAt:now()};
   researchDeliveries.set(key,delivery);

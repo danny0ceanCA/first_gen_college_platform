@@ -1,5 +1,5 @@
 // One scope-bound job per physical voice session. New spoken turns do not cancel it.
-export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,onState=()=>{},onRequest=()=>{},schedule=setTimeout,cancel=clearTimeout,now=Date.now,requireReplacementChange=false}){
+export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,onState=()=>{},onRequest=()=>{},schedule=setTimeout,cancel=clearTimeout,now=Date.now,requireReplacementChange=false,progressive=false}){
  let active=null,closed=false;
  let requestSequence=0;
  const state=(job,status)=>{job.state=status;onRequest({requestId:job.requestId,revision:job.revision,jobId:job.id,state:status,question:job.question,institution:job.input.institution||'',studentId:job.input.studentId??null,language:job.input.language,mode:job.input.mode,elapsedMs:now()-job.started});};
@@ -10,6 +10,8 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
  const receipt=job=>({status:job.id?'research_pending':'research_requesting',...(job.id?{jobId:job.id}:{}),requestId:job.requestId,revision:job.revision,question:job.question,institution:job.input.institution||'',
   instruction:job.id?'This source check is already accepted. Continue the conversation without another lookup or progress announcement. Rephrasing and ordinary follow-ups reuse it. Only a material change requested by the caller replaces it: copy this requestId and revision into replaceRequestId and replaceRevision.'+(requireReplacementChange?' Compare the full accepted question first. Choosing or narrowing scenarios it already covers keeps this job; it does not invalidate its findings. Replacement also requires replacementChange identifying the specific corrected assumption or additional evidence that this question cannot answer.':''):'The source-check request is awaiting its application receipt. Do not claim research is running or enqueue it again.'});
  const normalized=text=>String(text||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+ const finishEvidence=job=>job.latestEvidence?{...job.latestEvidence,evidenceVersion:job.latestEvidence.evidenceVersion+1,researchPending:false,recoveryUnavailable:true}:undefined;
+ const failed=job=>({status:'failed',...(progressive&&job.latestEvidence?{result:finishEvidence(job)}:{})});
  function replacementIssue(input){
   if(!requireReplacementChange)return null;
   if(normalized(input.question)===normalized(active.question)&&normalized(input.institution)===normalized(active.input.institution)&&input.mode===active.input.mode)return 'same_question';
@@ -25,13 +27,24 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
  async function poll(job){
   if(closed||active!==job)return;
   if(!isCurrent(job.input)){stop();return;}
-  if(now()>job.deadline&&!job.result){job.result={status:'failed'};if(job.id)void remove(job.id).catch(()=>{});}
+  if(now()>job.deadline&&!job.result){job.result=failed(job);if(job.id)void remove(job.id).catch(()=>{});}
   try{
-   const result=job.result||await read(job.id);
+   let result=job.result||await read(job.id);
    job.readFailures=0;
    if(closed||active!==job)return;
    if(!isCurrent(job.input)){stop();return;}
+   if(progressive&&result.status==='running'&&result.result?.researchPending===true&&Number.isSafeInteger(result.result.evidenceVersion)&&result.result.evidenceVersion>0)job.latestEvidence=result.result;
+   // A failed optional continuation cannot erase a finished pass. Normalize
+   // crash/expiry records as a newer terminal context update, never new facts.
+   if(progressive&&result.status==='failed'){
+    if(result.result?.researchPending===true)job.latestEvidence=result.result;
+    if(job.latestEvidence&&(!result.result?.evidenceVersion||result.result.researchPending===true))result={...result,result:finishEvidence(job)};
+   }
    if(result.status!==job.state)state(job,result.status);
+   if(progressive&&result.status==='running'&&result.result?.researchPending===true&&Number.isSafeInteger(result.result.evidenceVersion)&&result.result.evidenceVersion>0&&result.result.evidenceVersion>(job.deliveredVersion||0)&&isQuiet()){
+    job.deliveredVersion=result.result.evidenceVersion;
+    deliver({...result,id:job.id,requestId:job.requestId,revision:job.revision,question:job.question,query:job.input,durationMs:now()-job.started});
+   }
    if(['completed','failed','cancelled'].includes(result.status)){
     job.result=result;
     if(isQuiet()){
@@ -46,7 +59,7 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
    const terminal=[400,401,403,404,405,410].includes(error?.status);
    // A dropped response or temporary 5xx is not a failed research job.
    // Retry within the overall deadline without enqueueing another search.
-   if(terminal||now()>=job.deadline){if(job.id)void remove(job.id).catch(()=>{});job.result={status:'failed'};}
+   if(terminal||now()>=job.deadline){if(job.id)void remove(job.id).catch(()=>{});job.result=failed(job);}
    job.readFailures=(job.readFailures||0)+1;
    job.timer=schedule(()=>void poll(job),job.result?0:Math.min(8000,750*2**Math.min(job.readFailures,4)));
   }}
@@ -77,7 +90,7 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
     if(!job.id)throw Error('research_receipt_missing');
     state(job,result.status==='running'?'running':'queued');
     job.timer=schedule(()=>void poll(job),750);
-    return {...receipt(job),instruction:receipt(job).instruction+' Acknowledge once if useful, then respond to the caller normally from known context or listen. Results arrive separately; do not invent findings or an ETA.'};
+    return {...receipt(job),instruction:receipt(job).instruction+' Keep helping with the latest concern while sources are checked. Answer ordinary follow-ups from known context now; only source-dependent facts must wait. When it would help the student, ask one relevant unanswered question about their priorities or the missing detail, then listen to the reply. Use details already shared; do not repeat intake, fill silence with a questionnaire, or make another waiting announcement. Results arrive separately; do not invent findings or an ETA.'};
    }catch(error){if(active!==job||closed)return {status:'research_cancelled',requestId:job.requestId,revision:job.revision};active=null;cancel(job.timer);onState(false);state(job,'failed');throw error;}
   },cancel:stop,close(){closed=true;void stop();},
  };

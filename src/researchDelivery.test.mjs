@@ -131,3 +131,32 @@ for(const reason of ['cancelled','scope_changed','call_ended'])test(`${reason} c
  const f=fixture();f.ready();f.delivery.clear(reason);f.ack();f.advance(60000);
  assert.equal(f.announcements().length,0);assert.equal(f.tasks.size,0);assert.ok(f.events.some(e=>e.deliveryReason===reason));
 });
+
+for(const language of ['en','es'])test(`${language}: initial findings are usable during recovery; final context cannot repeat a native partial answer`,()=>{
+ const f=fixture(),finding={subject:'UC Santa Cruz — entering undergraduates, 2026–27',aspect:'tuition_fees',status:'partial',answer:'Annual tuition $17,490; additional nonresident tuition $39,270. [1]',qualification:'The fee subtotal remains unresolved. [1]'};
+ const result={sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'partial',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ f.ready(language,{question:'UC Santa Cruz tuition',evidenceVersion:1,researchPending:true,result});f.ack();
+ let packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+ let context=JSON.parse(packets.map(p=>p.text).join(''));assert.equal(context.researchPending,true);assert.equal(context.taskState,'running');
+ f.delivery.reply(language==='en'?'UC Santa Cruz tuition is about seventeen thousand four hundred dollars annually.':'La matrícula de UC Santa Cruz es de unos diecisiete mil cuatrocientos dólares al año.',{audible:true});
+ f.advance(1000);assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryStage==='native_portion_observed'));
+ const count=f.sent.length;
+ f.ready(language,{question:'UC Santa Cruz tuition',evidenceVersion:2,researchPending:false,result});f.ack();f.advance(10000);
+ assert.equal(f.announcements().length,0);packets=f.sent.slice(count).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+ context=JSON.parse(packets.map(p=>p.text).join(''));assert.equal(context.researchPending,false);assert.equal(context.evidenceVersion,2);
+ f.ready(language,{evidenceVersion:1,researchPending:true,result});assert.equal(f.sent.length,count+packets.length,'late initial revision cannot replace final facts');f.delivery.clear();
+});
+
+test('initial evidence can announce before recovery and final revision only refreshes context',()=>{
+ const f=fixture();f.ready('en',{evidenceVersion:1,researchPending:true});f.ack();f.advance(500);
+ assert.equal(f.announcements().length,1);assert.match(f.announcements()[0].content,/Initial sourced findings/);
+ f.ready('en',{evidenceVersion:2,researchPending:false});f.ack();f.advance(5000);assert.equal(f.announcements().length,1);f.delivery.clear();
+});
+
+test('quiet recovery updates still report failed context delivery without replaying speech',()=>{
+ const f=fixture();f.ready('en',{evidenceVersion:1,researchPending:true});f.ack();f.advance(500);
+ f.ready('en',{evidenceVersion:2,researchPending:false});
+ const packet=f.sent.filter(e=>e.type==='session.thinking.append').at(-1);
+ f.delivery.receive({type:'error',client_event_id:packet.event_id});f.advance(5000);
+ assert.equal(f.announcements().length,1);assert.ok(f.events.some(e=>e.evidenceVersion===2&&e.deliveryReason==='context_error'));f.delivery.clear();
+});

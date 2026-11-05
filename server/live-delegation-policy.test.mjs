@@ -35,6 +35,21 @@ test('current-call follow-ups are the default on production and development Live
 });
 for(const [name,change] of Object.entries({onboarding:{onboarding:true},profile:{mode:'profile'},collectAccount:{collectAccount:true},saveProfile:{saveOnboarding:true},unknownRole:{role:'unknown'},unselectedStudent:{studentId:undefined},pendingScope:{targetConfirmed:false},unconfirmedParent:{role:'parent',routeConversations:true,targetConfirmed:undefined}}))test(`backend policy retained during ${name}`,()=>assert.equal(studentLiveRouting(config(),{...input,...change}),baselineLiveRouting));
 
+for(const language of ['en','es'])test(`${language} research lets the same live voice support the caller without another delegation`,()=>{
+ const i={...input,language},c=voiceSession(i,{OPENAI_MODEL_VOICE:'gpt-live-1'});
+ for(const speech of [studentLiveSession(c,i).instructions,studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true})]){
+  assert.match(speech,/respond to their understandable comments.*promptly, without waiting for research/);
+  assert.match(speech,/one useful, unanswered question/);
+  assert.match(speech,/A pause alone is not a request for questions/);
+  assert.match(speech,/Initial findings can be used while an app-confirmed recovery check continues/);
+  assert.match(speech,/do not automatically expand it to every residency category/);
+  assert.match(speech,/Listen when the person wants a moment/);
+ }
+ assert.match(c.instructions,/Keep the lookup question close to the caller's actual request/);
+ assert.match(c.instructions,/name both campuses in institution/);
+ assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
+});
+
 for(const language of ['en','es'])test(`${language} call-only speech keeps backend context and tool contracts`,()=>{
  const i={...input,language,profile:{...input.profile,goals:'PRIVATE_PROFILE_GOALS'},memory:[{id:'m',mode:'planning',date:'2026-11-01',summary:'PRIVATE_OLD_SUMMARY'}],studentBrief:{available:true,memories:[{id:'n',status:'confirmed',category:'goal',content:'PRIVATE_SAVED_MEMORY'}]},workspace:{available:true,selection:'note',notes:[{selected:true,content:'PRIVATE_BINDER_NOTE'}],actions:[{selected:true,title:'PRIVATE_BINDER_ACTION'}]}};
  const c=voiceSession(i,{OPENAI_MODEL_VOICE:'gpt-live-1'}),live=studentLiveSession(c,i);

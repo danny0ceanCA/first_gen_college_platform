@@ -1,4 +1,4 @@
-import {researchFocus} from './researchFindings.mjs';
+import {researchFocus,findingSubjectMentioned} from './researchFindings.mjs';
 // Local duplicate suppression, not an answer-quality grader or proof of hearing.
 // Compare the finding's quantities and distinctive words, allowing spoken number
 // formats and paraphrases. Nothing here initiates model work or controls playback.
@@ -78,4 +78,20 @@ export function researchLimitationOverlap(finding,spoken,mentionsSubject){
  const pending=/\b(?:checking|verifying|investigating|searching|looking (?:up|for)|still trying|(?:will|going to) (?:check|verify|confirm|look|search)|revisando|comprobando|verificando|investigando|buscando|(?:voy|vamos) a (?:revisar|buscar|verificar|confirmar)|sigo intentando)\b/u;
  if(pending.test(text))return false;
  return /\b(?:could(?:n['’]?t| not)|cannot|can['’]?t|unable to|not able to|(?:haven['’]?t|have not) been able to) (?:verify|confirm|establish|find)|\b(?:haven['’]?t|have not) (?:yet )?(?:verified|confirmed)|\b(?:remain|remains|is|are) unverified|\b(?:no (?:pude|pudimos|logre|logramos|se pudo|se ha podido) (?:confirmar|verificar|encontrar)|no (?:esta|estan) verificad[oa]s?)\b/u.test(text);
+}
+
+// Retire an optional announcement when a native answer already explained a
+// relevant portion. This does not certify completeness or numerical accuracy.
+export function researchPortionObserved(finding,spoken){
+ if(!findingSubjectMentioned(finding.subject,spoken))return false;
+ if(finding.status==='unverified')return researchLimitationOverlap(finding,spoken,true);
+ const uncertain=/\b(?:checking|verifying|still trying|will check|going to check|pending|might|may|hypothetical|suppose|not verified|not confirmed|have not verified|have not confirmed|haven['’]?t verified|haven['’]?t confirmed|revisando|verificando|voy a revisar|pendiente|podria|hipotetic\w*|supongamos|no he verificado|no he confirmado|sin verificar|sin confirmar)\b/u;
+ const statements=String(spoken||'').split(/(?<=[.!?])\s+/u).filter(s=>!/[?？]\s*$/u.test(s)&&!uncertain.test(fold(s).toLowerCase()));
+ const amounts=text=>tokens(text).filter(t=>/^\d+$/u.test(t)).map(Number).filter(n=>n>=1000&&(n<1900||n>2100));
+ const expected=amounts(finding.answer);
+ return statements.some(statement=>{
+  if(!findingSubjectMentioned(finding.subject,statement)||!researchFocus(statement).includes(finding.aspect))return false;
+  const spokenAmounts=amounts(statement),approximate=/\b(?:about|roughly|around|near|approximately|cerca|aproximadamente|alrededor|unos|unas)\b/iu.test(statement);
+  return expected.some(n=>spokenAmounts.some(s=>s===n||approximate&&Math.abs(s-n)/n<=0.02));
+ });
 }
