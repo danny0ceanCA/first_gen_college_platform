@@ -109,6 +109,15 @@ test('ordinary conversation without completed research creates no model work or 
  const f=fixture();f.delivery.caller();f.delivery.callerStopped();f.advance(60000);f.delivery.reply(examples.en.reply,{audible:true});f.advance(60000);
  assert.equal(f.sent.length,0);assert.equal(f.tasks.size,0);
 });
+
+for(const language of ['en','es'])test(`${language}: new course research does not inherit an earlier tuition focus`,()=>{
+ const f=fixture();f.delivery.caller();f.delivery.callerStopped(language==='en'?'What is Berkeley tuition?':'¿Cuál es la matrícula de Berkeley?');
+ f.delivery.supersede('new_request',language==='en'?'Does my statistics class transfer to UCSC?':'¿Se transfiere mi clase de estadística a UCSC?');
+ const finding={subject:'UC Santa Cruz',aspect:'other',status:'verified',answer:'The statistics course requires an official articulation review [1].',qualification:'Transfer credit is not guaranteed [1].'};
+ f.ready(language,{jobId:'course',question:'Statistics transfer credit',result:{sources:[{url:'https://example.edu/transfer'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}}});
+ f.ack();f.delivery.reply(examples[language].reply,{audible:true});f.advance(500);
+ assert.equal(f.announcements().length,1);assert.ok(!f.events.some(e=>e.deliveryReason==='different_requested_portion'));f.delivery.clear();
+});
 for(const [language,{answer,spoken}] of Object.entries(discussionExamples))test(`${language}: a paraphrased native answer before context ack retires the opportunity without a redundant caveat`,()=>{
  const f=fixture();f.ready(language,{result:{text:answer}}, {awaitingReply:true});
  // Live can use context before its final acknowledgment. Recognition must work

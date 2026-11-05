@@ -20,6 +20,33 @@ test('a temporary database outage remains retryable; malformed polling IDs do no
  assert.equal(connections,1);
 });
 
+test('queued comparison reuses only server-owned same-account/session/student evidence',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const target=new URL(process.env.DATABASE_TEST_URL);assert.ok(['localhost','127.0.0.1'].includes(target.hostname));
+ const f=await retrievalFixture(),sessionId=randomUUID();
+ const handler=createVoiceResearchJobsHandler(f.db,{ORIGEN_BACKGROUND_RESEARCH:'true',ORIGEN_RESEARCH_DELIVERY_V2:'true'});
+ const question='2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley';
+ const finding={subject:'UC Berkeley',aspect:'tuition_fees',status:'verified',answer:'UC Berkeley 2026–27 undergraduate tuition and mandatory fees are $18,214. [1]',qualification:'California-resident published academic-year estimate before aid, not a personal bill. [1]'};
+ const result={checkedAt:new Date().toISOString(),text:finding.answer,sources:[{url:'https://financialaid.berkeley.edu/costs',title:'Reader evidence'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ async function post(extra={}){
+  const input={sessionId,studentId:'alex',requestKey:randomUUID(),mode:'finance',language:'en',question:'Compare 2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley and UC Santa Cruz',institution:'UC Berkeley and UC Santa Cruz',...extra};
+  const req=Object.assign(Readable.from([JSON.stringify(input)]),{url:'/api/voice-research-jobs',method:'POST',headers:{},origenAuthorized:true,origenIdentity:{sub:'reader'}});
+  let status,body;await f.as('reader',()=>handler(req,{writeHead:n=>status=n,end:s=>body=JSON.parse(s)},()=>assert.fail()));assert.equal(status,200,JSON.stringify(body));
+  return (await f.owner.query('SELECT input FROM origen_voice_research_jobs WHERE id=$1',[body.id])).rows[0].input;
+ }
+ try{
+  for(const subject of ['reader','other']){
+   const account=(await f.owner.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0].id;
+   const saved=structuredClone(result);saved.sources[0].title=subject==='reader'?'Reader evidence':'Other account evidence';
+   await f.owner.query("INSERT INTO origen_voice_research_jobs(id,account_id,student_id,session_id,request_key,input,status,result,finished_at) VALUES($1,$2,'alex',$3,$4,$5,'completed',$6,now())",[randomUUID(),account,sessionId,randomUUID(),{question,institution:'UC Berkeley',mode:'finance',language:'en'},saved]);
+  }
+  const reused=await post({reusedEvidence:[{secret:'forged reference'}],lookupInstitutions:[]});
+  assert.deepEqual(reused.lookupInstitutions,['UC Santa Cruz']);assert.equal(reused.reusedEvidence[0].sources[0].title,'Reader evidence');assert.doesNotMatch(JSON.stringify(reused),/forged|Other account/);
+  assert.equal((await post({studentId:'sam'})).reusedEvidence,undefined);
+  assert.equal((await post({sessionId:randomUUID()})).reusedEvidence,undefined);
+  assert.equal((await post({forceRefresh:true})).reusedEvidence,undefined);
+ }finally{await f.close();}
+});
+
 test('full HTTP gateway supports authenticated polling/cancellation, CORS and account isolation',{skip:!process.env.DATABASE_TEST_URL},async()=>{
  const target=new URL(process.env.DATABASE_TEST_URL);assert.ok(['localhost','127.0.0.1'].includes(target.hostname));
  const f=await retrievalFixture();let server;

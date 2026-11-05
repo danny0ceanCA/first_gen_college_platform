@@ -6,6 +6,7 @@ import {voiceResearchCache,voiceResearchBudget} from '../src/voiceResearchCache.
 import {researchEvidence} from '../src/voiceResearchProgress.mjs';
 import {researchModeForTool} from '../src/liveConversation.mjs';
 import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
+import {selectResearchReuse,cachedResearchForCoverage} from './research-reuse.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
@@ -41,7 +42,8 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   if(!scope.confirmed||typeof args.question!=='string'||!args.question.trim()||args.question.length>3000||typeof args.institution!=='string'||args.institution.length>300)throw Error('invalid_research');
   // Identity/scope/language never come from model arguments or browser packets.
   const query={...args,mode,language:config.language==='es'?'es':'en',sessionId:scope.sessionId,studentId:scope.studentId,requestKey:item.call_id};
-  const hit=args.replaceRequestId===undefined&&args.replaceRevision===undefined?cache.get(query):null;
+  const hit=args.replaceRequestId===undefined&&args.replaceRevision===undefined?
+   cache.get(query)||(researchDeliveryV2?cachedResearchForCoverage(selectResearchReuse(query,cache.records(),{now:now()})):null):null;
   return hit?researchEvidence(hit,true):research.start(query);
  }
  channel.onmessage=async message=>{
@@ -107,9 +109,9 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   },
   playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version)playback={idle:value.idle,version:value.version,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
-  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
+  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;closed=true;reports.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
+  close(){if(closed)return;closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
  };
 }
 

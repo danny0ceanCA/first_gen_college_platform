@@ -3,7 +3,7 @@
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
-export const liveChannelRevision='natural-conversation-research-reuse-2026-11-05';
+export const liveChannelRevision='natural-conversation-focused-research-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -115,7 +115,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   recentInput=repliedSinceInput?null:{transcript,lastInput};
   await emit({type:'input_audio_buffer.speech_stopped',item_id,liveBoundary:'transcript_quiet_estimate'});
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
-  if(researchDeliveryV2)deliveryTracker.callerStopped();
+  if(researchDeliveryV2)deliveryTracker.callerStopped(transcript);
   // Live can acknowledge a profile answer without delegating it. Give natural
   // delegation a brief head start, then ask the same guarded backend to process
   // this complete answer. This never parses or saves a profile in the adapter.
@@ -259,7 +259,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    researchReady=delivery;cancel(researchTimer);researchTimer=schedule(checkResearch,250);return;
   }
   if(event.type==='origen.research.state'){
-   if(researchState?.requestId!==event.request?.requestId||researchState?.revision!==event.request?.revision){researchVersion++;if(researchDeliveryV2)deliveryTracker.supersede();else clearResearch();}
+   if(researchState?.requestId!==event.request?.requestId||researchState?.revision!==event.request?.revision){researchVersion++;if(researchDeliveryV2)deliveryTracker.supersede('new_request',event.request?.question);else clearResearch();}
    const changed=JSON.stringify({...researchState,elapsedMs:undefined})!==JSON.stringify({...event.request,elapsedMs:undefined});
    researchState=event.request;
    if(changed){quietContext('research-state',researchState?.requestId||'current',{...researchState,elapsedMs:undefined});

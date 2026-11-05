@@ -1,3 +1,4 @@
+import {researchFocus} from './researchFindings.mjs';
 // Local duplicate suppression, not an answer-quality grader or proof of hearing.
 // Compare the finding's quantities and distinctive words, allowing spoken number
 // formats and paraphrases. Nothing here initiates model work or controls playback.
@@ -66,4 +67,15 @@ export function researchAnswerOverlap(answer,spoken){
  // Numbers and names provide strong anchors for a reordered explanation; a
  // non-numeric answer needs substantially more of the finding's actual words.
  return matches>=Math.min(4,content.length)&&content.length>=3&&matches/content.length>=(numbers.length?0.55:0.8);
+}
+
+// A finished check can truthfully yield an unavailable answer. Do not count an
+// ongoing search, a promise to check, or a generic apology as that disclosure.
+export function researchLimitationOverlap(finding,spoken,mentionsSubject){
+ const text=fold(spoken).toLowerCase();
+ const aspects=researchFocus(text);
+ if(!mentionsSubject||(aspects.length&&!aspects.includes(finding.aspect)))return false;
+ const pending=/\b(?:checking|verifying|investigating|searching|looking (?:up|for)|still trying|(?:will|going to) (?:check|verify|confirm|look|search)|revisando|comprobando|verificando|investigando|buscando|(?:voy|vamos) a (?:revisar|buscar|verificar|confirmar)|sigo intentando)\b/u;
+ if(pending.test(text))return false;
+ return /\b(?:could(?:n['’]?t| not)|cannot|can['’]?t|unable to|not able to|(?:haven['’]?t|have not) been able to) (?:verify|confirm|establish|find)|\b(?:haven['’]?t|have not) (?:yet )?(?:verified|confirmed)|\b(?:remain|remains|is|are) unverified|\b(?:no (?:pude|pudimos|logre|logramos|se pudo|se ha podido) (?:confirmar|verificar|encontrar)|no (?:esta|estan) verificad[oa]s?)\b/u.test(text);
 }

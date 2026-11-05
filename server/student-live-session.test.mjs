@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
+import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
 const teaching={id:'published-teaching',revision:14,content:{topic:'admissions',title:'Student background',deliveryStyle:'Warm, patient and encouraging.',conversationApproach:'Acknowledge uncertainty, then offer concrete choices.',example:'Your experiences are worth exploring.'}};
 for(const language of ['en','es'])for(const mode of ['profile','planning','admissions','finance','loans'])test(`Live retains ${language} ${mode} backend instructions and tool contracts`,()=>{
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
@@ -33,3 +33,19 @@ test('Live preserves the larger delegated response budget required by sharing an
   assert.equal(config.max_output_tokens,3000);
   assert.equal(studentLiveSession(config,{language:'en'}).delegation.responses.max_output_tokens,3000);
  });
+
+for(const language of ['en','es'])test(`${language} scope and later configuration updates do not independently restart the opening`,()=>{
+ const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:true,studentId:'aiden',students:[{id:'aiden',name:'Aiden'}],profile:{name:'Aiden'},continuing:true};
+ const first=studentLiveInstructions({...input,targetConfirmed:false,continuing:false});
+ assert.match(first,/# Backchannel policy\nMostly quiet listening/);
+ assert.match(first,/Acknowledgments before an answer are separate/);
+ assert.match(first,/usually begin directly with the useful answer/);
+ assert.match(first,/Do not produce consecutive or standalone hmm\/mm-hmm/);
+ for(const updateInput of [input,{...input,mode:'finance'},{...input,language:language==='en'?'es':'en'}]){
+  const instructions=studentLiveInstructions(updateInput,[],[],undefined,{update:true});
+  assert.match(instructions,/configuration is silent context/);
+  assert.match(instructions,/single continuation cue/);
+  assert.match(instructions,/this scope description is context only and requests no opening question/);
+  assert.doesNotMatch(instructions,/invite their priority|invite their next question|Invite a priority/);
+ }
+});

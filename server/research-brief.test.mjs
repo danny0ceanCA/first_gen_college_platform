@@ -30,7 +30,7 @@ test('oversized, uncited, partial and invalid-reference briefs retain the entire
 test('one existing research request produces brief and report without another model pass',()=>{
  const base={model:'gpt-6.1-sol',store:false,max_tool_calls:2,tools:[{type:'web_search'}],instructions:'Official sources only.',input:'public question'};
  const body=researchBriefRequest(base);assert.equal(body.model,base.model);assert.equal(body.tools,base.tools);assert.equal(body.max_tool_calls,2);assert.equal(body.store,false);assert.equal(body.text.format.type,'json_schema');assert.equal(body.text.format.strict,true);assert.match(body.instructions,/Preserve unknowns, exceptions and source conflicts/);
- assert.deepEqual(body.text.format.schema.properties.brief.required,['status','answer','qualification','nextStep']);
+ assert.deepEqual(body.text.format.schema.properties.brief.required,['status','answer','qualification','nextStep','findings']);
 });
 test('native citations survive structured output parsing and remain source linked',()=>{
  const text=JSON.stringify({brief:{status:'partial',answer:'Annual published budget CITE',qualification:'Personal aid is unknown CITE',nextStep:'Ask the office.'},report:'Detailed report CITE'});

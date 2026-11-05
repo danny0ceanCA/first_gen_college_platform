@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
 import {allowedRequest} from './origin.mjs';
+import {selectResearchReuse} from './research-reuse.mjs';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function assertBackgroundResearchReady(database,env){
  if(env.ORIGEN_BACKGROUND_RESEARCH!=='true')return;
@@ -40,7 +41,11 @@ export function createVoiceResearchJobsHandler(database,env){
     if(!row){
      const count=(await c.query("SELECT count(*)::int AS n FROM origen_voice_research_jobs WHERE account_id=$1 AND created_at>now()-interval '10 minutes'",[account.id])).rows[0].n;
      if(count>=6){await c.query('ROLLBACK');return send(429,{error:'research_limit'});}
-     const payload={question:input.question,institution:input.institution,language:input.language,mode:input.mode,purpose:input.mode==='planning'?'planning':undefined};
+     // Reuse is rebuilt from authorized stored results, never accepted from the
+     // POST body. An explicit refresh bypasses both exact-cache and evidence reuse.
+     const prior=env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&input.forceRefresh!==true?
+      (await c.query("SELECT input,result,status,finished_at FROM origen_voice_research_jobs WHERE account_id=$1 AND session_id=$2 AND student_id IS NOT DISTINCT FROM $3 AND status='completed' AND finished_at>now()-interval '5 minutes' AND expires_at>now() ORDER BY finished_at DESC LIMIT 8",[account.id,input.sessionId,input.studentId??null])).rows:[];
+     const payload={question:input.question,institution:input.institution,language:input.language,mode:input.mode,purpose:input.mode==='planning'?'planning':undefined,...selectResearchReuse(input,prior)};
      row=(await c.query('INSERT INTO origen_voice_research_jobs(id,account_id,student_id,session_id,request_key,input) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,status',[randomUUID(),account.id,input.studentId??null,input.sessionId,input.requestKey,payload])).rows[0];
     }
    }else if(req.method==='DELETE')row=(await c.query("UPDATE origen_voice_research_jobs SET status='cancelled',result=NULL,finished_at=now() WHERE id=$1 AND account_id=$2 RETURNING id,status",[id,account.id])).rows[0];

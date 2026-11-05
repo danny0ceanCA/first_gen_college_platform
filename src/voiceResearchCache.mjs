@@ -6,7 +6,9 @@ export function voiceResearchCache(now=Date.now){
  const key=input=>JSON.stringify([input.mode,input.language,normalize(input.institution),normalize(input.question)]);
  return {
   get(input){const id=key(input);if(input.forceRefresh){entries.delete(id);return undefined;}const entry=entries.get(id);if(!entry)return undefined;if(now()-entry.at>=300000){entries.delete(id);return undefined;}return entry.result;},
-  put(input,result){if(result?.error||!Array.isArray(result?.sources)||!result.sources.length)return;const id=key(input);entries.delete(id);if(entries.size>=12)entries.delete(entries.keys().next().value);entries.set(id,{at:now(),result});},
+  put(input,result){if(result?.error||!Array.isArray(result?.sources)||!result.sources.length)return;const id=key(input);entries.delete(id);if(entries.size>=12)entries.delete(entries.keys().next().value);entries.set(id,{at:now(),input:{mode:input.mode,question:input.question,institution:input.institution},result});},
+  records(){return [...entries.values()].reverse().map(entry=>({status:'completed',input:entry.input,result:entry.result,finished_at:new Date(entry.at).toISOString()}));},
+  clear(){entries.clear();},
  };
 }
 // Per physical call: cache hits are free; failed attempts count toward the budget.
