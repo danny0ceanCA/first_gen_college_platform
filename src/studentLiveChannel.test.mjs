@@ -40,6 +40,68 @@ test('a superseded research result cannot be announced as the current answer',as
  assert.ok(!JSON.stringify(f.sent).includes('OLD_FIGURE'));assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
 });
 
+for(const language of ['en','es'])test(`${language}: ordinary new speech preserves an authorized pending research call without flushing that speech`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Check Berkeley costs.':'Consulta los costos de Berkeley.'});await pause(0);clock.advance(1100);await pause(0);
+ f.backend('response.created','research');await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'I feel overwhelmed':'Me siento abrumado'});await pause(0);
+ f.backend('response.output_item.done','research',{item:{type:'function_call',name:'lookup_financial_aid',call_id:'lookup',arguments:'{}'}});f.backend('response.completed','research');await pause(0);
+ assert.ok(f.events.some(e=>e.type==='response.done'&&e.response.output?.some(i=>i.call_id==='lookup')));
+ assert.equal(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').length,1,'do not prematurely flush a follow-up');
+ assert.equal(f.events.find(e=>e.type==='response.done').response.metadata.origen_user_turn,'superseded-live-turn');
+ assert.ok(!f.sent.some(e=>e.type==='response.create'||e.type==='session.commentary.append'));f.channel.close();
+});
+for(const barrier of ['cancel','configuration'])test(`${barrier}: an old read-only request cannot restart research`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
+ f.backend('response.created','research');await pause(0);
+ if(barrier==='cancel')f.channel.send(JSON.stringify({type:'origen.research.cancel'}));
+ else f.channel.send(JSON.stringify({type:'session.update',event_id:'new-scope',session:{instructions:'New scope',tools:[]}}));
+ f.backend('response.output_item.done','research',{item:{type:'function_call',name:'lookup_financial_aid',call_id:'old',arguments:'{}'}});f.backend('response.completed','research');await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='response.done'&&e.response.output?.some(i=>i.call_id==='old')));f.channel.close();
+});
+test('a mixed stale tool batch preserves research but never a write or sharing approval',async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'},{name:'save_next_step'},{name:'confirm_coordinator_review_request'}]}});
+ f.backend('response.created','mixed');await pause(0);f.receive({type:'session.input_transcript.delta',delta:'Also, I am worried.'});await pause(0);
+ for(const name of ['lookup_financial_aid','save_next_step','confirm_coordinator_review_request'])f.backend('response.output_item.done','mixed',{item:{type:'function_call',name,call_id:name,arguments:'{}'}});
+ f.backend('response.completed','mixed');clock.advance(1100);await pause(0);
+ assert.deepEqual(f.events.find(e=>e.type==='response.done').response.output.map(i=>i.name),['lookup_financial_aid']);
+ assert.deepEqual(f.sent.filter(e=>e.type==='response.item.create').map(e=>e.item.call_id),['save_next_step','confirm_coordinator_review_request']);f.channel.close();
+});
+test('research commentary waits for every matching context acknowledgment and deduplicates the result',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});
+ const event={type:'origen.research.ready',jobId:'job',question:'Costs',result:{text:'A fact with a necessary qualification. '.repeat(40)}};
+ f.channel.send(JSON.stringify(event));f.channel.send(JSON.stringify(event));
+ const packets=f.sent.filter(e=>e.type==='session.thinking.append');assert.ok(packets.length>1);
+ clock.advance(3000);await pause(0);assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ f.receive({type:'session.thinking.appended',client_event_id:'unmatched'});
+ for(const packet of packets.slice(0,-1))f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});
+ await pause(0);assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ f.receive({type:'session.thinking.appended',client_event_id:packets.at(-1).event_id});await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+ assert.equal(f.events.filter(e=>e.type==='origen.research.context_acknowledged').length,1);
+ f.channel.send(JSON.stringify(event));clock.advance(3000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+});
+test('a rejected context update never triggers a result announcement',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Costs',result:{text:'Verified'}}));
+ const packet=f.sent.find(e=>e.type==='session.thinking.append');f.receive({type:'error',error:{code:'context_rejected',client_event_id:packet.event_id}});await pause(0);clock.advance(10000);await pause(0);
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));assert.ok(f.events.some(e=>e.type==='origen.research.context_failed'));f.channel.close();
+});
+test('missing context acknowledgments expire without treating supplied facts as heard speech',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Costs',result:{text:'Verified'}}));
+ clock.advance(30000);await pause(0);
+ assert.ok(f.events.some(e=>e.type==='origen.research.context_failed'&&e.reason==='acknowledgment_timeout'));
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));assert.ok(!f.events.some(e=>e.type==='origen.research.announced'));f.channel.close();
+});
+for(const language of ['en','es'])test(`${language}: Live can integrate delivered context without a second application speech request`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Costs',result:{text:'Verified budget; this is not an individual bill.'}}));
+ await pause(0);f.receive({type:'session.output_transcript.delta',delta:language==='en'?'I found the published budget.':'Encontré el presupuesto publicado.'});await pause(0);
+ clock.advance(10000);await pause(0);clock.advance(1000);await pause(0);
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ assert.ok(f.events.some(e=>e.type==='origen.research.native_reply_observed'));
+ assert.ok(!f.events.some(e=>e.type==='origen.research.announced'),'native speech observed is not a claim of verified spoken delivery');f.channel.close();
+});
+
 for(const text of ['How much does UC Santa Cruz cost?','¿Cuánto cuesta ir a UC Santa Cruz?'])test('an empty native backend outcome produces one clarification, no automatic tool retry: '+text,async()=>{
  const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
  f.receive({type:'session.input_transcript.delta',delta:text});await pause(0);clock.advance(1100);await pause(0);
@@ -135,7 +197,7 @@ test('background evidence waits for a quiet boundary before a natural continuati
  const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Cost?',result:{sources:[{url:'https://studentaid.gov'}],answer:'Verified'}}));
  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
  clock.advance(2000);await pause(0);
- assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+ assert.ok(f.sent.some(e=>e.type==='session.thinking.append'&&e.content.includes('Verified')));
  assert.ok(f.sent.some(e=>e.type==='session.commentary.append'&&e.content.includes('If the topic has moved on')));
  assert.ok(!f.sent.some(e=>e.type==='response.cancel'));f.channel.close();
 });
@@ -164,7 +226,7 @@ for(const [language,head,tail,question] of [
   f.receive({type:'session.output_transcript.delta',delta:head});await pause(0);
   f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Cost?',result:{answer:'Verified'}}));
   f.receive({type:'session.input_transcript.delta',delta:question});await pause(0);
-  assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+  assert.ok(f.sent.some(e=>e.type==='session.thinking.append'&&e.content.includes('Verified')));
   clock.advance(5000);await pause(0);
   assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
   assert.equal(f.events.filter(e=>e.type==='origen.research.supplied').length,1);f.channel.close();
@@ -191,12 +253,13 @@ for(const [language,head,tail,question] of [
  });
 }
 
-for(const question of ['What matters most to you?','¿Qué es lo más importante para ti?'])test(`research leaves room for the caller to answer: ${question}`,async()=>{
+for(const question of ['What matters most to you?','¿Qué es lo más importante para ti?'])test(`research leaves room for an answer without indefinitely stranding the finding: ${question}`,async()=>{
  const clock=fakeClock(),f=fixture(clock);
  f.receive({type:'session.output_transcript.delta',delta:question});await pause(0);
  f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
- clock.advance(10000);await pause(0);clock.advance(10000);await pause(0);
- assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
+ clock.advance(2000);await pause(0);assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ clock.advance(4500);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
 });
 
 test('a deferred handoff preserves the request without claiming a technical failure or confirmed scope',()=>{
@@ -242,9 +305,10 @@ test('superseded queued evidence never becomes the next research announcement',a
  const clock=fakeClock(),f=fixture(clock);
  f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Old',result:{answer:'Old evidence'}}));
  f.channel.send(JSON.stringify({type:'origen.research.cancel'}));
+ const afterCancellation=f.sent.length;
  f.channel.send(JSON.stringify({type:'origen.research.ready',question:'New',result:{answer:'New evidence'}}));
  clock.advance(2000);await pause(0);
- const context=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content).join('');
+ const context=f.sent.slice(afterCancellation).filter(e=>e.type==='session.thinking.append').map(e=>e.content).join('');
  assert.doesNotMatch(context,/Old evidence/);assert.match(context,/New evidence/);
  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
 });
@@ -253,14 +317,15 @@ test('results arriving during the caller turn are available to that reply withou
  const clock=fakeClock(),f=fixture(clock);
  f.receive({type:'session.input_transcript.delta',delta:'¿Qué incluye ese costo?'});await pause(0);
  f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
- assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+ assert.ok(f.sent.some(e=>e.type==='session.thinking.append'&&e.content.includes('Verified')));
  clock.advance(5000);await pause(0);
  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
 });
 function fixture(options={}){
+ const {autoAcknowledge=true,...channelOptions}=options;
  const sent=[],events=[],consent=voiceProfileSaveConsent();
- const raw={readyState:'open',send:value=>sent.push(JSON.parse(value)),close(){this.readyState='closed';}};
- const channel=studentLiveChannel(raw,{getTurn:()=>consent.token(),isPlaybackIdle:()=>true,...options});
+ const raw={readyState:'open',send:value=>{const event=JSON.parse(value);sent.push(event);if(autoAcknowledge&&event.type==='session.thinking.append'&&JSON.parse(event.content).kind==='untrusted-research-evidence')queueMicrotask(()=>receive({type:'session.thinking.appended',client_event_id:event.event_id}));},close(){this.readyState='closed';}};
+ const channel=studentLiveChannel(raw,{getTurn:()=>consent.token(),isPlaybackIdle:()=>true,...channelOptions});
  channel.onmessage=({data})=>{const e=JSON.parse(data);events.push(e);if(e.type==='input_audio_buffer.speech_started')consent.begin(e.item_id);if(e.type==='conversation.item.input_audio_transcription.completed')consent.transcript(e.item_id,e.transcript);};
  channel.configure({voiceProvider:'live',voiceSession:{instructions:'Backend policy',tools:[]}});
  const receive=e=>raw.onmessage({data:JSON.stringify(e)});
@@ -453,11 +518,12 @@ for(const status of ['research_pending','research_failed'])test(`single research
  f.channel.send(JSON.stringify({type:'response.create'}));
  assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);f.channel.close();
 });
-test('research evidence preserves missing verification and scenario assumptions',async()=>{
+test('quiet research evidence retains uncertainty and is never a behavioral instruction',async()=>{
  const f=fixture();
  f.receive({type:'session.input_transcript.delta',delta:'Tell me more'});await pause(0);
  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'r',question:'Berkeley costs',result:{status:'completed',answer:'Could not verify the next year.'}}));
- const instruction=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content).join('');
- assert.match(instruction,/could not verify never means not published/);
- assert.match(instruction,/never facts about this student unless confirmed/);f.channel.close();
+ const parts=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+ assert.ok(parts.every(p=>p.kind==='untrusted-research-evidence'));
+ assert.match(parts.map(p=>p.text).join(''),/Could not verify the next year/);
+ assert.ok(!f.sent.some(e=>e.type==='session.instructions.append'));f.channel.close();
 });

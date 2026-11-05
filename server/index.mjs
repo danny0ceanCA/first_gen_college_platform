@@ -1,4 +1,5 @@
 import {createVoiceResearchJobsHandler,assertBackgroundResearchReady} from './voice-research-jobs.mjs';
+import {createVoiceControl} from './voice-control.mjs';
 import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
 import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
 import {assertRecommendationContractReady} from './recommendation-contract.mjs';
@@ -101,7 +102,16 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const lifecycle=createLifecycleHandler(database,{env});
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
- const handlers=[createVoiceResearchJobsHandler(database,env),createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ let voiceServer;
+ const voiceControl=createVoiceControl({env,authenticate,log,authorize:identity=>runAsAccount(identity,async()=>{
+  if(!database||await accountClosed(database,identity.sub))throw Error('account_closed');
+  const eligibility=await permission.repository.read(identity.sub);if(!eligibilityAllowed(eligibility))throw Error('permission_required');return eligibility.revision;
+ }),request:async(token,method,path,body,sessionId)=>{
+  const address=voiceServer?.address();if(!address||typeof address==='string')throw Error('voice_control_unavailable');
+  const response=await fetch(`http://127.0.0.1:${address.port}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-Origen-Session':sessionId},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});
+  const value=await response.json();if(!response.ok)throw Object.assign(Error('research_unavailable'),{status:response.status});return value;
+ }});
+ const handlers=[createVoiceResearchJobsHandler(database,env),createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database,voiceControl),createAIHandler(env,providerRequest,database)];
  handlers.unshift(createPrivateVoiceCaptureHandler(database,env),createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
@@ -188,11 +198,13 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
    }
   }catch(error){req.log({event:'api_error',level:'error',code:safeErrorCode(error)});if(!res.headersSent)send(500,'server_error');else res.end();}
   };
+  req.origenPermissionRevision=eligibility?.revision;
   if(protectedRequest)return runPermittedRequest(database,identity.sub,eligibility.revision,req,res,dispatch);
   return dispatch();
   });
   });
  };
+ app.attachServer=server=>{voiceServer=server;voiceControl.attach(server);};app.closeVoiceControls=()=>voiceControl.close();
  app.privacyMonitor=privacyMonitor;app.flushLogs=log.flush;return app;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
@@ -233,7 +245,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const coordinatorSweep=async()=>{if(!jobs||coordinatorBusy)return;coordinatorBusy=true;try{await jobs.run('coordinator-lifecycle',maintainCoordinators);}finally{coordinatorBusy=false;}};
   await coordinatorSweep();
   const coordinatorTimer=setInterval(()=>{void coordinatorSweep();},30000);coordinatorTimer.unref();
-  const application=createApp(process.env,undefined,database),server=createServer(application);
+  const application=createApp(process.env,undefined,database),server=createServer(application);application.attachServer(server);
+  await assertBackgroundResearchReady(database,process.env);
   if(binderJobsEnabled(process.env)&&(!database||!maintenancePool||!await binderJobsReady(database)))throw new Error('binder_jobs_configuration_required');
    await assertOrganizationReady(database,process.env);
    await assertCorrectionsReady(database,process.env);
@@ -254,7 +267,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    if(stopping)return;stopping=true;runtimeLog({event:'service.stopping'});
    clearInterval(coordinatorTimer);clearInterval(metricsCleanup);clearInterval(checkpointCleanup);clearInterval(privacyAlerts);stopPermissionSupervisor();stopRuntimeMetrics();
    const deadline=setTimeout(()=>process.exit(1),10000);deadline.unref();
-   server.close(async()=>{try{await stopRegistrationEmailWorker();await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
+   application.closeVoiceControls();server.close(async()=>{try{await stopRegistrationEmailWorker();await stopBinderWorker();await application.privacyMonitor.flush();await jobs?.stop();await maintenancePool?.end();await database?.end();await application.flushLogs();}finally{clearTimeout(deadline);}});
   };
   process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
  }catch(error){

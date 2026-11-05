@@ -9,7 +9,7 @@ import {followUpOpeningPlayback,type OpeningClaim} from './followUpOpening.mjs';
 import {followUpVoiceTools} from './followUpVoiceTools.mjs';
 import {studentLivePlayback} from './studentLivePlayback.mjs';
 import {accountDraftProposal,type AccountDraft} from './voiceAccountDraft.mjs';
-import {studentLiveChannel} from './studentLiveChannel.mjs';
+import {studentVoiceChannel as studentLiveChannel} from './studentVoiceChannel.mjs';
 import {conversationCheckpoint,type CheckpointState} from './conversationCheckpoint.mjs';
 import {recoveryChoice,recoveryRequest,activeCheckpoints} from './conversationRecovery';
 import {coordinatorVoiceTools} from './coordinatorVoiceTools.mjs';
@@ -459,7 +459,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     try {
       if(summaryQueue.current.size){setNotice(t('Your previous conversation is still saving. You can start talking while it finishes.','Tu conversación anterior sigue guardándose. Puedes empezar a hablar mientras termina.'));void retrySummaries();}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('unsupported');
-      const voiceInput={voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud&&informational,continuing:memoryResume||!!continuingSession,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:!!continuingSession&&scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
+      const voiceInput={voiceControlProtocol:'server-v1',voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud&&informational,continuing:memoryResume||!!continuingSession,workspaceFocus:focus,routeConversations:routing,targetConfirmed:scope.confirmed,scopeRestart:!!continuingSession&&scope.confirmed&&!focus,students:family.students.map(({id,name})=>({id,name})),studentId:routing?(scope.confirmed?scope.id:undefined):scope.id===null?null:history.cloud&&family.students.some(student=>student.id===profile.id)?profile.id:undefined,profile:informational?{name:profile.name,stage:profile.stage,institutions:profile.institutions,entryTerm:profile.entryTerm,...(mode==='planning'?{school:profile.school,interest:profile.interest,goals:profile.goals}:{})}:profile,language:sessionLanguage,role,mode:liveMode.current,allowGuideHandoff:!!onGuideChanged,continuity:!memoryResume&&continuity&&scope.id===continuity.studentId?continuity.turns:undefined,collectAccount:!!onAccountDraft,saveOnboarding:!!onSaveProfile,onboarding,replayWelcome,experience:{usedApp:family.returningUser===true,usedVoice:family.account.usedVoice===true||loadLocal<boolean>(voiceUsageKey,false)===true||latestHistory.current.items.length>0},memory:(routing&&!scope.confirmed?[]:recentConversationMemory(latestHistory.current.items,scope.id,liveMode.current)).map(x=>({date:x.date,mode:x.mode,summary:x.summary}))};
       const startup=await voiceStartup({signal:abort.signal,
         getToken:async()=>history.cloud?getAccessTokenSilently():undefined,
         getMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}).catch(error=>{if(generation.current===version)trackOnboarding(['NotAllowedError','SecurityError'].includes(error?.name)?'microphone_denied':'microphone_failed',{code:error?.name||'other'});throw error;}),
@@ -482,7 +482,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       let welcomeResponseId:string|undefined,welcomeCompleted=false,welcomeRecorded=false,welcomeInterrupted=false;
       const sentEvents=new Map<string,string>();
       const backendReplyHolds=new Map<string,()=>void>();
-      let liveBackend=false,backgroundEnabled=false;
+      let liveBackend=false,backgroundEnabled=false,voiceControlId:string|undefined;
       let responseIgnored=false;
       const send=(event:unknown)=>{
         if(dc.readyState!=='open')return;
@@ -516,7 +516,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         try{
           await languageControl.configure(currentLanguage=>withRequestDeadline(async signal=>{
             const preparedContextId=initialScope&&shared&&user?.sub?shared.preparation.consumeReady(user.sub,{mode:next,language:currentLanguage,role:latestSetup.current.role,studentId:updateScope.id,routeConversations:latestSetup.current.role==='parent',targetConfirmed:true}):undefined;
-            const response=await timedVoiceFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',preparedContextId,voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud,memorySessionId:memoryTools.session()?.id,workspaceFocus:contextFocus,workspaceRefreshOnly:!focus&&!initialScope,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
+            const response=await timedVoiceFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json','X-Origen-Session':sessionId,'X-Origen-Operation':logOperation.current,'X-Origen-Segment':crypto.randomUUID()},body:JSON.stringify({action:'update-guide',preparedContextId,...(voiceControlId?{voiceControlId,voiceControlProtocol:'server-v1'}:{}),voiceProtocol:'live-v1',followUpProtocol:'student-follow-up-v1',recommendationProtocol:'recommendation-v1',outcomeProtocol:'student-outcome-v1',responseContextProtocol:'review-response-v1',enableLiveMemory:history.cloud,memorySessionId:memoryTools.session()?.id,workspaceFocus:contextFocus,workspaceRefreshOnly:!focus&&!initialScope,mode:next,language:currentLanguage,role:latestSetup.current.role,routeConversations:latestSetup.current.role==='parent',targetConfirmed:updateScope.confirmed,studentId:updateScope.id,students:currentStudents.map(({id,name})=>({id,name})),profile:updateProfile,allowGuideHandoff:true,memory:recentConversationMemory(latestHistory.current.items,updateScope.id,next)}),signal});
             const data=await response.json();if(!response.ok)setErrorReference(responseReference(response));if(!response.ok||!data.session?.instructions||!Array.isArray(data.session.tools))throw new Error(data.error||'guide_config_unavailable');
             capture({type:'context.received',instructions:data.session.instructions,model:data.session.model});
             if(data.reviewResponseGuard&&!await responseContext.accept(data.reviewResponseGuard))throw new Error('workspace_item_changed');
@@ -579,9 +579,9 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         // The Live adapter queues evidence separately from spoken announcements.
         isQuiet:()=>true,onState:setResearching,onRequest:(request:any)=>send({type:'origen.research.state',request}),
         deliver:(job:any)=>{log('background_research_delivered',{status:job.status,jobId:job.id,durationMs:job.durationMs});if(job.status==='completed'&&job.result){cache.put(job.query,job.result);sessionSources.current=mergeConversationSources(sessionSources.current,job.result.sources);setSources(sessionSources.current);}
-          send({type:'origen.research.ready',jobId:job.id,result:job.status==='completed'?researchEvidence(job.result,false):{status:'research_failed'},question:job.question});},
+          send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,result:job.status==='completed'?researchEvidence(job.result,false):{status:'research_failed'},question:job.question});},
       });
-      const cancelBackground=()=>{background.cancel();send({type:'origen.research.cancel'});};
+      const cancelBackground=()=>{if(voiceControlId)return dc.cancelResearch();const receipt=background.cancel();send({type:'origen.research.cancel'});return receipt;};
       resources.current.cancelResearch=()=>{research.cancel();cancelBackground();};
       abort.signal.addEventListener('abort',()=>background.close(),{once:true});
       const cache=voiceResearchCache();const researchBudget=voiceResearchBudget();const speechTimes=new Map<string,number>();const handledTranscripts=new Set<string>();
@@ -658,6 +658,8 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
         capture(e);callTiming.event(e);
+        if(e.type==='origen.research.active'){setResearching(e.active===true);return;}
+        if(e.type==='origen.research.result'){sessionSources.current=mergeConversationSources(sessionSources.current,e.sources||[]);setSources(sessionSources.current);return;}
         if(closing.current?.active()){closing.current.event(e);return;}
         onboardingVoice.current?.provider(e);
         turns.playback(e);
@@ -844,13 +846,13 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
               send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'invalid_target',instruction:'Ask one short spoken clarification. Do not request an on-screen confirmation.'})}});
               continue;
             }
-            if(item.name==='cancel_background_research'){cancelBackground();send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify({status:'research_cancelled'})}});continue;}
+            if(item.name==='cancel_background_research'){const output=await cancelBackground();send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(output)}});continue;}
             const researchMode=researchModeForTool(item.name,liveMode.current);
             if(researchMode&&backgroundEnabled){
               const researchTopic=researchMode==='finance'||researchMode==='loans'?'costs':researchMode==='admissions'?'applications':null;
               if(researchTopic)void topicControl.update([researchTopic],e.response?.metadata?.origen_user_turn);
               let output;
-              try{const args=JSON.parse(item.arguments),latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'',query={...args,institution:researchMode==='loans'?'':args.institution,mode:researchMode,language:languageControl.language(),forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};const cached=cache.get(query);
+              try{const args=JSON.parse(item.arguments),latestQuestion=[...sessionTurns.current].reverse().find(turn=>turn.role==='user')?.text||'',query={...args,institution:researchMode==='loans'?'':args.institution,mode:researchMode,language:languageControl.language(),forceRefresh:args.forceRefresh===true||wantsFreshLookup(latestQuestion)};const cached=args.replaceRequestId===undefined&&args.replaceRevision===undefined?cache.get(query):null;
                 output=cached?researchEvidence(cached,true):await background.start({...query,sessionId,studentId:summaryScope.current.id,requestKey:item.call_id});
               }catch{output={status:'research_unavailable',instruction:'Explain that the source check could not start. Continue helping without inventing verified figures.'};}
               if(generation.current!==version)return;
@@ -970,7 +972,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         });
         if(!await opening.verify())return;
       }
-      liveBackend=data.voiceProvider==='live';backgroundEnabled=liveBackend&&data.backgroundResearch===true;dc.configure(data);await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
+      liveBackend=data.voiceProvider==='live';backgroundEnabled=liveBackend&&data.backgroundResearch===true;voiceControlId=data.voiceControl?.id;await dc.configure(data,{token:startup.token,url:import.meta.env.VITE_API_URL||window.location.origin});await pc.setRemoteDescription({type:'answer',sdp:data.sdp});
     }catch(err){
       if(generation.current!==version||closing.current?.active())return;
       const code=err instanceof Error?err.message:'';

@@ -10,7 +10,8 @@ test('live registration collects account identity separately from student inform
   assert.ok(session.tools.some(tool=>tool.name==='propose_profile'));
   assert.match(session.instructions,/keep a parent's name separate/);
   assert.match(session.instructions,/Do not infer role from a fallback/);
-  assert.match(session.instructions,/Call propose_account after both are explicitly stated/);
+  assert.match(session.instructions,/Call propose_account immediately with each explicitly stated field/);
+  assert.match(session.instructions,/Never wait for both to update the visible form/);
   assert.match(session.instructions,/Draft proposals require review and Save profile in the app/);
   assert.ok(!session.tools.some(tool=>tool.name==='save_onboarding_profile'));
  }

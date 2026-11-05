@@ -1,0 +1,2 @@
+import {studentLiveChannel} from './studentLiveChannel.mjs';
+export function studentVoiceChannel(channel:RTCDataChannel,options?:Parameters<typeof studentLiveChannel>[1]):Omit<ReturnType<typeof studentLiveChannel>,'configure'>&{configure:(data:{voiceProvider?:string;voiceSession?:Record<string,unknown>;voiceControl?:{protocol:string;id:string}},options?:{token?:string;url?:string})=>Promise<void>;cancelResearch:()=>Promise<unknown>};

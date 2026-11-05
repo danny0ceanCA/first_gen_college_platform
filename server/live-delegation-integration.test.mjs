@@ -6,7 +6,7 @@ import {createProfileVoiceHandler} from './profile-voice.mjs';
 
 test('authorized prepared calls and updates use the scoped opening brief and preserve account boundaries',{skip:!process.env.DATABASE_TEST_URL,timeout:120000},async()=>{
  const f=await retrievalFixture();let sent,headers;
- const env={OPENAI_API_KEY:'synthetic',NODE_ENV:'development',ORIGEN_LIVE_FOLLOWUPS:'true',ORIGEN_VOICE_PREPARATION:'true',ORIGEN_PERSONALIZATION_MODE:'on'};
+ const env={OPENAI_API_KEY:'synthetic',NODE_ENV:'development',ORIGEN_LIVE_FOLLOWUPS:'true',ORIGEN_VOICE_PREPARATION:'true',ORIGEN_PERSONALIZATION_MODE:'on',ORIGEN_BACKGROUND_RESEARCH:'true'};
  const handler=createProfileVoiceHandler(env,async(_url,options)=>{sent=JSON.parse(options.body).session;return new Response(JSON.stringify({session:{id:'fake-provider'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});},()=>{},f.db);
  const base={mode:'planning',studentId:'alex',role:'parent',language:'en',routeConversations:true,targetConfirmed:true,voiceProtocol:'live-v1'};
  async function call(body){
@@ -23,6 +23,13 @@ test('authorized prepared calls and updates use the scoped opening brief and pre
    const live=await call({sdp:'v=0',language,preparedContextId:prepared.preparedContextId});
    assert.match(headers['Server-Timing'],/preparation;desc="hit"/);
    assert.equal(live.voiceSession.routingPolicy,'bounded-follow-up-v1');assert.match(sent.instructions,/Do not restrict this to the immediately preceding answer/);
+   for(const name of ['lookup_financial_aid','lookup_college_applications','lookup_education_planning']){
+    const tool=sent.delegation.responses.tools.find(t=>t.name===name);
+    assert.equal(tool.parameters.properties.replaceRequestId.type,'string');
+    assert.equal(tool.parameters.properties.replaceRevision.type,'integer');
+    assert.ok(!tool.parameters.required.includes('replaceRequestId'),'ordinary research needs no revision to start');
+   }
+   assert.ok(sent.delegation.responses.tools.some(t=>t.name==='cancel_background_research'));
    assert.match(sent.delegation.responses.instructions,/FICTIONAL_HISTORY/);
    assert.doesNotMatch(JSON.stringify(sent),/PRIVATE_OTHER_STUDENT|PRIVATE_OTHER_ACCOUNT/);
    assert.equal(sent.routingPolicy,undefined);assert.equal(sent.delegation.responses.routingPolicy,undefined);

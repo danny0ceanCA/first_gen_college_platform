@@ -2,8 +2,13 @@
 export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,onState=()=>{},onRequest=()=>{},schedule=setTimeout,cancel=clearTimeout,now=Date.now}){
  let active=null,closed=false;
  let requestSequence=0;
- const state=(job,status)=>{job.state=status;onRequest({requestId:job.requestId,jobId:job.id,state:status,question:job.question,institution:job.input.institution||'',studentId:job.input.studentId??null,language:job.input.language,mode:job.input.mode,elapsedMs:now()-job.started});};
- const stop=()=>{const job=active;active=null;if(job){cancel(job.timer);if(job.id)void remove(job.id).catch(()=>{});state(job,'cancelled');}onState(false);};
+ const state=(job,status)=>{job.state=status;onRequest({requestId:job.requestId,revision:job.revision,jobId:job.id,state:status,question:job.question,institution:job.input.institution||'',studentId:job.input.studentId??null,language:job.input.language,mode:job.input.mode,elapsedMs:now()-job.started});};
+ // Stop local delivery immediately. Only the DELETE receipt confirms that the
+ // server accepted cancellation; a lost response must not be called success.
+ const stop=()=>{const job=active;active=null;if(job){cancel(job.timer);state(job,'cancelled');}onState(false);
+  return (async()=>{try{if(job?.id)await remove(job.id);else if(job)return {status:'research_cancellation_requested',instruction:'Local delivery stopped while enqueue was pending. Server cancellation is not yet confirmed; do not claim the worker stopped.'};return {status:'research_cancelled'};}catch{return {status:'research_cancellation_unconfirmed',instruction:'Local result delivery stopped, but server cancellation could not be confirmed. Do not claim the worker stopped.'};}})();};
+ const receipt=job=>({status:job.id?'research_pending':'research_requesting',...(job.id?{jobId:job.id}:{}),requestId:job.requestId,revision:job.revision,question:job.question,institution:job.input.institution||'',
+  instruction:job.id?'This source check is already accepted. Continue the conversation without another lookup or progress announcement. Rephrasing and ordinary follow-ups reuse it. Only a material change requested by the caller replaces it: copy this requestId and revision into replaceRequestId and replaceRevision.':'The source-check request is awaiting its application receipt. Do not claim research is running or enqueue it again.'});
  async function poll(job){
   if(closed||active!==job)return;
   if(!isCurrent(job.input)){stop();return;}
@@ -18,7 +23,7 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
     job.result=result;
     if(isQuiet()){
      active=null;onState(false);
-     if(result.status!=='cancelled')deliver({...result,id:job.id,question:job.question,query:job.input,durationMs:now()-job.started});
+     if(result.status!=='cancelled')deliver({...result,id:job.id,requestId:job.requestId,revision:job.revision,question:job.question,query:job.input,durationMs:now()-job.started});
      return;
     }
    }
@@ -36,18 +41,29 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
  return {
   async start(input){
    if(closed)throw new Error('research_closed');
-   if(active&&['mode','question','institution','language','studentId'].every(k=>active.input[k]===input[k])&&!input.forceRefresh)return active.id
-    ? {status:'research_pending',jobId:active.id,instruction:'The same source check is already accepted. Continue the conversation; do not start it again.'}
-    : {status:'research_requesting',instruction:'The same request is awaiting the application receipt. Do not claim research is running or send another request.'};
-   stop();const job={input,requestId:input.requestKey||String(++requestSequence),started:now(),id:null,question:input.question,deadline:now()+110000,timer:null,result:null};active=job;onState(true);state(job,'requesting');
+   if(active&&!isCurrent(active.input))void stop();
+   if(!isCurrent(input))return {status:'research_scope_changed'};
+   if(active&&((active.input.studentId??null)!==(input.studentId??null)||active.input.sessionId!==input.sessionId))return {status:'research_scope_changed'};
+   const replacing=input.replaceRequestId!==undefined||input.replaceRevision!==undefined;
+   let requestId=input.requestKey||String(++requestSequence),revision=1;
+   if(replacing){
+    if(!active||input.replaceRequestId!==active.requestId||input.replaceRevision!==active.revision)return {...(active?{activeTask:receipt(active)}:{}),status:'research_request_changed',instruction:'The replacement refers to an outdated research revision and was not applied. Use the current task receipt; do not repeat old arguments or start an automatic retry.'};
+    requestId=active.requestId;revision=active.revision+1;void stop();
+   }else if(active){
+    // Never infer a replacement from wording, topic, language, or forceRefresh.
+    // The backend expresses semantic changes through the explicit revision.
+    return receipt(active);
+   }
+   const {replaceRequestId,replaceRevision,...query}=input;
+   const job={input:query,requestId,revision,started:now(),id:null,question:input.question,deadline:now()+110000,timer:null,result:null};active=job;onState(true);state(job,'requesting');
    try{
-    const result=await post(input);job.id=result.id;
-    if(closed||active!==job||!isCurrent(job.input)){if(job.id)void remove(job.id).catch(()=>{});return {status:'research_cancelled'};}
+    const result=await post(query);job.id=result.id;
+    if(closed||active!==job||!isCurrent(job.input)){try{if(job.id)await remove(job.id);return {status:'research_cancelled',requestId:job.requestId,revision:job.revision};}catch{return {status:'research_cancellation_unconfirmed',requestId:job.requestId,revision:job.revision};}}
     if(!job.id)throw Error('research_receipt_missing');
     state(job,result.status==='running'?'running':'queued');
     job.timer=schedule(()=>void poll(job),750);
-    return {status:'research_pending',jobId:job.id,instruction:'Official-source research is running in the background. Stay available to the caller. Briefly acknowledge it once; answer clarifications using known context, or ask one useful question if needed. Let the caller wait quietly if they prefer. Do not claim findings yet, repeat this lookup, or cancel it for ordinary conversation. Results will arrive separately. If the caller abandons this research, call cancel_background_research.'};
-   }catch(error){if(active===job){active=null;cancel(job.timer);onState(false);state(job,'failed');}throw error;}
-  },cancel:stop,close(){closed=true;stop();},
+    return {...receipt(job),instruction:receipt(job).instruction+' Acknowledge once if useful, then respond to the caller normally from known context or listen. Results arrive separately; do not invent findings or an ETA.'};
+   }catch(error){if(active!==job||closed)return {status:'research_cancelled',requestId:job.requestId,revision:job.revision};active=null;cancel(job.timer);onState(false);state(job,'failed');throw error;}
+  },cancel:stop,close(){closed=true;void stop();},
  };
 }

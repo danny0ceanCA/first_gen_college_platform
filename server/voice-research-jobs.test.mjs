@@ -94,3 +94,23 @@ test('queue ownership, idempotency, cancellation and restricted worker RLS', {sk
   await f.close();
  }
 });
+
+test('authorized voice negotiation selects a server owner and stages server-only guide updates',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const target=new URL(process.env.DATABASE_TEST_URL);assert.ok(['localhost','127.0.0.1'].includes(target.hostname));
+ const f=await retrievalFixture();const provider=[],registered=[],staged=[];const sessionId=randomUUID();
+ const control={available:true,register:value=>{registered.push(value);return {protocol:'server-v1',id:'opaque-handle'};},stage:(...args)=>{staged.push(args);return 'one-use-update';}};
+ const voice=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',ORIGEN_BACKGROUND_RESEARCH:'true',ORIGEN_LIVE_SERVER_CONTROL:'true'},async(url,options)=>{provider.push(JSON.parse(options.body));return new Response(JSON.stringify({session:{id:'live_session_fixture'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});},()=>{},f.db,control);
+ async function call(extra={}){
+  let status,data;const body={sdp:'v=0\r\noffer',voiceProtocol:'live-v1',voiceControlProtocol:'server-v1',language:'en',role:'student',mode:'planning',studentId:'alex',...extra};
+  const req=Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json','x-origen-session':sessionId},origenAuthorized:true,origenPermissionRevision:7,origenIdentity:{sub:'other'}});
+  await f.as('other',()=>voice(req,{writeHead:n=>status=n,end:s=>data=JSON.parse(s)},()=>assert.fail()));return {status,data};
+ }
+ try{
+  const start=await call();assert.equal(start.status,200,JSON.stringify(start.data));assert.equal(start.data.voiceControl.id,'opaque-handle');assert.equal(start.data.providerId,undefined);
+  assert.ok(start.data.voiceSession.tools.some(tool=>tool.name==='read_research_details'));
+  assert.deepEqual(provider[0].session.client.data_channel.allowed_client_events,['session.close']);assert.equal(registered[0].subject,'other');assert.equal(registered[0].permissionRevision,7);assert.equal(registered[0].scope.studentId,'alex');
+  const update=await call({action:'update-guide',voiceControlId:'opaque-handle',language:'es'});assert.equal(update.status,200,JSON.stringify(update.data));assert.equal(update.data.session.controlUpdateId,'one-use-update');assert.equal(staged[0][0],'opaque-handle');assert.equal(staged[0][1],'other');assert.equal(staged[0][3].sessionId,sessionId);
+  const fallback=await call({voiceControlProtocol:undefined});assert.equal(fallback.status,200);assert.equal(fallback.data.voiceControl,undefined);assert.equal(provider.at(-1).session.client,undefined);
+  assert.ok(!fallback.data.voiceSession.tools.some(tool=>tool.name==='read_research_details'));
+ }finally{await f.close();}
+});

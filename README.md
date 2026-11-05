@@ -14,6 +14,81 @@ This local API is available with the Vite development and preview servers; deplo
 
 Validation: `node --test server/ai.test.mjs` checks request validation, origin rejection, secret-safe failures, model selection and conversation roles. A live API smoke test and a temporary browser conversation successfully returned Astra responses. The test conversation tab was closed after verification.
 
+## Experimental server voice control
+
+On `Origen-Natural-Conversation`, `ORIGEN_LIVE_SERVER_CONTROL=true` enables
+the Step 2 sideband owner for clients advertising `voiceControlProtocol: server-v1`.
+It requires the authenticated API, the existing research worker, and
+`ORIGEN_BACKGROUND_RESEARCH=true` with migration 123 already applied. No new
+database migration or additional Render service is introduced by Step 2.
+
+The browser retains WebRTC audio, playback telemetry, consent controls, and UI
+callbacks. The API owns the Live sideband, research polling, evidence injection,
+tool-result correlation, and backend continuation. Existing guarded application
+endpoints still authorize durable changes. GPT-Live continues using managed
+Responses delegation; this does not switch it to client delegation.
+
+Custom HTTP launchers must call `app.attachServer(server)` before listening and
+`app.closeVoiceControls()` during shutdown. Proxy `/api/voice-control` WebSocket
+upgrades to that same API process and preserve the browser Origin. The Vite API
+proxy supports this route. Credentials travel in the first authenticated control
+message, never a URL. The primary provider data channel permits emergency
+`session.close` only; it cannot run a second tool loop.
+
+The flag defaults off. Calls fail closed if their control connection or account
+permission is lost; no tool writes replay and no browser executor takes over.
+The current registry is process-local, supports two calls per account, and limits
+a call to ten minutes. Multi-instance routing must keep a call on its owner;
+another process rejects the handle rather than creating duplicate work. Worker
+cancellation on disconnect is best effort, not proof that a provider search stopped.
+Operational logs record sideband attachment time, closure reason, callback
+timeouts, and worker duration. The existing private diagnostic archive additionally
+captures server-owned tool calls/results for its opted-in account.
+
+Offline bridge tests and isolated database checks do not measure real voice
+latency or prove natural speech. Run a separately budgeted English/Spanish audio
+comparison before enabling this flag for production. Disable it for new sessions
+to return to browser control; an active session never switches owners.
+
+Step 3 makes the existing worker request a source-linked conversation brief and
+a retained detailed report in one Responses call. Live receives the complete
+brief, including its qualification and uncertainty; missing, oversized, or invalid
+briefs retain the full report. No text is shortened by cutting off conditions.
+`ORIGEN_RESEARCH_BRIEFS=false` on the worker restores plain reports for comparison.
+With server control enabled, `read_research_details` reads the current completed
+report for a requested supporting detail without starting another web search.
+Report access is bound to the current job, revision, and student scope.
+
+Delivery diagnostics record context bytes, packet counts, evidence format, and
+context acknowledgment duration. A commentary request or observed reply is not
+proof that a particular finding was spoken or heard; compare these events with
+the call recording and actual playback timing.
+
+### Production research worker
+
+The manually managed Render service **Origen Research Worker** shares the Origen
+API's project, environment, Oregon region, and GitHub repository. API, site, and
+worker releases follow `main`. Its build command is `npm ci`; its start command is
+`node scripts/voice-research-worker.mjs`, using Node 22. Existing Render services
+are configured directly; applying a new Blueprint is not required for this release.
+
+The worker requires `OPENAI_API_KEY`, `RESEARCH_WORKER_DATABASE_URL`, and
+`ORIGEN_RESEARCH_BRIEFS=true`. The research model settings use `gpt-6.1-sol`.
+The database URL uses the internal Render hostname and the dedicated
+`origen_research_worker` login, with queue SELECT/UPDATE/DELETE access only, no
+queue INSERT, and no account/student-table access. Migration 123 and the API's
+queue grants must exist before activation. Never use the migration owner's or
+API runtime's credentials for the worker. Rotate the OpenAI key on both services
+when replacing it; secret values are managed in Render, not this repository.
+
+Production API activation uses `ORIGEN_BACKGROUND_RESEARCH=true`,
+`ORIGEN_LIVE_SERVER_CONTROL=true`, and `ORIGEN_VOICE_PREPARATION=true`.
+For a coordinated release, hold auto-deploys, publish the source, verify the
+worker starts and polls the queue, deploy the API and site at that same commit,
+then restore auto-deploys. A worker showing a live deploy alone does not prove
+that it is running the research command; verify `research_worker_ready` and queue
+polling. Users should refresh the site and start a new call after the release.
+
 ## Run
 
 ```sh

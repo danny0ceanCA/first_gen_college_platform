@@ -44,7 +44,7 @@ export function voiceLanguageControl(send,{language='en',onLanguage=()=>{},...ti
    if(!['en','es'].includes(next))return false;
    if(next===current&&!uncertain)return true;
    if(!instructions)throw new Error('voice_session_not_ready');
-   await apply({type:'realtime',instructions:voiceLanguageInstructions(instructions,next)},next);
+   await apply({type:'realtime',controlLanguage:next,instructions:voiceLanguageInstructions(instructions,next)},next);
    return true;
   });},
   configure(build,onApplied){return enqueue(async()=>{
@@ -52,7 +52,7 @@ export function voiceLanguageControl(send,{language='en',onLanguage=()=>{},...ti
    if(stopped)throw new Error('voice_session_stopped');
    if(typeof session?.instructions!=='string'||!Array.isArray(session.tools))throw new Error('invalid_guide_config');
    // A topic change must never change the model, voice, speed or audio settings.
-   const next={type:'realtime',instructions:voiceLanguageInstructions(session.instructions,current),tools:session.tools,tool_choice:session.tool_choice||'auto',...(session.liveInstructions?{liveInstructions:session.liveInstructions}:{}),...(['backend-first','bounded-follow-up-v1'].includes(session.routingPolicy)?{routingPolicy:session.routingPolicy}:{}),...(Number.isSafeInteger(session.max_output_tokens)&&session.max_output_tokens>0?{max_output_tokens:session.max_output_tokens}:{})};
+   const next={type:'realtime',...(session.controlUpdateId?{controlUpdateId:session.controlUpdateId}:{}),controlLanguage:current,instructions:voiceLanguageInstructions(session.instructions,current),tools:session.tools,tool_choice:session.tool_choice||'auto',...(session.liveInstructions?{liveInstructions:session.liveInstructions}:{}),...(['backend-first','bounded-follow-up-v1'].includes(session.routingPolicy)?{routingPolicy:session.routingPolicy}:{}),...(Number.isSafeInteger(session.max_output_tokens)&&session.max_output_tokens>0?{max_output_tokens:session.max_output_tokens}:{})};
    await apply(next,current,onApplied);
    return true;
   });},

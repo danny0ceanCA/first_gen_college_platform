@@ -42,6 +42,47 @@ test('duplicate accepted requests preserve their original job and scope',async()
  assert.equal(first.jobId,second.jobId);assert.equal(posts,1);assert.equal(states.at(-1).requestId,'first');q.close();
 });
 
+for(const language of ['en','es'])test(`${language}: rephrasing and a fresh flag cannot replace accepted research`,async()=>{
+ const states=[],removed=[];let posts=0;
+ const q=backgroundResearch({post:async()=>({id:'job'+ ++posts}),remove:async id=>removed.push(id),isCurrent:()=>true,onRequest:s=>states.push(s),schedule:()=>1,cancel:()=>{}});
+ const first=await q.start({question:language==='en'?'Berkeley costs':'Costos de Berkeley',institution:'UC Berkeley',studentId:'a',requestKey:'first',language});
+ const repeat=await q.start({question:language==='en'?'How much is that?':'¿Cuánto cuesta?',institution:'Berkeley',studentId:'a',requestKey:'other',language,forceRefresh:true});
+ assert.equal(posts,1);assert.deepEqual(removed,[]);assert.equal(repeat.requestId,first.requestId);assert.equal(repeat.revision,1);assert.equal(repeat.jobId,first.jobId);q.close();
+});
+test('explicit current revision replaces research; stale revisions cannot replace it again',async()=>{
+ const states=[],removed=[],delivered=[],timers=new Map();let posts=0;
+ const q=backgroundResearch({post:async()=>({id:'job'+ ++posts}),remove:async id=>removed.push(id),read:async id=>({status:'completed',result:{text:id}}),isCurrent:()=>true,isQuiet:()=>true,deliver:x=>delivered.push(x),onRequest:s=>states.push(s),schedule:fn=>(timers.set(posts,fn),posts),cancel:id=>timers.delete(id)});
+ const original=await q.start({question:'Berkeley',studentId:'a',requestKey:'first'}),oldPoll=timers.get(1);
+ const replacement=await q.start({question:'Actually Davis',studentId:'a',requestKey:'second',replaceRequestId:original.requestId,replaceRevision:1});
+ assert.equal(replacement.requestId,original.requestId);assert.equal(replacement.revision,2);assert.equal(posts,2);assert.deepEqual(removed,['job1']);
+ const stale=await q.start({question:'Old correction',studentId:'a',replaceRequestId:original.requestId,replaceRevision:1});
+ assert.equal(stale.status,'research_request_changed');assert.equal(stale.activeTask.revision,2);assert.equal(posts,2);
+ oldPoll();await new Promise(r=>setImmediate(r));assert.equal(delivered.length,0);
+ timers.get(2)();await new Promise(r=>setImmediate(r));assert.equal(delivered[0].result.text,'job2');assert.equal(delivered[0].revision,2);q.close();
+});
+test('a rephrased request while enqueueing shares the pending request without a fake receipt',async()=>{
+ let accept,posts=0;const q=backgroundResearch({post:()=>{posts++;return new Promise(r=>accept=r);},remove:async()=>{},isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ const first=q.start({question:'Cost of attendance',requestKey:'first'});
+ const duplicate=await q.start({question:'The published budget please',requestKey:'repeat'});
+ assert.equal(posts,1);assert.equal(duplicate.status,'research_requesting');assert.equal(duplicate.requestId,'first');assert.equal(duplicate.jobId,undefined);
+ accept({id:'accepted'});await first;q.close();
+});
+test('failed cancellation never claims server work stopped',async()=>{
+ const q=backgroundResearch({post:async()=>({id:'j'}),remove:async()=>{throw Error('offline');},isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ await q.start({question:'Costs'});const result=await q.cancel();assert.equal(result.status,'research_cancellation_unconfirmed');q.close();
+});
+test('replacement identifiers cannot move a task into a different student scope',async()=>{
+ let posts=0;const q=backgroundResearch({post:async()=>({id:'j'+ ++posts}),remove:async()=>{},isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ const first=await q.start({studentId:'a',sessionId:'call',question:'Costs'});
+ const result=await q.start({studentId:'b',sessionId:'call',question:'Other student',replaceRequestId:first.requestId,replaceRevision:1});
+ assert.equal(result.status,'research_scope_changed');assert.equal(posts,1);q.close();
+});
+test('cancelling an unacknowledged enqueue does not claim confirmed server cancellation',async()=>{
+ let accept;const removed=[];const q=backgroundResearch({post:()=>new Promise(r=>accept=r),remove:async id=>removed.push(id),isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ const first=q.start({question:'Costs'});assert.equal((await q.cancel()).status,'research_cancellation_requested');
+ accept({id:'late'});assert.equal((await first).status,'research_cancelled');assert.deepEqual(removed,['late']);q.close();
+});
+
 for(const status of [undefined,429,500,503])test(`temporary polling failure ${status} keeps the original job and recovers`,async()=>{
  let reads=0,tick;const delivered=[],removed=[];
  const q=backgroundResearch({post:async()=>({id:'original'}),read:async()=>{if(++reads<3)throw Object.assign(Error('temporary'),{status});return {status:'completed',result:{text:'Verified'}};},remove:async id=>removed.push(id),isCurrent:()=>true,isQuiet:()=>true,deliver:r=>delivered.push(r),schedule:fn=>(tick=fn,1),cancel:()=>{}});

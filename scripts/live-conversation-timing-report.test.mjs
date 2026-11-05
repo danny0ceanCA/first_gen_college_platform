@@ -10,3 +10,11 @@ test('missing speech and failed calls are not reported as fast successful answer
  const r=liveConversationTiming({runs:[{language:'es',failure:'private error',steps:[{after:1,audioEnded:3,at:9}],events:[]}]});
  assert.equal(r.calls[0].failed,true);assert.equal(r.calls[0].turns[0].candidateTranscriptMs,null);assert.doesNotMatch(JSON.stringify(r),/private error/);
 });
+test('server-control traces correlate evidence without emitting content or identifiers',()=>{
+ const r=liveConversationTiming({research:[{run:'PRIVATE',kind:'research-finished',durationMs:21000,status:200,data:{text:'SECRET'}}],diagnostics:[{run:'PRIVATE',event:'voice.control.callback_timeout'}],native:[{run:'PRIVATE',at:160,type:'session.output_transcript.delta',delta:'SECRET '.repeat(20)}],runs:[{id:'PRIVATE',language:'en',brief:true,finishedAt:500,steps:[{startedAt:100,audioEnded:120}],soundStarts:[180],events:[{type:'origen.research.supplied',at:200,jobId:'PRIVATE_JOB',packetCount:3,contextBytes:1000,evidenceFormat:'brief-v1'},{type:'origen.research.context_acknowledged',at:220,jobId:'OTHER_JOB',durationMs:20},{type:'origen.research.context_acknowledged',at:240,jobId:'PRIVATE_JOB',durationMs:40}]}]});
+ const call=r.calls[0];assert.equal(call.variant,'brief');assert.equal(call.callbackTimeouts,1);assert.equal(call.turns[0].candidateTranscriptMs,40);assert.equal(call.turns[0].firstAudibleMs,60);assert.equal(call.delivery[0].acknowledgmentMs,40);assert.equal(call.research[0].durationMs,21000);assert.doesNotMatch(JSON.stringify(r),/PRIVATE|SECRET|OTHER_JOB/);
+});
+test('speech already underway during the question is not a fast answer candidate',()=>{
+ const r=liveConversationTiming({runs:[{language:'es',steps:[{startedAt:100,audioEnded:200}],finishedAt:1000,events:[{type:'session.output_transcript.delta',at:150,delta:'PRIVATE prior speech '.repeat(10)}]}]});
+ assert.equal(r.calls[0].turns[0].firstTranscriptMs,-50);assert.equal(r.calls[0].turns[0].candidateTranscriptMs,null);
+});

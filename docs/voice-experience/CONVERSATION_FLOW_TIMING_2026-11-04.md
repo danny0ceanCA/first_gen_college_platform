@@ -2,7 +2,7 @@
 
 Date: November 4, 2026. Branch: Origen-Development. Local changes only; no commit, push, deployment, migration, or production write.
 
-> The sections below describe earlier iterations. The latest consolidated-guide comparison and complete trend table are at the end of this report.
+> The sections below describe earlier iterations. The latest validation is the Natural Conversation Step 3 section at the end of this report.
 
 ## Finding
 
@@ -240,3 +240,38 @@ Fresh authorized ceiling: **$5**. Finalized voice/backend usage estimates total 
 This test validates conversation behavior, context delivery and tool flow, not production microphone conditions, summary persistence or binder-writing behavior. The fixture omits the final-summary endpoint; expected summary persistence failures there are not classified as production defects. Existing fixture notes were not created by the test conversation.
 
 Evidence: `tmp/items123-cap5-ten/{report,analysis,manual-review,metadata,budget}.json`, `comparison.csv`, `transcripts.txt`, `en-output.webm`, `es-output.webm`, and `run.log`. Raw artifacts remain local/ignored. Source hashes and the branch were captured in metadata. The same source was used for both calls.
+
+## Natural Conversation Step 3 — local validation
+
+Branch: **Origen-Natural-Conversation**. Implemented and tested locally; no commit, push, deployment, new migration, or production write.
+
+The existing research call now produces a short source-linked brief and a retained detailed report together. The brief includes the answer, material qualification/unknowns, and an optional next step. Live receives that complete brief and its cited sources; invalid or oversized briefs fall back to the full report without cutting off conditions. The server-owned `read_research_details` tool can retrieve the current completed report without repeating a web search. Ordinary explanations still use the conversation and supplied context directly.
+
+Live testing also exposed a circular handoff wait: the server awaited a browser continuation while the browser held it until the server finished. All required tool results now trigger server continuation immediately. Late browser continuations are deduplicated so they cannot resume or close a newer tool batch. The initial trace had a 35-second callback timeout with zero results outstanding; the comparison traces below had no callback timeouts.
+
+### Observed comparison
+
+Real synthetic audio, the isolated copy of Aiden's account data, the actual local research worker, and official-source searches were used. Seven prompts covered student selection, a source check, essay encouragement, simplifying an explanation, applying the findings, missing-detail recall, and thanks.
+
+| Language / result | Prompts sent | Research | Context packets / bytes | Context injection ACK | Ordinary first sound, median | New searches on ordinary turns | Outcome |
+|---|---:|---:|---:|---:|---:|---:|---|
+| English / full report | 7/7 | 23.24 s | 11 / 4,840 | 3.91 s | 1.56 s, n=4 | 0 | All prompts sent |
+| English / brief | 7/7 | 17.65 s | 4 / 1,742 | 1.96 s | 1.57 s, n=4 | 0 | All prompts sent |
+| Spanish / full report | 3/7 | 25.87 s | 12 / 5,363 | 4.32 s | 1.25 s, n=1 | 0 | 65-second wait cutoff |
+| Spanish / brief | 7/7 | 24.71 s | 4 / 1,835 | 1.89 s | 1.32 s, n=4 | 0 | All prompts sent |
+
+The brief reduced supplied context bytes by about **64–66%** in these examples, and context acknowledgment took roughly half as long. English ordinary first sound was essentially unchanged. The research duration varied; this small sample does not establish a causal improvement in search speed. Origen continued answering ordinary questions while research ran, with no new external searches on those turns.
+
+“First sound” can be an acknowledgment, not a substantive answer. A context ACK confirms injection, not that the model used the finding correctly or that the caller heard it. Review the recordings alongside the transcripts. A transcript group already underway while the caller was speaking is not counted as a fast answer candidate.
+
+The Spanish full-report answer combined essay support with a long cost recap, exceeding the harness's per-turn wait. It is an incomplete scenario comparator. A prior brief run reached the 200-second overall call limit; its completed repeat used a 300-second limit. These cutoffs remain in the raw evidence, and completion is not presented as a controlled speed improvement. The English pair predates advertising `read_research_details`; the Spanish repeat includes it. Direct report reading passed offline scope/revision and authorized API checks; these voice scenarios did not specifically request that tool's additional detail.
+
+### Budget and evidence
+
+The new authorized ceiling was **$5**. The ledger conservatively accounts for **$4.3709**, including initial diagnostic attempts, retries, retained uncertain reservations, and safety allowances. That is an upper accounting allowance, not an invoice. Existing WAV files were reused, so there were no new TTS generation charges. All paid test calls ended.
+
+Final automated verification: **206 tests passed, zero failures or skips**, including disposable PostgreSQL checks, server/browser transport, stale continuation and scope guards, brief/citation parsing, and diagnostic reporting. `npm run build` passed with the existing bundle-size advisory. The isolated test database was returned to its prior stopped state.
+
+The final-summary provider endpoint was excluded by the test budget gate; expected summary-save failures in this harness are outside this conversation/research comparison. No production records were accessed for writes.
+
+Sanitized measurements: [timing summary](../../output/playwright/natural-step3-final/timing-summary.json). Recordings: [English full report](../../output/playwright/natural-step3-final/full-en.webm), [English brief](../../output/playwright/natural-step3-final/brief-en.webm), [Spanish brief](../../output/playwright/natural-step3-spanish-complete/brief-es.webm). Raw local traces and the budget ledger are under `output/playwright/natural-step3*` and `tmp/natural-step3/`; they remain uncommitted. The offline timing utility is `scripts/live-conversation-timing-report.mjs`.
