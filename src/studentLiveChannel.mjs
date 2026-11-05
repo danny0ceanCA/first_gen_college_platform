@@ -2,7 +2,7 @@
 // guarded tool handlers. No tool is executed here and no permission is granted.
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
-export const liveChannelRevision='natural-conversation-recap-delivery-2026-11-05';
+export const liveChannelRevision='natural-conversation-step-3-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -57,7 +57,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  function supplyResearch(job){
   const key=job.jobId||job.requestId||id();
   if(researchDeliveries.has(key))return researchDeliveries.get(key);
-  const delivery={...job,key,pending:new Set(),acknowledged:false,announced:false,quietOnly:false,suppliedAt:now()};
+  const delivery={...job,key,pending:new Set(),acknowledged:false,announced:false,quietOnly:!!inputId,suppliedAt:now()};
   researchDeliveries.set(key,delivery);
   const packets=researchContextPackets(job,key);
   for(const content of packets){
@@ -84,7 +84,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    const job=researchReady;researchReady=null;job.announced=true;
    transmit({type:'session.commentary.append',event_id:id(),delegation_id:null,content:job.result?.status==='research_failed'
     ? 'At this completed conversational pause, the source check failed: there are no verified findings to share. If still relevant, warmly and plainly say you could not confirm this detail right now, then offer one useful next step. Do not say results are ready, ask permission to share nonexistent findings, invent facts, or automatically retry. If the topic has moved on, stay quiet. Continue in the current language without a greeting.'
-    : `At this completed pause, consider the supplied completed research result ${JSON.stringify(job.jobId||job.requestId||job.key)} and check the conversation before speaking. If these findings were already explained, stay silent. Otherwise introduce the completed result relevant to the pending research question warmly in one or two short sentences: the useful finding, its essential qualification, and what it means. Keep uncertainty and scenario assumptions explicit. Leave secondary figures for a follow-up unless requested; do not read the research report aloud. No permission-to-hear-results question, new greeting or intake question. If the topic has moved on, offer once to return later. Never interrupt new caller speech or repeat evidence already discussed. Use the current language.`});
+    : 'At this completed pause, answer the pending question warmly in two or three short sentences: the useful finding, its essential qualification, and what it means. Keep uncertainty and scenario assumptions explicit. Leave secondary figures for a follow-up unless requested; do not read the research report aloud. No permission-to-hear-results question, new greeting or intake question. If the topic has moved on, offer once to return later. Never interrupt new caller speech or repeat evidence already discussed. Use the current language.'});
    void emit({type:'origen.research.announced',jobId:job.jobId,requestId:job.requestId,revision:job.revision});return;
   }
   researchTimer=schedule(checkResearch,250);
@@ -147,8 +147,9 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(e.type==='session.input_transcript.delta'&&typeof e.delta==='string'){
    if(ending)return;
-   // New speech delays the safe boundary; it does not prove the caller has
-   // heard the completed findings. Keep the single delivery opportunity pending.
+   // Live already has the facts. Let it use them in this caller-led exchange
+   // without an additional application-requested announcement afterward.
+   if(researchReady){researchReady.quietOnly=true;cancel(researchTimer);researchTimer=null;}
    repliedSinceInput=false;
    // A quiet-window boundary is provisional: a short natural pause must not
    // discard the beginning of a save request. Re-register the complete phrase
@@ -163,11 +164,12 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    input+=e.delta;if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
   }
   if(e.type==='session.output_transcript.delta'&&typeof e.delta==='string'){
-   // Observe native speech once, but do not mistake an unrelated reply for
-   // delivery of findings. The pending opportunity still waits for real idle.
+   // A fresh native reply after context delivery owns the next explanation.
+   // Do not queue another app-generated speech request behind it. This records
+   // observed speech, not proof that the findings were spoken or heard.
    if(!outputId&&researchReady?.acknowledged&&(!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))){
-    if(!researchReady.nativeReplyObserved){researchReady.nativeReplyObserved=true;
-    await emit({type:'origen.research.native_reply_observed',jobId:researchReady.jobId,requestId:researchReady.requestId,revision:researchReady.revision});}
+    researchReady.quietOnly=true;cancel(researchTimer);researchTimer=null;
+    await emit({type:'origen.research.native_reply_observed',jobId:researchReady.jobId,requestId:researchReady.requestId,revision:researchReady.revision});
    }
    lastOutputAt=now();lastOutputText=outputId?lastOutputText+e.delta:e.delta;
    repliedSinceInput=true;recentInput=null;

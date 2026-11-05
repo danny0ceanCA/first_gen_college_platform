@@ -93,14 +93,13 @@ test('missing context acknowledgments expire without treating supplied facts as 
  assert.ok(f.events.some(e=>e.type==='origen.research.context_failed'&&e.reason==='acknowledgment_timeout'));
  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));assert.ok(!f.events.some(e=>e.type==='origen.research.announced'));f.channel.close();
 });
-for(const language of ['en','es'])test(`${language}: an unrelated native reply does not discard the completed research opportunity`,async()=>{
+for(const language of ['en','es'])test(`${language}: Live can integrate delivered context without a second application speech request`,async()=>{
  const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Costs',result:{text:'Verified budget; this is not an individual bill.'}}));
  await pause(0);f.receive({type:'session.output_transcript.delta',delta:language==='en'?'I found the published budget.':'Encontré el presupuesto publicado.'});await pause(0);
  clock.advance(10000);await pause(0);clock.advance(1000);await pause(0);
- assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
- assert.match(f.sent.find(e=>e.type==='session.commentary.append').content,/already explained, stay silent/);
- assert.equal(f.events.filter(e=>e.type==='origen.research.native_reply_observed').length,1);
- clock.advance(10000);await pause(0);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ assert.ok(f.events.some(e=>e.type==='origen.research.native_reply_observed'));
+ assert.ok(!f.events.some(e=>e.type==='origen.research.announced'),'native speech observed is not a claim of verified spoken delivery');f.channel.close();
 });
 
 for(const text of ['How much does UC Santa Cruz cost?','¿Cuánto cuesta ir a UC Santa Cruz?'])test('an empty native backend outcome produces one clarification, no automatic tool retry: '+text,async()=>{
@@ -314,15 +313,13 @@ test('superseded queued evidence never becomes the next research announcement',a
  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
 });
 
-test('results arriving during the caller turn wait for audible idle and remain deliverable',async()=>{
- const clock=fakeClock();let idle=false;const f=fixture({...clock,isPlaybackIdle:()=>idle});
+test('results arriving during the caller turn are available to that reply without a spoken interruption',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
  f.receive({type:'session.input_transcript.delta',delta:'¿Qué incluye ese costo?'});await pause(0);
  f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
  assert.ok(f.sent.some(e=>e.type==='session.thinking.append'&&e.content.includes('Verified')));
  clock.advance(5000);await pause(0);
- assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
- idle=true;clock.advance(1000);await pause(0);
- assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
 });
 function fixture(options={}){
  const {autoAcknowledge=true,...channelOptions}=options;

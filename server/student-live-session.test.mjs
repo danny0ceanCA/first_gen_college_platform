@@ -1,20 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
-import {studentRecapInstructions,voiceHandoff} from '../src/voiceHandoff.mjs';
+import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
 const teaching={id:'published-teaching',revision:14,content:{topic:'admissions',title:'Student background',deliveryStyle:'Warm, patient and encouraging.',conversationApproach:'Acknowledge uncertainty, then offer concrete choices.',example:'Your experiences are worth exploring.'}};
-for(const language of ['en','es'])test(`${language}: initial and updated student selection offer a grounded recap without new tools`,()=>{
- const input={language,mode:'planning',role:'parent',studentId:'aiden',targetConfirmed:true};
- for(const update of [false,true]){
-  const text=studentLiveInstructions(input,[],[],'bounded-follow-up-v1',{update});
-  assert.ok(text.includes(studentRecapInstructions));
-  assert.match(text,/substantive question, answer it first/);
-  assert.match(text,/not on language changes, context refreshes or ordinary follow-ups/);
-  assert.match(text,/never invent progress, decisions, tasks or missing history/);
-  assert.match(text,/No extra lookup is needed/);
- }
- assert.ok(voiceHandoff(language==='es'?'Aiden':'Talk about Aiden').includes(studentRecapInstructions));
- assert.ok(!studentLiveInstructions({...input,onboarding:true}).includes(studentRecapInstructions));
-});
 for(const language of ['en','es'])for(const mode of ['profile','planning','admissions','finance','loans'])test(`Live retains ${language} ${mode} backend instructions and tool contracts`,()=>{
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
  const legacy=voiceSession(input,{OPENAI_MODEL_VOICE:'gpt-realtime-2.1'}),live=studentLiveSession(legacy,input,[teaching]);

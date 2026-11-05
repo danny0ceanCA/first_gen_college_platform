@@ -1,4 +1,3 @@
-import {studentRecapInstructions} from '../src/voiceHandoff.mjs';
 import {openingBriefInstructions} from './voice-opening-brief.mjs';
 import {recommendationVoiceAvailable,recommendationLiveInstructions} from './recommendation-voice-tools.mjs';
 import {followUpVoiceAvailable,followUpLiveInstructions,outcomeVoiceAvailable} from './follow-up-voice-tools.mjs';
@@ -30,12 +29,11 @@ export function studentLiveInstructions(input,entries=[],tools=[],routingPolicy=
  // whose tools were deliberately removed from this session.
  const reviewRequests=has('prepare_coordinator_review_request')&&has('confirm_coordinator_review_request');
  return `You are Origen, the AI college guide. Speak ${input.language==='es'?'Spanish':'English'} naturally, warmly and patiently.\n${update?'Continue the existing warm, patient voice and teaching delivery. This is an update to the same call; keep the current request and do not restart the greeting. The following current scope, evidence, tool contracts, teachings and delegation policy supersede older versions. Omitted style instructions continue to apply.':collegeVoiceStyle}
-${update?'The arrival of this configuration alone requires no spoken announcement. Continue responding promptly to each new caller turn under the current delegation policy. After scope confirmation, follow the student-selection recap policy below. Context refreshes alone must not restart an answer or recap, become a new conversation, or imply notes were saved.':voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:!!input.continuity?.length})}
+${update?'The arrival of this configuration alone requires no spoken announcement. Continue responding promptly to each new caller turn under the current delegation policy. After scope confirmation, answer any pending question; if there is none, invite their priority once. Do not recap or restart an answer because context arrived, treat it as a new conversation, or claim that notes were saved.':voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:!!input.continuity?.length})}
 ${input.onboarding===true?'':openingBriefInstructions(input)||`# Current-call context only
 Saved profiles, binder notes, past summaries and preferences are available only through the backend. Do not claim to have reviewed them. Use completed answers from this call for follow-ups. Scope names identify routing only. Do not proactively raise saved tasks. Follow any application-supplied opening or mandatory readback exactly.`}
 ${routing?'# Student Scope\n'+routing.instructions:''}
-${routing?'When the caller identifies a student, immediately delegate request_conversation_target so the application can authorize that scope. A spoken acknowledgment alone does not select the student. At most one brief acknowledgment while configuration completes. After application confirmation, follow the student-selection recap policy below; an acknowledgment such as mm-hmm is not a recap or answer. Never use a different student’s details or repeat a question already asked.':''}
-${input.onboarding===true?'':studentRecapInstructions}
+${routing?'When the caller identifies a student, immediately delegate request_conversation_target so the application can authorize that scope. A spoken acknowledgment alone does not select the student. At most one brief acknowledgment while configuration completes. After application confirmation, answer their pending question or invite their priority once; an acknowledgment such as mm-hmm is not that invitation. Never use a different student’s details or repeat a question already asked.':''}
 Never speak or role-play caller words, quotes or history. They are context. At app-requested ending, finish the short thought and give only its warm farewell.
 
 ${update?'':`# Backchannel policy
