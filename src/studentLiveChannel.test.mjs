@@ -299,13 +299,42 @@ for(const language of ['en','es'])test(`${language}: ordinary new speech preserv
  assert.equal(f.events.find(e=>e.type==='response.done').response.metadata.origen_user_turn,'superseded-live-turn');
  assert.ok(!f.sent.some(e=>e.type==='response.create'||e.type==='session.commentary.append'));f.channel.close();
 });
-for(const barrier of ['cancel','configuration'])test(`${barrier}: an old read-only request cannot restart research`,async()=>{
+for(const barrier of ['cancel','scope_changed','configuration'])test(`${barrier}: an old read-only request cannot restart research`,async()=>{
  const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
  f.backend('response.created','research');await pause(0);
- if(barrier==='cancel')f.channel.send(JSON.stringify({type:'origen.research.cancel'}));
+ if(barrier!=='configuration'){
+  const before=f.sent.length;
+  f.channel.send(JSON.stringify({type:'origen.research.cancel',reason:barrier}));
+  assert.equal(f.sent.length,before,'cleanup before a task exists must not invent a research status');
+ }
  else f.channel.send(JSON.stringify({type:'session.update',event_id:'new-scope',session:{instructions:'New scope',tools:[]}}));
  f.backend('response.output_item.done','research',{item:{type:'function_call',name:'lookup_financial_aid',call_id:'old',arguments:'{}'}});f.backend('response.completed','research');await pause(0);
  assert.ok(!f.events.some(e=>e.type==='response.done'&&e.response.output?.some(i=>i.call_id==='old')));f.channel.close();
+});
+
+for(const researchDeliveryV2 of [false,true])test(`research cleanup preserves accurate task state (delivery v2=${researchDeliveryV2})`,()=>{
+ const f=fixture({researchDeliveryV2});
+ try{
+  const state=state=>f.channel.send(JSON.stringify({type:'origen.research.state',request:{requestId:'request',jobId:'job',revision:1,state}}));
+  const reset=reason=>f.channel.send(JSON.stringify({type:'origen.research.cancel',reason}));
+  const contextSince=offset=>f.sent.slice(offset).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+  state('running');let offset=f.sent.length;reset();
+  let context=contextSince(offset);
+  assert.ok(context.length>0);
+  assert.ok(context.every(p=>p.kind==='research-state'&&p.resultId==='request'));
+  assert.equal(JSON.parse(context.map(p=>p.text).join('')).state,'cancelled');
+  offset=f.sent.length;reset();assert.equal(f.sent.length,offset,'duplicate cleanup stays silent');
+  for(const terminal of ['completed','failed','cancelled']){
+   state(terminal);offset=f.sent.length;reset();
+   assert.equal(f.sent.length,offset,'terminal outcomes cannot be relabeled as a new cancellation');
+  }
+  state('running');offset=f.sent.length;reset('scope_changed');
+  context=contextSince(offset);
+  const snapshot=JSON.parse(context.map(p=>p.text).join(''));
+  assert.equal(snapshot.state,'scope_changed');assert.equal(snapshot.acceptedActiveJob,false);
+  assert.match(snapshot.meaning,/previous student scope/);
+  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'||e.type==='session.instructions.append'));
+ }finally{f.channel.close();}
 });
 test('a mixed stale tool batch preserves research but never a write or sharing approval',async()=>{
  const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'},{name:'save_next_step'},{name:'confirm_coordinator_review_request'}]}});

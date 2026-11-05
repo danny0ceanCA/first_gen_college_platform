@@ -4,7 +4,7 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-export const liveChannelRevision='natural-conversation-recap-timing-audio-2026-11-05';
+export const liveChannelRevision='natural-conversation-selection-acknowledgment-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -303,7 +303,16 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     if(researchDeliveryV2&&['completed','failed','cancelled'].includes(snapshot.state))transmit({type:'response.item.create',event_id:id(),item:{type:'message',role:'developer',content:[{type:'input_text',text:'Application research task update, not a new caller request. The newest state or receipt for this task replaces its older state. '+JSON.stringify({requestId:researchState?.requestId,...snapshot})}]}});
     void emit({type:'origen.research.state_changed',requestId:event.request?.requestId,revision:event.request?.revision,jobId:event.request?.jobId,state:event.request?.state});}return;
   }
-  if(event.type==='origen.research.cancel'){researchVersion++;researchState=null;clearResearch(event.reason==='scope_changed'?'scope_changed':'cancelled');quietContext('research-state','current',{state:'cancelled',acceptedActiveJob:false});return;}
+  if(event.type==='origen.research.cancel'){
+   const previous=researchState,scopeChanged=event.reason==='scope_changed';
+   researchVersion++;researchState=null;clearResearch(scopeChanged?'scope_changed':'cancelled');
+   // Scope cleanup also runs on the first student selection, with no research.
+   // Keep the stale-work barrier without inventing a cancelled lookup for Live.
+   if(previous&&scopeChanged)quietContext('research-state',previous.requestId||'current',{
+    state:'scope_changed',acceptedActiveJob:false,meaning:'Earlier research belongs to the previous student scope. Use only evidence authorized for the new scope. This internal reset needs no spoken announcement.'});
+   else if(previous&&['requesting','queued','running'].includes(previous.state))quietContext('research-state',previous.requestId||'current',researchStateContext({...previous,state:'cancelled'}));
+   return;
+  }
   if(event.type==='session.update'){
    // Server-side scope changes explicitly cancel delivery first. Language and
    // same-scope configuration updates must not discard completed findings.

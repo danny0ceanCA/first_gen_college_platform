@@ -10,7 +10,7 @@ export function liveSelectionDelivery({send,emit,id,now,schedule=setTimeout,canc
   begin(callId,assistantText='',scope){
    if(pending.has(callId))return;
    pending.set(callId,{startedAt:now(),scope,assistantText:assistantText.slice(-800),callerText:'',questionObserved:/[?？]/u.test(assistantText)});
-   context(callId,'The selection tool is pending. The profile is not ready; only its successful target_confirmed result confirms readiness.');
+   context(callId,'Student selection is pending. Recap preparation is background context; only target_confirmed confirms readiness.');
   },
   stageConfiguration(configurationId,value){
    // Language-only updates inherit the pending authorized facts and still wait

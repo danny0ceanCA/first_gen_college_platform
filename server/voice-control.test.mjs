@@ -41,6 +41,8 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])for(const
    await until(()=>f.events.some(e=>e.type==='response.output_audio_transcript.delta'&&e.delta===invitation));
   }
   await f.engine.configure({...config,language,...studentLiveUpdate(input)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'first-selection');
+  assert.ok(!f.sent.some(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='research-state'),'first selection must not report a cancelled or missing lookup');
+  assert.equal(f.jobs.length,0,'selecting the student does not start research');
   const packets=f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='selected-student-context');
   assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
   assert.equal(packets.length,0,'student facts stay out of voice context before the successful selection receipt');

@@ -59,6 +59,11 @@ for(const language of ['en','es'])test(`${language}: first selection stays conve
  assert.match(live.instructions,/Open with one scope question only/);
  assert.match(live.delegation.responses.instructions,/Open with one scope question only/);
  assert.match(live.instructions,/For a name-only first selection, acknowledge once, promptly but gently/);
+ assert.match(live.instructions,/"Of course" or "Claro"/);
+ assert.match(live.instructions,/do not address the caller by that student's name/);
+ assert.match(live.instructions,/Mention a lookup only for a lookup the caller actually requested/);
+ assert.match(live.instructions,/Do not narrate profile loading, missing context or internal research cleanup/);
+ assert.doesNotMatch(live.instructions,/Thanks, let me take a look|Gracias, déjame ver/);
  assert.match(live.instructions,/Tool dispatch is not completion/);
  assert.match(live.instructions,/Silence is not a request for another acknowledgment/);
  assert.match(live.instructions,/Slow the articulation itself/);
