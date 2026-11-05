@@ -43,22 +43,28 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])for(const
   await f.engine.configure({...config,language,...studentLiveUpdate(input)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'first-selection');
   const packets=f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='selected-student-context');
   assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
-  assert.deepEqual(JSON.parse(packets.map(e=>JSON.parse(e.content).text).join('')).openingBrief,input.openingBrief);
-  f.engine.receive({type:'session.updated',client_event_id:'first-selection'});
+  assert.equal(packets.length,0,'student facts stay out of voice context before the successful selection receipt');
   const questionParts=language==='en'?['How can he choose ','between colleges?']:['¿Cómo puede elegir ','entre universidades?'];
   if(callerAsks){
    f.engine.receive({type:'session.input_transcript.delta',delta:questionParts[0]});
    await until(()=>f.events.filter(e=>e.type==='input_audio_buffer.speech_started').length===2);
   }
   await pause(0);assert.ok(!f.events.some(e=>e.type==='session.updated'));
-  for(const packet of packets)f.engine.receive({type:packet.type+'ed',client_event_id:packet.event_id});
+  f.engine.receive({type:'session.updated',client_event_id:'first-selection'});
   await until(()=>f.events.some(e=>e.type==='session.updated'));
+  assert.equal(f.events.find(e=>e.type==='origen.configuration.applied').contextDelivery,'staged_for_selection');
   assert.equal(f.sent.filter(e=>e.type==='response.create').length,0,'context delivery alone cannot open a second speaking turn');
   const receipt=voiceTargetResult(true,'Aiden');
   assert.equal(f.engine.command({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(receipt)}},lease),true);
   await until(()=>f.sent.some(e=>e.type==='response.create'));
   assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
   const delivered=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+  assert.deepEqual(delivered.selectionContext.openingBrief,input.openingBrief,'the backend retains the complete authorized brief');
+  const snapshots=f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='confirmed-student-brief');
+  assert.equal(snapshots.length,1);assert.ok(new TextEncoder().encode(snapshots[0].content).length<=480);
+  assert.equal(JSON.parse(snapshots[0].content).profile.school,'Synthetic Community College');
+  f.engine.receive({type:'session.thinking.appended',client_event_id:snapshots[0].event_id,start_ms:1000,end_ms:1400});
+  await until(()=>f.events.some(e=>e.type==='origen.selection.context'&&e.stage==='acknowledged'));
   assert.equal(delivered.status,receipt.status);
   assert.equal(delivered.selectionDelivery.mode,callerAsks?'caller_first':invitedEarly?'leave_floor':'conditional_recap');
   assert.equal(delivered.selectionDelivery.assistantQuestionObserved,invitedEarly);

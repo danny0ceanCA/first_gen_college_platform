@@ -9,6 +9,7 @@ import {recommendationVoiceTools} from './recommendationVoiceTools.mjs';
 import {followUpOpeningPlayback,type OpeningClaim} from './followUpOpening.mjs';
 import {followUpVoiceTools} from './followUpVoiceTools.mjs';
 import {studentLivePlayback} from './studentLivePlayback.mjs';
+import {startLiveAudioDiagnostics} from './liveAudioDiagnostics.mjs';
 import {accountDraftProposal,type AccountDraft} from './voiceAccountDraft.mjs';
 import {studentVoiceChannel as studentLiveChannel} from './studentVoiceChannel.mjs';
 import {conversationCheckpoint,type CheckpointState} from './conversationCheckpoint.mjs';
@@ -240,7 +241,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const researchStarted=useRef(0);
   const [researching,setResearching]=useState(false);
   const [seconds,setSeconds]=useState(0);
-  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopMemory?:()=>void;cancelResearch?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;stopTopics?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection,isCurrent?:()=>boolean)=>Promise<boolean>}>({});
+  const resources=useRef<{pc?:RTCPeerConnection;stream?:MediaStream;dc?:RTCDataChannel;abort?:AbortController;timer?:ReturnType<typeof setInterval>;deadline?:ReturnType<typeof setTimeout>;stopWake?:()=>void;stopProgress?:()=>void;stopMemory?:()=>void;cancelResearch?:()=>void;stopAudioDiagnostics?:()=>void;stopConnection?:()=>void;stopTurns?:()=>void;turnsBusy?:()=>boolean;stopGuide?:()=>void;stopTopics?:()=>void;workspace?:{select:(selection:WorkspaceSelection)=>void;stop:()=>void};studentSelection?:{select:(id:string|null)=>void;stop:()=>void};switchGuide?:(mode:'finance'|'admissions'|'planning'|'loans',initialScope?:{id:string|null;confirmed:true},focus?:WorkspaceSelection,isCurrent?:()=>boolean)=>Promise<boolean>}>({});
   const generation=useRef(0);
   const finalReason=useRef<'completed'|'disconnected'|'failed'>('disconnected');
   const preserveLogicalSession=useRef(false);
@@ -264,6 +265,9 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     onboardingVoice.current?.stop();onboardingVoice.current=null;
     if(logSession.current)trackOnboarding('voice_ended',{reason:onboardingEndReason.current});
     timing.current?.stop();timing.current=null;
+    // Capture the monitor's final state before clearing this call's identifiers
+    // and before closing playback; cleanup must not look like an audio glitch.
+    resources.current.stopAudioDiagnostics?.();
     log('session_cleanup');void privateCapture.current.flush();logSession.current='';
     generation.current++;
     const r=resources.current;resources.current={};
@@ -474,6 +478,13 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       trackOnboarding('microphone_allowed');
       resources.current.stream=stream;
       const pc=new RTCPeerConnection();resources.current.pc=pc;const stopPlaybackTimer=setInterval(()=>{livePlayback.idle();if(!audio.current||audio.current.paused||audio.current.muted||audio.current.volume===0)setAudibleSpeaking(false);},100);const priorStopConnection=resources.current.stopConnection;resources.current.stopConnection=()=>{clearInterval(stopPlaybackTimer);priorStopConnection?.();};
+      // Use this call's immutable archive scope. Samples go through the existing
+      // opt-in batch queue, never through one operational HTTP upload per sample.
+      const audioDiagnosticScope={subject:user?.sub,sessionId,attemptId:logAttempt.current,studentId:logTarget.current};
+      const audioDiagnostics=startLiveAudioDiagnostics({pc,audio:audio.current,enabled:captureRequested,getAudioContextState:()=>livePlayback.contextState(),onEvent:(event,details)=>{
+        if(generation.current!==version||!privacyLease.valid())return;
+        privateCapture.current.event({type:'diagnostic',event,details},audioDiagnosticScope);
+      }});resources.current.stopAudioDiagnostics=()=>audioDiagnostics.stop();
       pc.ontrack=e=>{if(generation.current!==version||closing.current?.active())return;void livePlayback.attach(e.streams[0]);if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
       const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),getPlaybackVersion:()=>livePlayback.audibleVersion(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted});resources.current.dc=dc;

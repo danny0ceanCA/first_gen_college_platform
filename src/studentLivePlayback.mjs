@@ -18,6 +18,9 @@ export function studentLivePlayback({clock=Date.now,AudioContext=globalThis.Audi
    return clock()-lastSound>1200;
   },
   audibleVersion:()=>audibleVersion,
+  // Diagnostics observe the existing analyser context without creating or
+  // resuming an AudioContext and without touching the playback element.
+  contextState:()=>context?.state,
   stop(){report(false);source?.disconnect();void context?.close().catch(()=>{});analyser=undefined;},
  };
 }

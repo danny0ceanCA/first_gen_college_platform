@@ -7,6 +7,81 @@ import {capturePayload} from './voiceCapture.mjs';
 import {voiceTargetResult} from './voiceTargetResult.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
+for(const language of ['en','es'])for(const callerFirst of [false,true])test(`${language}: selected brief stays off the voice stream until its successful receipt (${callerFirst?'caller first':'short recap'})`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});
+ f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Scope pending',tools:[{name:'request_conversation_target'}]}});
+ f.backend('response.created','selection');await pause(0);
+ f.backend('response.output_item.done','selection',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','selection');await pause(0);
+ const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{name:'Aiden',school:'SAVED_SCHOOL'},records:[{content:'Private detailed history. '.repeat(50)}]}};
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'selection-config',session:{language,instructions:'AUTHORIZED_BACKEND_HISTORY',tools:[],liveContext:context}}));
+ assert.equal(f.sent.filter(e=>e.type==='session.thinking.append').length,1,'only the pending status, no partial facts');
+ assert.ok(!f.sent.filter(e=>e.type==='session.thinking.append').some(e=>e.content.includes('SAVED_SCHOOL')));
+ if(callerFirst){f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Could we talk about his essay':'¿Podemos hablar de su ensayo'});await pause(0);}
+ f.receive({type:'session.updated',client_event_id:'selection-config'});await pause(0);
+ assert.equal(f.events.find(e=>e.type==='origen.configuration.applied').contextDelivery,'staged_for_selection');
+ assert.ok(!f.sent.some(e=>e.type==='response.create'));
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ const packet=f.sent.find(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='confirmed-student-brief');
+ assert.ok(packet);assert.ok(new TextEncoder().encode(packet.content).length<=480);
+ assert.equal(JSON.parse(packet.content).profile.school,'SAVED_SCHOOL');
+ const result=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+ assert.deepEqual(result.selectionContext,context);assert.equal(result.selectionDelivery.mode,callerFirst?'caller_first':'conditional_recap');
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+ assert.ok(!f.events.some(e=>e.type==='origen.selection.context'&&e.stage==='acknowledged'));
+ f.receive({type:'session.thinking.appended',client_event_id:packet.event_id,start_ms:1200,end_ms:1500});await pause(0);
+ const acknowledged=f.events.find(e=>e.type==='origen.selection.context'&&e.stage==='acknowledged');
+ assert.equal(capturePayload(acknowledged).endMs,1500);
+ f.receive({type:'session.output_transcript.delta',delta:'A brief continuation.',start_ms:1600,end_ms:2400});await pause(0);
+ const speech=f.events.find(e=>e.type==='response.output_audio_transcript.delta');assert.equal(capturePayload(speech).startMs,1600);
+ assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
+ f.channel.close();
+});
+
+for(const failure of ['backend-error','timeout','superseded','failed-receipt','close'])test(`staged selection facts are discarded on ${failure}`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});
+ f.backend('response.created','select');await pause(0);
+ f.backend('response.output_item.done','select',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','select');await pause(0);
+ const config={instructions:'Backend',tools:[],liveContext:{scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{school:'PRIVATE_SCHOOL'}}}};
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'config',session:config}));
+ if(failure==='backend-error')f.receive({type:'error',error:{code:'responses_validation_failed',client_event_id:'config'}});
+ if(failure==='timeout')clock.advance(10000);
+ if(failure==='superseded')f.channel.send(JSON.stringify({type:'session.update',event_id:'new-config',session:{...config,liveContext:{scope:{confirmed:true,studentId:'elodie'}}}}));
+ if(failure==='close')f.channel.close();
+ f.receive({type:'session.updated',client_event_id:'config'});await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(failure!=='failed-receipt','Aiden'))}}));
+ assert.ok(!f.sent.filter(e=>e.type==='session.thinking.append'||e.type==='response.item.create').some(e=>JSON.stringify(e).includes('PRIVATE_SCHOOL')));
+ if(failure!=='close')assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output).status,'target_update_failed');
+ f.channel.close();
+});
+
+test('changing language during selection keeps the staged brief and waits for the newest configuration',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});
+ f.channel.configure({voiceProvider:'live',voiceSession:{language:'en',tools:[]}});
+ f.backend('response.created','select');await pause(0);
+ f.backend('response.output_item.done','select',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','select');await pause(0);
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'context',session:{instructions:'Authorized backend',liveContext:{scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{name:'Aiden'}}}}}));
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'spanish',session:{language:'es'}}));
+ assert.equal(f.sent.find(e=>e.type==='session.update'&&e.event_id==='spanish').session.delegation.responses.instructions,'Authorized backend','a language change cannot restore the old unconfirmed backend');
+ f.receive({type:'session.updated',client_event_id:'context'});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='session.updated'));
+ f.receive({type:'session.updated',client_event_id:'spanish'});
+ const direction=f.sent.find(e=>e.type==='session.instructions.append');f.receive({type:'session.instructions.appended',client_event_id:direction.event_id});await pause(0);
+ assert.equal(f.events.find(e=>e.type==='session.updated').session.liveContext.scope.studentId,'aiden');
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+ const result=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+ assert.equal(result.status,'target_confirmed');assert.equal(result.selectionContext.openingBrief.profile.name,'Aiden');
+ const packet=f.sent.find(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='confirmed-student-brief');
+ clock.advance(10000);await pause(0);
+ assert.ok(f.events.some(e=>e.type==='origen.selection.context'&&e.stage==='acknowledgment_timeout'));
+ f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='origen.selection.context'&&e.stage==='acknowledged'),'a late ack cannot manufacture a delivery confirmation');
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'),'a missing brief ack never starts a second opening');f.channel.close();
+});
+
 for(const language of ['en','es'])test(`${language}: a fast student choice cannot mistake the old scope question for a new invitation`,async()=>{
  const clock=fakeClock(),f=fixture({...clock,isPlaybackIdle:()=>false});
  f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Aiden, Elodie, or college in general?':'¿Aiden, Elodie o la universidad en general?'});await pause(0);
@@ -101,6 +176,25 @@ test('same-scope language change does not resend the student brief or unchanged 
  assert.equal(f.sent.filter(e=>e.type==='session.thinking.append').length,0);
  assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,1);
  assert.match(f.sent.find(e=>e.type==='session.instructions.append').content,/Respond in Spanish/);f.channel.close();
+});
+test('an old pending configuration cannot replace an already-applied newer student during a language change',async()=>{
+ const f=fixture({autoAcknowledge:false});
+ f.channel.configure({voiceProvider:'live',voiceSession:{language:'en',instructions:'Scope pending',tools:[]}});
+ for(const studentId of ['aiden','elodie'])f.channel.send(JSON.stringify({type:'session.update',event_id:studentId,session:{language:'en',instructions:studentId,tools:[{name:studentId}],liveContext:{scope:{confirmed:true,studentId}}}}));
+ f.receive({type:'session.updated',client_event_id:'elodie'});
+ for(const packet of f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).resultId==='elodie'))f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});
+ await pause(0);
+ assert.equal(f.events.find(e=>e.type==='session.updated').session.instructions,'elodie');
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'spanish',session:{language:'es'}}));
+ const configuration=f.sent.find(e=>e.type==='session.update'&&e.event_id==='spanish').session.delegation.responses;
+ assert.equal(configuration.instructions,'elodie');assert.equal(configuration.tools[0].name,'elodie');
+ assert.equal(f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).resultId==='spanish').length,0,'the current student does not change');
+ f.receive({type:'session.updated',client_event_id:'spanish'});
+ const direction=f.sent.find(e=>e.type==='session.instructions.append');f.receive({type:'session.instructions.appended',client_event_id:direction.event_id});await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='session.updated').at(-1).session.liveContext.scope.studentId,'elodie');
+ f.receive({type:'session.updated',client_event_id:'aiden'});
+ for(const packet of f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).resultId==='aiden'))f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});await pause(0);
+ assert.deepEqual(f.events.filter(e=>e.type==='session.updated').map(e=>e.session.instructions),['elodie','elodie']);f.channel.close();
 });
 for(const language of ['en','es'])test(`${language}: speech before a target proposal triggers one reevaluation without asking for the name again`,async()=>{
  const clock=fakeClock(),f=fixture(clock);

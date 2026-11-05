@@ -17,3 +17,13 @@ test('speaking indicator follows audible samples, tolerates short gaps, and stop
  time=400;playback.idle();assert.deepEqual(states,[true,false]);
  sound=.1;playback.idle();playback.stop();assert.deepEqual(states,[true,false,true,false]);
 });
+
+test('diagnostics read context state without creating or resuming audio',async()=>{
+ let created=0,resumed=0,context;
+ class Context{constructor(){created++;context=this;this.state='suspended';}async resume(){resumed++;this.state='running';}async close(){this.state='closed';}}
+ const playback=studentLivePlayback({AudioContext:Context});
+ assert.equal(playback.contextState(),undefined);assert.equal(created,0);assert.equal(resumed,0);
+ await playback.prime();assert.equal(playback.contextState(),'running');assert.equal(created,1);assert.equal(resumed,1);
+ context.state='interrupted';assert.equal(playback.contextState(),'interrupted');assert.equal(resumed,1);
+ playback.stop();assert.equal(playback.contextState(),'closed');assert.equal(resumed,1);
+});

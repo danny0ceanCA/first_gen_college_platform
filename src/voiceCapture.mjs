@@ -7,7 +7,8 @@ export function capturePayload(event,direction='provider'){
  if(type==='origen.client.build')return {...base,buildId:event.buildId};
  if(type==='origen.client.revision')return {...base,revision:event.revision};
  if(type==='origen.control.ready')return {...base,durationMs:event.durationMs};
- if(type==='origen.configuration.applied')return {...base,durationMs:event.durationMs,contextPacketCount:event.contextPacketCount,instructionPacketCount:event.instructionPacketCount};
+ if(type==='origen.configuration.applied')return {...base,configurationId:event.configurationId,contextDelivery:event.contextDelivery,durationMs:event.durationMs,contextPacketCount:event.contextPacketCount,instructionPacketCount:event.instructionPacketCount};
+ if(type==='origen.selection.context')return {...base,stage:event.stage,callId:event.callId,configurationId:event.configurationId,eventId:event.eventId,durationMs:event.durationMs,startMs:event.startMs,endMs:event.endMs,contextBytes:event.contextBytes};
  if(type==='origen.selection.delivery')return {...base,callId:event.callId,deliveryMode:event.deliveryMode,assistantQuestionObserved:event.assistantQuestionObserved,callerSpeechObserved:event.callerSpeechObserved,durationMs:event.durationMs};
  if(type==='origen.control.tool_call')return {...base,name:event.item?.name,callId:event.item?.call_id,arguments:event.item?.arguments};
  if(type==='origen.control.tool_result')return {...base,callId:event.callId,output:event.output,durationMs:event.durationMs};
@@ -18,7 +19,7 @@ export function capturePayload(event,direction='provider'){
  if(type==='origen.backend.empty')return base;
  if(['origen.research.handoff_recovered','origen.speech.silence_recovered'].includes(type))return base;
  if(/transcription.completed$|audio_transcript.done$/.test(type))return {...base,text:event.transcript};
- if(['session.input_transcript.delta','session.output_transcript.delta','response.output_audio_transcript.delta','response.audio_transcript.delta'].includes(type))return {...base,text:event.delta,partial:true};
+ if(['session.input_transcript.delta','session.output_transcript.delta','response.output_audio_transcript.delta','response.audio_transcript.delta'].includes(type))return {...base,text:event.delta,partial:true,startMs:event.start_ms,endMs:event.end_ms};
  if(type==='response.create')return {...base,instructions:event.response?.instructions};
  if(type==='response.done')return {...base,status:event.response?.status,usage:event.response?.usage,calls:event.response?.output?.filter(x=>x.type==='function_call').map(x=>({name:x.name,callId:x.call_id,arguments:x.arguments}))};
  if(type==='response.function_call_arguments.done')return {...base,name:event.name,callId:event.call_id,arguments:event.arguments};

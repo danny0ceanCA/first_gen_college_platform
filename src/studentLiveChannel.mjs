@@ -4,7 +4,7 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-export const liveChannelRevision='natural-conversation-gentle-intro-2026-11-05';
+export const liveChannelRevision='natural-conversation-recap-timing-audio-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -25,7 +25,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
- const selectionDelivery=liveSelectionDelivery({send:transmit,emit:event=>void emit(event),id,now});
+ const selectionDelivery=liveSelectionDelivery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel});
  const deliveryTracker=researchDelivery({send:transmit,emit:event=>void emit(event),now,schedule,cancel,id,
   canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&
    (!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))&&quietBoundary(/[?？]["”’')]*\s*$/u.test(lastOutputText)?6000:600)});
@@ -53,18 +53,20 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  function quietContext(kind,resultId,value){
   return liveContextPackets(kind,resultId,value).map(content=>{const event_id=id();transmit({type:'session.thinking.append',event_id,delegation_id:null,content});return event_id;});
  }
- function retireConfiguration(job){
+ function retireConfiguration(job,applied=false){
   cancel(job.timer);updates.delete(job.id);
+  if(!applied)selectionDelivery.configurationFailed(job.id);
   for(const packetId of job.pending)configurationAcknowledgments.delete(packetId);
  }
  function clearConfigurations(){for(const job of updates.values())retireConfiguration(job);}
  async function finishConfiguration(job){
   if(!updates.has(job.id)||!job.backendApplied||job.pending.size)return;
-  retireConfiguration(job);
+  retireConfiguration(job,true);
   // A late acknowledgment must not restore an older scope or language.
   if(job.version!==configurationVersion)return;
+  selectionDelivery.configurationReady(job.id);
   session={...session,...job.session};
-  await emit({type:'origen.configuration.applied',durationMs:Math.max(0,now()-job.startedAt),contextPacketCount:job.contextPacketCount,instructionPacketCount:job.instructionPacketCount});
+  await emit({type:'origen.configuration.applied',configurationId:job.id,contextDelivery:job.contextStaged?'staged_for_selection':'acknowledged',durationMs:Math.max(0,now()-job.startedAt),contextPacketCount:job.contextPacketCount,instructionPacketCount:job.instructionPacketCount});
   await emit({type:'session.updated',session,client_event_id:job.id});
  }
  // Live transcript silence is not a semantic end-of-turn event. Track actual
@@ -157,6 +159,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
+  selectionDelivery.receive(e);
   if(researchDeliveryV2)deliveryTracker.receive(e);
   if(e.type==='session.started'){
    started=true;await emit({type:'origen.client.revision',revision:liveChannelRevision});
@@ -208,7 +211,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    lastOutputAt=now();lastOutputText=outputId?lastOutputText+e.delta:e.delta;
    repliedSinceInput=true;recentInput=null;
    if(!outputId){outputInterrupted=!!inputId;outputId=id();await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});}
-   output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta});
+   output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta,start_ms:e.start_ms,end_ms:e.end_ms});
    if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }
   if(e.type==='session.updated'){
@@ -255,7 +258,10 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     }
     if(output.length){
      if(!current)await emit({type:'origen.research.turn_preserved',response_id:responseId});
-     for(const item of output)if(item.name==='request_conversation_target')selectionDelivery.begin(item.call_id,response.selectionSpeech);
+     for(const item of output)if(item.name==='request_conversation_target'){
+      let scope;try{scope=JSON.parse(item.arguments).scope;}catch{}
+      selectionDelivery.begin(item.call_id,response.selectionSpeech,scope);
+     }
      toolHandlers++;try{await emit({type:'response.created',response:{id:responseId,metadata}});await emit({type:'response.done',response:{id:responseId,metadata,status:event.response?.status||(event.type==='response.completed'?'completed':event.type.split('.').at(-1)),output}});}finally{toolHandlers--;}}
     else if(current&&!response.continued&&!response.hasText&&event.type==='response.completed'&&session.routingPolicy==='bounded-follow-up-v1'&&emptyRecoveryEpoch!==epoch){
      emptyRecoveryEpoch=epoch;
@@ -302,14 +308,20 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    // Server-side scope changes explicitly cancel delivery first. Language and
    // same-scope configuration updates must not discard completed findings.
    configurationVersion++;researchVersion++;if(!researchDeliveryV2)clearResearch();
-   const next=event.session||{};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto',reasoning:{effort:'low'},text:{verbosity:'low'},max_output_tokens:Math.max(1800,next.max_output_tokens??session.max_output_tokens??0)};
+   // A language-only update can arrive while selection is being configured.
+   // Preserve that newest pending configuration, not the older confirmed one.
+   const pendingConfiguration=[...updates.values()].find(job=>job.version===configurationVersion-1);
+   const next={...(pendingConfiguration?.session||session),...event.session};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto',reasoning:{effort:'low'},text:{verbosity:'low'},max_output_tokens:Math.max(1800,next.max_output_tokens??session.max_output_tokens??0)};
    const job={id:event.event_id,session:next,startedAt:now(),version:configurationVersion,pending:new Set(),backendApplied:false,contextPacketCount:0,instructionPacketCount:0};
+   job.contextStaged=selectionDelivery.stageConfiguration(job.id,next.liveContext);
    updates.set(job.id,job);
    job.timer=schedule(()=>{if(!updates.has(job.id))return;retireConfiguration(job);void emit({type:'error',error:{code:'configuration_context_timeout',event_id:job.id}});},10000);
    const track=(type,contents)=>{for(const content of contents){const event_id=id();job.pending.add(event_id);configurationAcknowledgments.set(event_id,job);transmit({type,event_id,delegation_id:null,content});}};
    // Facts are quiet context, never a replay of the complete speaking prompt.
-   // Confirm the update only after both the voice context and backend are ready.
-   if(next.liveContext&&JSON.stringify(next.liveContext)!==JSON.stringify(session.liveContext)){const packets=liveContextPackets('selected-student-context',job.id,next.liveContext);job.contextPacketCount=packets.length;track('session.thinking.append',packets);}
+   // For an active selection, the backend receives the complete authorized
+   // context now; voice facts wait for the matching successful tool receipt.
+   // Refreshes retain the existing full-context acknowledgment contract.
+   if(!job.contextStaged&&next.liveContext&&JSON.stringify(next.liveContext)!==JSON.stringify(session.liveContext)){const packets=liveContextPackets('selected-student-context',job.id,next.liveContext);job.contextPacketCount=packets.length;track('session.thinking.append',packets);}
    if(next.liveInstructions&&next.liveInstructions!==session.liveInstructions){
     // Legacy callers may still provide longer instructions. Preserve their
     // contract while the current server supplies one bounded scope direction.
