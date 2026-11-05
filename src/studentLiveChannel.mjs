@@ -3,7 +3,7 @@
 import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
-export const liveChannelRevision='natural-conversation-progressive-research-2026-11-05';
+export const liveChannelRevision='natural-conversation-smooth-selection-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -13,6 +13,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  let researchReady=null,researchTimer,lastOutputAt=0,lastOutputText='',lastSoundVersion=0,lastSoundAt=0,toolHandlers=0;
  let researchVersion=0,configurationVersion=0;
  const researchDeliveries=new Map(),researchAcknowledgments=new Map();
+ const configurationAcknowledgments=new Map();
  const researchTools=new Set(['lookup_financial_aid','lookup_college_applications','lookup_education_planning']);
  const boundaryWaiters=new Set();
  // Live owns conversational intent. No keyword-triggered backend requests or
@@ -43,12 +44,26 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    : 'This request is taking too long, and I couldn’t finish it. Could you try again?';
   transmit({type:'session.commentary.append',event_id:id(),delegation_id:null,content:`The application cancelled the pending backend response after its deadline. Briefly tell the caller: ${message} Do not claim success, repeat the request automatically, or invent a result. Then listen.`});
  }
- function append(type,text){
+ function append(type,text,onSend=()=>{}){
   let part='';const parts=[];for(const character of String(text||'')){if(new TextEncoder().encode(part+character).length>440){parts.push(part);part='';}part+=character;}if(part)parts.push(part);
-  return parts.map(content=>{const event_id=id();transmit({type,event_id,delegation_id:null,content});return event_id;});
+  return parts.map(content=>{const event_id=id();onSend(event_id);transmit({type,event_id,delegation_id:null,content});return event_id;});
  }
  function quietContext(kind,resultId,value){
   return liveContextPackets(kind,resultId,value).map(content=>{const event_id=id();transmit({type:'session.thinking.append',event_id,delegation_id:null,content});return event_id;});
+ }
+ function retireConfiguration(job){
+  cancel(job.timer);updates.delete(job.id);
+  for(const packetId of job.pending)configurationAcknowledgments.delete(packetId);
+ }
+ function clearConfigurations(){for(const job of updates.values())retireConfiguration(job);}
+ async function finishConfiguration(job){
+  if(!updates.has(job.id)||!job.backendApplied||job.pending.size)return;
+  retireConfiguration(job);
+  // A late acknowledgment must not restore an older scope or language.
+  if(job.version!==configurationVersion)return;
+  session={...session,...job.session};
+  await emit({type:'origen.configuration.applied',durationMs:Math.max(0,now()-job.startedAt),contextPacketCount:job.contextPacketCount,instructionPacketCount:job.instructionPacketCount});
+  await emit({type:'session.updated',session,client_event_id:job.id});
  }
  // Live transcript silence is not a semantic end-of-turn event. Track actual
  // playback as well, and never use a comma/unfinished clause to start research
@@ -146,7 +161,10 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(researchDeliveryV2)await emit({type:'origen.research.delivery',deliveryStage:'enabled',durationMs:0});
    await emit({type:'session.created',session});const pending=queue;queue=[];pending.forEach(transmit);return;
   }
-  if(e.type==='session.thinking.appended'){
+  if(e.type==='session.thinking.appended'||e.type==='session.instructions.appended'){
+   const configuration=configurationAcknowledgments.get(e.client_event_id);
+   if(configuration){configurationAcknowledgments.delete(e.client_event_id);configuration.pending.delete(e.client_event_id);await finishConfiguration(configuration);}
+   if(e.type!=='session.thinking.appended')return;
    const delivery=researchAcknowledgments.get(e.client_event_id);
    if(delivery){researchAcknowledgments.delete(e.client_event_id);delivery.pending.delete(e.client_event_id);
     if(!delivery.pending.size){delivery.acknowledged=true;await emit({type:'origen.research.context_acknowledged',jobId:delivery.jobId,requestId:delivery.requestId,revision:delivery.revision,durationMs:now()-delivery.suppliedAt});
@@ -189,8 +207,8 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }
   if(e.type==='session.updated'){
-   const job=updates.get(e.client_event_id)||[...updates.values()].find(job=>job.session.instructions===e.session?.delegation?.responses?.instructions);
-   if(job){updates.delete(job.id);await emit({type:'origen.configuration.applied',durationMs:Math.max(0,now()-job.startedAt)});session={...session,...job.session};await emit({type:'session.updated',session,client_event_id:job.id});}return;
+   const job=e.client_event_id?updates.get(e.client_event_id):[...updates.values()].find(job=>job.session.instructions===e.session?.delegation?.responses?.instructions);
+   if(job){job.backendApplied=true;await finishConfiguration(job);}return;
   }
   if(e.type==='response.event'){
    const event=e.event||{},responseId=event.response?.id||event.response_id||[...responses].find(([,value])=>value.delegationId===e.delegation_id)?.[0];
@@ -244,9 +262,11 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    return;
   }
   if(e.type==='error'){const error={...e.error,event_id:e.error?.client_event_id||e.client_event_id||e.error?.event_id};
+   const configuration=configurationAcknowledgments.get(error.event_id)||updates.get(error.event_id);
+   if(configuration){retireConfiguration(configuration);error.event_id=configuration.id;}
    const delivery=researchAcknowledgments.get(error.event_id);if(delivery){delivery.quietOnly=true;researchAcknowledgments.delete(error.event_id);await emit({type:'origen.research.context_failed',jobId:delivery.jobId,requestId:delivery.requestId,revision:delivery.revision});}
    await emit({...e,error});return;}
-  if(e.type==='session.closed'){stopBoundaries();clearBackendTimers();cancel(inputTimer);cancel(draftTimer);await finishSpeech(true);closed=true;handlers.onclose?.({});return;}
+  if(e.type==='session.closed'){stopBoundaries();clearConfigurations();clearBackendTimers();cancel(inputTimer);cancel(draftTimer);await finishSpeech(true);closed=true;handlers.onclose?.({});return;}
  }
  function send(text){
   if(!live)return raw.send(text);const event=JSON.parse(text);
@@ -271,9 +291,20 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    // same-scope configuration updates must not discard completed findings.
    configurationVersion++;researchVersion++;if(!researchDeliveryV2)clearResearch();
    const next=event.session||{};const responses={instructions:next.instructions||session.instructions,tools:(next.tools||session.tools||[]).map(tool=>({...tool,strict:false})),tool_choice:next.tool_choice||'auto',reasoning:{effort:'low'},text:{verbosity:'low'},max_output_tokens:Math.max(1800,next.max_output_tokens??session.max_output_tokens??0)};
-   updates.set(event.event_id,{id:event.event_id,session:next,startedAt:now()});
-   if(next.liveInstructions)append('session.instructions.append',next.liveInstructions);
-   const language=next.instructions?.match(/Current conversation language: (Spanish|English)/)?.[1];if(language)append('session.instructions.append',`Respond in ${language} from now on. Continue this same conversation without greeting again.`);
+   const job={id:event.event_id,session:next,startedAt:now(),version:configurationVersion,pending:new Set(),backendApplied:false,contextPacketCount:0,instructionPacketCount:0};
+   updates.set(job.id,job);
+   job.timer=schedule(()=>{if(!updates.has(job.id))return;retireConfiguration(job);void emit({type:'error',error:{code:'configuration_context_timeout',event_id:job.id}});},10000);
+   const track=(type,contents)=>{for(const content of contents){const event_id=id();job.pending.add(event_id);configurationAcknowledgments.set(event_id,job);transmit({type,event_id,delegation_id:null,content});}};
+   // Facts are quiet context, never a replay of the complete speaking prompt.
+   // Confirm the update only after both the voice context and backend are ready.
+   if(next.liveContext&&JSON.stringify(next.liveContext)!==JSON.stringify(session.liveContext)){const packets=liveContextPackets('selected-student-context',job.id,next.liveContext);job.contextPacketCount=packets.length;track('session.thinking.append',packets);}
+   if(next.liveInstructions&&next.liveInstructions!==session.liveInstructions){
+    // Legacy callers may still provide longer instructions. Preserve their
+    // contract while the current server supplies one bounded scope direction.
+    const packetIds=append('session.instructions.append',next.liveInstructions,packetId=>{job.pending.add(packetId);configurationAcknowledgments.set(packetId,job);});job.instructionPacketCount+=packetIds.length;
+   }
+   const language=next.controlLanguage||next.language||({Spanish:'es',English:'en'}[next.instructions?.match(/Current conversation language: (Spanish|English)/)?.[1]]);
+   if(language&&language!==session.language){job.session={...next,language};const contents=[`Respond in ${language==='es'?'Spanish':'English'} from now on. Continue this same conversation without greeting again.`];job.instructionPacketCount++;track('session.instructions.append',contents);}
    transmit({type:'session.update',event_id:event.event_id,session:{delegation:{type:'responses',responses}}});return;
   }
   if(event.type==='conversation.item.create'){
@@ -330,6 +361,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  const api={configure(data){live=data.voiceProvider==='live';session=data.voiceSession||{};},settle,prepareClose,flush:async()=>{if(live){await flushInput();await finishSpeech(true);}}};
  raw.onmessage=event=>{try{void receive(JSON.parse(event.data)).catch(()=>void emit({type:'error',error:{code:'live_adapter_failed'}}));}catch{void emit({type:'error',error:{code:'live_event_invalid'}});}};
- raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>{closed=true;stopBoundaries();clearBackendTimers();cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);handlers.onclose?.(event);};
- return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='settle')return api.settle;if(key==='prepareClose')return api.prepareClose;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;stopBoundaries();clearBackendTimers();cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
+ raw.onopen=event=>handlers.onopen?.(event);raw.onclose=event=>{closed=true;stopBoundaries();clearConfigurations();clearBackendTimers();cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);handlers.onclose?.(event);};
+ return new Proxy(raw,{get(target,key){if(key==='configure')return api.configure;if(key==='settle')return api.settle;if(key==='prepareClose')return api.prepareClose;if(key==='flush')return api.flush;if(key==='send')return send;if(key==='close')return ()=>{if(live&&started&&raw.readyState==='open')transmit({type:'session.close',event_id:id()});closed=true;stopBoundaries();clearConfigurations();clearBackendTimers();cancel(inputTimer);cancel(outputTimer);cancel(draftTimer);queue=[];raw.close();};if(key in handlers)return handlers[key];const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(['onmessage','onopen','onclose'].includes(key)){handlers[key]=value;return true;}return Reflect.set(target,key,value,target);}});
 }

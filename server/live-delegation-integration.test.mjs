@@ -40,8 +40,9 @@ test('authorized prepared calls and updates use the scoped opening brief and pre
    const update=await call({action:'update-guide',language,preparedContextId:handoff.preparedContextId,workspaceRefreshOnly:false,routingPolicy:'bounded-follow-up-v1'});
    assert.match(headers['Server-Timing'],/preparation;desc="hit"/);
    assert.match(update.session.instructions,/FICTIONAL_HISTORY/);
-   assert.equal(update.session.routingPolicy,'bounded-follow-up-v1');assert.match(update.session.liveInstructions,/replaces every earlier delegation policy/);
-   assert.match(update.session.liveInstructions,/Do not restrict this to the immediately preceding answer/);
+   assert.equal(update.session.routingPolicy,'bounded-follow-up-v1');assert.equal(update.session.liveInstructions,'');
+   assert.match(JSON.stringify(update.session.liveContext),/FICTIONAL_HISTORY/);
+   assert.doesNotMatch(update.session.liveInstructions,/FICTIONAL_HISTORY|Research alongside conversation/);
    assert.doesNotMatch(JSON.stringify(update),/PRIVATE_OTHER_STUDENT|PRIVATE_OTHER_ACCOUNT/);
   }
   const prepared=await call({action:'prepare'});env.NODE_ENV='production';

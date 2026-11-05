@@ -23,9 +23,9 @@ test('authorized prepared brief reaches initial and updated speech; stale, forei
    await call({sdp:'v=0',language,preparedContextId:prepared.preparedContextId,openingBrief:{version:'opening-brief-v1',studentId:'alex',records:[{content:'FORGED_CONTEXT'}]}});
    assert.match(headers['Server-Timing'],/preparation;desc="hit"/);assert.match(headers['Server-Timing'],/brief;dur=/);
    assert.match(sent.instructions,/PARENT_REPORT/);assert.doesNotMatch(sent.instructions,/OTHER_CHILD_PRIVATE|FORGED_CONTEXT/);
-   const update=await call({action:'update-guide',language});assert.match(update.session.liveInstructions,/PARENT_REPORT/);
+   const update=await call({action:'update-guide',language});assert.match(JSON.stringify(update.session.liveContext),/PARENT_REPORT/);assert.doesNotMatch(update.session.liveInstructions,/PARENT_REPORT/);
    await call({sdp:'v=0',studentId:undefined,targetConfirmed:false,language});assert.doesNotMatch(sent.instructions,/PARENT_REPORT|Authorized opening brief/);
-   const other=await call({action:'update-guide',studentId:'sam',language});assert.match(other.session.liveInstructions,/OTHER_CHILD_PRIVATE/);assert.doesNotMatch(other.session.liveInstructions,/PARENT_REPORT/);
+   const other=await call({action:'update-guide',studentId:'sam',language});assert.match(JSON.stringify(other.session.liveContext),/OTHER_CHILD_PRIVATE/);assert.doesNotMatch(JSON.stringify(other.session.liveContext),/PARENT_REPORT/);
   }
   const stale=await call({action:'prepare'});await f.history({action:'delete',id:'brief-history'});
   await call({sdp:'v=0',preparedContextId:stale.preparedContextId});assert.match(headers['Server-Timing'],/preparation;desc="miss"/);assert.doesNotMatch(sent.instructions,/PARENT_REPORT/);

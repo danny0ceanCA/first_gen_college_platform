@@ -201,7 +201,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
         const update=run.updates.get(proposed.controlUpdateId);run.updates.clear();
         if(proposed.controlUpdateId&&(!update||update.expires<Date.now()))return client.close(1008,'invalid_update');
         const next={...(update?.config||run.config),language,instructions:voiceLanguageInstructions((update?.config||run.config).instructions,language)};
-        if(!update&&(proposed.tools||proposed.liveInstructions||proposed.instructions!==next.instructions))return client.close(1008,'invalid_update');
+        if(!update&&(proposed.tools||proposed.liveInstructions||proposed.liveContext||proposed.instructions!==next.instructions))return client.close(1008,'invalid_update');
         const nextScope=update?.scope||run.scope;run.config=next;run.scope=nextScope;
         chain=chain.then(()=>run.engine.configure(next,nextScope,message.event.event_id)).catch(()=>dispose(run,'update_failed'));
        }else if(!run.engine.command(message.event||{},message.lease))client.close(1008,'invalid_command');

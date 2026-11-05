@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
+import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,studentLiveUpdate,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
+import {buildOpeningBrief} from './voice-opening-brief.mjs';
 const teaching={id:'published-teaching',revision:14,content:{topic:'admissions',title:'Student background',deliveryStyle:'Warm, patient and encouraging.',conversationApproach:'Acknowledge uncertainty, then offer concrete choices.',example:'Your experiences are worth exploring.'}};
 for(const language of ['en','es'])for(const mode of ['profile','planning','admissions','finance','loans'])test(`Live retains ${language} ${mode} backend instructions and tool contracts`,()=>{
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
@@ -23,7 +24,7 @@ test('New student clients default to Live; older tabs and explicit rollback reta
  let status,data;const input={sdp:'v=0\r\noffer',voiceProtocol:'live-v1',language:'en',role:'student',mode:'planning',profile:{name:'Synthetic',stage:'Community college'}};
  const invoke=async body=>{await handler(Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json'}}),{writeHead:value=>status=value,end:value=>data=JSON.parse(value)},()=>assert.fail());};
  await invoke(input);assert.equal(status,200);assert.equal(data.voiceProvider,'live');assert.equal(data.voiceSession.language,'en');assert.equal(data.voiceSession.max_output_tokens,1500);assert.ok(!JSON.stringify(data).includes('Bearer'));assert.equal(calls,1);
- await invoke({...input,action:'update-guide',mode:'finance'});assert.equal(status,200);assert.match(data.session.liveInstructions,/Origen/);assert.equal(data.session.max_output_tokens,1500);assert.equal(calls,1);
+ await invoke({...input,action:'update-guide',mode:'finance'});assert.equal(status,200);assert.equal(data.session.liveInstructions,'');assert.equal(data.session.liveContext.version,'student-live-context-v1');assert.equal(data.session.max_output_tokens,1500);assert.equal(calls,1);
  await invoke({...input,voiceProtocol:'other'});assert.equal(status,400);assert.equal(calls,1);
 });
 
@@ -44,9 +45,37 @@ for(const language of ['en','es'])test(`${language} scope and later configuratio
  assert.match(first,/This listening rule does not delay your response after they finish/);
  for(const updateInput of [input,{...input,mode:'finance'},{...input,language:language==='en'?'es':'en'}]){
   const instructions=studentLiveInstructions(updateInput,[],[],undefined,{update:true});
-  assert.match(instructions,/configuration is silent context/);
-  assert.match(instructions,/single continuation cue/);
-  assert.match(instructions,/this scope description is context only and requests no opening question/);
-  assert.doesNotMatch(instructions,/invite their priority|invite their next question|Invite a priority/);
+  assert.equal(instructions,'','ordinary scope update never appends speech-interrupting instructions');
  }
+ assert.match(first,/successful target_confirmed receipt satisfies the initial scope question/);
+ assert.match(first,/without another greeting, confirmation or invitation/);
+});
+
+for(const language of ['en','es'])test(`${language}: first selection stays conversational while private context is still unconfirmed`,()=>{
+ const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:false,students:[{id:'a',name:'Aiden'},{id:'e',name:'Elodie'}]};
+ const config=voiceSession(input,{}),live=studentLiveSession(config,input);
+ assert.match(live.instructions,/for a name-only answer, ask one warm, short question/);
+ assert.match(live.instructions,/If they already gave their question/);
+ assert.match(live.instructions,/Do not use private student details before confirmation/);
+ assert.match(live.instructions,/Scope precedence: conversational permission does not grant student access/);
+ assert.match(live.instructions,/Research alongside conversation/,'seed stable policy before first selection');
+ assert.deepEqual(live.delegation.responses.tools.map(({strict,...tool})=>tool),config.tools,'speech policy never broadens the guarded tool set');
+ assert.doesNotMatch(live.instructions,/Listen while configuration completes/);
+});
+
+for(const language of ['en','es'])test(`${language}: selection sends complete bounded facts without a speech-interrupting instruction`,()=>{
+ const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:true,studentId:'a',profile:{id:'a',name:'Aiden',stage:'Community college',school:'Woodland',interest:'Political science'},memory:[{id:'m',studentId:'a',summary:'Parent shared that UC Berkeley is a possibility, not a decision.',date:'2026-11-01'}]};
+ input.openingBrief=buildOpeningBrief(input);
+ const update=studentLiveUpdate(input,[teaching],voiceSession(input,{}).tools);
+ assert.equal(update.liveInstructions,'');
+ assert.doesNotMatch(update.liveInstructions,/Woodland|Political science|UC Berkeley|Warm, patient and encouraging|Research alongside conversation/);
+ assert.deepEqual(update.liveContext.openingBrief,input.openingBrief);
+ assert.deepEqual(update.liveContext.scope,{confirmed:true,studentId:'a'});
+ assert.equal(update.liveContext.teachingReferences[0].deliveryStyle,teaching.content.deliveryStyle);
+ assert.equal(update.liveContext.openingBrief.records[0].content,input.memory[0].summary,'no lost negation or attribution');
+ const pending=studentLiveUpdate({...input,targetConfirmed:false},[teaching]);
+ assert.deepEqual(pending.liveContext.scope,{confirmed:false,studentId:null});
+ assert.equal(pending.liveContext.openingBrief,null);assert.deepEqual(pending.liveContext.teachingReferences,[]);
+ const wrong=studentLiveUpdate({...input,studentId:'other'});
+ assert.equal(wrong.liveContext.openingBrief,null,'never transfer another student brief');
 });

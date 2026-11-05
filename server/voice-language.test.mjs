@@ -14,15 +14,17 @@ function harness(options={}){
 }
 test('confirmed guide handoff preserves server routing policy and workflow token budget through the effective session',async()=>{
  const {control,events,ack}=harness();
- const pending=control.configure(async()=>({instructions:'Authorized Aiden context',tools:[],liveInstructions:'Current policy',routingPolicy:'bounded-follow-up-v1',max_output_tokens:3000}));
- await tick();assert.equal(events[0].session.routingPolicy,'bounded-follow-up-v1');assert.equal(events[0].session.max_output_tokens,3000);ack(0);await pending;control.stop();
+ const liveContext={scope:{confirmed:true,studentId:'aiden'},openingBrief:{profile:{name:'Aiden'}}};
+ const pending=control.configure(async()=>({instructions:'Authorized Aiden context',tools:[],liveInstructions:'Current policy',liveContext,routingPolicy:'bounded-follow-up-v1',max_output_tokens:3000}));
+ await tick();assert.deepEqual(events[0].session.liveContext,liveContext);assert.equal(events[0].session.routingPolicy,'bounded-follow-up-v1');assert.equal(events[0].session.max_output_tokens,3000);ack(0);await pending;control.stop();
 });
 
 test('English to Spanish and back updates the existing session before reporting success, without touching audio or tools',async()=>{
  const {control,events,ack,languages}=harness();
  const spanish=control.change('es');await tick();
  assert.equal(control.language(),'en');
- assert.deepEqual(Object.keys(events[0].session).sort(),['instructions','type']);
+ assert.deepEqual(Object.keys(events[0].session).sort(),['controlLanguage','instructions','type']);
+ assert.equal(events[0].session.controlLanguage,'es');
  assert.match(events[0].session.instructions,/Current conversation language: Spanish/);
  assert.match(events[0].session.instructions,/Profile context/);
  ack(0);assert.equal(await spanish,true);assert.equal(control.language(),'es');

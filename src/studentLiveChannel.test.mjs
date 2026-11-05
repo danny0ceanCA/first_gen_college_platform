@@ -11,6 +11,92 @@ test('private diagnostics preserve request state without copying the question',(
  const payload=capturePayload({type:'origen.research.state_changed',requestId:'r',jobId:'j',state:'running',question:'PRIVATE'});
  assert.equal(payload.state,'running');assert.equal(payload.jobId,'j');assert.ok(!JSON.stringify(payload).includes('PRIVATE'));
 });
+for(const language of ['en','es'])test(`${language}: selection keeps speech flowing and confirms only after voice context and backend acknowledgments`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});
+ f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Initial backend',tools:[]}});
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'What would you like':'¿Qué te gustaría'});await pause(0);
+ const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{profile:{name:'Aiden',school:'SAVED_SCHOOL'},records:[{content:'A useful qualified note. '.repeat(40)}]}};
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'selected',session:{language,instructions:'Authorized Aiden backend',tools:[],liveInstructions:'Use the newest confirmed scope. Continue the current conversation.',liveContext:context}}));
+ const packets=f.sent.filter(e=>e.type==='session.thinking.append'),directions=f.sent.filter(e=>e.type==='session.instructions.append');
+ assert.ok(packets.length>1);assert.equal(directions.length,1);
+ assert.ok(!directions[0].content.includes('SAVED_SCHOOL'));
+ assert.deepEqual(JSON.parse(packets.map(e=>JSON.parse(e.content).text).join('')),context);
+ assert.ok(!f.sent.some(e=>['response.cancel','session.commentary.append','output_audio_buffer.clear'].includes(e.type)));
+ f.receive({type:'session.updated',client_event_id:'selected'});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='session.updated'),'backend ready is not voice context delivery');
+ for(const packet of [...packets,directions[0]].slice(0,-1))f.receive({type:packet.type+'ed',client_event_id:packet.event_id});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='session.updated'));
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?' to focus on?':' conversar?'});await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'His college options.':'Sus opciones universitarias.'});await pause(0);
+ clock.advance(200);
+ f.receive({type:'session.instructions.appended',client_event_id:directions[0].event_id});await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='session.updated').length,1);
+ const timing=f.events.find(e=>e.type==='origen.configuration.applied');assert.equal(timing.contextPacketCount,packets.length);assert.equal(timing.instructionPacketCount,1);assert.equal(timing.durationMs,200);
+ assert.ok(!f.sent.some(e=>e.type==='response.create'||e.type==='session.commentary.append'),'configuration is not a second speaking cue');
+ f.channel.close();
+});
+test('failed selection context reports the configuration failure and cannot later confirm scope',async()=>{
+ const f=fixture({autoAcknowledge:false});
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'scope',session:{instructions:'New backend',tools:[],liveContext:{scope:{studentId:'aiden'}}}}));
+ const packet=f.sent.find(e=>e.type==='session.thinking.append');
+ f.receive({type:'error',error:{code:'context_rejected',client_event_id:packet.event_id}});await pause(0);
+ f.receive({type:'session.updated',client_event_id:'scope'});f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});await pause(0);
+ assert.ok(f.events.some(e=>e.type==='error'&&e.error.event_id==='scope'));
+ assert.ok(!f.events.some(e=>e.type==='session.updated'));f.channel.close();
+});
+test('missing selection acknowledgment expires, permits a fresh update and rejects late acknowledgments',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false,researchDeliveryV2:true});
+ const session={instructions:'Same backend',tools:[],liveContext:{scope:{studentId:'aiden'}}};
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'expired',session}));
+ const oldPacket=f.sent.find(e=>e.type==='session.thinking.append');
+ f.receive({type:'session.updated',client_event_id:'expired'});await pause(0);clock.advance(10000);await pause(0);
+ assert.ok(f.events.some(e=>e.type==='error'&&e.error.event_id==='expired'&&e.error.code==='configuration_context_timeout'));
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'fresh',session}));
+ f.receive({type:'session.thinking.appended',client_event_id:oldPacket.event_id});
+ f.receive({type:'session.updated',client_event_id:'expired',session:{delegation:{responses:{instructions:'Same backend'}}}});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='session.updated'));
+ const packet=f.sent.filter(e=>e.type==='session.thinking.append').at(-1);
+ f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='session.updated'),'old backend acknowledgment cannot complete fresh retry');
+ f.receive({type:'session.updated',client_event_id:'fresh'});await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='session.updated').length,1);f.channel.close();
+});
+test('late older context acknowledgments never restore a superseded configuration',async()=>{
+ const f=fixture({autoAcknowledge:false});
+ for(const studentId of ['aiden','elodie'])f.channel.send(JSON.stringify({type:'session.update',event_id:studentId,session:{instructions:studentId,tools:[],liveContext:{scope:{studentId}}}}));
+ const packets=f.sent.filter(e=>e.type==='session.thinking.append');
+ for(const eventId of ['elodie','aiden']){
+  f.receive({type:'session.updated',client_event_id:eventId});
+  for(const packet of packets.filter(p=>JSON.parse(p.content).resultId===eventId))f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});
+  await pause(0);
+ }
+ assert.deepEqual(f.events.filter(e=>e.type==='session.updated').map(e=>e.session.instructions),['elodie']);f.channel.close();
+});
+test('same-scope language change does not resend the student brief or unchanged direction',async()=>{
+ const f=fixture();const same={liveInstructions:'Confirmed scope; continue.',liveContext:{scope:{studentId:'aiden'}}};
+ f.channel.configure({voiceProvider:'live',voiceSession:{...same,language:'en',instructions:'Backend',tools:[]}});
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'language',session:{...same,language:'es',instructions:'Backend in Spanish',tools:[]}}));await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.thinking.append').length,0);
+ assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,1);
+ assert.match(f.sent.find(e=>e.type==='session.instructions.append').content,/Respond in Spanish/);f.channel.close();
+});
+for(const language of ['en','es'])test(`${language}: speech before a target proposal triggers one reevaluation without asking for the name again`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Scope must be confirmed',tools:[{name:'request_conversation_target'}]}});
+ f.receive({type:'session.input_transcript.delta',delta:'Aiden'});await pause(0);clock.advance(1100);await pause(0);
+ f.backend('response.created','selecting');await pause(0);
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'What would you like help with?':'¿Con qué te gustaría recibir ayuda?'});await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'His college options.':'Sus opciones universitarias.'});await pause(0);clock.advance(1100);await pause(0);
+ const proposal={type:'function_call',name:'request_conversation_target',call_id:'old-selection',arguments:'{"scope":"student:aiden"}'};
+ f.backend('response.output_item.done','selecting',{item:proposal});f.backend('response.completed','selecting');await pause(0);
+ assert.ok(!f.events.some(e=>e.response?.output?.some(i=>i.call_id==='old-selection')),'stale selection may be a correction: re-evaluate safely');
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+ assert.match(JSON.parse(f.sent.find(e=>e.item?.call_id==='old-selection').item.output).instruction,/do not ask them to repeat/);
+ f.backend('response.created','current');await pause(0);
+ f.backend('response.output_item.done','current',{item:{...proposal,call_id:'current-selection'}});f.backend('response.completed','current');await pause(0);
+ assert.ok(f.events.some(e=>e.response?.output?.some(i=>i.call_id==='current-selection')));
+ assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel'].includes(e.type)));f.channel.close();
+});
 for(const language of ['en','es'])test(`${language}: delivery v2 waits through an ordinary reply and then introduces completed research once`,async()=>{
  const clock=fakeClock();let audible=0;
  const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>audible});
@@ -347,7 +433,7 @@ test('results arriving during the caller turn are available to that reply withou
 function fixture(options={}){
  const {autoAcknowledge=true,...channelOptions}=options;
  const sent=[],events=[],consent=voiceProfileSaveConsent();
- const raw={readyState:'open',send:value=>{const event=JSON.parse(value);sent.push(event);if(autoAcknowledge&&event.type==='session.thinking.append'&&JSON.parse(event.content).kind==='untrusted-research-evidence')queueMicrotask(()=>receive({type:'session.thinking.appended',client_event_id:event.event_id}));},close(){this.readyState='closed';}};
+ const raw={readyState:'open',send:value=>{const event=JSON.parse(value);sent.push(event);if(autoAcknowledge&&['session.thinking.append','session.instructions.append'].includes(event.type))queueMicrotask(()=>receive({type:event.type+'ed',client_event_id:event.event_id}));},close(){this.readyState='closed';}};
  const channel=studentLiveChannel(raw,{getTurn:()=>consent.token(),isPlaybackIdle:()=>true,...channelOptions});
  channel.onmessage=({data})=>{const e=JSON.parse(data);events.push(e);if(e.type==='input_audio_buffer.speech_started')consent.begin(e.item_id);if(e.type==='conversation.item.input_audio_transcription.completed')consent.transcript(e.item_id,e.transcript);};
  channel.configure({voiceProvider:'live',voiceSession:{instructions:'Backend policy',tools:[]}});

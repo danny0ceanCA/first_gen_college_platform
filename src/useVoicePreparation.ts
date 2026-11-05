@@ -6,6 +6,7 @@ import {apiFetch} from './api';
 import {browserPrivacy} from './browserPrivacy.mjs';
 import {subscribeMemoryContext} from './memoryContext.mjs';
 import {createVoicePreparation} from './voicePreparation.mjs';
+import {voicePreparationCandidates} from './voicePreparationCandidates.mjs';
 import type {VoiceProps} from './ProfileVoice';
 
 export function useVoicePreparation(entry:VoiceProps|null,active:boolean){
@@ -39,10 +40,16 @@ export function useVoicePreparation(entry:VoiceProps|null,active:boolean){
     const response=await apiFetch('/api/profile-voice',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({...scope,action:'prepare'}),signal});
     return response.ok?response.json():undefined;
    };
-   // Start neutral and selected-student preparation together. Both remain
-   // separately keyed; confirmation is still required before student context is used.
-   const scopes=role==='parent'?[input,{...input,studentId:undefined,targetConfirmed:false}]:[input];
-   void Promise.all(scopes.map(scope=>preparation.warm(subject!,scope,load(scope)))).then(ids=>{
+   // Give the neutral opening and screen selection priority. A second child
+   // often gets chosen by voice; prepare that scope after the first pair, not
+   // as a third concurrent request competing with call startup. Starting a call
+   // stops queued work, but does not abort an already loading opaque handle.
+   const scopes=voicePreparationCandidates(input,family.students);
+   void Promise.all(scopes.slice(0,2).map(scope=>preparation.warm(subject!,scope,load(scope)))).then(async ids=>{
+    for(const scope of scopes.slice(2)){
+     if(stopped||document.visibilityState==='hidden'||!browserPrivacy.valid()||browserPrivacy.subject!==subject)break;
+     ids.push(await preparation.warm(subject!,scope,load(scope)));
+    }
     if(!stopped)timer=setTimeout(prepare,ids.some(Boolean)?25000:5000);
    });
   };

@@ -2,6 +2,7 @@ import {backgroundResearch} from './backgroundResearch.mjs';
 import {voiceBuildId} from './voiceBuild.mjs';
 import {voiceHandoff,deferredVoiceHandoff} from './voiceHandoff.mjs';
 import {voiceTargetResult} from './voiceTargetResult.mjs';
+import {voiceInitialScope} from './voiceInitialScope.mjs';
 import {createVoiceTiming,parseContextTiming} from './voiceTiming.mjs';
 import {createVoiceCapture,CAPTURE_EMAIL} from './voiceCapture.mjs';
 import {recommendationVoiceTools} from './recommendationVoiceTools.mjs';
@@ -500,12 +501,13 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       };
       const languageControl=voiceLanguageControl(event=>dc.send(JSON.stringify(event)),{language:sessionLanguage,onLanguage:next=>{if(generation.current===version){spokenLanguage.current=next;checkpointSummary();onLanguageChanged?.(next);void guidance.current.event('guidance.language_changed',{language:next,basis:'model-detection'})?.catch(()=>{});}}});resources.current.stopGuide=()=>languageControl.stop();
       let changingGuide=false,scopeUpdateDeferred=false;
+      const initialScopeLoad=voiceInitialScope();
+      abort.signal.addEventListener('abort',()=>initialScopeLoad.stop(),{once:true});
       resources.current.switchGuide=async (next,initialScope,focus,isCurrent)=>{
         if(isCurrent&&!isCurrent())return false;
         if(next===liveMode.current&&!initialScope&&!focus)return true;
         if((!summaryScope.current.confirmed&&!initialScope)||changingGuide){if(initialScope&&changingGuide)scopeUpdateDeferred=true;return false;}
         const updateScope=initialScope||summaryScope.current;
-        const scopeTurn=saveConsent.token();
         if(initialScope)scopeUpdateDeferred=false;
         const contextFocus=focus||(currentWorkspace.current?.studentId===updateScope.id?currentWorkspace.current:undefined);
         const currentStudents=latestFamily.current.students;
@@ -522,18 +524,18 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
             if(data.reviewResponseGuard&&!await responseContext.accept(data.reviewResponseGuard))throw new Error('workspace_item_changed');
             signal.throwIfAborted();
             if(generation.current!==version)throw new Error('voice_session_stopped');
-            if(isCurrent&&!isCurrent())throw new Error('topic_superseded');
+            if(isCurrent&&!isCurrent())throw new Error(initialScope?'scope_boundary_pending':'topic_superseded');
             // The first selection has no previous student's private context.
             // This silent update can overlap its acknowledgment without replacing
             // audio or requesting speech. Cross-student handoffs still drain below.
-            if(initialScope&&(closing.current?.active()||saveConsent.token()!==scopeTurn))throw new Error('scope_boundary_pending');
+            if(initialScope&&closing.current?.active())throw new Error('scope_boundary_pending');
             if(memoryPolicyRef.current!==undefined&&data.memoryPolicy!==memoryPolicyRef.current){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryPolicyRef.current=data.memoryPolicy;
             if(typeof data.memoryRevision==='number'){if(memoryRevisionRef.current!==null&&memoryRevisionRef.current!==data.memoryRevision){invalidateRememberedContext();throw new Error('voice_session_stopped');}memoryRevisionRef.current=data.memoryRevision;setMemoryRevision(data.memoryRevision);}
             followUpTools?.configure(data.followUpVoiceControls===true,data.studentOutcomeVoice===true);recommendationTools?.configure(data.recommendationVoice===true);memoryTools.configure(data.liveMemorySession);reviewTools.configure(data.reviewVoiceSession);linkTools.configure(data.coordinatorLinking===true);
             nextGuidance=data.guidance;
             return data.session;
           },{signal:abort.signal,timeoutMs:35000}),()=>{
-            if(generation.current!==version||closing.current?.active())return;
+            if(generation.current!==version||closing.current?.active()||isCurrent&&!isCurrent())return;
             if(focus&&(!isCurrent||isCurrent()))currentWorkspace.current=focus;
             guidance.current.accept(nextGuidance);void guidance.current.event('guidance.configuration_applied')?.catch(()=>{});
             if(initialScope){summaryScope.current={...initialScope,name:updateProfile.name};memorySaved.current=false;setTarget(initialScope);log('initial_target_confirmed');}
@@ -541,6 +543,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
             if(!isCurrent||isCurrent())publishBinderActivity(focus?[focus.topic]:next==='finance'||next==='loans'?['costs']:next==='admissions'?['applications']:[]);
           });
           if(generation.current!==version)return false;
+          if(isCurrent&&!isCurrent()){if(initialScope)scopeUpdateDeferred=true;return false;}
           // A specialty change remains one conversation and one recovery record.
           return true;
         }catch(error){if(error instanceof Error&&error.message==='scope_boundary_pending'){scopeUpdateDeferred=true;return false;}if(focus)throw error;if(generation.current===version){log('guide_update_failed',{mode:next});setNotice(t('I could not change topics yet. You can keep talking or try again.','No pude cambiar de tema todavía. Puedes seguir hablando o intentar de nuevo.'));}return false;}
@@ -822,8 +825,10 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
                 // The first confirmation has no prior student's private context to discard.
                 // Keep the microphone, output track and conversation instead of reconnecting.
                 if(!summaryScope.current.confirmed){
-                  const accepted=await resources.current.switchGuide?.(liveMode.current as 'planning'|'finance'|'loans'|'admissions',{id:next,confirmed:true});
-                  send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(!accepted&&scopeUpdateDeferred?deferredVoiceHandoff():voiceTargetResult(accepted===true,latestFamily.current.students.find(student=>student.id===next)?.name))}});
+                  const result=await initialScopeLoad.select(next,isCurrent=>resources.current.switchGuide!(liveMode.current as 'planning'|'finance'|'loans'|'admissions',{id:next,confirmed:true},undefined,isCurrent));
+                  if(generation.current!==version||abort.signal.aborted||closing.current?.active())return;
+                  const receipt=result.superseded?{status:'target_selection_superseded',instruction:'A newer explicit student selection replaced this load and is already queued in the application. Do not retry the older selection, ask for the name again, or issue a duplicate selection. Keep listening to the latest request; use private context only after the newer target receipt confirms it.'}:!result.accepted&&scopeUpdateDeferred?deferredVoiceHandoff():voiceTargetResult(result.accepted,latestFamily.current.students.find(student=>student.id===next)?.name);
+                  send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(receipt)}});
                   continue;
                 }
                 // Keep the call listening while the acknowledgment drains. Do

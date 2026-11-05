@@ -4,7 +4,8 @@ import {EventEmitter,once} from 'node:events';
 import {createServer} from 'node:http';
 import WebSocket from 'ws';
 import {voiceControlSession,createVoiceControl} from './voice-control.mjs';
-import {studentLiveSession} from './student-live-session.mjs';
+import {studentLiveSession,studentLiveUpdate} from './student-live-session.mjs';
+import {buildOpeningBrief} from './voice-opening-brief.mjs';
 import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -20,6 +21,30 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
+for(const language of ['en','es'])test(`${language}: initial selection sends quiet facts, preserves caller speech and resumes one native continuation`,async()=>{
+ const input={mode:'planning',role:'parent',language,studentId:'aiden',targetConfirmed:true,routeConversations:true,profile:{id:'aiden',name:'Aiden',school:'Synthetic Community College'}};
+ input.openingBrief=buildOpeningBrief(input);
+ const f=fixture({config:{language,tools:[{name:'request_conversation_target'}]},scope:{sessionId:'physical-call',studentId:null,confirmed:false}});
+ try{
+  f.call([tool('request_conversation_target','choose',{scope:'student:aiden'})]);
+  await until(()=>f.events.some(e=>e.controlLease));const lease=f.events.find(e=>e.controlLease).controlLease;
+  f.engine.receive({type:'session.output_transcript.delta',delta:language==='en'?'What would you like to focus on?':'¿En qué te gustaría enfocarte?'});
+  await f.engine.configure({...config,language,...studentLiveUpdate(input)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'first-selection');
+  const packets=f.sent.filter(e=>['session.thinking.append','session.instructions.append'].includes(e.type));
+  assert.equal(packets.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
+  assert.ok(!packets.filter(e=>e.type==='session.instructions.append').some(e=>e.content.includes(input.profile.school)));
+  f.engine.receive({type:'session.updated',client_event_id:'first-selection'});
+  f.engine.receive({type:'session.input_transcript.delta',delta:language==='en'?'His college options.':'Sus opciones universitarias.'});
+  await pause(0);assert.ok(!f.events.some(e=>e.type==='session.updated'));
+  for(const packet of packets)f.engine.receive({type:packet.type+'ed',client_event_id:packet.event_id});
+  await until(()=>f.events.some(e=>e.type==='session.updated'));
+  assert.equal(f.engine.command({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify({status:'target_confirmed'})}},lease),true);
+  await until(()=>f.sent.some(e=>e.type==='response.create'));
+  assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+  assert.ok(!f.sent.some(e=>['session.commentary.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
+  assert.equal(f.jobs.length,0,'student selection must not start public research');
+ }finally{f.engine.close();}
+});
 for(const language of ['en','es'])test(`server owns research, scope and continuation in ${language}`,async()=>{
  const f=fixture({config:{language}});try{
   f.call([tool('lookup_financial_aid','c',{question:'Published costs',institution:'UC Berkeley',studentId:'other',sessionId:'forged',language:'xx'})]);

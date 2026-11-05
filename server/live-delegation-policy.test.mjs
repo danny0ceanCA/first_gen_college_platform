@@ -37,7 +37,7 @@ for(const [name,change] of Object.entries({onboarding:{onboarding:true},profile:
 
 for(const language of ['en','es'])test(`${language} research lets the same live voice support the caller without another delegation`,()=>{
  const i={...input,language},c=voiceSession(i,{OPENAI_MODEL_VOICE:'gpt-live-1'});
- for(const speech of [studentLiveSession(c,i).instructions,studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true})]){
+ for(const speech of [studentLiveSession(c,i).instructions]){
   assert.match(speech,/respond to their understandable comments.*promptly, without waiting for research/);
   assert.match(speech,/one useful, unanswered question/);
   assert.match(speech,/A pause alone is not a request for questions/);
@@ -45,6 +45,7 @@ for(const language of ['en','es'])test(`${language} research lets the same live 
   assert.match(speech,/do not automatically expand it to every residency category/);
   assert.match(speech,/Listen when the person wants a moment/);
  }
+ assert.equal(studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true}),'','ordinary updates rely on startup conversation policy');
  assert.match(c.instructions,/Keep the lookup question close to the caller's actual request/);
  assert.match(c.instructions,/name both campuses in institution/);
  assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
@@ -57,7 +58,7 @@ for(const language of ['en','es'])test(`${language} call-only speech keeps backe
  assert.equal(live.delegation.responses.instructions,c.instructions);
  assert.deepEqual(live.delegation.responses.tools.map(({strict,...tool})=>tool),c.tools);
  for(const text of ['PRIVATE_PROFILE_GOALS','PRIVATE_OLD_SUMMARY','PRIVATE_BINDER_NOTE'])assert.ok(c.instructions.includes(text),text);
- for(const speech of [live.instructions,studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true})]){
+ for(const speech of [live.instructions]){
   assert.doesNotMatch(speech,/PRIVATE_PROFILE_GOALS|PRIVATE_OLD_SUMMARY|PRIVATE_SAVED_MEMORY|PRIVATE_BINDER_NOTE|PRIVATE_BINDER_ACTION/);
   assert.match(speech,/Do not restrict this to the immediately preceding answer/);
   assert.match(speech,/caller asks to review saved notes or earlier history/);
@@ -65,4 +66,7 @@ for(const language of ['en','es'])test(`${language} call-only speech keeps backe
   assert.match(speech,/Never paraphrase a mandatory disclosure/);
   assert.match(speech,/unfinished, interrupted, cancelled, failed or timed-out/);
  }
+ const update=studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true});
+ assert.doesNotMatch(update,/PRIVATE_PROFILE_GOALS|PRIVATE_OLD_SUMMARY|PRIVATE_SAVED_MEMORY|PRIVATE_BINDER_NOTE|PRIVATE_BINDER_ACTION/);
+ assert.equal(update,'','ordinary updates rely on startup conversation policy');
 });

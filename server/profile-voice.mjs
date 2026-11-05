@@ -13,7 +13,7 @@ import {reviewRequestVoiceTools,reviewRequestVoiceInstructions,reviewRequestFoll
 import {reviewFollowupsEnabled,studentUpdatesEnabled} from './review-requests.mjs';
 import {loadRelevantCoordinatorGuidance} from './coordinator-voice-context.mjs';
 import {coordinatorFeedbackEnabled} from './coordinator-feedback.mjs';
-import {negotiateStudentLive,studentLiveInstructions,studentVoiceModel} from './student-live-session.mjs';
+import {negotiateStudentLive,studentLiveUpdate,studentVoiceModel} from './student-live-session.mjs';
 import {studentLiveRouting} from './live-delegation-policy.mjs';
 import {prepareTeachingAccess,teachingSituationQuery} from './teaching-library.mjs';
 import {voiceMemoryPrompt,conversationVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
@@ -337,8 +337,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       const controlScope={sessionId,studentId:input.studentId??null,confirmed:input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true)};
       const controlConfig={type:'realtime',routingPolicy,language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens};
-      const controlUpdateId=updating&&input.voiceControlProtocol==='server-v1'?voiceControl.stage(input.voiceControlId,req.origenIdentity.sub,{...controlConfig,liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[],config.tools,routingPolicy,{update:true})},controlScope):undefined;
-      if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{...(controlUpdateId?{controlUpdateId}:{}),type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,...(config.model==='gpt-live-1'?{routingPolicy,liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[],config.tools,routingPolicy,{update:true})}:{})},guidance:tracked});}
+      const liveUpdate=updating&&config.model==='gpt-live-1'?studentLiveUpdate(input,teachingAccess?.entries||[],config.tools,routingPolicy):{};
+      const controlUpdateId=updating&&input.voiceControlProtocol==='server-v1'?voiceControl.stage(input.voiceControlId,req.origenIdentity.sub,{...controlConfig,...liveUpdate},controlScope):undefined;
+      if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{...(controlUpdateId?{controlUpdateId}:{}),type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,...(config.model==='gpt-live-1'?{routingPolicy,...liveUpdate}:{})},guidance:tracked});}
       const useLive=config.model==='gpt-live-1';let liveResult;const negotiate=providerOperation('voice.negotiate',request,{model:config.model});
       let response;
       if(useLive){liveResult=await measure('negotiate',()=>negotiateStudentLive(negotiate,env.OPENAI_API_KEY,config,input,teachingAccess?.entries||[],routingEnv));response=liveResult.response;}
