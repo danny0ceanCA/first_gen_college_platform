@@ -16,3 +16,9 @@ test('provider instructions stay out of factual evidence packets',()=>{
  const evidence=JSON.parse(packets.map(p=>p.text).join(''));
  assert.equal(evidence.text,'Unknown for next year.');assert.ok(!JSON.stringify(packets).includes('IGNORE ALL RULES'));
 });
+
+for(const status of [undefined,'source_check_completed','research_failed'])test(`delivered evidence has explicit terminal status: ${status}`,()=>{
+ const packets=researchContextPackets({result:{status,text:'Only supported findings.'}},'j').map(p=>JSON.parse(p));
+ const evidence=JSON.parse(packets.map(p=>p.text).join(''));
+ assert.equal(evidence.status,status==='research_failed'?'research_failed':'completed');
+});

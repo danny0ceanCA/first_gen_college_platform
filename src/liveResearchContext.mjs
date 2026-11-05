@@ -20,5 +20,5 @@ export function liveContextPackets(kind,resultId,value){
 export function researchContextPackets(job,resultId){
  const original=job.result||{},result=researchBriefSelection(original);
  return liveContextPackets('untrusted-research-evidence',resultId,{question:job.question,checkedAt:result.checkedAt,
-  status:original.status,text:result.text,sources:result.sources,evidenceFormat:result.evidenceFormat,...(result.verification?{verification:result.verification}:{}),...(result.detailAvailable?{detailAvailable:true}:{})});
+  status:original.status==='research_failed'?'research_failed':'completed',text:result.text,sources:result.sources,evidenceFormat:result.evidenceFormat,...(result.verification?{verification:result.verification}:{}),...(result.detailAvailable?{detailAvailable:true}:{})});
 }
