@@ -216,7 +216,7 @@ test('PIQ teaching reaches admissions voice start and handoff, while research ke
    await f.as('reader',()=>voice(req,{writeHead:s=>status=s,end:s=>body=JSON.parse(s)},()=>assert.fail('wrong route')));assert.equal(status,200);responses.push(body);return body;
   };
   await invoke({});assert.match(inputs[0].instructions,/Your experiences matter/);assert.match(inputs[0].instructions,/Be warm, patient/);assert.match(inputs[0].instructions,/Acknowledge the concern before a question/);assert.match(inputs[0].instructions,/We can explore this together/);
-  await invoke({mode:'planning'});assert.doesNotMatch(inputs[1].instructions,/Your experiences matter/);
+  await invoke({mode:'planning'});assert.match(inputs[1].instructions,/Your experiences matter/,'one guide carries the published essay teaching even from the planning entry point');
   const handoff=await invoke({action:'update-guide'});assert.equal(inputs.length,2,'handoff prepares an update without opening another provider call');assert.match(handoff.session.instructions,/Your experiences matter/);assert.match(handoff.session.instructions,/one gentle question/);assert.match(handoff.session.instructions,/Acknowledge the concern before a question/);
   const unresolved=await invoke({action:'update-guide',role:'student',targetConfirmed:false,studentId:undefined});assert.doesNotMatch(unresolved.session.instructions,/Your experiences matter/);
   const generalIds=[];

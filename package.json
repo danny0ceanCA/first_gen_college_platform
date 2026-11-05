@@ -62,7 +62,9 @@
     "db:check-retrieval": "node scripts/check-history-retrieval.mjs",
     "eval:personalization:release": "node scripts/personalization-release.mjs",
     "test:personalization": "node --test --test-concurrency=1 server/student-memory.test.mjs server/history-retrieval.test.mjs server/live-memory.test.mjs server/adaptive-guidance.test.mjs server/personalization-controls.test.mjs server/personalization-release.test.mjs server/personalization-migrations.test.mjs server/voice-startup.test.mjs server/binder-jobs.test.mjs",
-    "test:voice-infrastructure": "node --test --test-concurrency=1 server/voice-startup.test.mjs server/binder-jobs.test.mjs"
+    "test:voice-infrastructure": "node --test --test-concurrency=1 server/voice-startup.test.mjs server/binder-jobs.test.mjs",
+    "worker:research": "node scripts/voice-research-worker.mjs",
+    "db:grant-research-worker": "node scripts/provision-research-worker.mjs"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.28.0",

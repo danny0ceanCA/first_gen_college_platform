@@ -1,3 +1,5 @@
+import {buildOpeningBrief} from './voice-opening-brief.mjs';
+import {voiceContextTiming} from './voice-context-timing.mjs';
 import {recommendationsEnabled} from './recommendation-contract.mjs';
 import {recommendationVoiceAvailable,recommendationVoiceTools,recommendationVoiceInstructions} from './recommendation-voice-tools.mjs';
 import {studentFollowUpEnabled} from './student-follow-up.mjs';
@@ -12,12 +14,13 @@ import {reviewFollowupsEnabled,studentUpdatesEnabled} from './review-requests.mj
 import {loadRelevantCoordinatorGuidance} from './coordinator-voice-context.mjs';
 import {coordinatorFeedbackEnabled} from './coordinator-feedback.mjs';
 import {negotiateStudentLive,studentLiveInstructions,studentVoiceModel} from './student-live-session.mjs';
+import {studentLiveRouting} from './live-delegation-policy.mjs';
 import {prepareTeachingAccess,teachingSituationQuery} from './teaching-library.mjs';
-import {voiceMemoryPrompt,financeVoicePrompt,admissionsVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
+import {voiceMemoryPrompt,conversationVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
 import {voiceOrientationInstructions} from './voice-orientation.mjs';
 import {coordinatorVoiceAvailable} from './coordinator-connections.mjs';
 import {coordinatorLinkTools,coordinatorLinkInstructions} from './coordinator-voice-tools.mjs';
-import {voicePreparationCache,voicePreparationKey,voiceContextVersion} from './voice-preparation.mjs';
+import {voicePreparationCache,voicePreparationKey,voiceContextVersion,preparedVoiceContext,preparationTtlMs} from './voice-preparation.mjs';
 import {personalizationControls,personalizationPolicy} from './personalization-controls.mjs';
 import {adaptiveGuidanceInstructions} from './adaptive-guidance.mjs';
 import {createLiveMemoryRepository} from './live-memory.mjs';
@@ -33,11 +36,11 @@ import {safeErrorCode} from './api-logging.mjs';
 import {createHistoryRepository} from './history.mjs';
 import {allowedRequest} from './origin.mjs';
 import {admissionsTool} from './admissions-research.mjs';
-import {planningTool,planningInstructions} from './education-planning.mjs';
+import {planningTool} from './education-planning.mjs';
 import {financeTool} from './finance-research.mjs';
 import {scopeRouting} from './voice-scope.mjs';
 import {createFamilyRepository} from './family.mjs';
-import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
+import {collegeVoiceStyle,collegeBackendStyle} from '../src/voiceStyle.mjs';
 import {binderTopicTool,binderTopicInstructions} from '../src/binderSignals.mjs';
 import {voiceStartingPoints} from '../src/voiceStartingPoints.mjs';
 import {selectConversationMemory} from '../src/voiceMemory.mjs';
@@ -58,16 +61,13 @@ export function voiceSession(input, env) {
   const session={
     type:'realtime',model:env.OPENAI_MODEL_VOICE||'gpt-realtime-2.1',
     audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',prompt:bilingualTranscriptionPrompt},turn_detection:{type:'server_vad',threshold:0.65,prefix_padding_ms:300,silence_duration_ms:700,create_response:false,interrupt_response:true}},output:{voice:'marin',speed:1}},
-    tools:scopePending?[routing.tool]:planning?[planningTool]:admissions?[admissionsTool]:finance?[financeTool]:[{type:'function',name:'propose_profile',description:setup?'Immediately update the visible unsaved onboarding form with explicitly supplied details or corrections. Replace corrected fields and preserve unrelated fields; do not ask for confirmation of every draft edit. This does not save the profile.':'Propose updated profile fields for review, without saving them.',parameters:{type:'object',properties:{changes:{type:'array',items:{type:'object',properties:{field:{type:'string',enum:profileFields},value:{type:'string'},clear:{type:'boolean',description:'Only true when the user explicitly asks to remove this optional field. Never clear fields as part of saving or merely because they were not mentioned.'}},required:['field','value'],additionalProperties:false}}},required:['changes'],additionalProperties:false}}],
+    tools:scopePending?[routing.tool]:!profileMode?[planningTool,financeTool,admissionsTool]:[{type:'function',name:'propose_profile',description:setup?'Immediately update the visible unsaved onboarding form with explicitly supplied details or corrections. Replace corrected fields and preserve unrelated fields; do not ask for confirmation of every draft edit. This does not save the profile.':'Propose updated profile fields for review, without saving them.',parameters:{type:'object',properties:{changes:{type:'array',items:{type:'object',properties:{field:{type:'string',enum:profileFields},value:{type:'string'},clear:{type:'boolean',description:'Only true when the user explicitly asks to remove this optional field. Never clear fields as part of saving or merely because they were not mentioned.'}},required:['field','value'],additionalProperties:false}}},required:['changes'],additionalProperties:false}}],
     tool_choice:'auto',max_output_tokens:1500,
   };
   if(routing&&!scopePending)session.tools.push(routing.tool);
   session.tools=session.tools.map(t=>t.name.startsWith('lookup_')?{...t,parameters:{...t.parameters,properties:{...t.parameters.properties,language:{type:'string',enum:['en','es']}},required:[...t.parameters.required,'language']}}:t);
   session.tools.push({type:'function',name:'set_conversation_language',description:'Change the response language when the user clearly requests it or speaks an understandable question or sentence in the other language. Do not switch for names, acronyms, quoted terms, silence or unclear audio.',parameters:{type:'object',properties:{language:{type:'string',enum:['en','es']}},required:['language'],additionalProperties:false}});
-  if(!scopePending&&(planning||finance||admissions))session.tools.push(binderTopicTool);
-  if(input.allowGuideHandoff===true&&['finance','admissions','planning','loans'].includes(input.mode)&&!scopePending){
-    session.tools.push({type:'function',name:'switch_college_guide',description:'Continue the same conversation in the specialty needed for the user’s current question. Use only when another guide’s specialty is needed, not just because a related topic is mentioned. Preserve the confirmed student or general family scope and language. No user confirmation form is needed.',parameters:{type:'object',additionalProperties:false,properties:{guide:{type:'string',enum:['planning','finance','loans','admissions'].filter(g=>g!==input.mode)}},required:['guide']}});
-  }
+  if(session.model!=='gpt-live-1'&&!scopePending&&(planning||finance||admissions))session.tools.push(binderTopicTool);
   if(input.collectAccount===true&&input.mode==='profile'&&!scopePending)session.tools.push({type:'function',name:'propose_account',description:'Immediately record each explicitly stated account field as an unsaved onboarding draft, even if only firstName or role is known. Never invent a missing field or substitute a student name for a parent name.',parameters:{type:'object',properties:{firstName:{type:'string'},role:{type:'string',enum:['parent','student']}},required:[],minProperties:1,additionalProperties:false}});
   if(setup&&!scopePending)session.tools.push({type:'function',name:'review_onboarding_profile',description:'Make the current populated draft ready for final review only after account name and role, student name, education stage (or explicitly unknown), and the optional question answered or declined. First apply every supplied detail with draft tools. Then give a brief recap and ask whether to save. This does not save or grant consent.',parameters:{type:'object',properties:{education_stage_addressed:{type:'boolean',enum:[true]}},required:['education_stage_addressed'],additionalProperties:false}});
   if(input.saveOnboarding===true&&(input.collectAccount===true||input.onboarding===true)&&input.mode==='profile'&&!scopePending)session.tools.push({type:'function',name:'save_onboarding_profile',description:'Save the current onboarding account and student profile only after the user asks to save, in English or Spanish. The live call continues. First propose all details shared in this turn. Do not claim a save until this tool reports success.',parameters:{type:'object',properties:{requested_by_user:{type:'boolean',enum:[true]}},required:['requested_by_user'],additionalProperties:false}});
@@ -92,8 +92,8 @@ export function voiceSession(input, env) {
     session.tools=session.tools.map(tool=>descriptions[tool.name]?{...tool,description:descriptions[tool.name]}:tool);
   }
   const parts=[
-    scopePending?'# Role & Objective\nYou are Origen, an AI college voice guide. Confirm the conversation target before substantive guidance.':planning?planningInstructions(input,profile):finance?financeVoicePrompt(input,profile):admissions?admissionsVoicePrompt(input,profile):profileVoicePrompt(input,profile),
-    collegeVoiceStyle,
+    scopePending?'# Role & Objective\nYou are Origen, an AI college voice guide. Confirm the conversation target before substantive guidance.':!profileMode?conversationVoicePrompt(input,profile):profileVoicePrompt(input,profile),
+    session.model==='gpt-live-1'?collegeBackendStyle:collegeVoiceStyle,
     voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:turns.length>0}),
     voiceOrientationInstructions(input,{includeHistory:false}),
     voiceToolPrompt(session.tools,input),
@@ -107,7 +107,7 @@ export function voiceSession(input, env) {
   if(!setup&&!scopePending){
     parts.push(binderInstructions({canHighlight:has('highlight_binder_topics')}));
     parts.push(workspaceInstructions(input.workspace,{continuing:input.continuing===true||turns.length>0,selectedNow:input.workspaceRefreshOnly!==true,canWrite:has('save_student_memory')||has('correct_binder_item')}));
-    parts.push(memoryInstructions(input.studentBrief,{canWrite:has('save_student_memory')}));
+    parts.push(memoryInstructions(input.studentBrief,{canWrite:has('save_student_memory'),includeEvidenceInstructions:session.model!=='gpt-live-1'||!input.workspace?.available}));
     parts.push(retrievalInstructions(input.historicalEvidence),continuityInstructions(input.returnContext));
     if(input.liveMemoryEnabled)parts.push(liveMemoryInstructionsFor(session.tools));
     if(responseVoice){parts.push(reviewResponseVoiceInstructions);if(input.reviewRequestVoice===true&&input.reviewFollowupVoice===true)parts.push(reviewFollowupVoiceInstructions);if(input.studentUpdateVoice===true&&input.reviewRequestVoice===true&&input.reviewFollowupVoice===true)parts.push(studentUpdateVoiceInstructions);}
@@ -121,6 +121,7 @@ export function voiceSession(input, env) {
   if(has('prepare_student_outcome_evidence'))parts.push(outcomeVoiceInstructions);
   if(has('prepare_student_check_in')){parts.push(followUpVoiceInstructions);session.max_output_tokens=3000;}
   session.instructions=voiceLanguageInstructions(parts.filter(Boolean).join('\n\n'),input.language);
+  if(!scopePending&&!setup&&input.studentId)session.instructions+='\nTOOL CONTINUATION: Complete successful memory tools in 1–3 sentences, preserving mandatory readbacks and evidence limits. Divider highlighting is presentation only, never a prerequisite for recall or research. Do not delegate solely to change dividers. Continue without greeting or repeating a tool.';
   return session;
 }
 
@@ -157,15 +158,17 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
   return async(req,res,next) => {
     if(req.url?.split('?')[0] !== '/api/profile-voice') return next();
     const started=Date.now();
+    const contextTiming=voiceContextTiming({emit:record=>{const pending=(req.log||log)(record);pending?.catch?.(()=>{});}});
+    const measure=contextTiming.measure;
     let execution,tracked,upstreamRequestId,storedRole='unknown',teachingAccess,teachingOutcome='failed',openingClaim,openingDelivered=false;
   const sessionHeader=req.headers['x-origen-session']||req.headers['x-camino-session'];
   const sessionId=typeof sessionHeader==='string'?sessionHeader:undefined;
-  const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...body,...(tracked?{guidance:tracked}:{})}));};
+  const send=(status,body)=>{void (req.log||log)({sessionId,event:'voice_session',httpStatus:status,durationMs:Date.now()-started,code:body.error,sourceCount:body.sources?.length});res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','Server-Timing':contextTiming.header()});res.end(JSON.stringify({...body,...(tracked?{guidance:tracked}:{})}));};
     if(!allowedRequest(req)) return send(403,{error:'origin_not_allowed'});
     if(req.method!=='POST') return send(405,{error:'method_not_allowed'});
     if(!req.headers['content-type']?.startsWith('application/json')) return send(415,{error:'json_required'});
     if(!env.OPENAI_API_KEY?.trim()) return send(503,{error:'missing_api_key'});
-    if(active>=2) return send(429,{error:'busy'});
+    if(active>=(env.ORIGEN_VOICE_PREPARATION==='true'?3:2)) return send(429,{error:'busy'});
     active++;
     try {
       let raw=''; for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>96000)return send(413,{error:'request_too_large'});}
@@ -174,7 +177,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(input?.outcomeProtocol!==undefined&&input.outcomeProtocol!=='student-outcome-v1')return send(400,{error:'invalid_request'});
       if(input?.followUpProtocol!==undefined&&input.followUpProtocol!=='student-follow-up-v1')return send(400,{error:'invalid_request'});
       if(input?.responseContextProtocol!==undefined&&input.responseContextProtocol!=='review-response-v1')return send(400,{error:'invalid_request'});
-      if(input&&typeof input==='object'){input.caller=undefined;input.studentOutcomeVoice=false;input.studentUpdateVoice=false;input.studentFollowUpVoice=false;input.openingDecision=undefined;input.returnContext=undefined;input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.reviewRequestVoice=false;input.reviewResponseVoice=false;input.reviewFollowupVoice=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
+      if(input&&typeof input==='object'){input.openingBrief=undefined;input.caller=undefined;input.studentOutcomeVoice=false;input.studentUpdateVoice=false;input.studentFollowUpVoice=false;input.openingDecision=undefined;input.returnContext=undefined;input.workspace=undefined;input.studentBrief=undefined;input.historicalEvidence=undefined;input.liveMemoryEnabled=false;input.coordinatorLinking=false;input.reviewRequestVoice=false;input.reviewResponseVoice=false;input.reviewFollowupVoice=false;input.workspaceFocus=validateWorkspaceFocus(input.workspaceFocus);}
       const policy=personalizationControls(env,req.origenAuthorized?req.origenIdentity?.sub:undefined);
       const continuity=req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub);
       if(input&&typeof input==='object'){input.adaptiveEnabled=policy.adaptive;input.liveMemoryReadEnabled=policy.retrieval;input.liveMemoryWriteEnabled=policy.writes;}
@@ -183,20 +186,29 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(updating){if(!['finance','loans','admissions','planning'].includes(input.mode)||input.role==='parent'&&(!input.routeConversations||!input.targetConfirmed))return send(400,{error:'invalid_guide_update'});input.continuing=true;input.onboarding=false;}
       if(input.routeConversations!==undefined&&typeof input.routeConversations!=='boolean'||input.targetConfirmed!==undefined&&typeof input.targetConfirmed!=='boolean'||input.routeConversations&&input.targetConfirmed&&input.studentId===undefined)return send(400,{error:'invalid_request'});
       if(input.workspaceFocus&&(!req.origenAuthorized||!['planning','finance','loans','admissions'].includes(input.mode)||input.workspaceFocus.studentId!==input.studentId||input.routeConversations&&!input.targetConfirmed))return send(400,{error:'invalid_workspace_focus'});
-      if(preparing&&(!req.origenAuthorized||!['planning','finance','loans','admissions'].includes(input.mode)||input.studentId===undefined||input.routeConversations&&!input.targetConfirmed))return send(400,{error:'invalid_preparation'});
+      const neutralParent=input.role==='parent'&&input.routeConversations===true&&input.targetConfirmed===false&&input.studentId===undefined&&!input.workspaceFocus;
+      if(preparing&&(!req.origenAuthorized||input.onboarding===true||!['planning','finance','loans','admissions'].includes(input.mode)||(input.studentId===undefined||input.routeConversations&&!input.targetConfirmed)&&!neutralParent))return send(400,{error:'invalid_preparation'});
       if(preparing&&env.ORIGEN_VOICE_PREPARATION!=='true')return send(200,{preparedContextId:null});
+      // These sources can be edited/revoked by another account. Always resolve
+      // focused coordinator guidance and responses through their current guards.
+      if(preparing&&['coordinator-guidance','review-response'].includes(input.workspaceFocus?.kind))return send(200,{preparedContextId:null});
+      // Background preparation yields to active requests, leaving one slot for
+      // an actual call. Never queue speculative work ahead of voice startup.
+      if(preparing&&active>2)return send(200,{preparedContextId:null});
       const preparationKey=voicePreparationKey(input),prepareEnabled=env.ORIGEN_VOICE_PREPARATION==='true'&&req.origenAuthorized;
-      const versionBefore=prepareEnabled&&(preparing||input.preparedContextId)?await voiceContextVersion(database,req.origenIdentity.sub):undefined;
+      const versionBefore=prepareEnabled&&(preparing||input.preparedContextId)?await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub,{forPreparation:true})):undefined;
+      if(preparing&&versionBefore===undefined)return send(200,{preparedContextId:null});
       const cached=prepareEnabled&&!preparing&&input.preparedContextId?preparations.take(req.origenIdentity.sub,input.preparedContextId,preparationKey,versionBefore):undefined;
-      if(cached){input={...cached.input,action:input.action,sdp:input.sdp};storedRole=cached.storedRole;}
+      contextTiming.preparation(preparing?'preparing':cached?'hit':input.preparedContextId?'miss':'cold');
+      if(cached){input={...input,...cached.context};storedRole=cached.storedRole;if(input.studentId!==undefined)await req.bindDiagnosticOperation?.('voice',input.studentId);}
       if(!cached){
-      const continuityVersion=continuity?await voiceContextVersion(database,req.origenIdentity.sub):undefined;
+      const continuityVersion=continuity?await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub)):undefined;
       if(req.origenAuthorized){
         // Saved context is server-owned; callers may only supply an unsaved setup draft.
         input.memory=[];input.plans=[];delete input.workspace;input.students=[];
-        if(['planning','finance','loans','admissions'].includes(input.mode)&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed))input.studentBrief=await createMemoryRepository(database)(req.origenIdentity.sub,{action:'load',studentId:input.studentId});
+        if(['planning','finance','loans','admissions'].includes(input.mode)&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed))input.studentBrief=await measure('memory',()=>createMemoryRepository(database)(req.origenIdentity.sub,{action:'load',studentId:input.studentId}));
         let family;
-        try{family=await createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'});storedRole=family.account.role||'unknown';input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};}catch{return send(503,{error:'history_unavailable'});}
+        try{family=await measure('profile',()=>createFamilyRepository(database)(req.origenIdentity.sub,{action:'load'}));storedRole=family.account.role||'unknown';input.experience={usedApp:!!family.account.firstName||family.account.usedVoice,usedVoice:family.account.usedVoice};}catch{return send(503,{error:'history_unavailable'});}
         const informational=['planning','finance','loans','admissions'].includes(input.mode);
         if(informational)input.caller={firstName:family.account.firstName};
         if(informational&&['parent','student'].includes(storedRole))input.role=storedRole;
@@ -211,15 +223,15 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         }
         if(input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
           if(input.studentId!==null&&(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128))return send(400,{error:'invalid_request'});
-          try{input.memory=(await createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId,mode:input.mode})).items;}catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
+          try{input.memory=(await measure('history',()=>createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId,mode:input.mode}))).items;}catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
         }
       }
       if(input.routeConversations&&!input.targetConfirmed){input.memory=[];input.plans=[];input.profile={};}
       if(req.origenAuthorized&&['planning','finance','loans','admissions'].includes(input.mode)&&input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
         try{
-          try{input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,focus:input.workspaceFocus,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity});}
+          try{input.workspace=await measure('workspace',()=>loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,focus:input.workspaceFocus,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity}));}
           catch(error){
-            if(updating&&input.workspaceRefreshOnly===true&&['workspace_item_changed','workspace_item_unavailable'].includes(error.message))input.workspace=await loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity});
+            if(updating&&input.workspaceRefreshOnly===true&&['workspace_item_changed','workspace_item_unavailable'].includes(error.message))input.workspace=await measure('workspace',()=>loadVoiceWorkspace(database,req.origenIdentity.sub,{studentId:input.studentId,mode:input.mode,suppressedSummaryIds:input.studentBrief?.suppressedSummaryIds,continuity}));
             else throw error;
           }
         }catch(error){return send([400,404,409].includes(error.status)?error.status:503,{error:[400,404,409].includes(error.status)?error.message:'workspace_unavailable'});}
@@ -231,24 +243,24 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(input.studentBrief?.available){
         const selectedBrief=briefMemorySelection(input.studentBrief);
         const workspaceEntries=[...(input.workspace?.notes||[]),...(input.workspace?.conversationPoints||[])];
-        if(policy.retrieval)input.historicalEvidence=await retrieveStudentHistory(database,req.origenIdentity.sub,{
+        if(policy.retrieval)input.historicalEvidence=await measure('retrieval',()=>retrieveStudentHistory(database,req.origenIdentity.sub,{
           studentId:input.studentId,...voiceHistoryQuery(input),continuity,
           excludeRefs:[...selectedBrief.map(m=>m.ref),...workspaceEntries.map(n=>n.evidenceRef).filter(Boolean)],
           excludeSummaryIds:[...input.memory.map(m=>m.id),...selectedBrief.map(m=>m.summaryId),...workspaceEntries.map(n=>n.sourceSummaryId)].filter(Boolean),
-        });
-        const check=await createMemoryRepository(database)(req.origenIdentity.sub,{action:'revision',studentId:input.studentId});
+        }));
+        const check=await measure('memory',()=>createMemoryRepository(database)(req.origenIdentity.sub,{action:'revision',studentId:input.studentId}));
         if(check.revision!==input.studentBrief.revision)return send(409,{error:'memory_changed'});
         const suppressed=new Set(input.studentBrief.suppressedSummaryIds);input.memory=input.memory.filter(m=>!suppressed.has(m.id));
-        if(continuity)input.returnContext=continuitySnapshot(input,await loadQuestionContinuity(database,req.origenIdentity.sub,input.studentId));
+        if(continuity)input.returnContext=continuitySnapshot(input,await measure('continuity',()=>loadQuestionContinuity(database,req.origenIdentity.sub,input.studentId)));
       }
-      if(continuity&&continuityVersion!==await voiceContextVersion(database,req.origenIdentity.sub))return send(409,{error:'memory_changed'});
+      if(continuity&&continuityVersion!==await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub)))return send(409,{error:'memory_changed'});
       }
       if(continuity!==(req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub)))return send(409,{error:'memory_changed'});
       if(input.returnContext)input.returnContext=continuitySnapshot(input,input.returnContext.recentQuestions);
       if(preparing){
-        const versionAfter=await voiceContextVersion(database,req.origenIdentity.sub);
-        const preparedContextId=versionBefore!==undefined&&versionBefore===versionAfter?preparations.put(req.origenIdentity.sub,preparationKey,versionAfter,{input,storedRole}):undefined;
-        return send(200,{preparedContextId:preparedContextId||null});
+        const versionAfter=await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub,{forPreparation:true}));
+        const preparedContextId=versionBefore!==undefined&&versionBefore===versionAfter?preparations.put(req.origenIdentity.sub,preparationKey,versionAfter,{context:preparedVoiceContext(input),storedRole}):undefined;
+        return send(200,{preparedContextId:preparedContextId||null,expiresInMs:preparedContextId?preparationTtlMs:0});
       }
       // Fetch after preparation/cache reuse: hidden, edited or withdrawn comments
       // must not be restored from a prepared voice snapshot.
@@ -257,17 +269,17 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         const topics=input.workspace.topic?[input.workspace.topic]:input.mode==='finance'||input.mode==='loans'?['costs']:input.mode==='admissions'?['applications']:['options','transfer'];
         const query=Array.isArray(input.continuity)?input.continuity.filter(t=>t?.role==='user'&&typeof t.text==='string').at(-1)?.text?.slice(0,1000)||'':'';
         try{
-          const guidance=await loadRelevantCoordinatorGuidance(database,req.origenIdentity.sub,{studentId:input.studentId,topics,query});
+          const guidance=await measure('coordinator',()=>loadRelevantCoordinatorGuidance(database,req.origenIdentity.sub,{studentId:input.studentId,topics,query}));
           if(guidance&&JSON.stringify({...input.workspace,relatedCoordinatorGuidance:guidance}).length<=10000)input.workspace.relatedCoordinatorGuidance=guidance;
         }catch{req.log?.({event:'guidance_error',code:'coordinator_context_unavailable'});}
       }
       input.guidedConversation=guidedConversationEnabled(env);
-      input.coordinatorLinking=await coordinatorVoiceAvailable(database,env,input.studentId);
-      const reviewVoiceSession=req.origenAuthorized&&storedRole==='student'&&input.onboarding!==true&&(!input.routeConversations||input.targetConfirmed)?await openReviewVoiceSession(database,env,input.studentId):undefined;
+      input.coordinatorLinking=await measure('session_guards',()=>coordinatorVoiceAvailable(database,env,input.studentId));
+      const reviewVoiceSession=req.origenAuthorized&&storedRole==='student'&&input.onboarding!==true&&(!input.routeConversations||input.targetConfirmed)?await measure('session_guards',()=>openReviewVoiceSession(database,env,input.studentId)):undefined;
       input.reviewRequestVoice=!!reviewVoiceSession;
       let liveMemorySession;
       if(req.origenAuthorized&&(policy.retrieval||policy.writes)&&input.enableLiveMemory===true&&input.studentBrief?.available){
-        liveMemorySession=await createLiveMemoryRepository(database,env)(req.origenIdentity.sub,{action:'open',studentId:input.studentId,revision:input.studentBrief.revision,sessionId:input.memorySessionId});
+        liveMemorySession=await measure('session_guards',()=>createLiveMemoryRepository(database,env)(req.origenIdentity.sub,{action:'open',studentId:input.studentId,revision:input.studentBrief.revision,sessionId:input.memorySessionId}));
         input.liveMemoryEnabled=!!liveMemorySession;
       }
       // A protocol marker advertises client freshness support; it grants no
@@ -290,11 +302,13 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const memoryRevision=input.studentBrief?.revision,memoryPolicy=typeof memoryRevision==='number'?personalizationPolicy(env,req.origenAuthorized?req.origenIdentity?.sub:undefined):undefined;
       if(!policy.enabled)input.studentBrief=undefined;
       // Reserve the shared allowance after fresh context loads, never during prewarming.
-      input.openingDecision=await selectConversationOpening(database,req.origenIdentity?.sub,input,{conversationId:sessionId,memorySessionId:liveMemorySession?.id,allowFollowUp:input.followUpProtocol==='student-follow-up-v1',env:req.origenAuthorized?env:{}});
+      input.openingDecision=await measure('opening',()=>selectConversationOpening(database,req.origenIdentity?.sub,input,{conversationId:sessionId,memorySessionId:liveMemorySession?.id,allowFollowUp:input.followUpProtocol==='student-follow-up-v1',env:req.origenAuthorized?env:{}}));
+      input.openingBrief=req.origenAuthorized?await measure('brief',()=>buildOpeningBrief(input,{history:policy.retrieval})):undefined;
       openingClaim=input.openingDecision?.claim;
       if(openingClaim){const context=await loadReviewResponseContext(database,req.origenIdentity.sub,{studentId:input.studentId,focus:input.openingDecision.opening.source},env);if(context.status!=='retrieved')throw Object.assign(Error('workspace_item_changed'),{status:409});reviewResponseGuard=context.guard;}
       const config=voiceSession(input,{...env,OPENAI_MODEL_VOICE:studentVoiceModel(input,env)});
-      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',retrieval:'guide',query:teachingSituationQuery(input)},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})});config.instructions+=teachingAccess.instructions;}
+      const routingEnv=req.origenAuthorized?env:{},routingPolicy=studentLiveRouting(config,input,routingEnv);
+      if(req.origenAuthorized&&(!input.routeConversations||input.targetConfirmed)&&input.onboarding!==true){teachingAccess=await measure('teachings',()=>prepareTeachingAccess(database,{topic:input.mode||'profile',language:input.language,campus:input.profile?.institutions||'',academicYear:(input.profile?.entryTerm||'').match(/\b\d{4}-\d{2}\b/)?.[0]||'',retrieval:'guide',conversation:['planning','finance','loans','admissions'].includes(input.mode),query:teachingSituationQuery(input)},{model:config.model,operation:updating?'voice_update':'voice_start',onLogFailure:()=>req.log?.({event:'guidance_error',code:'teaching_activity_unavailable'})}));config.instructions+=teachingAccess.instructions;}
       if(req.origenAuthorized&&guidanceEnabled(env)&&sessionId&&req.headers['x-origen-segment']){
         await bindGuidanceIdentity(database,req.origenIdentity.sub,`https://${env.AUTH0_DOMAIN}/`);
         // Hash the reusable policy with empty personal context, never store prompt text.
@@ -306,11 +320,13 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       const verifyFocusedResponse=async()=>{if(input.openingDecision?.claim){const result=await createOpeningEvidenceRepository(database,env)(req.origenIdentity.sub,{action:'verify',studentId:input.studentId,conversationId:sessionId,claimId:input.openingDecision.claim.claimId});if(result.status!=='current')throw Object.assign(new Error('workspace_item_changed'),{status:409});}if(reviewResponseGuard&&(await verifyReviewResponseContext(database,req.origenIdentity.sub,input.studentId,reviewResponseGuard,env)).status!=='current')throw Object.assign(new Error('workspace_item_changed'),{status:409});};
       await verifyFocusedResponse();
-      if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,...(config.model==='gpt-live-1'?{liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[])}:{})},guidance:tracked});}
+      const backgroundResearch=env.ORIGEN_BACKGROUND_RESEARCH==='true'&&config.model==='gpt-live-1'&&input.onboarding!==true&&!!database&&req.origenAuthorized===true;
+      if(backgroundResearch)config.tools.push({type:'function',name:'cancel_background_research',description:'Cancel pending research when the caller explicitly abandons or replaces that research. Ordinary clarifications do not cancel it.',parameters:{type:'object',properties:{},additionalProperties:false}});
+      if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,...(config.model==='gpt-live-1'?{routingPolicy,liveInstructions:studentLiveInstructions(input,teachingAccess?.entries||[],config.tools,routingPolicy,{update:true})}:{})},guidance:tracked});}
       const useLive=config.model==='gpt-live-1';let liveResult;const negotiate=providerOperation('voice.negotiate',request,{model:config.model});
       let response;
-      if(useLive){liveResult=await negotiateStudentLive(negotiate,env.OPENAI_API_KEY,config,input,teachingAccess?.entries||[]);response=liveResult.response;}
-      else{const form=new FormData();form.set('sdp',input.sdp);form.set('session',JSON.stringify(config));response=await negotiate('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)});}
+      if(useLive){liveResult=await measure('negotiate',()=>negotiateStudentLive(negotiate,env.OPENAI_API_KEY,config,input,teachingAccess?.entries||[],routingEnv));response=liveResult.response;}
+      else{const form=new FormData();form.set('sdp',input.sdp);form.set('session',JSON.stringify(config));response=await measure('negotiate',()=>negotiate('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(25000)}));}
   void (req.log||log)({sessionId,event:'upstream_response',operation:'voice_session',httpStatus:response.status,upstreamRequestId:response.headers.get('x-request-id')||undefined});
       upstreamRequestId=response.headers.get('x-request-id');
       if(!response.ok) {
@@ -324,7 +340,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
       await verifyFocusedResponse();
       openingDelivered=true;
-      return send(200,{sdp,...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(useLive?{voiceProvider:'live',voiceSession:{type:'realtime',language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens}}:{}),...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
+      return send(200,{sdp,...(backgroundResearch?{backgroundResearch:true}:{}),...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(useLive?{voiceProvider:'live',voiceSession:{type:'realtime',routingPolicy,language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens}}:{}),...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
     } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(openingClaim&&!openingDelivered)await createOpeningEvidenceRepository(database,env)(req.origenIdentity.sub,{action:'release',studentId:openingClaim.studentId,conversationId:openingClaim.conversationId,claimId:openingClaim.claimId}).catch(()=>{});await teachingAccess?.finish(teachingOutcome);if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}
   };
 }

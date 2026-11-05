@@ -35,10 +35,10 @@ test('all live modes permit bilingual transcription and explicit language switch
   }
  }
 });
-async function call(handler,body=input,headers={}){
+async function call(handler,body=input,headers={},onHeaders=()=>{}){
   const req=Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json',...headers}});
   let status,output;
-  await handler(req,{writeHead(s){status=s;},end(text){output=JSON.parse(text);}},()=>assert.fail('wrong route'));
+  await handler(req,{writeHead(s,h){status=s;onHeaders(h);},end(text){output=JSON.parse(text);}},()=>assert.fail('wrong route'));
   return {status,output};
 }
 test('voice rejects cross-origin, invalid sessions and oversized requests before contacting OpenAI',async()=>{
@@ -64,7 +64,8 @@ test('voice sends server-owned settings and returns SDP without exposing credent
     assert.ok(!session.tools[0].parameters.properties.changes.items.properties.field.enum.includes('id'));
     return new Response('v=0\r\nanswer');
   });
-  assert.deepEqual(await call(handler),{status:200,output:{sdp:'v=0\r\nanswer',playWelcome:false}});
+  let timingHeader;assert.deepEqual(await call(handler,input,{},h=>timingHeader=h['Server-Timing']),{status:200,output:{sdp:'v=0\r\nanswer',playWelcome:false}});
+  assert.match(timingHeader,/negotiate;dur=\d+\.\d/);assert.match(timingHeader,/total;dur=\d+\.\d/);assert.doesNotMatch(timingHeader,/Test student|private-id|secret/);
   assert.match(voiceSession({...input,role:'student',language:'en'},{}).instructions,/student describe their own profile/);
 });
 test('voice sanitizes errors and does not return upstream messages',async()=>{
@@ -88,12 +89,12 @@ test('finance voice uses teaching instructions, minimal context and no profile e
     assert.match(session.instructions,new RegExp(role==='student'?'their own education':'parent understand'));
     assert.ok(!session.instructions.includes('private-note'));
     assert.ok(!session.instructions.includes('private-gpa'));
-    assert.equal(session.tools[0].name,'lookup_financial_aid');
+    assert.ok(session.tools.some(t=>t.name==='lookup_financial_aid'));
     assert.equal(session.audio.input.turn_detection.create_response,false);
   }
   const handler=createProfileVoiceHandler({OPENAI_API_KEY:'secret'},async(url,options)=>{
     const session=JSON.parse(options.body.get('session'));
-    assert.equal(session.tools[0].name,'lookup_financial_aid');
+    assert.ok(session.tools.some(t=>t.name==='lookup_financial_aid'));
     return new Response('v=0\r\nanswer');
   });
   assert.equal((await call(handler,{...input,mode:'finance'})).status,200);
@@ -106,14 +107,14 @@ test('admissions voice supports both languages and roles, VAD, minimal context a
   assert.equal(session.model,'gpt-realtime-2.1');
   assert.match(session.instructions,new RegExp(`Current conversation language: ${language==='es'?'Spanish':'English'}`));
   assert.match(session.instructions,/Cal State Apply/);assert.match(session.instructions,/Common App/);
-  assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/never draft an admission essay/);
+  assert.match(session.instructions,/first-year\/transfer/);assert.match(session.instructions,/Never draft an admission essay/);
   assert.ok(session.instructions.includes('Fall 2027'));assert.ok(!session.instructions.includes('private-note'));assert.ok(!session.instructions.includes('private-gpa'));
-  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_college_applications','set_conversation_language','highlight_binder_topics','end_conversation']);
+  assert.deepEqual(session.tools.map(tool=>tool.name),['lookup_education_planning','lookup_financial_aid','lookup_college_applications','set_conversation_language','highlight_binder_topics','end_conversation']);
   assert.equal(session.audio.output.speed,1);
   assert.equal(session.audio.input.turn_detection.type,'server_vad');assert.equal(session.audio.input.turn_detection.create_response,false);assert.equal(session.audio.input.turn_detection.interrupt_response,true);
  }
  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'secret'},async(url,options)=>{
-  assert.equal(JSON.parse(options.body.get('session')).tools[0].name,'lookup_college_applications');return new Response('v=0\r\nanswer');
+  assert.ok(JSON.parse(options.body.get('session')).tools.some(t=>t.name==='lookup_college_applications'));return new Response('v=0\r\nanswer');
  });
  assert.equal((await call(handler,{...input,mode:'admissions'})).status,200);
 });
@@ -178,14 +179,15 @@ test('every voice guide teaches college basics naturally across roles, languages
  }
 });
 
-test('specialty handoffs preserve one identity and carry bounded context only after scope is established',()=>{
+test('one guide preserves identity and bounded continuity only after scope is established',()=>{
  for(const mode of ['finance','admissions','planning','loans']){
   const session=voiceSession({...input,mode,allowGuideHandoff:true,continuity:[{role:'user',text:'What aid can help with the classes we planned?'}]},{});
-  assert.match(session.instructions,/ONE ORIGEN EXPERIENCE/);
+  assert.match(session.instructions,/one AI guide/);
   assert.match(session.instructions,/SAME-CONVERSATION HANDOFF/);
   assert.match(session.instructions,/do not say Hola again/);
-  assert.match(session.instructions,/avoid bouncing between guides/);
-  const tool=session.tools.find(tool=>tool.name==='switch_college_guide');assert.ok(tool);assert.ok(!tool.parameters.properties.guide.enum.includes(mode));
+  assert.match(session.instructions,/Never switch guides/);
+  assert.ok(!session.tools.some(tool=>tool.name==='switch_college_guide'));
+  assert.equal(session.tools.filter(tool=>tool.name.startsWith('lookup_')).length,3);
  }
  const waiting=voiceSession({...input,mode:'planning',routeConversations:true,allowGuideHandoff:true,continuity:[{role:'user',text:'PRIVATE HANDOFF'}]},{});
  assert.doesNotMatch(waiting.instructions,/PRIVATE HANDOFF|SAME-CONVERSATION HANDOFF/);

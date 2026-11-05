@@ -4,6 +4,11 @@ export function capturePayload(event,direction='provider'){
  const type=event?.type;
  if(typeof type!=='string')return null;
  const base={type,direction,itemId:event.item_id||event.item?.id,responseId:event.response_id||event.response?.id};
+ if(type==='origen.client.build')return {...base,buildId:event.buildId};
+ if(type==='origen.client.revision')return {...base,revision:event.revision};
+ if(type==='origen.research.state_changed')return {...base,requestId:event.requestId,jobId:event.jobId,state:event.state};
+ if(type==='origen.backend.empty')return base;
+ if(['origen.research.handoff_recovered','origen.speech.silence_recovered'].includes(type))return base;
  if(/transcription.completed$|audio_transcript.done$/.test(type))return {...base,text:event.transcript};
  if(['session.input_transcript.delta','session.output_transcript.delta','response.output_audio_transcript.delta','response.audio_transcript.delta'].includes(type))return {...base,text:event.delta,partial:true};
  if(type==='response.create')return {...base,instructions:event.response?.instructions};

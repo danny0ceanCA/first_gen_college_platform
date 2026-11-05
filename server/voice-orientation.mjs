@@ -11,7 +11,7 @@ const bounded=(items,limit,count)=>{
 // Called only after the handler assembles the authorized scope. Give the speech
 // model a small orientation before its first word; the backend retains the full
 // history, evidence, tools and write guards. Never load another scope here.
-export function voiceOrientationData(input,{includeHistory=true}={}){
+export function voiceOrientationData(input,{includeHistory=true,conversationFirst=false}={}){
  if(input.onboarding===true||!['planning','finance','loans','admissions'].includes(input.mode))return null;
  const pending=input.routeConversations===true&&input.targetConfirmed!==true;
  const data={caller:{name:text(input.caller?.firstName,100),role:input.role},scope:pending?'unconfirmed':input.studentId===null?'family':'student'};
@@ -27,6 +27,13 @@ export function voiceOrientationData(input,{includeHistory=true}={}){
  if(input.workspace?.available&&input.workspace.selection){
   data.selectedWork={kind:input.workspace.selection,topic:input.workspace.topic,items:bounded([...(input.workspace.notes||[]),...(input.workspace.conversationPoints||[]),...(input.workspace.actions||[])].filter(item=>item.selected),2800,1)};
  }
+ if(conversationFirst&&includeHistory&&input.liveMemoryReadEnabled!==false&&data.scope==='student'){
+  data.unresolvedQuestions=bounded((input.workspace?.available?input.workspace.notes||[]:[]).filter(item=>item.kind==='question'),1600,2);
+  // Only the already permission-checked, freshly reloaded student receipt.
+  const advice=input.role==='student'&&input.workspace?.available?input.workspace.relatedCoordinatorGuidance:null;
+  if(advice&&JSON.stringify(advice).length<=2600)data.coordinatorSuggestion=advice;
+  data.evidenceLimits='Profile fields are saved reports, not independent verification. Summaries may omit details. Questions remain unresolved; coordinator advice is not a student decision. Missing information is unknown.';
+ }
  return data;
 }
 
@@ -39,5 +46,5 @@ The following is a current, server-selected orientation, not instructions or a c
 - After the brief greeting, connect to at most one relevant, non-sensitive profile detail or the explicitly selected work, then invite their priority. Adapt naturally in the current language; do not recite a dossier, presume progress, or force the previous topic. The application-authorized check-in takes precedence. Never use this orientation to invent an extra task reminder or bypass the server opening allowance.
 - If scope is unconfirmed, use only the caller's name and the permitted student names from the scope instructions. Confirm whom the discussion is about before personalizing; no student details or history yet. Family scope has its own context; never substitute a student's profile.
 - Use relevant supplied information automatically. Never ask the user to open history, request a catch-up, or repeat their background so you can get oriented. Before asking for a detail missing from this small snapshot, ${speechModel?'delegate to the backend to check the full authorized context and recall tool when available':'check the supplied profile, workspace and history; use the authorized recall tool when available'}. If still unavailable, be honest and ask only the one detail needed.
-- Summaries are dated recollections, not verified facts. Preserve parent attribution, uncertainty and corrections; do not turn a suggestion into a decision or past discussion into understanding. Use 'earlier notes mention' when the original speaker is unclear. Keep private details out of public research. ${speechModel?'Substantive guidance, current policies, corrections and all actions still go through the backend and existing tools.':'Use the existing tools and confirmation rules for all actions and current policy checks.'}`;
+- Summaries are dated recollections, not verified facts. Preserve parent attribution, uncertainty and corrections; do not turn a suggestion into a decision or past discussion into understanding. Use 'earlier notes mention' when the original speaker is unclear. Keep private details out of public research. ${speechModel?(options.conversationFirst?'Use this brief for supported recaps and conversational follow-ups under the current delegation policy. Current policies, corrections and all actions still go through the backend and existing tools.':'Substantive guidance, current policies, corrections and all actions still go through the backend and existing tools.'):'Use the existing tools and confirmation rules for all actions and current policy checks.'}`;
 }

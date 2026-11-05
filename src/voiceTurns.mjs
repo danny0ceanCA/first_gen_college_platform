@@ -2,7 +2,7 @@ import {brandVoicePronunciation} from './voiceStyle.mjs';
 
 // Serialize replies across transcription, interruptions and asynchronous tool calls.
 export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,cancel=clearTimeout,transcriptionTimeout=12000,onMissing=()=>{},onBusy=()=>{}}={}) {
-  let active = false, pending = false, tools = 0, replyHolds = 0;
+  let active = false, pending = false, tools = 0, replyHolds = 0, backgroundContinuation = false;
   let interrupted = false, heardSpeech = false, recoveryUsed = false, resume = false;
   const seen = new Set(), finished = new Set(), awaiting = new Set();
   const timers=new Map();
@@ -18,15 +18,15 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
   function notify(){const next=busy();if(next!==lastBusy){lastBusy=next;onBusy(next);}}
   function flush() {
     try{
-    if (stopped || !pending || active || progressActive || tools || replyHolds || awaiting.size || playing.size) return;
-    active = true; pending = false;
+    if (stopped || !pending || (active && !backgroundContinuation) || progressActive || tools || replyHolds || awaiting.size || (playing.size && !backgroundContinuation)) return;
+    active = true; pending = false; backgroundContinuation = false;
     if (resume) {
       resume = false; recoveryUsed = true; onRecovery();
       if(send({type:'response.create'})===false)active=false;
     } else if(send({type:'response.create'})===false)active=false;
     }finally{notify();}
   }
-  function request() { pending = true; flush(); }
+  function request(background = false) { pending = true; backgroundContinuation = background; flush(); }
   function cancelProgress(id){
     if(!id)return;
     retiredProgress.add(id);
@@ -122,7 +122,9 @@ export function voiceTurns(send, onRecovery = () => {}, {schedule=setTimeout,can
       notify();
       return true;
     },
-    toolsCompleted() { tools = Math.max(0, tools - 1); request(); },
+    // Live independently sequences its speech. Resume completed tool work while
+    // its acknowledgement plays; still wait for input, tool and backend holds.
+    toolsCompleted(background = false) { tools = Math.max(0, tools - 1); request(background); },
     failed(responseId, retry = false) {
       if(stopped || responseId && finished.has(responseId))return false;
       if(responseId)finished.add(responseId);

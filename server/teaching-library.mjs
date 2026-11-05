@@ -67,11 +67,32 @@ export async function loadTeachingReferences(database,scope={}){
  try{return await readTeachingReferences(database,scope);}catch{return [];}
 }
 
+// Round-robin prevents one topic or repeated general references from consuming
+// the opening bundle. Keep whole entries and log only what was actually supplied.
+export function selectConversationTeachings(lists){
+ const entries=[],seen=new Set();let size=0;
+ for(let row=0;row<6;row++)for(const list of lists){
+  const item=list[row];if(!item||seen.has(item.id))continue;
+  const bytes=Buffer.byteLength(JSON.stringify(item));
+  if(entries.length>=6||size+bytes>12000)continue;
+  entries.push(item);seen.add(item.id);size+=bytes;
+ }
+ return entries;
+}
+
 // Record delivery evidence, never inferred influence on a generated answer.
 // Queries, prompts, names, account IDs and conversation text are deliberately omitted.
 export async function prepareTeachingAccess(database,scope,{model,operation,onLogFailure=()=>{}}={}){
  let entries=[],availability='available';
- try{entries=await readTeachingReferences(database,scope);}catch{availability='unavailable';}
+ try{
+  if(scope.conversation===true){
+   // Same published-language/campus/year checks as topic retrieval, with one
+   // shared count/byte budget. No family history is added to these queries.
+   const ordered=[scope.topic,...['planning','admissions','finance','loans']].filter((t,i,a)=>a.indexOf(t)===i&&topics.includes(t));
+   const lists=await Promise.all(ordered.map(async topic=>{try{return await readTeachingReferences(database,{...scope,topic});}catch{availability='unavailable';return [];}}));
+   entries=selectConversationTeachings(lists);
+  }else entries=await readTeachingReferences(database,scope);
+ }catch{availability='unavailable';}
  const id=randomUUID();let recorded=false;
  return {entries,instructions:teachingReferenceInstructions(entries),async finish(outcome='failed',resolvedModel){
   if(recorded||!database)return;recorded=true;

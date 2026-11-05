@@ -202,3 +202,13 @@ test('repeated noise during buffered playback cannot cause endless paid recovery
  }
  assert.equal(events.length,2);
 });
+
+test('Live tool continuation overlaps acknowledgement audio but respects backend and user-input holds',()=>{
+ const sent=[],turns=voiceTurns(e=>sent.push(e));
+ turns.created();turns.playback({type:'output_audio_buffer.started',response_id:'ack'});
+ const release=turns.holdReply();turns.beginDone('tool',true);turns.toolsCompleted(true);
+ assert.equal(sent.length,0);release();assert.equal(sent.length,1);assert.equal(sent[0].type,'response.create');
+ turns.beginDone('tool2',true);turns.speechStarted('new-question');turns.toolsCompleted(true);
+ assert.equal(sent.length,1);turns.transcript('new-question','Actually, wait.');assert.equal(sent.length,1,'a new user turn must not inherit the background bypass');
+ turns.playback({type:'output_audio_buffer.stopped',response_id:'ack'});assert.equal(sent.length,2);turns.stop();
+});

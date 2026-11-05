@@ -20,7 +20,7 @@ test('financial-aid teaching survives roles, languages and continuing guide upda
   assert.ok(example);
   assert.ok(example.startsWith(language==='es'?'Para entender la universidad':'To understand college'));
   assert.ok(!example.includes(language==='es'?'To understand college':'Para entender la universidad'));
-  assert.equal(session.tools[0].name,'lookup_financial_aid');
+  assert.ok(session.tools.some(t=>t.name==='lookup_financial_aid'));
   assert.equal(session.audio.output.voice,'marin');assert.equal(session.audio.output.speed,1);
   if(continuing)assert.match(session.instructions,/CONTINUING LIVE CONVERSATION/);
  }

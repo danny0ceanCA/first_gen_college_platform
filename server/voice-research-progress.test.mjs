@@ -13,7 +13,7 @@ function harness(){
 }
 
 test('fast research stays quiet; delayed updates vary and are capped per lookup and call',()=>{
- const h=harness();h.progress.start();h.advance(9000);h.progress.stop();h.advance(60000);assert.deepEqual(h.said,[]);
+ const h=harness();h.progress.start();h.advance(3000);h.progress.stop();h.advance(60000);assert.deepEqual(h.said,[]);
  h.progress.start();h.advance(70000);assert.equal(h.said.length,2);assert.equal(h.timers.size,0);
  assert.notEqual(h.said[0],h.said[1]);
  h.progress.start();h.advance(70000);assert.equal(h.said.length,3);assert.equal(new Set(h.said).size,3);
@@ -23,7 +23,7 @@ test('fast research stays quiet; delayed updates vary and are capped per lookup 
 test('busy speech defers updates without consuming allowance, and language is read when speaking',()=>{
  const h=harness();h.available(false);h.progress.start();h.advance(12000);assert.equal(h.said.length,0);
  h.language('es');h.available(true);h.advance(1000);assert.match(h.said[0],/Estoy consultando/);
- h.advance(23000);assert.match(h.said[1],/Puedes seguir hablando/);
+ h.advance(13000);assert.match(h.said[1],/Puedes seguir hablando/);
  h.progress.stop();assert.equal(h.timers.size,0);
 });
 
@@ -59,3 +59,7 @@ test('a closed transport cannot leave a nonexistent status response blocking a r
  turns.request();turns.beginDone('lookup',true);assert.equal(turns.progress('Checking sources.'),false);
  turns.toolsCompleted();assert.equal(events.length,2);turns.stop();
 });
+
+test('verified housing classification survives delivery in either language',()=>{for(const text of ['Campus housing and meals: directly billed.','Alojamiento y comidas del campus: cargos facturados.']){const result={text,sources:[{url:'https://example.edu/costs'}],checkedAt:'2026-11-04'};const delivered=researchEvidence(result,false);assert.equal(delivered.text,text);assert.deepEqual(delivered.sources,result.sources);assert.match(delivered.instruction,/do not label them indirect/);assert.match(delivered.instruction,/not a bill/);}});
+
+test('slow lookup offers one update at four seconds and stops immediately on completion',()=>{const h=harness();h.progress.start();h.advance(3999);assert.equal(h.said.length,0);h.advance(1);assert.equal(h.said.length,1);h.progress.stop();h.advance(60000);assert.equal(h.said.length,1);});

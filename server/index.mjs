@@ -1,3 +1,4 @@
+import {createVoiceResearchJobsHandler,assertBackgroundResearchReady} from './voice-research-jobs.mjs';
 import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
 import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
 import {assertRecommendationContractReady} from './recommendation-contract.mjs';
@@ -100,7 +101,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const lifecycle=createLifecycleHandler(database,{env});
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
- const handlers=[createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
+ const handlers=[createVoiceResearchJobsHandler(database,env),createTopicRecapHandler(database,env,providerRequest),createRecommendationEvaluationHandler(database,env),createRecommendationDeliveryHandler(database,env),createOutcomeEvaluationHandler(database,env),createOutcomeObservationHandler(database,env),createOutcomeEvidenceHandler(database,env),createFollowUpConversationHandler(database,env),createOpeningEvidenceHandler(database,env),createStudentFollowUpHandler(database,env),createReviewResponseChoicesHandler(database,env),createReviewResponseContextHandler(database,env),createCoordinatorReviewHandler(database,env),createReviewVoiceHandler(database,env),createReviewRequestsHandler(database,env),createAdminVoiceHandler(database,env),createTeachingLibraryHandler(database,env),createCoordinatorNotificationsHandler(database,env),createCoordinatorFeedbackHandler(database,env),createCoordinatorBindersHandler(database,env),createBinderSharingHandler(database,env),createCoordinatorConnectionsHandler(database,env),createCoordinatorHandler(database,env),createLiveMemoryHandler(database,env),createMemoryHandler(database,env,providerRequest),createSupportHandler(database,env),createPrivacyHandler(database),createOnboardingHandler(database),createAdminHandler(database,env),createProgressHandler(database,env),createGuidanceHandler(database,env),lifecycle,metrics,institutions,inquiries,createCampaignHandler(database),createPlanHandler(database,env),createTopicNotesHandler(database,env,providerRequest),createSheetHandler(database),createLinksHandler(database),createFamilyHandler(database,database?createFamilyRepository(database,env):null),createHistoryHandler(database),createSummaryHandler(env,providerRequest,database),createDiagnosticHandler(log,database),createFinanceResearchHandler(env,providerRequest,log,database),createAdmissionsResearchHandler(env,providerRequest,log,database),createProfileVoiceHandler(env,providerRequest,log,database),createAIHandler(env,providerRequest,database)];
  handlers.unshift(createPrivateVoiceCaptureHandler(database,env),createCorrectionsHandler(database,env),createRecoveryHandler(database,env));
  const buckets=new Map();
  const mapOperation=createDiagnosticOperations(database);
@@ -131,12 +132,13 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   if(origin&&!origins.has(origin))return send(403,'origin_not_allowed');
   if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Access-Control-Expose-Headers','X-Request-ID, X-Origen-Operation-ID');res.setHeader('Vary','Origin');}
   if(req.method==='OPTIONS'){
-   res.setHeader('Access-Control-Allow-Methods','POST, GET, OPTIONS');
+   res.setHeader('Access-Control-Allow-Methods',req.url.split('?')[0]==='/api/voice-research-jobs'?'POST, GET, DELETE, OPTIONS':'POST, GET, OPTIONS');
    res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, X-Origen-Session, X-Camino-Session, X-Origen-Segment, X-Origen-Operation');
    res.writeHead(204);return res.end();
   }
   if(req.method==='GET'&&/^\/api\/institutions\/(?:directory|(?:published|pages|qr)\/[a-z0-9-]{1,100})$/.test(req.url.split('?')[0]))return institutions(req,res,()=>send(404,'not_found'));
-  if(req.method!=='POST')return send(405,'method_not_allowed');
+  const researchRoute=req.url.split('?')[0]==='/api/voice-research-jobs';
+  if(req.method!=='POST'&&!(researchRoute&&['GET','DELETE'].includes(req.method)))return send(405,'method_not_allowed');
   if(req.url==='/api/auth0/coordinator-events')return coordinatorIdentity(req,res);
   if(req.url==='/api/guardian-permission')return permission.handle(req,res,true);
   if(req.url==='/api/institution-inquiries/public')return inquiries(req,res,()=>send(404,'not_found'));
@@ -153,9 +155,11 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
   // Frequent diagnostic events must never spend the budget used by permission
   // checks, saves, or research. Both lanes stay bounded before database work.
   const diagnostic=['/api/voice-diagnostics','/api/private-voice-capture'].includes(req.url.split('?')[0]);
-  const bucketKey=JSON.stringify([identity.sub,diagnostic?'diagnostics':'application']);
+  // Polling must not exhaust the budget needed for saves and ordinary tools.
+  const polling=researchRoute&&req.method==='GET';
+  const bucketKey=JSON.stringify([identity.sub,diagnostic?'diagnostics':polling?'research-polling':'application']);
   const bucket=buckets.get(bucketKey)||{count:0,reset:now+60000};buckets.set(bucketKey,bucket);
-  if(++bucket.count>(diagnostic?240:120)){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
+  if(++bucket.count>(diagnostic?240:polling?180:120)){res.setHeader('Retry-After','60');return send(429,'rate_limited');}
   // Apply the account budget before database lookups so excess traffic cannot
   // consume a closure-status query on every rejected request.
   return runAsAccount(identity,async()=>{

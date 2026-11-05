@@ -17,7 +17,7 @@ test('unconfirmed parent sessions offer routing only and omit private history',(
 });
 test('confirmed family scope retains specialist tools and applies clear spoken switches automatically',()=>{
  const session=voiceSession({role:'parent',mode:'finance',language:'es',routeConversations:true,targetConfirmed:true,scopeRestart:true,studentId:null,students,profile:{}},{});
- assert.deepEqual(session.tools.map(t=>t.name),['lookup_financial_aid','request_conversation_target','set_conversation_language','highlight_binder_topics','end_conversation']);
+ assert.deepEqual(session.tools.map(t=>t.name),['lookup_education_planning','lookup_financial_aid','lookup_college_applications','request_conversation_target','set_conversation_language','highlight_binder_topics','end_conversation']);
  assert.match(session.instructions,/general family questions/);
  assert.match(session.instructions,/Do not say Hola, greet, introduce yourself/);
  assert.doesNotMatch(session.instructions,/first spoken word must be exactly Hola/);
@@ -30,3 +30,5 @@ test('target IDs are validated and switch utterances stay out of previous summar
  const turns=[{role:'user',text:'Costs for Sofia?'},{role:'assistant',text:'Discuss costs.'},{role:'user',text:'Now Mateo has different circumstances.'},{role:'assistant',text:'Please confirm Mateo.'}];
  assert.deepEqual(beforeScopeRequest(turns),turns.slice(0,2));
 });
+
+for(const language of ['en','es'])test(`${language} confirmed handoff carries the new stage and keeps the pending question`,()=>{const session=voiceSession({role:'parent',mode:'planning',language,routeConversations:true,targetConfirmed:true,scopeRestart:true,continuing:true,studentId:'elodie',students:[{id:'elodie',name:'Elodie'}],profile:{name:'Elodie',stage:'9th grade',interest:'Biology'}},{OPENAI_MODEL_VOICE:'gpt-live-1'});assert.match(session.instructions,/9th grade/);assert.match(session.instructions,/Biology/);assert.match(session.instructions,/answer the pending question from the new profile/);assert.match(session.instructions,/without re-asking supplied stage/);assert.match(session.instructions,/Invite a priority only for a name-only choice/);assert.match(session.instructions,/same call/);assert.doesNotMatch(session.instructions,/briefly acknowledge the target and invite the question/);});

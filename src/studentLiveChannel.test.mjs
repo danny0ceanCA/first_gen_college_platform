@@ -2,7 +2,261 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {studentLiveChannel,liveBackendDeadlineMs} from './studentLiveChannel.mjs';
 import {voiceProfileSaveConsent} from './voiceProfileSave.mjs';
+import {voiceHandoff,deferredVoiceHandoff} from './voiceHandoff.mjs';
+import {capturePayload} from './voiceCapture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+
+test('private diagnostics preserve request state without copying the question',()=>{
+ const payload=capturePayload({type:'origen.research.state_changed',requestId:'r',jobId:'j',state:'running',question:'PRIVATE'});
+ assert.equal(payload.state,'running');assert.equal(payload.jobId,'j');assert.ok(!JSON.stringify(payload).includes('PRIVATE'));
+});
+for(const text of ['How much does it cost to go to UC Santa Cruz?','How much is that?','What does residency mean?','Okay.','Yes.','¿Cuánto cuesta ir a UC Santa Cruz?','¿Cuánto es?','¿Qué significa residencia?','Gracias.'])test('native conversation has no keyword or silence-triggered second decision: '+text,async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
+ f.receive({type:'session.input_transcript.delta',delta:text});await pause(0);clock.advance(1100);await pause(0);clock.advance(30000);await pause(0);
+ assert.ok(f.events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'&&e.transcript===text));
+ assert.ok(!f.sent.some(e=>['response.create','session.commentary.append'].includes(e.type)));
+ // Native requests remain executable, including affirmative workflow replies.
+ f.backend('response.created','native');await pause(0);
+ f.backend('response.output_item.done','native',{item:{type:'function_call',name:'lookup_financial_aid',call_id:'lookup',arguments:'{"institution":"UC Santa Cruz","question":"Published costs"}'}});
+ f.backend('response.completed','native');await pause(0);
+ assert.equal(f.events.find(e=>e.type==='response.done').response.output[0].call_id,'lookup');f.channel.close();
+});
+test('active research does not generate repeated backend calls on conversational follow-ups',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.send(JSON.stringify({type:'origen.research.state',request:{requestId:'r',jobId:'j',state:'running',question:'Santa Cruz costs'}}));
+ for(const text of ['What does tuition residency mean?','Okay.','How much is that?']){
+  f.receive({type:'session.input_transcript.delta',delta:text});await pause(0);clock.advance(1100);await pause(0);clock.advance(6000);await pause(0);
+ }
+ assert.ok(!f.sent.some(e=>e.type==='response.create'||e.type==='session.commentary.append'));
+ assert.equal(f.events.filter(e=>e.type==='origen.research.state_changed').length,1);f.channel.close();
+});
+test('a superseded research result cannot be announced as the current answer',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.send(JSON.stringify({type:'origen.research.state',request:{requestId:'new',jobId:'new-job',state:'running'}}));
+ f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'old-job',question:'Old costs',result:{status:'completed',answer:'OLD_FIGURE'}}));
+ clock.advance(5000);await pause(0);
+ assert.ok(!JSON.stringify(f.sent).includes('OLD_FIGURE'));assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
+});
+
+for(const text of ['How much does UC Santa Cruz cost?','¿Cuánto cuesta ir a UC Santa Cruz?'])test('an empty native backend outcome produces one clarification, no automatic tool retry: '+text,async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[{name:'lookup_financial_aid'}]}});
+ f.receive({type:'session.input_transcript.delta',delta:text});await pause(0);clock.advance(1100);await pause(0);
+ for(const id of ['empty','same-turn-empty']){f.backend('response.created',id);await pause(0);f.backend('response.completed',id);await pause(0);}
+ assert.equal(f.events.filter(e=>e.type==='origen.backend.empty').length,1);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+ assert.match(f.sent.find(e=>e.type==='session.commentary.append').content,/one short, concrete clarification/);
+ assert.ok(!f.sent.some(e=>e.type==='response.create'),'no auto-retry of writes or research');f.channel.close();
+});
+
+test('a completed native tool continuation may be silent without another clarification',async()=>{
+ const f=fixture();f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[]}});
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'verified',output:'{"status":"research_pending","jobId":"job"}'}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));f.backend('response.created','continued');await pause(0);f.backend('response.completed','continued');await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='origen.backend.empty'));
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1,'opening only');f.channel.close();
+});
+
+test('a useful backend text answer does not trigger empty-result recovery',async()=>{
+ const f=fixture();f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',tools:[]}});
+ f.backend('response.created','text');await pause(0);f.backend('response.output_item.done','text',{item:{type:'message',content:[{type:'output_text',text:'A useful explanation.'}]}});f.backend('response.completed','text');await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='origen.backend.empty'));assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
+});
+test('a failed source check never announces verified findings or asks to share them',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',result:{status:'research_failed'},question:'Costs?'}));
+ clock.advance(2000);await pause(0);
+ const prompt=f.sent.find(e=>e.type==='session.commentary.append').content;
+ assert.match(prompt,/source check failed/);assert.match(prompt,/no verified findings/);assert.doesNotMatch(prompt,/source check is ready|explain the verified finding/);f.channel.close();
+});
+for(const language of ['en','es'])test(`${language}: end call drains current audio before requesting a separate farewell`,async()=>{
+ const clock=fakeClock();let idle=false;
+ const f=fixture({...clock,isPlaybackIdle:()=>idle});let ready;
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'The housing budget':'El presupuesto de vivienda'});await pause(0);
+ void f.channel.prepareClose().then(value=>ready=value);
+ await pause(0);clock.advance(2000);await pause(0);
+ assert.equal(ready,undefined);assert.ok(!f.events.some(e=>e.type==='response.done'));
+ f.receive({type:'session.input_transcript.delta',delta:'No, give me a straight answer.'});await pause(0);
+ f.receive({type:'session.output_transcript.delta',delta:'.'});await pause(0);idle=true;
+ clock.advance(2000);await pause(0);clock.advance(100);await pause(0);
+ assert.equal(ready,true);assert.ok(!f.events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'));
+ const previous=f.events.find(e=>e.type==='response.output_audio_transcript.done').response_id;
+ f.channel.send(JSON.stringify({type:'response.create',response:{metadata:{topic:'origen_farewell'},instructions:'A warm goodbye only.'}}));
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Take care!':'¡Hasta luego!'});await pause(0);
+ clock.advance(3000);await pause(0);
+ const goodbye=f.events.filter(e=>e.type==='response.output_audio_transcript.done').at(-1);
+ assert.notEqual(goodbye.response_id,previous);assert.doesNotMatch(goodbye.transcript,/budget|presupuesto|straight answer/);
+ assert.ok(!f.sent.some(e=>e.type==='session.thinking.append'));f.channel.close();
+});
+test('caller reference text is never injected as assistant thinking',()=>{
+ const f=fixture();f.channel.send(JSON.stringify({type:'conversation.item.create',item:{role:'user',type:'message',content:[{text:'No, give me a straight answer.'}]}}));
+ assert.ok(!f.sent.some(e=>e.type==='session.thinking.append'));assert.match(f.sent.find(e=>e.type==='session.instructions.append').content,/Caller reference data/);f.channel.close();
+});
+
+for(const status of ['target_confirmed','target_update_failed'])test(`scope continuation ${status} always completes the backend tool loop`,async()=>{
+ const f=fixture();f.channel.send(JSON.stringify({type:'response.create'}));
+ f.backend('response.created','scope');await pause(0);
+ f.backend('response.output_item.done','scope',{item:{type:'function_call',name:'request_conversation_target',call_id:'target',arguments:'{}'}});
+ f.backend('response.completed','scope');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'target',output:JSON.stringify({status})}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+});
+for(const barrier of ['pending-configuration','multiple-tools'])test(`scope continuation retains backend checks for ${barrier}`,async()=>{
+ const f=fixture();f.channel.send(JSON.stringify({type:'response.create'}));
+ f.backend('response.created','scope');await pause(0);
+ f.backend('response.output_item.done','scope',{item:{type:'function_call',name:'request_conversation_target',call_id:'target',arguments:'{}'}});
+ if(barrier==='multiple-tools')f.backend('response.output_item.done','scope',{item:{type:'function_call',name:'recall_student_context',call_id:'memory',arguments:'{}'}});
+ f.backend('response.completed','scope');await pause(0);
+ if(barrier==='pending-configuration')f.channel.send(JSON.stringify({type:'session.update',event_id:'pending',session:{instructions:'New scope',tools:[]}}));
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'target',output:JSON.stringify({status:'target_confirmed'})}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);f.channel.close();
+});
+
+test('closing drain has a bounded fallback without declaring unfinished audio complete',async()=>{
+ const clock=fakeClock(),f=fixture({...clock,isPlaybackIdle:()=>false});let ready;
+ f.receive({type:'session.output_transcript.delta',delta:'Unfinished explanation'});await pause(0);
+ void f.channel.prepareClose().then(value=>ready=value);await pause(0);
+ clock.advance(12000);await pause(0);
+ assert.equal(ready,false);assert.ok(!f.events.some(e=>e.type==='output_audio_buffer.stopped'));
+ assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('speech boundary')));f.channel.close();
+});
+
+test('student handoff is context to answer, never a thinking transcript',()=>{
+ const f=fixture();f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'system',content:[{type:'input_text',text:voiceHandoff('What about Elodie?')}]}}));
+ assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('pending caller question')));
+ assert.ok(!f.sent.some(e=>e.type==='session.thinking.append'));f.channel.close();
+});
+test('background evidence waits for a quiet boundary before a natural continuation',async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Cost?',result:{sources:[{url:'https://studentaid.gov'}],answer:'Verified'}}));
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ clock.advance(2000);await pause(0);
+ assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+ assert.ok(f.sent.some(e=>e.type==='session.commentary.append'&&e.content.includes('If the topic has moved on')));
+ assert.ok(!f.sent.some(e=>e.type==='response.cancel'));f.channel.close();
+});
+
+for(const [language,head,tail,question] of [
+ ['en','And if it helps,',' we can start with that example.','What does the cost include?'],
+ ['es','Y si te sirve,',' podemos empezar con ese ejemplo.','¿Qué incluye ese costo?'],
+]){
+ test(`${language}: research cannot splice into an unfinished sentence, even after a long pause`,async()=>{
+  const clock=fakeClock();let idle=false;
+  // Playback can continue long after transcript text has arrived.
+  const g=fixture({...clock,isPlaybackIdle:()=>idle});
+  g.receive({type:'session.output_transcript.delta',delta:head});await pause(0);
+  g.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Cost?',result:{answer:'Verified'}}));
+  clock.advance(5000);await pause(0);assert.ok(!g.sent.some(e=>e.type==='session.commentary.append'));
+  idle=true;clock.advance(5000);await pause(0);clock.advance(5000);await pause(0);
+  assert.ok(!g.sent.some(e=>e.type==='session.commentary.append'),'a quiet comma is not a completed thought');
+  g.receive({type:'session.output_transcript.delta',delta:tail});await pause(0);
+  clock.advance(1800);await pause(0);clock.advance(250);await pause(0);
+  assert.equal(g.sent.filter(e=>e.type==='session.commentary.append').length,1);
+  clock.advance(5000);await pause(0);assert.equal(g.sent.filter(e=>e.type==='session.commentary.append').length,1);
+  assert.equal(g.events.filter(e=>e.type==='origen.research.announced').length,1);g.channel.close();
+ });
+ test(`${language}: a new caller turn receives evidence without a competing announcement`,async()=>{
+  const clock=fakeClock(),f=fixture(clock);
+  f.receive({type:'session.output_transcript.delta',delta:head});await pause(0);
+  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'j',question:'Cost?',result:{answer:'Verified'}}));
+  f.receive({type:'session.input_transcript.delta',delta:question});await pause(0);
+  assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+  clock.advance(5000);await pause(0);
+  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+  assert.equal(f.events.filter(e=>e.type==='origen.research.supplied').length,1);f.channel.close();
+ });
+ test(`${language}: a student handoff waits for audible acknowledgment without closing or muting the call`,async()=>{
+  const clock=fakeClock();let idle=false;
+  const f=fixture({...clock,isPlaybackIdle:()=>idle});let result;
+  f.receive({type:'session.output_transcript.delta',delta:language==='en'?"Let's talk about Elodie.":'Hablemos de Elodie.'});await pause(0);
+  void f.channel.settle().then(value=>{result=value;});
+  clock.advance(4000);await pause(0);assert.equal(result,undefined);
+  assert.equal(f.raw.readyState,'open');assert.ok(!f.sent.some(e=>e.type==='session.input_audio.mute'));
+  idle=true;clock.advance(250);await pause(0);clock.advance(100);await pause(0);
+  assert.equal(result,true);f.channel.close();
+ });
+ test(`${language}: an interruption supersedes a pending student switch and retains the complete question`,async()=>{
+  const clock=fakeClock(),f=fixture(clock);let result;
+  f.receive({type:'session.output_transcript.delta',delta:head});await pause(0);
+  const turn=f.consent.token();void f.channel.settle({isCurrent:()=>f.consent.token()===turn}).then(value=>{result=value;});
+  f.receive({type:'session.input_transcript.delta',delta:question});await pause(0);
+  clock.advance(1100);await pause(0);
+  assert.equal(result,false);assert.equal(f.raw.readyState,'open');
+  assert.equal(f.events.find(e=>e.type==='conversation.item.input_audio_transcription.completed').transcript,question);
+  assert.ok(!f.sent.some(e=>e.type==='session.close'));f.channel.close();
+ });
+}
+
+for(const question of ['What matters most to you?','¿Qué es lo más importante para ti?'])test(`research leaves room for the caller to answer: ${question}`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.receive({type:'session.output_transcript.delta',delta:question});await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
+ clock.advance(10000);await pause(0);clock.advance(10000);await pause(0);
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
+});
+
+test('a deferred handoff preserves the request without claiming a technical failure or confirmed scope',()=>{
+ const result=deferredVoiceHandoff();assert.equal(result.status,'target_switch_deferred');
+ assert.match(result.instruction,/latest complete caller request/);assert.match(result.instruction,/do not ask them to repeat/);
+ assert.match(result.instruction,/Do not use the proposed student context/);assert.doesNotMatch(result.instruction,/loading problem|failed technically/);
+});
+
+for(const reason of ['cancel','close','transport','session','farewell'])test(`${reason} discards queued research rather than speaking it later`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Cost?',result:{answer:'Verified'}}));
+ if(reason==='cancel')f.channel.send(JSON.stringify({type:'origen.research.cancel'}));
+ if(reason==='close')f.channel.close();
+ if(reason==='transport')f.raw.onclose({});
+ if(reason==='session')f.receive({type:'session.closed'});
+ if(reason==='farewell')f.channel.send(JSON.stringify({type:'response.create',response:{metadata:{topic:'origen_farewell'}}}));
+ await pause(0);const count=f.sent.length;clock.advance(10000);await pause(0);
+ assert.equal(f.sent.length,count);assert.ok(!f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));f.channel.close();
+});
+
+test('handoff timeout and aborted/closed calls never authorize forced audio teardown',async()=>{
+ for(const action of ['timeout','abort','close','transport']){
+  const clock=fakeClock(),f=fixture({...clock,isPlaybackIdle:()=>false}),abort=new AbortController();let result;
+  void f.channel.settle({signal:abort.signal,timeoutMs:2000}).then(value=>{result=value;});
+  if(action==='abort')abort.abort();if(action==='close')f.channel.close();if(action==='transport')f.raw.onclose({});
+  clock.advance(2000);await pause(0);assert.equal(result,false);f.channel.close();
+ }
+});
+
+test('research waits for application tool handling even after model generation finished',async()=>{
+ const clock=fakeClock(),f=fixture(clock);let release;
+ const pending=new Promise(resolve=>release=resolve),original=f.channel.onmessage;
+ f.channel.onmessage=async event=>{original(event);if(JSON.parse(event.data).type==='response.done')await pending;};
+ f.backend('response.created','scope');f.backend('response.output_item.done','scope',{item:{type:'function_call',name:'request_conversation_target',call_id:'switch',arguments:'{}'}});
+ f.backend('response.completed','scope');await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
+ clock.advance(5000);await pause(0);assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));
+ release();await pause(0);clock.advance(250);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+});
+
+test('superseded queued evidence never becomes the next research announcement',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Old',result:{answer:'Old evidence'}}));
+ f.channel.send(JSON.stringify({type:'origen.research.cancel'}));
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'New',result:{answer:'New evidence'}}));
+ clock.advance(2000);await pause(0);
+ const context=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content).join('');
+ assert.doesNotMatch(context,/Old evidence/);assert.match(context,/New evidence/);
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);f.channel.close();
+});
+
+test('results arriving during the caller turn are available to that reply without a spoken interruption',async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.receive({type:'session.input_transcript.delta',delta:'¿Qué incluye ese costo?'});await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',question:'Costs',result:{answer:'Verified'}}));
+ assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Verified')));
+ clock.advance(5000);await pause(0);
+ assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
+});
 function fixture(options={}){
  const sent=[],events=[],consent=voiceProfileSaveConsent();
  const raw={readyState:'open',send:value=>sent.push(JSON.parse(value)),close(){this.readyState='closed';}};
@@ -15,6 +269,32 @@ function fixture(options={}){
  return {sent,events,consent,channel,receive,backend,raw};
 }
 test('Realtime remains an unchanged pass-through',()=>{const sent=[];const raw={send:value=>sent.push(value)};const dc=studentLiveChannel(raw);dc.send('{"type":"response.create"}');assert.deepEqual(sent,['{"type":"response.create"}']);});
+test('routing policy reaches timing metadata but is not an unsupported provider session option',async()=>{
+ const f=fixture();f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',instructions:'Backend',tools:[]}});
+ f.receive({type:'session.started'});await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='session.created').at(-1).session.routingPolicy,'bounded-follow-up-v1');
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'reset',session:{routingPolicy:'backend-first',instructions:'New backend',tools:[],liveInstructions:'Replace earlier delegation policy.'}}));
+ const update=f.sent.find(e=>e.type==='session.update');assert.equal(update.session.routingPolicy,undefined);assert.equal(update.session.delegation.responses.routingPolicy,undefined);
+ assert.ok(f.sent.some(e=>e.type==='session.instructions.append'&&e.content.includes('Replace earlier delegation policy.')));
+ f.receive({type:'session.updated',client_event_id:'reset'});await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='session.updated').at(-1).session.routingPolicy,'backend-first');f.channel.close();
+});
+
+test('model timing ends before quiet-window and async tool handling; Live boundaries are labeled estimates',async()=>{
+ const clock=fakeClock(),f=fixture(clock);let release;
+ const pending=new Promise(resolve=>release=resolve),original=f.channel.onmessage;
+ f.channel.onmessage=async event=>{original(event);if(JSON.parse(event.data).type==='response.done')await pending;};
+ f.receive({type:'session.input_transcript.delta',delta:'Recall my earlier plan.'});await pause(0);
+ f.backend('response.created','b');await pause(0);
+ const started=f.events.find(e=>e.type==='origen.backend.started');assert.ok(started.item_id);
+ f.backend('response.output_item.done','b',{item:{type:'function_call',name:'recall_student_context',call_id:'c',arguments:'{}'}});
+ f.backend('response.completed','b');await pause(0);
+ assert.ok(f.events.some(e=>e.type==='origen.backend.model_finished'));assert.ok(!f.events.some(e=>e.type==='origen.backend.finished'));
+ clock.advance(1100);await pause(0);
+ assert.equal(f.events.find(e=>e.type==='input_audio_buffer.speech_stopped').liveBoundary,'transcript_quiet_estimate');
+ assert.ok(f.events.some(e=>e.type==='response.done'));assert.ok(!f.events.some(e=>e.type==='origen.backend.finished'));
+ release();await pause(0);assert.ok(f.events.some(e=>e.type==='origen.backend.finished'));f.channel.close();
+});
 test('Live opening waits for session startup; regular response requests do not duplicate speech',()=>{const f=fixture();f.channel.send(JSON.stringify({type:'response.create',response:{instructions:'Introduce yourself as Origen'}}));f.channel.send(JSON.stringify({type:'response.create'}));assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);assert.equal(f.sent.filter(e=>e.type==='response.create').length,0);f.channel.close();});
 test('opening transport follows familiar context and preserves exact approved check-ins',()=>{
  for(const language of ['en','es'])for(const onboarding of [true,false]){
@@ -44,7 +324,7 @@ for(const name of ['remember_student_detail','recall_student_context','prepare_c
  const f=fixture();f.receive({type:'session.input_transcript.delta',delta:'An earlier request.'});f.backend('response.created','old');await pause(1200);
  f.receive({type:'session.input_transcript.delta',delta:'Stop. I changed my mind.'});f.backend('response.output_item.done','old',{item:{type:'function_call',name,call_id:'stale-call',arguments:'{}'}});f.backend('response.completed','old');await pause(1200);
  assert.ok(!f.events.some(event=>event.type==='response.done'&&event.response.output?.some(item=>item.type==='function_call')));
- const reply=f.sent.find(event=>event.type==='response.item.create');assert.equal(reply.item.call_id,'stale-call');assert.equal(JSON.parse(reply.item.output).status,'superseded_turn');assert.equal(f.sent.filter(event=>event.type==='response.create').length,1);f.channel.close();
+ const reply=f.sent.find(event=>event.type==='response.item.create');assert.equal(reply.item.call_id,'stale-call');assert.equal(JSON.parse(reply.item.output).status,'superseded_turn');assert.match(JSON.parse(reply.item.output).instruction,/not a hearing failure/);assert.match(JSON.parse(reply.item.output).instruction,/do not ask them to repeat/);assert.match(JSON.parse(reply.item.output).instruction,/retry writes automatically/);assert.equal(f.sent.filter(event=>event.type==='response.create').length,1);f.channel.close();
 });
 test('Partial save phrase followed by not yet never grants save consent',async()=>{
  const f=fixture();f.receive({type:'session.input_transcript.delta',delta:'Save my profile'});f.backend('response.created','r');f.receive({type:'session.input_transcript.delta',delta:'? No, not yet.'});f.backend('response.output_item.done','r',{item:{type:'function_call',name:'save_onboarding_profile',call_id:'c',arguments:'{}'}});f.backend('response.completed','r');await pause(1200);
@@ -75,6 +355,29 @@ function fakeClock(){
  return {now:()=>time,schedule:(fn,ms)=>{const id=++next;jobs.set(id,{fn,at:time+ms});return id;},cancel:id=>jobs.delete(id),
   advance(ms){time+=ms;for(const [id,job]of [...jobs])if(job.at<=time){jobs.delete(id);job.fn();}}};
 }
+for(const [language,head,tail]of [['es','Guarda un próximo paso sobre estudios',' ambientales.'],['en','Save a next step about environmental',' studies.']])test(`A brief ${language} pause preserves the complete request while fencing earlier work`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);
+ f.receive({type:'session.input_transcript.delta',delta:head});await pause(0);
+ f.backend('response.created','fragment');clock.advance(1100);await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:tail});await pause(0);
+ f.backend('response.output_item.done','fragment',{item:{type:'function_call',name:'save_next_step',call_id:'old',arguments:'{}'}});
+ f.backend('response.completed','fragment');clock.advance(1100);await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').at(-1).transcript,head+tail);
+ assert.equal(f.events.filter(e=>e.type==='input_audio_buffer.speech_started').at(-1).liveBoundary,'transcript_continuation');
+ assert.equal(JSON.parse(f.sent.find(e=>e.type==='response.item.create').item.output).status,'superseded_turn');
+ assert.ok(!f.events.some(e=>e.type==='response.done'&&e.response.output?.some(i=>i.type==='function_call')));f.channel.close();
+});
+test('Transcript stitching never crosses an assistant reply or a long pause',async()=>{
+ for(const boundary of ['reply','reply-before-flush','silence']){
+  const clock=fakeClock(),f=fixture(clock);
+  f.receive({type:'session.input_transcript.delta',delta:'Save an earlier step.'});await pause(0);
+  if(boundary==='reply-before-flush')f.receive({type:'session.output_transcript.delta',delta:'Do you want to save it?'});
+  await pause(0);clock.advance(1100);await pause(0);
+  if(boundary==='reply')f.receive({type:'session.output_transcript.delta',delta:'Do you want to save it?'});else if(boundary==='silence')clock.advance(1500);
+  await pause(0);f.receive({type:'session.input_transcript.delta',delta:'No, do not save it.'});await pause(0);clock.advance(1100);await pause(0);
+  assert.equal(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').at(-1).transcript,'No, do not save it.');f.channel.close();
+ }
+});
 for(const language of ['en','es'])test(`A stalled ${language} backend is bounded and late write proposals never execute`,async()=>{
  const clock=fakeClock(),f=fixture(clock);f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Policy',tools:[]}});
  f.backend('response.created','slow');
@@ -125,4 +428,36 @@ for(const ending of ['close','transport','session','farewell'])test(`${ending} c
  if(ending==='farewell')f.channel.send(JSON.stringify({type:'response.create',response:{metadata:{topic:'origen_farewell'},instructions:'Say goodbye'}}));
  await pause(0);const sent=f.sent.length;clock.advance(liveBackendDeadlineMs);await pause(0);
  assert.equal(f.sent.length,sent);assert.ok(!f.events.some(e=>e.outcome==='timed_out'));f.channel.close();
+});
+
+test('configuration timing spans send through matching acknowledgment only',async()=>{const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'session.update',event_id:'scope-ready',session:{instructions:'New scope',tools:[]}}));clock.advance(2500);f.receive({type:'session.updated',client_event_id:'unknown'});await pause(0);assert.equal(f.events.filter(e=>e.type==='origen.configuration.applied').length,0);clock.advance(450);f.receive({type:'session.updated',client_event_id:'scope-ready'});await pause(0);assert.equal(f.events.find(e=>e.type==='origen.configuration.applied').durationMs,2950);f.channel.close();});
+
+for(const name of ['Aiden','Hablemos de Aiden'])test(`scope confirmation resumes its native backend before the next research question: ${name}`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);f.channel.send(JSON.stringify({type:'response.create'}));
+ f.receive({type:'session.input_transcript.delta',delta:name});await pause(0);clock.advance(1100);await pause(0);
+ f.backend('response.created','scope');await pause(0);
+ f.backend('response.output_item.done','scope',{item:{type:'function_call',name:'request_conversation_target',call_id:'target',arguments:'{}'}});
+ f.backend('response.completed','scope');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'target',output:JSON.stringify({status:'target_confirmed'})}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));clock.advance(6000);await pause(0);
+ assert.ok(!f.events.some(e=>e.type==='origen.speech.silence_recovered'));
+ assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1,'scope receipts must complete the same backend tool loop');f.channel.close();
+});
+for(const status of ['research_pending','research_failed'])test(`single research receipt ${status} resumes its native backend exactly once`,async()=>{
+ const f=fixture();f.channel.send(JSON.stringify({type:'response.create'}));
+ f.backend('response.created','research');await pause(0);
+ f.backend('response.output_item.done','research',{item:{type:'function_call',name:'lookup_financial_aid',call_id:'lookup',arguments:'{}'}});
+ f.backend('response.completed','research');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'lookup',output:JSON.stringify({status})}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);f.channel.close();
+});
+test('research evidence preserves missing verification and scenario assumptions',async()=>{
+ const f=fixture();
+ f.receive({type:'session.input_transcript.delta',delta:'Tell me more'});await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'r',question:'Berkeley costs',result:{status:'completed',answer:'Could not verify the next year.'}}));
+ const instruction=f.sent.filter(e=>e.type==='session.instructions.append').map(e=>e.content).join('');
+ assert.match(instruction,/could not verify never means not published/);
+ assert.match(instruction,/never facts about this student unless confirmed/);f.channel.close();
 });

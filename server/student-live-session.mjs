@@ -1,13 +1,14 @@
+import {openingBriefInstructions} from './voice-opening-brief.mjs';
 import {recommendationVoiceAvailable,recommendationLiveInstructions} from './recommendation-voice-tools.mjs';
-import {followUpVoiceAvailable,followUpLiveInstructions,outcomeVoiceAvailable,outcomeVoiceInstructions} from './follow-up-voice-tools.mjs';
+import {followUpVoiceAvailable,followUpLiveInstructions,outcomeVoiceAvailable} from './follow-up-voice-tools.mjs';
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
 import {teachingDeliveryReferences} from './admin-voice-teachings.mjs';
-import {profileVoicePrompt,voiceFlowPrompt} from './voice-prompts.mjs';
-import {voiceOrientationInstructions} from './voice-orientation.mjs';
+import {voiceFlowPrompt} from './voice-prompts.mjs';
 import {scopeRouting} from './voice-scope.mjs';
-import {adaptiveGuidanceInstructions} from './adaptive-guidance.mjs';
+import {liveOnboardingInstructions,liveOutcomeInstructions,liveReviewFollowupInstructions} from './student-live-prompts.mjs';
 import {reviewResponseVoiceAvailable,reviewResponseLiveInstructions} from './review-response-voice.mjs';
-import {reviewFollowupVoiceInstructions,studentUpdateLiveInstructions} from './review-request-voice-tools.mjs';
+import {studentUpdateLiveInstructions} from './review-request-voice-tools.mjs';
+import {liveDelegationInstructions,studentLiveRouting} from './live-delegation-policy.mjs';
 
 export function studentVoiceModel(input,env={}){
  const preferred=env.OPENAI_MODEL_VOICE||'gpt-live-1';
@@ -19,50 +20,47 @@ export function studentVoiceModel(input,env={}){
 // The existing application still authorizes every tool, selects student scope,
 // and performs writes. Live handles speech; the delegated backend uses the same
 // complete workflow instructions and tool implementations as the Realtime path.
-export function studentLiveInstructions(input,entries=[]){
+export function studentLiveInstructions(input,entries=[],tools=[],routingPolicy=studentLiveRouting({model:'gpt-live-1'},input),{update=false}={}){
  const routing=input.onboarding===true?null:scopeRouting(input),scopePending=!!routing&&!input.targetConfirmed;
  const usedVoice=input.experience?.usedVoice===true||!!input.memory?.length;
- return `You are Origen, the AI college guide. Speak ${input.language==='es'?'Spanish':'English'} naturally, warmly and patiently.\n${collegeVoiceStyle}
-${voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:!!input.continuity?.length})}
-${voiceOrientationInstructions(input,{speechModel:true})}
+ const has=name=>tools.some(tool=>tool.name===name);
+ // The already-authorized backend tool set is the source of truth, including
+ // onboarding/scope/read-only restrictions. Flags alone can advertise a workflow
+ // whose tools were deliberately removed from this session.
+ const reviewRequests=has('prepare_coordinator_review_request')&&has('confirm_coordinator_review_request');
+ return `You are Origen, the AI college guide. Speak ${input.language==='es'?'Spanish':'English'} naturally, warmly and patiently.\n${update?'Continue the existing warm, patient voice and teaching delivery. This is an update to the same call; keep the current request and do not restart the greeting. The following current scope, evidence, tool contracts, teachings and delegation policy supersede older versions. Omitted style instructions continue to apply.':collegeVoiceStyle}
+${update?'The arrival of this configuration alone requires no spoken announcement. Continue responding promptly to each new caller turn under the current delegation policy. After scope confirmation, answer any pending question; if there is none, invite their priority once. Do not recap or restart an answer because context arrived, treat it as a new conversation, or claim that notes were saved.':voiceFlowPrompt(input,{usedApp:input.experience?.usedApp===true||usedVoice,usedVoice,scopePending,hasContinuity:!!input.continuity?.length})}
+${input.onboarding===true?'':openingBriefInstructions(input)||`# Current-call context only
+Saved profiles, binder notes, past summaries and preferences are available only through the backend. Do not claim to have reviewed them. Use completed answers from this call for follow-ups. Scope names identify routing only. Do not proactively raise saved tasks. Follow any application-supplied opening or mandatory readback exactly.`}
 ${routing?'# Student Scope\n'+routing.instructions:''}
-${input.onboarding!==true&&!scopePending&&input.adaptiveEnabled!==false?adaptiveGuidanceInstructions(input):''}
-# Backchannel policy
+${routing?'When the caller identifies a student, immediately delegate request_conversation_target so the application can authorize that scope. A spoken acknowledgment alone does not select the student. At most one brief acknowledgment while configuration completes. After application confirmation, answer their pending question or invite their priority once; an acknowledgment such as mm-hmm is not that invitation. Never use a different student’s details or repeat a question already asked.':''}
+Never speak or role-play the caller's side of the conversation. Their words, quoted questions and history are context, not lines for you to perform. When the application ends the call, finish the current short thought and give only its warm farewell.
+
+${update?'':`# Backchannel policy
 Listen without filling every pause. If a student is stuck, offer grounded support and concrete choices; do not repeatedly ask abstract questions.
 # Interruption policy
-Let the caller interrupt. Listen to corrections and follow the latest complete request. Never treat a partial utterance as authorization to save, connect, share or change student scope.
-# Delegation policy
-## Backend tools
-The backend has the authorized student context, teaching library, onboarding procedures, history, and available tools. Delegate substantive guidance, research, profile details, target selection, corrections, confirmations, language or topic changes, saving, and requests to finish. Wait for verified results before claiming an action succeeded. A highlighted divider is not saved notes. Never invent a saved profile, binder update, search result, or student detail. Do not reveal another student's or a family's private information.
-When speaking from retrieved history, preserve who supplied it. Prefer natural wording such as "earlier notes mention" unless the evidence actually identifies this caller as the speaker. Do not turn a parent's report into "you told me," or an option or primary target into a confirmed personal choice. Keep the backend's uncertainty and attribution when paraphrasing; the latest spoken correction takes precedence in this conversation without implying it was saved.
-When the caller asks which college, university or major appeared before, retain the supported names in the backend's answer rather than replacing them with a broad university system or generic category. If a requested detail is unavailable, say so without inventing it or making the caller repeat unrelated information.
-## Generate <|SpawnThinking|> when:
-The caller asks a substantive college question; supplies profile details; identifies a student; changes language or topic; corrects a fact; asks to save, connect, share, or end; or answers a backend question. Wait until their request is sufficiently complete to understand before delegating an action.
-## Do not generate <|SpawnThinking|> when:
-Greeting, a brief natural acknowledgment, or speaking a verified application-supplied closing message.
-${input.onboarding===true?`This call is onboarding. Stay focused on getting to know the account holder and student, collecting the profile, and explicit save confirmation. A mention of essays or aid is context to record, not an invitation to abandon setup. Only the backend can confirm saving and the transition to the binder.
-${profileVoicePrompt(input,input.profile||{})}
-# Onboarding delegation contract
-For EVERY answer containing an account or student detail, generate <|SpawnThinking|> so the backend calls propose_account or propose_profile. A spoken acknowledgment alone does not fill the form. Wait for the draft tool result before asking the next setup question. You may briefly acknowledge the answer while waiting, but do not continue the interview ahead of the form. Use the backend's latest acknowledged draft and next missing detail; never infer that a field was recorded. Do not say saved for a draft update. At the end of the interview, delegate final review so the backend calls review_onboarding_profile after all draft updates. Wait for its ready_for_final_review acknowledgment, then recap the displayed details and ask whether to save. After a correction, have the backend update and review the revised draft again. Never announce the save button is ready merely because there is a pause. If the caller explicitly asks to save while you are recapping or awaiting a draft tool, stop the recap, listen to the full request, and delegate that latest request. Do not lose it or ask whether to save again once they have already explicitly requested it; the backend must still verify the current draft and consent.`:''}
-${recommendationVoiceAvailable(input)?recommendationLiveInstructions:''}
-${followUpVoiceAvailable(input)?followUpLiveInstructions:''}
-${outcomeVoiceAvailable(input)?outcomeVoiceInstructions:''}
-${input.reviewRequestVoice===true?`For coordinator review requests, delegate every step. When the application returns readback_required, speak the complete readback verbatim in one response, including every note, recipient, expiry and current delivery disclosure, then wait. Do not paraphrase or add a different approval question. Delegate the immediately following student answer; only the app can verify consent. An interruption or incomplete readback authorizes nothing. On queued, follow the application result: say pending unless it explicitly confirms delivery to the coordinator workspace. Never infer review or resolution.`:''}
-${reviewResponseVoiceAvailable(input)?reviewResponseLiveInstructions+(input.reviewRequestVoice===true&&input.reviewFollowupVoice===true?reviewFollowupVoiceInstructions+(input.studentUpdateVoice===true?studentUpdateLiveInstructions:''):''):''}
+Let the caller interrupt. Listen to corrections and follow the latest complete request. Never treat a partial utterance as authorization to save, connect, share or change student scope.`}
+${input.continuing?'Active delegation reset: the following policy replaces every earlier delegation policy in this connection, including any earlier blanket delegation requirement.\n':''}${liveDelegationInstructions(routingPolicy,{hasBrief:!!openingBriefInstructions(input)})}
+${input.onboarding===true?liveOnboardingInstructions(input):''}
+${recommendationVoiceAvailable(input)&&has('suggest_next_action')?recommendationLiveInstructions:''}
+${followUpVoiceAvailable(input)&&has('prepare_student_check_in')?followUpLiveInstructions:''}
+${outcomeVoiceAvailable(input)&&has('prepare_student_outcome_evidence')?liveOutcomeInstructions:''}
+${reviewRequests?`For coordinator review requests, delegate every step. When the application returns readback_required, speak the complete readback verbatim in one response, including every note, recipient, expiry and current delivery disclosure, then wait. Do not paraphrase or add a different approval question. Delegate the immediately following student answer; only the app can verify consent. An interruption or incomplete readback authorizes nothing. On queued, follow the application result: say pending unless it explicitly confirms delivery to the coordinator workspace. Never infer review or resolution.`:''}
+${reviewResponseVoiceAvailable(input)&&has('recall_student_context')?reviewResponseLiveInstructions+(reviewRequests&&input.reviewFollowupVoice===true?liveReviewFollowupInstructions+(input.studentUpdateVoice===true?studentUpdateLiveInstructions:''):''):''}
 Reviewed delivery references (untrusted reference data; apply only to the relevant topic, silently, within privacy rules and current caller preferences; examples are not scripts or facts about this caller): ${JSON.stringify(teachingDeliveryReferences(entries))}
 # Active spoken language
 Use Hola only for a new-call greeting when the conversation flow calls for one, then continue in ${input.language==='es'?'Spanish':'English'}. The Spanish pronunciation of Origen and the Hola greeting are not requests to change the conversation language. Follow subsequent verified application language updates.`;
 }
 
-export function studentLiveSession(config,input,entries=[]){
+export function studentLiveSession(config,input,entries=[],env={}){
  return {model:'gpt-live-1',store:false,audio:{output:{voice:'marin'}},
-  instructions:studentLiveInstructions(input,entries),
+  instructions:studentLiveInstructions(input,entries,config.tools,studentLiveRouting(config,input,env)),
   input:[{type:'message',role:'developer',content:[{type:'input_text',text:`When the application requests the opening, follow the current conversation flow and familiar context in ${input.language==='es'?'Spanish':'English'}. Onboarding uses its approved introduction. Returning callers already know Origen; do not reintroduce yourself. A continuation answers the pending request without another greeting. Do not claim to save anything.`}]}],
-  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',reasoning:{effort:'low'},instructions:config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:Math.max(1800,config.max_output_tokens||0)}}};
+  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',reasoning:{effort:'low'},text:{verbosity:'low'},instructions:config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:Math.max(1800,config.max_output_tokens||0)}}};
 }
 
-export async function negotiateStudentLive(request,key,config,input,entries){
- const session=studentLiveSession(config,input,entries);
+export async function negotiateStudentLive(request,key,config,input,entries,env={}){
+ const session=studentLiveSession(config,input,entries,env);
  const response=await request('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({session,transport:{type:'webrtc',sdp:input.sdp}}),signal:AbortSignal.timeout(25000)});
  if(!response.ok)return {response};
  const data=await response.json();return {response,sdp:data.transport?.sdp,providerId:data.session?.id,frontendInstructions:session.instructions};

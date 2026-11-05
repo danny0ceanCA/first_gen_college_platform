@@ -9,3 +9,6 @@
 .voice-presence[data-state=muted],.voice-presence[data-state=ending],.voice-presence[data-state=blocked]{color:#857971}.voice-presence[data-state=muted] .presence-orbit{stroke-dasharray:3 6;opacity:.6}
 @keyframes presence-orbit{to{transform:rotate(360deg)}}@keyframes presence-breathe{50%{transform:scale(1.13);opacity:.3}}
 @media(prefers-reduced-motion:reduce){.voice-presence *{animation:none!important;transition:none!important}}
+
+/* Only audible Origen speech animates. All waiting and microphone states stay still. */
+.voice-presence:not([data-state=speaking]) *{animation:none!important;transition:none!important}

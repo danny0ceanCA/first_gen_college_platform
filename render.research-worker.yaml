@@ -1,0 +1,24 @@
+# Separate opt-in Blueprint. Nothing deploys from this local file automatically.
+# API requires ORIGEN_BACKGROUND_RESEARCH=true after migration 123 and grants.
+# Provision the origen_research_worker LOGIN separately, then run
+# npm run db:grant-research-worker with MIGRATION_DATABASE_URL. Use that
+# restricted login in RESEARCH_WORKER_DATABASE_URL, never the migration login.
+# Re-run existing npm run db:grant-runtime for the API role if applicable.
+# Worker receives sanitized public questions only, not binder/student history.
+services:
+  - type: worker
+    name: origen-official-research
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm run worker:research
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: RESEARCH_WORKER_DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+

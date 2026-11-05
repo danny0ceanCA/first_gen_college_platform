@@ -20,6 +20,12 @@ test('live intent requires an explicit exact request or a separately bound confi
  assert.equal(memoryIntent('Add email my counselor to my next steps',{kind:'next-step',content:'Email my counselor'}),'authorized');
  assert.equal(memoryIntent('Guarda llamar a la consejera como mi próximo paso',{kind:'next-step',content:'Llamar a la consejera'}),'authorized');
  assert.equal(acceptsProposal('Sí, guárdalo.'),true);assert.equal(acceptsProposal('Yes but save a different thing'),false);
+ for(const text of ['Yes, save that next step.','Sí, guarda ese próximo paso.']){
+  assert.equal(acceptsProposal(text,'next-step'),true);
+  assert.equal(acceptsProposal(text,'create'),false);
+  assert.equal(memoryIntent(text,{kind:'next-step',content:'A new step'}),'clarify');
+ }
+ for(const text of ['Yes, save that next step but change the college.','Sí, guarda ese próximo paso pero cambia la universidad.','Do not save that next step.','Can you save that next step?'])assert.equal(acceptsProposal(text,'next-step'),false);
  assert.throws(()=>validateLiveMemoryRequest({action:'read',sessionId:randomUUID(),studentId:'forged'}),{status:400});
 });
 
@@ -79,9 +85,25 @@ test('live memory repositories enforce session, consent, receipt and lifecycle b
   });
   await t.test('accepted next steps reuse plans and cannot become completed actions or duplicate on retry',async()=>{
    const s=await open(),base=await turn(s,1,'Add email my counselor to my next steps'),c={kind:'next-step',category:'education',content:'Email my counselor'},id=randomUUID();
-   const saved=await write(base,c,id);assert.equal((await write(base,c,id)).id,saved.id);
+   const saved=await write(base,c,id);assert.equal(saved.reconnect,false);assert.match(saved.instruction,/continue the same conversation/);assert.equal((await write(base,c,id)).id,saved.id);
    const rows=(await f.as('reader',()=>f.db.query('SELECT status FROM origen_plan_steps WHERE plan_id=$1',[saved.id]))).rows;assert.deepEqual(rows,[{status:'not-started'}]);
    assert.equal((await f.as('reader',()=>f.db.query('SELECT count(*)::int AS n FROM origen_plans WHERE id=$1',[saved.id]))).rows[0].n,1);
+  });
+  await t.test('natural English and Spanish step confirmations require a presented current proposal',async()=>{
+   for(const [language,request,yes,content] of [
+    ['en','Please save a next step to ask a counselor about transfer options.','Yes, save that next step.','Ask a counselor about transfer options.'],
+    ['es','Guarda un próximo paso para preguntar al consejero sobre transferencias.','Sí, guarda ese próximo paso.','Preguntar al consejero sobre transferencias.']
+   ]){
+    const s=await open(),c={kind:'next-step',category:'transfer',content};
+    const base=await turn(s,1,request,language),proposal=await write(base,c);assert.equal(proposal.status,'clarification_required');assert.ok(proposal.readback.includes(content));
+    const unpresented=await turn(s,2,yes,language);assert.equal((await write(unpresented,c)).status,'clarification_required');
+    const presentation=proposal.readback;
+    assert.equal((await run({...unpresented,action:'present',change:c,presentation})).status,'presented');
+    const confirmation=await turn(s,3,yes,language),saved=await write(confirmation,c);
+    assert.equal(saved.status,'saved');
+    const steps=(await f.as('reader',()=>f.db.query('SELECT status FROM origen_plan_steps WHERE plan_id=$1',[saved.id]))).rows;
+    assert.deepEqual(steps,[{status:'not-started'}]);
+   }
   });
   await t.test('new turns, scope erasure, concurrent edits and session expiry fence delayed work',async()=>{
    const s=await open(),base=await turn(s,1,'Remember that a delayed detail');await turn(s,2,'A newer question');await assert.rejects(write(base,change('a delayed detail')),{status:409});

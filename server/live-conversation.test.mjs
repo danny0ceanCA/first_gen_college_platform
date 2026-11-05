@@ -15,7 +15,7 @@ test('research calls remain fulfillable across every topic transition',()=>{
  for(const current of ['finance','loans','planning','admissions']){
   assert.equal(researchModeForTool('lookup_college_applications',current),'admissions');
   assert.equal(researchModeForTool('lookup_education_planning',current),'planning');
-  assert.equal(researchModeForTool('lookup_financial_aid',current),current==='loans'?'loans':'finance');
+  assert.equal(researchModeForTool('lookup_financial_aid',current),'finance');
   assert.equal(researchModeForTool('unknown_tool',current),null);
  }
 });

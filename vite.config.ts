@@ -4,6 +4,8 @@ import {createDiagnostics,createDiagnosticHandler} from './server/diagnostics.mj
 import {createFinanceResearchHandler} from './server/finance-research.mjs';
 import { createProfileVoiceHandler } from './server/profile-voice.mjs';
 import { defineConfig, loadEnv } from 'vite';
+import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import { createAIHandler } from './server/ai.mjs';
 import {createProxyRecapHandler} from './server/topic-recap-dev.mjs';
 
@@ -19,6 +21,7 @@ export default defineConfig(({mode}) => {
   const financeMiddleware=createFinanceResearchHandler(env,fetch,log);
   const summaryMiddleware=createSummaryHandler(env); const middleware = createAIHandler(env); const voiceMiddleware = createProfileVoiceHandler(env,fetch,log);
   return {
+    define:{__ORIGEN_BUILD_ID__:JSON.stringify(createHash('sha256').update(['src/ProfileVoice.tsx','src/studentLiveChannel.mjs','src/backgroundResearch.mjs','server/student-live-session.mjs','server/live-delegation-policy.mjs','server/voice-prompts.mjs'].map(path=>readFileSync(path,'utf8')).join('\n')).digest('hex').slice(0,16))},
     server: {host:'127.0.0.1',port:5173,strictPort:true,proxy:apiTarget?{
       '/api':{target:apiTarget,changeOrigin:true,configure(proxy){
         // This is a server-to-server request, rather than browser CORS.

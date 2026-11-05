@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {backgroundResearch} from './backgroundResearch.mjs';
+import {voiceHandoff} from './voiceHandoff.mjs';
+function fixture(){
+ const timers=new Map(),delivered=[],removed=[];let seq=0,current=true,quiet=true,clock=0,status='running',reads=0;
+ const queue=backgroundResearch({post:async()=>({id:'job'}),read:async()=>{reads++;return {id:'job',status,result:{answer:'Verified',sources:[]}}},remove:async id=>removed.push(id),isCurrent:()=>current,isQuiet:()=>quiet,deliver:x=>delivered.push(x),schedule:fn=>{timers.set(++seq,fn);return seq;},cancel:id=>timers.delete(id),now:()=>clock});
+ return {queue,delivered,removed,setCurrent:v=>current=v,setQuiet:v=>quiet=v,setStatus:v=>status=v,setClock:v=>clock=v,reads:()=>reads,async tick(){const [id,fn]=timers.entries().next().value||[];if(fn){timers.delete(id);fn();await new Promise(r=>setImmediate(r));}}};
+}
+
+test('research status is accepted only after a job receipt, then follows real worker state',async()=>{
+ let accept,tick,status='running';const states=[],delivered=[];
+ const q=backgroundResearch({post:()=>new Promise(r=>accept=r),read:async()=>({status,result:{answer:'Verified'}}),remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:x=>delivered.push(x),onRequest:x=>states.push(x),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ const starting=q.start({requestKey:'native-call',question:'Santa Cruz published tuition; residency unknown',institution:'UC Santa Cruz',language:'en',mode:'finance',studentId:'student'});
+ assert.equal(states.at(-1).state,'requesting');assert.equal(states.at(-1).jobId,null);
+ accept({id:'real-job',status:'queued'});assert.equal((await starting).jobId,'real-job');
+ assert.equal(states.at(-1).state,'queued');assert.equal(states.at(-1).requestId,'native-call');
+ await tick();await new Promise(r=>setImmediate(r));assert.equal(states.at(-1).state,'running');
+ status='completed';await tick();await new Promise(r=>setImmediate(r));
+ assert.equal(states.at(-1).state,'completed');assert.equal(delivered.length,1);
+ assert.ok(states.every(s=>s.question.includes('residency unknown')&&s.studentId==='student'));q.close();
+});
+
+test('a failed enqueue is never reported as an active lookup',async()=>{
+ const states=[];const q=backgroundResearch({post:async()=>{throw Error('offline');},remove:async()=>{},onRequest:x=>states.push(x),isCurrent:()=>true,onState:()=>{}});
+ await assert.rejects(q.start({question:'Costs',requestKey:'r'}));
+ assert.deepEqual(states.map(s=>s.state),['requesting','failed']);assert.ok(states.every(s=>s.jobId===null));q.close();
+});
+
+test('a duplicate while enqueue is pending cannot fabricate an accepted job',async()=>{
+ let accept,posts=0;const q=backgroundResearch({post:()=>{posts++;return new Promise(r=>accept=r);},remove:async()=>{},isCurrent:()=>true,schedule:()=>1,cancel:()=>{}});
+ const query={question:'Costs',institution:'UC Santa Cruz',studentId:'a'};
+ const first=q.start(query),second=await q.start(query);
+ assert.equal(posts,1);assert.equal(second.status,'research_requesting');assert.equal(second.jobId,undefined);
+ accept({id:'accepted'});assert.equal((await first).jobId,'accepted');q.close();
+});
+
+test('duplicate accepted requests preserve their original job and scope',async()=>{
+ let posts=0;const states=[];const q=backgroundResearch({post:async()=>({id:'job'+ ++posts}),remove:async()=>{},isCurrent:()=>true,isQuiet:()=>false,onRequest:x=>states.push(x),schedule:()=>1,cancel:()=>{}});
+ const query={question:'Santa Cruz tuition',institution:'UC Santa Cruz',mode:'finance',language:'en',studentId:'a'};
+ const first=await q.start({...query,requestKey:'first'}),second=await q.start({...query,requestKey:'repeat'});
+ assert.equal(first.jobId,second.jobId);assert.equal(posts,1);assert.equal(states.at(-1).requestId,'first');q.close();
+});
+
+for(const status of [undefined,429,500,503])test(`temporary polling failure ${status} keeps the original job and recovers`,async()=>{
+ let reads=0,tick;const delivered=[],removed=[];
+ const q=backgroundResearch({post:async()=>({id:'original'}),read:async()=>{if(++reads<3)throw Object.assign(Error('temporary'),{status});return {status:'completed',result:{text:'Verified'}};},remove:async id=>removed.push(id),isCurrent:()=>true,isQuiet:()=>true,deliver:r=>delivered.push(r),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ await q.start({question:'Costs'});for(let n=0;n<3;n++){await tick();await new Promise(r=>setImmediate(r));}
+ assert.equal(reads,3);assert.deepEqual(removed,[]);assert.equal(delivered.length,1);assert.equal(delivered[0].status,'completed');q.close();
+});
+for(const status of [401,403,404,405])test(`terminal polling failure ${status} is delivered once without a retry loop`,async()=>{
+ let reads=0,tick;const delivered=[];
+ const q=backgroundResearch({post:async()=>({id:'original'}),read:async()=>{reads++;throw Object.assign(Error('denied'),{status});},remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:r=>delivered.push(r),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ await q.start({question:'Costs'});for(let n=0;n<3;n++){await tick();await new Promise(r=>setImmediate(r));}
+ assert.equal(reads,1);assert.equal(delivered.length,1);assert.equal(delivered[0].status,'failed');q.close();
+});
+for(const question of ['What does Berkeley cost?','¿Cuánto cuesta Berkeley?'])test(`research returns immediately and survives ordinary clarification: ${question}`,async()=>{
+ const f=fixture();const pending=await f.queue.start({question});assert.equal(pending.status,'research_pending');assert.equal(f.reads(),0);
+ f.setQuiet(false);await f.tick();assert.equal(f.removed.length,0);
+ f.setStatus('completed');await f.tick();assert.equal(f.delivered.length,0);
+ f.setQuiet(true);await f.tick();assert.equal(f.delivered.length,1);assert.equal(f.delivered[0].question,question);f.queue.close();
+});
+test('scope changes discard completed evidence',async()=>{const f=fixture();await f.queue.start({question:'Costs'});f.setStatus('completed');f.setCurrent(false);await f.tick();assert.equal(f.delivered.length,0);assert.deepEqual(f.removed,['job']);});
+test('cancel does not disable later research',async()=>{const f=fixture();await f.queue.start({question:'Costs'});f.queue.cancel();await f.tick();assert.equal(f.delivered.length,0);await f.queue.start({question:'Deadlines'});f.setStatus('completed');await f.tick();assert.equal(f.delivered[0].question,'Deadlines');});
+test('close while enqueue is pending cancels the eventual job',async()=>{let finish;const removed=[];const f=backgroundResearch({post:()=>new Promise(r=>finish=r),remove:async id=>removed.push(id),isCurrent:()=>true,isQuiet:()=>true,deliver:()=>assert.fail()});const pending=f.start({question:'Costs'});f.close();finish({id:'late'});assert.equal((await pending).status,'research_cancelled');assert.deepEqual(removed,['late']);});
+test('timeout cancels server work and reports failure once at a pause',async()=>{const f=fixture();await f.queue.start({question:'Costs'});f.setClock(120000);f.setQuiet(false);await f.tick();assert.equal(f.delivered.length,0);f.setQuiet(true);await f.tick();assert.equal(f.delivered[0].status,'failed');await f.tick();assert.equal(f.delivered.length,1);});
+test('handoff separates pending caller speech from instructions in both languages',()=>{for(const q of ['What about Elodie?','¿Y Elodie?']){const text=voiceHandoff(q);assert.ok(text.endsWith(JSON.stringify(q)));assert.match(text,/never speak, paraphrase or role-play/);assert.match(text,/without asking for them again/);}});

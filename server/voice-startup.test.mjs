@@ -2,12 +2,48 @@ import {createPlanRepository,validatePlan} from './plans.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
+import {randomUUID} from 'node:crypto';
 import {voiceStartup} from '../src/voiceStartup.mjs';
-import {voicePreparationCache,voicePreparationKey,voiceContextVersion} from './voice-preparation.mjs';
+import {voicePreparationCache,voicePreparationKey,voiceContextVersion,preparedVoiceContext} from './voice-preparation.mjs';
 import {retrievalFixture} from './history-retrieval-fixture.mjs';
 import {createProfileVoiceHandler} from './profile-voice.mjs';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {resolve,reject,promise};};
 const audio=()=>{let stopped=0;return {stream:{getTracks:()=>[{stop(){stopped++;}}]},stopped:()=>stopped};};
+
+test('returning parent startup receipts preserve prepared child context; real changes still invalidate it',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();let headers;
+ const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',ORIGEN_VOICE_PREPARATION:'true'},async()=>new Response(JSON.stringify({session:{id:'synthetic'},transport:{sdp:'v=0\r\nanswer'}}),{status:201}),()=>{},f.db);
+ const scope={mode:'planning',studentId:'alex',role:'parent',language:'en',targetConfirmed:true,routeConversations:true};
+ async function call(body){
+  const req=Object.assign(Readable.from([JSON.stringify({...scope,...body})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reader'}});let status,data;
+  await f.as('reader',()=>handler(req,{writeHead(s,h){status=s;headers=h;},end(s){data=JSON.parse(s);}},()=>{}));
+  assert.equal(status,200,JSON.stringify(data));return data;
+ }
+ const revision=()=>f.as('reader',()=>voiceContextVersion(f.db,'reader'));
+ try{
+  await f.family('reader',{action:'welcome-heard'});
+  for(const language of ['en','es']){
+   const selected=await call({action:'prepare',language});assert.ok(selected.preparedContextId);
+   const neutral=await call({action:'prepare',language,studentId:undefined,targetConfirmed:false});
+   const before=await revision();
+   await call({sdp:'v=0',voiceProtocol:'live-v1',language,studentId:undefined,targetConfirmed:false,preparedContextId:neutral.preparedContextId});
+   await f.family('reader',{action:'voice-used'});
+   await f.family('reader',{action:'welcome-heard'});
+   assert.equal(await revision(),before,'repeat receipts must not change the context revision');
+   await call({action:'update-guide',voiceProtocol:'live-v1',language,preparedContextId:selected.preparedContextId});
+   assert.match(headers['Server-Timing'],/preparation;desc="hit"/);
+  }
+  const stale=await call({action:'prepare'});
+  await f.family('reader',{action:'save-student',student:{id:'alex',name:'Alex',stage:'Community college',interest:'NEW_INTEREST',gpa:'',color:'peach'}});
+  const updated=await call({action:'update-guide',voiceProtocol:'live-v1',preparedContextId:stale.preparedContextId});
+  assert.match(headers['Server-Timing'],/preparation;desc="miss"/);
+  assert.match(JSON.stringify(updated.session),/NEW_INTEREST/);
+  // A first-ever receipt is a real experience change and must remain versioned.
+  const before=await f.as('other',()=>voiceContextVersion(f.db,'other'));
+  await f.family('other',{action:'voice-used'});
+  assert.notEqual(await f.as('other',()=>voiceContextVersion(f.db,'other')),before);
+ }finally{await f.close();}
+});
 
 test('audio permission and authentication start concurrently; ready preparation is optional',async()=>{
  const token=deferred(),media=deferred(),calls=[],a=audio();
@@ -36,7 +72,67 @@ test('preparation is one-use, bounded, scope/key/revision/policy checked, and ev
  const id=put();assert.equal(cache.take('other',id,key,'1'),undefined);assert.equal(cache.take('reader',id,key,'1').input.studentId,'alex');assert.equal(cache.take('reader',id,key,'1'),undefined);
  assert.equal(cache.take('reader',put(),key,'2'),undefined);assert.equal(cache.take('reader',put(),'wrong','1'),undefined);
  const old=put();env.ORIGEN_PERSONALIZATION_MODE='off';assert.equal(cache.take('reader',old,key,'1'),undefined);
- const expired=put();time=13000;assert.equal(cache.take('reader',expired,key,'1'),undefined);
+ const expired=put();time=61000;assert.equal(cache.take('reader',expired,key,'1'),undefined);
+});
+
+test('SDP-ready wait uses preparation finishing after audio, with a bounded abortable grace period',async()=>{
+ const p=deferred();const ready=await voiceStartup({getToken:async()=> 'token',getMedia:async()=>audio().stream,prepare:()=>p.promise});
+ assert.equal(ready.prepared(),undefined);const waiting=ready.waitForPrepared(1000);p.resolve('ready');assert.equal(await waiting,'ready');
+ const late=deferred();let signal;const slow=await voiceStartup({getToken:async()=> 'token',getMedia:async()=>audio().stream,prepare:(_,s)=>{signal=s;return late.promise;}});
+ assert.equal(await slow.waitForPrepared(10),undefined);assert.equal(signal.aborted,true);late.resolve('too-late');await new Promise(r=>setImmediate(r));assert.equal(slow.prepared(),undefined);
+});
+
+test('prepared snapshots contain evidence only and keep separate neutral/confirmed scopes',()=>{
+ assert.deepEqual(preparedVoiceContext({profile:{name:'Alex'},caller:{name:'Parent'},voiceProtocol:'old',enableLiveMemory:false,continuing:true,token:'secret',sdp:'v=0'}),{profile:{name:'Alex'},caller:{name:'Parent'}});
+ const cache=voicePreparationCache({});const one=cache.put('parent','neutral','1',{context:'neutral'}),two=cache.put('parent','alex','1',{context:'alex'});
+ assert.equal(cache.take('parent',one,'neutral','1').context,'neutral');assert.equal(cache.take('parent',two,'alex','1').context,'alex');
+});
+
+test('preparation bypass for linked profiles preserves ordinary continuity revision checks',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();
+ try{
+  await f.owner.query("INSERT INTO origen_student_links(owner_account_id,owner_student_id,member_account_id,member_student_id,member_role) SELECT o.id,'alex',m.id,'alex','student' FROM origen_accounts o CROSS JOIN origen_accounts m WHERE o.auth0_subject='reader' AND m.auth0_subject='other'");
+  assert.notEqual(await f.as('other',()=>voiceContextVersion(f.db,'other')),undefined);
+  assert.equal(await f.as('other',()=>voiceContextVersion(f.db,'other',{forPreparation:true})),undefined);
+  assert.notEqual(await f.as('reader',()=>voiceContextVersion(f.db,'reader',{forPreparation:true})),undefined);
+ }finally{await f.close();}
+});
+
+test('prepared Live startup preserves current controls, reloads teachings, and isolates the parent opening in both languages',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const f=await retrievalFixture();let calls=0,sent,headers;
+ const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',ORIGEN_VOICE_PREPARATION:'true'},async(url,options)=>{
+  calls++;assert.ok(url.endsWith('/live/sessions'));sent=JSON.parse(options.body).session;
+  return new Response(JSON.stringify({session:{id:'synthetic'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});
+ },()=>{},f.db);
+ const input={mode:'planning',studentId:'alex',role:'parent',language:'en',targetConfirmed:true,routeConversations:true};
+ async function call(body){
+  const req=Object.assign(Readable.from([JSON.stringify({...input,...body})]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json'},origenAuthorized:true,origenIdentity:{sub:'reader'}});let status,data;
+  await f.as('reader',()=>handler(req,{writeHead(s,h){status=s;headers=h;},end(s){data=JSON.parse(s);}},()=>{}));
+  assert.equal(status,200,JSON.stringify(data));return data;
+ }
+ try{
+  await f.save('private','PRIVATE_CHILD_DETAIL: Alex wants evening classes.');
+  for(const language of ['en','es']){
+   const selected=await call({action:'prepare',language});assert.ok(selected.preparedContextId);
+   const neutral=await call({action:'prepare',language,studentId:undefined,targetConfirmed:false});assert.ok(neutral.preparedContextId);
+   const before=calls;
+   // A teaching published after preparation must still be available at call time.
+   const id=randomUUID(),doc={title:'Synthetic teaching',topic:'planning',language,explanation:'FRESH_TEACHING: explain the idea before the term.',deliveryStyle:'Warm and patient.',reviewBy:'2099-12-31'};
+   await f.owner.query('INSERT INTO origen_teachings(id,draft,published,published_revision) VALUES($1,$2::jsonb,$2::jsonb,1)',[id,JSON.stringify(doc)]);
+   const result=await call({sdp:'v=0',voiceProtocol:'live-v1',language,preparedContextId:selected.preparedContextId,scopeRestart:true});
+   assert.equal(result.voiceProvider,'live');assert.match(headers['Server-Timing'],/preparation;desc="hit"/);assert.equal(calls,before+1);
+   assert.match(sent.delegation.responses.instructions,/PRIVATE_CHILD_DETAIL/);
+   assert.match(sent.delegation.responses.instructions,/FRESH_TEACHING/);assert.match(sent.delegation.responses.instructions,/Scope restart: true/);
+   assert.equal(result.voiceSession.language,language);
+   await call({sdp:'v=0',voiceProtocol:'live-v1',language,studentId:undefined,targetConfirmed:false,preparedContextId:neutral.preparedContextId});
+   assert.match(headers['Server-Timing'],/preparation;desc="hit"/);assert.doesNotMatch(JSON.stringify(sent),/PRIVATE_CHILD_DETAIL|FRESH_TEACHING/);
+   const withdrawal=await call({action:'prepare',language});await f.owner.query('UPDATE origen_teachings SET published=NULL,published_revision=NULL WHERE id=$1',[id]);
+   await call({sdp:'v=0',voiceProtocol:'live-v1',language,preparedContextId:withdrawal.preparedContextId});assert.match(headers['Server-Timing'],/preparation;desc="hit"/);assert.doesNotMatch(JSON.stringify(sent),/FRESH_TEACHING/);
+  }
+  const before=calls;
+  for(const workspaceFocus of [{kind:'coordinator-guidance',studentId:'alex',topic:'transfer',feedbackId:randomUUID(),version:1},{kind:'review-response',studentId:'alex',topic:'transfer',source:{kind:'review-response',requestId:randomUUID(),responseVersion:1}}])assert.equal((await call({action:'prepare',workspaceFocus})).preparedContextId,null);
+  assert.equal(calls,before);
+ }finally{await f.close();}
 });
 
 test('prepared voice skips repeated context loads but rejects stale profiles, sources, actions and another account',{skip:!process.env.DATABASE_TEST_URL},async t=>{

@@ -1,5 +1,3 @@
-import {collegeVoiceStyle} from './voiceStyle.mjs';
-
 // Only unambiguous, complete closing turns. A bare thanks, a quoted goodbye,
 // or a thanks followed by another question must leave the conversation open.
 export function isVoiceGoodbye(text){
@@ -18,7 +16,7 @@ export function canEndVoiceConversation(text){
 }
 
 export function voiceFarewell(language){
- return `${collegeVoiceStyle} The person has ended this call. Say only one brief, warm farewell in ${language==='es'?'Spanish: "Gracias por conversar conmigo. ¡Hasta luego!"':'English: "Thanks for talking with me. Take care!"'}. Do not greet, ask a question, offer more help, or claim that anything was saved.`;
+ return `Keep the same warm, relaxed voice. The person has ended this call. Say only one brief farewell in ${language==='es'?'Spanish: "Gracias por conversar conmigo. ¡Hasta luego!"':'English: "Thanks for talking with me. Take care!"'}. If you just said goodbye, stay silent. Do not greet, ask a question, offer more help, or claim that anything was saved.`;
 }
 
 // Own the final response independently of normal turn scheduling. Generation

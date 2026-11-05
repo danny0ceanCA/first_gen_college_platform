@@ -105,8 +105,10 @@ export function createFamilyRepository(database,env=process.env){
      if(input.account.role)await client.query('UPDATE origen_accounts SET role=COALESCE(role,$2) WHERE id=$1',[owner,input.account.role]);
     }
    }
-   if(input.action==='voice-used'||input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET voice_used_at=COALESCE(voice_used_at,now()),updated_at=now() WHERE id=$1',[owner]);
-   if(input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET welcome_heard_at=COALESCE(welcome_heard_at,now()) WHERE id=$1',[owner]);
+   // Receipts are milestones, not per-call activity. Even a no-op UPDATE fires
+   // the context-revision trigger and invalidates prewarmed student context.
+   if(input.action==='voice-used'||input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET voice_used_at=now(),updated_at=now() WHERE id=$1 AND voice_used_at IS NULL',[owner]);
+   if(input.action==='welcome-heard')await client.query('UPDATE origen_accounts SET welcome_heard_at=now() WHERE id=$1 AND welcome_heard_at IS NULL',[owner]);
    const row=(await client.query('SELECT first_name,email,role,welcome_heard_at,voice_used_at FROM origen_accounts WHERE id=$1',[owner])).rows[0];
    const sharedJoin=client.isolated?'LEFT JOIN LATERAL origen_shared_profile(m.id) s ON true':'LEFT JOIN origen_student_links l ON l.member_account_id=m.account_id AND l.member_student_id=m.id LEFT JOIN origen_students s ON s.account_id=l.owner_account_id AND s.id=l.owner_student_id';
    const students=(await client.query(`SELECT m.id,${sharedColumns.map(c=>`COALESCE(s.${c},m.${c}) AS "${c==='entry_term'?'entryTerm':c}"`).join(',')},m.needs,m.notes FROM origen_students m ${sharedJoin} WHERE m.account_id=$1 ORDER BY m.created_at,m.id`,[owner])).rows;

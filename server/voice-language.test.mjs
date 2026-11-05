@@ -12,6 +12,11 @@ function harness(options={}){
  const ack=index=>control.event({type:'session.updated',session:events[index].session});
  return {events,languages,control,ack};
 }
+test('confirmed guide handoff preserves server routing policy and workflow token budget through the effective session',async()=>{
+ const {control,events,ack}=harness();
+ const pending=control.configure(async()=>({instructions:'Authorized Aiden context',tools:[],liveInstructions:'Current policy',routingPolicy:'bounded-follow-up-v1',max_output_tokens:3000}));
+ await tick();assert.equal(events[0].session.routingPolicy,'bounded-follow-up-v1');assert.equal(events[0].session.max_output_tokens,3000);ack(0);await pending;control.stop();
+});
 
 test('English to Spanish and back updates the existing session before reporting success, without touching audio or tools',async()=>{
  const {control,events,ack,languages}=harness();

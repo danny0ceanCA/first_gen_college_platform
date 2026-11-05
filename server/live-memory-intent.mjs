@@ -2,7 +2,7 @@
 // model tool arguments. Normalize punctuation/case, never paraphrase a write.
 export const normalizeIntent=value=>String(value||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
 const polite=value=>normalizeIntent(value).replace(/^(please |por favor )/,'').replace(/^(can you |could you |would you |puedes |podrias )/,'').replace(/ (please|por favor)$/,'');
-export const acceptsProposal=value=>/^(yes|yes please|yes save it|yes save that|save it|save that|si|si por favor|si guardalo|si guarda eso|guardalo|guarda eso)$/.test(polite(value));
+export const acceptsProposal=(value,kind)=>/^(yes|yes please|yes save it|yes save that|save it|save that|si|si por favor|si guardalo|si guarda eso|guardalo|guarda eso)$/.test(polite(value))||kind==='next-step'&&/^(yes save (?:that|this|the) next step|si guarda (?:ese|este|el) (?:proximo|siguiente) paso)$/.test(polite(value));
 export function memoryIntent(transcript,change,oldContent){
  const spoken=polite(transcript),content=normalizeIntent(change.content),old=normalizeIntent(oldContent);
  if(!spoken||/^(no|not|dont|don t|never|nunca)\b/.test(spoken))return 'not_requested';
@@ -16,6 +16,6 @@ export function memoryIntent(transcript,change,oldContent){
  }
  // Ambiguous referents/rewrites need one confirmation bound to this exact
  // request. Plain conversation, questions and negated requests cannot prepare it.
- if(/^(remember|save|update|change|correct|forget|remove|delete|add|recuerda|guarda|actualiza|cambia|corrige|olvida|borra|elimina|agrega|anade)\b/.test(spoken)||/\b(?:please (?:save|update|correct|change) (?:it|that|this)|por favor (?:actualiza|guarda|corrige) (?:eso|esto))$/.test(spoken)||acceptsProposal(spoken))return 'clarify';
+ if(/^(remember|save|update|change|correct|forget|remove|delete|add|recuerda|guarda|actualiza|cambia|corrige|olvida|borra|elimina|agrega|anade)\b/.test(spoken)||/\b(?:please (?:save|update|correct|change) (?:it|that|this)|por favor (?:actualiza|guarda|corrige) (?:eso|esto))$/.test(spoken)||acceptsProposal(spoken,change.kind))return 'clarify';
  return 'not_requested';
 }

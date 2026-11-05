@@ -14,7 +14,7 @@ test('flexible flow is shared across guides, roles and languages without losing 
   assert.match(session.instructions,/CONTINUING LIVE CONVERSATION/);
   assert.ok(session.tools.some(tool=>tool.name==='set_conversation_language'));
   if(mode==='profile')assert.ok(session.tools.some(tool=>tool.name==='save_onboarding_profile'));
-  else assert.ok(session.tools.some(tool=>tool.name==='switch_college_guide'));
+  else {assert.ok(!session.tools.some(tool=>tool.name==='switch_college_guide'));assert.equal(session.tools.filter(t=>t.name.startsWith('lookup_')).length,3);}
  }
  for(const language of ['en','es']){
   assert.ok(onboardingWelcome(language).includes(flexibleVoiceFlow));

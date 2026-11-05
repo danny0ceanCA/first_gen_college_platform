@@ -124,8 +124,8 @@ test('continuation and specialty changes preserve transport and suppress a new o
   assert.match(continuing.instructions,/Do not say Hola, greet/);
   assert.doesNotMatch(continuing.instructions,/first spoken word must be exactly Hola/);
  }
- const handoff=fresh.tools.find(tool=>tool.name==='switch_college_guide');
- assert.deepEqual(handoff.parameters.properties.guide.enum,['planning','loans','admissions']);
+ assert.ok(!names(fresh).includes('switch_college_guide'));
+ assert.ok(['lookup_education_planning','lookup_financial_aid','lookup_college_applications'].every(name=>names(fresh).includes(name)));
 });
 
 test('app control outcomes remain authoritative while embedded context cannot grant tools or unbounded research',()=>{
@@ -148,7 +148,7 @@ test('app control outcomes remain authoritative while embedded context cannot gr
 
 test('release capture source provenance includes every newly shared prompt dependency',async()=>{
  const hashes=await releaseSourceHashes();
- for(const path of ['server/voice-prompts.mjs','server/review-response-voice.mjs','server/review-request-voice.mjs','server/review-request-voice-tools.mjs','src/reviewRequestVoiceTools.mjs','server/student-live-session.mjs','src/voiceStyle.mjs','src/financialAidTeaching.mjs','src/voiceLanguage.mjs']){
+ for(const path of ['server/voice-prompts.mjs','server/review-response-voice.mjs','server/review-request-voice.mjs','server/review-request-voice-tools.mjs','src/reviewRequestVoiceTools.mjs','server/student-live-session.mjs','server/student-live-prompts.mjs','src/voiceStyle.mjs','src/financialAidTeaching.mjs','src/voiceLanguage.mjs']){
   const content=await readFile(new URL('../'+path,import.meta.url),'utf8');
   assert.equal(hashes[path],hash(content),path);
  }

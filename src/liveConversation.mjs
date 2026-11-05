@@ -8,7 +8,7 @@ export function conversationIsActive(id){return active.has(id);}
 // A tool response can arrive after the visible specialty has changed. Route
 // the tool actually requested, not the current screen/guide label.
 export function researchModeForTool(name,current){
- if(name==='lookup_financial_aid')return current==='loans'?'loans':'finance';
+ if(name==='lookup_financial_aid')return 'finance';
  if(name==='lookup_college_applications')return 'admissions';
  if(name==='lookup_education_planning')return 'planning';
  return null;

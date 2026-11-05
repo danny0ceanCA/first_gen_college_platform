@@ -46,7 +46,7 @@ export function validateLiveMemoryRequest(input){
  return out;
 }
 export const responseActionReadback=(change,author,language)=>language==='es'?`¿Quieres guardar «${change.content}» como un próximo paso privado basado en la respuesta de ${author||'tu coordinador'}? No se compartirá con tu coordinador.`:`Do you want to save “${change.content}” as a private next step based on the response from ${author||'your coordinator'}? It will not be shared with your coordinator.`;
-const saved=receipt=>({status:'saved',kind:receipt.kind,id:receipt.record_id,version:receipt.record_version,revision:receipt.revision,reconnect:true,instruction:'The database committed this change. The app will acknowledge it and reconnect with fresh context. Do not save it again.'});
+const saved=receipt=>({status:'saved',kind:receipt.kind,id:receipt.record_id,version:receipt.record_version,revision:receipt.revision,reconnect:receipt.kind!=='next-step',instruction:receipt.kind==='next-step'?'The database committed this change. Briefly acknowledge this verified save and continue the same conversation. Do not greet, ask the name again, or repeat the save.':'The database committed this change. The app will acknowledge it and reconnect with fresh context. Do not save it again.'});
 
 export function createLiveMemoryRepository(database,env={}){return async(subject,input,{signal}={})=>{
  requireLiveCapability(env,subject,input.action);
@@ -132,7 +132,7 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
    await c.query('UPDATE origen_live_memory_sessions SET proposal_presented=$3 WHERE account_id=$1 AND id=$2 AND proposal_hash=$4 AND proposal_turn=$5',[owner,session.id,valid,fingerprint,input.sequence]);
    await c.query('COMMIT');committed=true;return {status:valid?'presented':'not_presented'};
   }
-  const confirmed=acceptsProposal(input.transcript)&&session.proposal_presented&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence-1&&Date.now()-Date.parse(session.proposal_at)<120000;
+  const confirmed=acceptsProposal(input.transcript,change.kind)&&session.proposal_presented&&session.proposal_hash===fingerprint&&session.proposal_turn===input.sequence-1&&Date.now()-Date.parse(session.proposal_at)<120000;
   let intent=guided&&old?spokenCorrectionIntent(input.transcript,change,old):memoryIntent(input.transcript,change,old?.content);
   if(responseSource&&!confirmed){
    if(/^(yes|yes please|si|si por favor)$/.test(normalizeIntent(input.transcript)))intent='not_requested';
@@ -141,7 +141,7 @@ export function createLiveMemoryRepository(database,env={}){return async(subject
   if(!confirmed&&intent!=='authorized'){
    if(intent==='clarify'&&session.proposal_turn===input.sequence&&session.proposal_hash!==fingerprint)throw fail(409,'memory_request_changed');
    if(intent==='clarify')await c.query('UPDATE origen_live_memory_sessions SET proposal_hash=$3,proposal_turn=$4,proposal_at=now(),proposal_presented=false WHERE account_id=$1 AND id=$2',[owner,session.id,fingerprint,input.sequence]);
-   await c.query('COMMIT');committed=true;return {status:intent==='clarify'?'clarification_required':'not_requested',...(intent==='clarify'?{proposal:{...change,...(old?{previousContent:old.content}:{})},...(responseSource?{readback:responseActionReadback(change,responseSource.authorName,session.turn_language)}:{})}:{}),instruction:intent==='clarify'?(responseSource?'Nothing was saved. Speak the complete readback verbatim, then wait for the student’s answer. A partial or interrupted readback is not confirmation. On explicit yes, repeat identical arguments.':'Nothing was saved. Describe this exact change and ask one focused spoken confirmation. On yes, repeat the identical arguments.'):'Nothing was saved. The user did not request a durable change. Continue their question without proposing a save.'};
+   await c.query('COMMIT');committed=true;return {status:intent==='clarify'?'clarification_required':'not_requested',...(intent==='clarify'?{proposal:{...change,...(old?{previousContent:old.content}:{})},...(responseSource?{readback:responseActionReadback(change,responseSource.authorName,session.turn_language)}:change.kind==='next-step'?{readback:session.turn_language==='es'?`¿Quieres que guarde este próximo paso: "${change.content}"?`:`Should I save this next step: "${change.content}"?`}:{})}:{}),instruction:intent==='clarify'?((responseSource||change.kind==='next-step')?'Nothing was saved. Speak the complete readback verbatim, then wait for the student’s answer. A partial or interrupted readback is not confirmation. On explicit yes, repeat identical arguments.':'Nothing was saved. Describe this exact change and ask one focused spoken confirmation. On yes, repeat the identical arguments.'):'Nothing was saved. The user did not request a durable change. Continue their question without proposing a save.'};
   }
   signal?.throwIfAborted();let recordId,recordVersion,newRevision;
   if(change.kind==='next-step'){
