@@ -95,8 +95,12 @@ for(const status of [401,403,404,405])test(`terminal polling failure ${status} i
  await q.start({question:'Costs'});for(let n=0;n<3;n++){await tick();await new Promise(r=>setImmediate(r));}
  assert.equal(reads,1);assert.equal(delivered.length,1);assert.equal(delivered[0].status,'failed');q.close();
 });
-for(const question of ['What does Berkeley cost?','¿Cuánto cuesta Berkeley?'])test(`research returns immediately and survives ordinary clarification: ${question}`,async()=>{
+for(const question of ['What does Berkeley cost?','¿Cuánto cuesta Berkeley?','What are the application requirements?','¿Cuáles son los requisitos para transferirse?'])test(`research returns immediately and survives ordinary clarification: ${question}`,async()=>{
  const f=fixture();const pending=await f.queue.start({question});assert.equal(pending.status,'research_pending');assert.equal(f.reads(),0);
+ assert.match(pending.instruction,/Explain the useful concept or distinction already supported by known context now/);
+ assert.match(pending.instruction,/only source-dependent facts must wait/);
+ assert.match(pending.instruction,/carry the answer forward/);
+ assert.match(pending.instruction,/do not re-ask an answered question/);
  f.setQuiet(false);await f.tick();assert.equal(f.removed.length,0);
  f.setStatus('completed');await f.tick();assert.equal(f.delivered.length,0);
  f.setQuiet(true);await f.tick();assert.equal(f.delivered.length,1);assert.equal(f.delivered[0].question,question);f.queue.close();

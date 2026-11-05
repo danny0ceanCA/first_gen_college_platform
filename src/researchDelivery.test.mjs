@@ -105,6 +105,22 @@ test('private delivery diagnostics retain correlation and stage without copied c
  const payload=capturePayload({type:'origen.research.delivery',jobId:'job',revision:1,deliveryStage:'deferred',deliveryReason:'caller_turn',durationMs:123,question:'PRIVATE',text:'PRIVATE'});
  assert.equal(payload.jobId,'job');assert.equal(payload.deliveryStage,'deferred');assert.doesNotMatch(JSON.stringify(payload),/PRIVATE/);
 });
+
+for(const [language,example]of Object.entries({
+ en:{subject:'North Campus',answer:'For 2026–27 entering transfers, the admission application serves as the campus-scholarship application; the published minimum GPA is 3.25. Current awards range from USD 100–17,000 per academic year. [1]',spoken:'North Campus scholarships use the admission application, and they say the published minimum GPA is three point two five.',thanks:'Yeah, that is all helpful.'},
+ es:{subject:'Campus Norte',answer:'Para los estudiantes de transferencia de 2026–27, la solicitud de admisión sirve como solicitud de becas; el promedio mínimo publicado es 3.25. Los premios actuales varían entre USD 100–17,000 por año académico. [1]',spoken:'Las becas de Campus Norte usan la solicitud de admisión y el promedio mínimo publicado es tres punto veinticinco.',thanks:'Sí, todo eso me ayuda.'},
+}))test(`${language}: a native scholarship explanation retires an optional award-range addendum`,()=>{
+ const f=fixture(),finding={subject:example.subject,aspect:'eligibility',status:'verified',answer:example.answer,qualification:'Published program rules do not establish an individual award. [1]'};
+ const result={sources:[{url:'https://example.edu/scholarships'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ f.ready(language,{question:'Scholarship requirements',result},{awaitingReply:true});f.ack();
+ f.delivery.reply(example.spoken,{audible:true});
+ assert.ok(f.events.some(e=>e.deliveryStage==='native_portion_observed'));
+ f.delivery.caller();f.delivery.callerStopped(example.thanks);f.delivery.reply(examples[language].reply,{audible:true});f.advance(10000);
+ assert.equal(f.announcements().length,0,'unused award figures do not create an unsolicited second turn');
+ f.ready(language,{question:'Scholarship requirements',evidenceVersion:2,researchPending:false,result});f.ack();f.advance(10000);
+ assert.equal(f.announcements().length,0,'a final revision with the same findings cannot revive the addendum');
+ f.delivery.clear();
+});
 test('ordinary conversation without completed research creates no model work or timed speech',()=>{
  const f=fixture();f.delivery.caller();f.delivery.callerStopped();f.advance(60000);f.delivery.reply(examples.en.reply,{audible:true});f.advance(60000);
  assert.equal(f.sent.length,0);assert.equal(f.tasks.size,0);

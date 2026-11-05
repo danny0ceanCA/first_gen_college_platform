@@ -10,6 +10,19 @@ const units=Object.fromEntries([
 const tens={twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,veinte:20,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,
  veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29};
 const hundreds={cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900};
+function decimalFraction(tokens,start){
+ let end=start,digits='';
+ while(Object.hasOwn(units,tokens[end])&&units[tokens[end]]<=9){digits+=units[tokens[end++]];}
+ if(digits)return {digits,end};
+ const first=units[tokens[start]]??tens[tokens[start]];
+ if(first===undefined)return null;
+ end=start+1;let value=first;
+ if(first>=20&&first%10===0){
+  if((tokens[end]==='y'||tokens[end]==='and')&&Object.hasOwn(units,tokens[end+1])&&units[tokens[end+1]]<10)end++;
+  if(Object.hasOwn(units,tokens[end])&&units[tokens[end]]<10)value+=units[tokens[end++]];
+ }
+ return {digits:String(value),end};
+}
 function numberWords(tokens){
  const result=[];let i=0;
  const numeric=word=>Object.hasOwn(units,word)||Object.hasOwn(tens,word)||Object.hasOwn(hundreds,word)||['hundred','thousand','mil','million','millon','millones'].includes(word);
@@ -27,6 +40,10 @@ function numberWords(tokens){
    else if(word==='thousand'||word==='mil'){total+=(part||1)*1000;part=0;}
    else{total=(total+part||1)*1000000;part=0;}
    i++;
+  }
+  if(['point','punto','coma'].includes(tokens[i])){
+   const fraction=decimalFraction(tokens,i+1);
+   if(fraction){result.push(`${total+part}decimal${fraction.digits}`);i=fraction.end;continue;}
   }
   result.push(i>start?String(total+part):tokens[i++]);
  }
@@ -80,6 +97,23 @@ export function researchLimitationOverlap(finding,spoken,mentionsSubject){
  return /\b(?:could(?:n['’]?t| not)|cannot|can['’]?t|unable to|not able to|(?:haven['’]?t|have not) been able to) (?:verify|confirm|establish|find)|\b(?:haven['’]?t|have not) (?:yet )?(?:verified|confirmed)|\b(?:remain|remains|is|are) unverified|\b(?:no (?:pude|pudimos|logre|logramos|se pudo|se ha podido) (?:confirmar|verificar|encontrar)|no (?:esta|estan) verificad[oa]s?)\b/u.test(text);
 }
 
+function concretePortion(source,aspect){
+ const text=fold(source).toLowerCase();
+ const condition=/\b(?:financial need|academic merit|necesidad economica|merito academico)\b/u.test(text);
+ const grade=/\b(?:gpa|promedio)\b/u.test(text);
+ // Counts of unnamed criteria and references to information or page numbers
+ // describe where an answer lives, not the answer. Keep ambiguous clauses pending.
+ if(/\b(?:information|details?|pages?|sections?|informacion|detalles|paginas?|secciones?)\b/u.test(text))return false;
+ if(!condition&&!grade&&/\b(?:requirements?|criteria|requisitos|criterios)\b/u.test(text))return false;
+ const rule=/\b(?:requires?|must|needs? to|requiere[n]?|debe[n]?)\b/u.test(text)||(condition&&/\b(?:includes?|incluye[n]?)\b/u.test(text));
+ const eligibility=aspect==='eligibility'&&(rule||grade||condition);
+ if(aspect!=='other'&&!researchFocus(source).includes(aspect)&&!eligibility)return false;
+ // A year or a generic notice that information/requirements exist is not a
+ // delivered fact. Partial suppression needs a value or a stated prerequisite.
+ const value=tokens(source).some(token=>/^\d+(?:decimal\d+)?$/u.test(token)&&!(Number(token)>=1900&&Number(token)<=2100));
+ return value||rule;
+}
+
 // Retire an optional announcement when a native answer already explained a
 // relevant portion. This does not certify completeness or numerical accuracy.
 export function researchPortionObserved(finding,spoken){
@@ -89,8 +123,18 @@ export function researchPortionObserved(finding,spoken){
  const statements=String(spoken||'').split(/(?<=[.!?])\s+/u).filter(s=>!/[?？]\s*$/u.test(s)&&!uncertain.test(fold(s).toLowerCase()));
  const amounts=text=>tokens(text).filter(t=>/^\d+$/u.test(t)).map(Number).filter(n=>n>=1000&&(n<1900||n>2100));
  const expected=amounts(finding.answer);
+ const sourceSentences=String(finding.answer||'').split(/(?<=[.!?;])\s+/u);
+ const subject=String(finding.subject).split(/\s+[—–]\s+|\s*\(/u)[0];
+ const negative=text=>/\b(?:no|not|never|without|cannot|can['’]?t|don['’]?t|doesn['’]?t|isn['’]?t|aren['’]?t|won['’]?t|sin|nunca)\b/u.test(fold(text).toLowerCase());
  return statements.some(statement=>{
-  if(!findingSubjectMentioned(finding.subject,statement)||!researchFocus(statement).includes(finding.aspect))return false;
+  if(!findingSubjectMentioned(finding.subject,statement))return false;
+  const aspects=researchFocus(statement);
+  if(aspects.length&&finding.aspect!=='other'&&!aspects.includes(finding.aspect))return false;
+  // An explained requirement or deadline is useful delivery too. Compare one
+  // complete sourced clause, retaining every number and its polarity, so an
+  // optional addendum does not require reciting the whole multi-part finding.
+  if(sourceSentences.some(source=>concretePortion(source,finding.aspect)&&negative(source)===negative(statement)&&researchAnswerOverlap(`${subject} ${source}`,statement)))return true;
+  if(!aspects.includes(finding.aspect)||negative(statement.split(/,?\s+(?:but|pero)\s+/iu)[0]))return false;
   const spokenAmounts=amounts(statement),approximate=/\b(?:about|roughly|around|near|approximately|cerca|aproximadamente|alrededor|unos|unas)\b/iu.test(statement);
   return expected.some(n=>spokenAmounts.some(s=>s===n||approximate&&Math.abs(s-n)/n<=0.02));
  });

@@ -90,7 +90,7 @@ export function backgroundResearch({post,read,remove,isCurrent,isQuiet,deliver,o
     if(!job.id)throw Error('research_receipt_missing');
     state(job,result.status==='running'?'running':'queued');
     job.timer=schedule(()=>void poll(job),750);
-    return {...receipt(job),instruction:receipt(job).instruction+' Keep helping with the latest concern while sources are checked. Answer ordinary follow-ups from known context now; only source-dependent facts must wait. When it would help the student, ask one relevant unanswered question about their priorities or the missing detail, then listen to the reply. Use details already shared; do not repeat intake, fill silence with a questionnaire, or make another waiting announcement. Results arrive separately; do not invent findings or an ETA.'};
+    return {...receipt(job),instruction:receipt(job).instruction+' Keep helping with the latest concern while sources are checked. Explain the useful concept or distinction already supported by known context now; only source-dependent facts must wait. If a missing preference would help the next decision, ask one relevant unanswered question, then listen and carry the answer forward. An explanation can be enough; do not re-ask an answered question, fill silence with a questionnaire, or make another waiting announcement. Results arrive separately; do not invent findings or an ETA.'};
    }catch(error){if(active!==job||closed)return {status:'research_cancelled',requestId:job.requestId,revision:job.revision};active=null;cancel(job.timer);onState(false);state(job,'failed');throw error;}
   },cancel:stop,close(){closed=true;void stop();},
  };

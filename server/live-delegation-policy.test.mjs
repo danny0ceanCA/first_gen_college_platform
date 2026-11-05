@@ -40,6 +40,10 @@ for(const language of ['en','es'])test(`${language} research lets the same live 
  for(const speech of [studentLiveSession(c,i).instructions]){
   assert.match(speech,/respond to their understandable comments.*promptly, without waiting for research/);
   assert.match(speech,/one useful, unanswered question/);
+  assert.match(speech,/First offer the useful part you can explain now/);
+  assert.match(speech,/individual eligibility for verified evidence/);
+  assert.match(speech,/carry that preference forward; do not re-ask it/);
+  assert.match(speech,/A brief relevant explanation is enough when no clarification is needed/);
   assert.match(speech,/A pause alone is not a request for questions/);
   assert.match(speech,/Initial findings can be used while an app-confirmed recovery check continues/);
   assert.match(speech,/do not automatically expand it to every residency category/);
@@ -50,6 +54,8 @@ for(const language of ['en','es'])test(`${language} research lets the same live 
  }
  assert.equal(studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true}),'','ordinary updates rely on startup conversation policy');
  assert.match(c.instructions,/Keep the lookup question close to the caller's actual request/);
+ assert.match(c.instructions,/explain any useful concept or distinction already supported by known context/);
+ assert.match(c.instructions,/carry the answer forward without repeating the question/);
  assert.match(c.instructions,/name both campuses in institution/);
  assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
  assert.match(c.instructions,/research only the unresolved portion if needed/);

@@ -4,7 +4,7 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-export const liveChannelRevision='natural-conversation-complete-acknowledgment-2026-11-05';
+export const liveChannelRevision='natural-conversation-research-follow-through-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -210,7 +210,14 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    }
    lastOutputAt=now();lastOutputText=outputId?lastOutputText+e.delta:e.delta;
    repliedSinceInput=true;recentInput=null;
-   if(!outputId){outputInterrupted=!!inputId;outputId=id();await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});}
+   if(!outputId){
+    // inputId may still be waiting for the transcript grouping timer after the
+    // caller has finished. A fast answer is not evidence of an interruption.
+    // New caller fragments arriving during this output mark it interrupted.
+    outputInterrupted=false;outputId=id();
+    await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});
+    await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});
+   }
    output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta,start_ms:e.start_ms,end_ms:e.end_ms});
    if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }

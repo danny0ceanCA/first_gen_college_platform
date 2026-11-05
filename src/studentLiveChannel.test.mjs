@@ -265,6 +265,28 @@ for(const language of ['en','es'])test(`${language}: delivery v2 waits through a
  clock.advance(10000);await pause(0);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
  assert.ok(!f.sent.some(e=>['response.cancel','response.create','session.instructions.append'].includes(e.type)));f.channel.close();
 });
+for(const language of ['en','es'])for(const interrupted of [false,true])test(`${language}: fast native research answer ${interrupted?'still respects a subsequent interruption':'retires its announcement before the input grouping timer closes'}`,async()=>{
+ const clock=fakeClock();let playbackVersion=0;
+ const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>playbackVersion});
+ const answer=language==='en'?'The published annual tuition is 12345 dollars at Example University.':'La matrícula anual publicada es de 12345 dólares en la Universidad Ejemplo.';
+ try{
+  f.receive({type:'session.input_transcript.delta',delta:language==='en'?'What did you find?':'¿Qué encontraste?'});await pause(0);
+  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',requestId:'request',revision:1,question:'Tuition',result:{text:answer}}));await pause(0);
+  clock.advance(200);await pause(0);
+  assert.ok(!f.events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'));
+  f.receive({type:'session.output_transcript.delta',delta:answer});await pause(0);playbackVersion++;
+  if(interrupted){f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Wait, stop.':'Espera, para.'});await pause(0);}
+  clock.advance(1800);await pause(0);
+  assert.equal(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'),!interrupted);
+  if(!interrupted){
+   f.receive({type:'session.input_transcript.delta',delta:language==='en'?'That was helpful.':'Eso fue útil.'});await pause(0);
+   clock.advance(1100);await pause(0);clock.advance(6000);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+  }
+  assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));
+ }finally{f.channel.close();}
+});
+
 test('delivery v2 survives a same-scope language update but waits for its acknowledgment',async()=>{
  const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',question:'Costs',result:{text:'The verified annual tuition is 12345 dollars.'}}));await pause(0);
