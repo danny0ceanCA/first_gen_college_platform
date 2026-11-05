@@ -14,6 +14,40 @@ for(const language of ['en','es'])test(`first post-onboarding ${language} call k
  assert.doesNotMatch(session.input[0].content[0].text,/introduce yourself as Origen/);
 
  assert.doesNotMatch(session.delegation.responses.instructions,/delegate to the backend to check/);
+ const orientation=voiceOrientationInstructions({...input,language});
+ assert.match(orientation,/new confirmed-scope post-onboarding call with familiar warmth/);
+ assert.match(orientation,/one casual sentence, then ask one short question/);
+ assert.match(orientation,/If the caller speaks first, answer their question/);
+ assert.match(orientation,/application-authorized check-in takes precedence/);
+});
+
+for(const language of ['en','es'])test(`unconfirmed ${language} opening cannot imply that the student profile has loaded`,()=>{
+ const pending={...input,language,targetConfirmed:false,memory:[{summary:'PRIVATE-STUDENT-HISTORY'}]};
+ const orientation=voiceOrientationInstructions(pending);
+ assert.match(orientation,/this orientation contains no student profile or history/);
+ assert.match(orientation,/scope policy owns the opening; do not add a greeting, profile recap or general invitation/);
+ assert.match(orientation,/While selection is pending, do not claim the profile has arrived/);
+ assert.match(orientation,/then listen; silence is not a request for another invitation/);
+ assert.doesNotMatch(orientation,/saved profile is already available|After the brief greeting|new confirmed-scope post-onboarding call|PRIVATE-STUDENT-HISTORY|Fictional Valley College/);
+ const instructions=studentLiveSession(voiceSession(pending,{}),pending).delegation.responses.instructions;
+ assert.ok(instructions.includes(orientation));
+ assert.doesNotMatch(instructions,/saved profile is already available/);
+});
+
+for(const language of ['en','es'])test(`ongoing ${language} orientation leaves the selection continuation to its receipt`,()=>{
+ for(const change of [{continuing:true},{scopeRestart:true},{continuity:[{role:'user',text:language==='es'?'¿Cómo puede comenzar su ensayo?':'How can he start his essay?'}]}]){
+  const continuing={...input,language,...change};
+  const orientation=voiceOrientationInstructions(continuing,{includeHistory:false});
+  assert.match(orientation,/Orientation arrival does not request speech/);
+  assert.match(orientation,/target_confirmed receipt or explicit completed handoff owns the selection continuation/);
+  assert.match(orientation,/If a question was already asked, leave the floor with the caller/);
+  assert.match(orientation,/caller has begun their own question, answer it and weave in only relevant context/);
+  assert.doesNotMatch(orientation,/Begin a new|After the brief greeting|saved profile is already available/);
+  assert.match(orientation,/Fictional Valley College/);
+  assert.match(orientation,/Preserve parent attribution, uncertainty and corrections/);
+  const instructions=studentLiveSession(voiceSession(continuing,{}),continuing).delegation.responses.instructions;
+  assert.ok(instructions.includes(orientation));
+ }
 });
 
 test('unconfirmed parent scope has only caller identity; family scope never inherits the selected student profile',()=>{

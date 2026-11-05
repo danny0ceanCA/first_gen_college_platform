@@ -8,6 +8,7 @@ export function capturePayload(event,direction='provider'){
  if(type==='origen.client.revision')return {...base,revision:event.revision};
  if(type==='origen.control.ready')return {...base,durationMs:event.durationMs};
  if(type==='origen.configuration.applied')return {...base,durationMs:event.durationMs,contextPacketCount:event.contextPacketCount,instructionPacketCount:event.instructionPacketCount};
+ if(type==='origen.selection.delivery')return {...base,callId:event.callId,deliveryMode:event.deliveryMode,assistantQuestionObserved:event.assistantQuestionObserved,callerSpeechObserved:event.callerSpeechObserved,durationMs:event.durationMs};
  if(type==='origen.control.tool_call')return {...base,name:event.item?.name,callId:event.item?.call_id,arguments:event.item?.arguments};
  if(type==='origen.control.tool_result')return {...base,callId:event.callId,output:event.output,durationMs:event.durationMs};
  if(type==='origen.research.state_changed')return {...base,requestId:event.requestId,revision:event.revision,jobId:event.jobId,state:event.state};

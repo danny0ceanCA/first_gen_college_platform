@@ -58,7 +58,11 @@ for(const language of ['en','es'])test(`${language}: first selection stays conve
  const config=voiceSession(input,{}),live=studentLiveSession(config,input);
  assert.match(live.instructions,/Open with one scope question only/);
  assert.match(live.delegation.responses.instructions,/Open with one scope question only/);
- assert.match(live.instructions,/For a name-only first selection, give one quick, warm acknowledgment/);
+ assert.match(live.instructions,/For a name-only first selection, acknowledge once, promptly but gently/);
+ assert.match(live.instructions,/Tool dispatch is not completion/);
+ assert.match(live.instructions,/Silence is not a request for another acknowledgment/);
+ assert.match(live.instructions,/Slow the articulation itself/);
+ assert.match(live.instructions,/never speed up to squeeze it in/);
  assert.match(live.instructions,/Do not ask what they need help with before the selection receipt/);
  assert.doesNotMatch(live.instructions,/ask one warm, short question about what they want help with|single conversational invitation above while/);
  assert.match(live.instructions,/If they already gave their question/);
@@ -75,7 +79,7 @@ for(const language of ['en','es'])test(`${language}: a caller question takes pre
  const live=studentLiveSession(voiceSession(input,{}),input);
  assert.match(live.instructions,/listen until they finish, then answer it directly and weave in only relevant brief details/);
  assert.match(live.instructions,/skip a separate recap and generic invitation/);
- assert.match(live.instructions,/one short recap of at most two relevant facts in one or two connected sentences/);
+ assert.match(live.instructions,/one main thread from the brief in one short sentence/);
  assert.match(live.instructions,/If an invitation was already asked, leave the floor with the caller/);
  assert.match(live.delegation.responses.instructions,/target-selection receipt may request one short recap when the caller has not yet asked a question/);
  assert.match(live.instructions,/this brief arriving never starts one/);

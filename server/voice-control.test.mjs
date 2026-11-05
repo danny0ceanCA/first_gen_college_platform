@@ -22,7 +22,7 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
-for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${language}: selection acknowledgment and ${callerAsks?'an arriving caller question':'a name-only selection'} keep one native continuation through later refresh`,async()=>{
+for(const language of ['en','es'])for(const callerAsks of [false,true])for(const invitedEarly of [false,true])test(`${language}: selection ${invitedEarly?'with an early invitation':'acknowledgment only'} and ${callerAsks?'an arriving caller question':'a name-only selection'} keep one native continuation through later refresh`,async()=>{
  const input={mode:'planning',role:'parent',language,studentId:'aiden',targetConfirmed:true,routeConversations:true,profile:{id:'aiden',name:'Aiden',school:'Synthetic Community College'}};
  input.openingBrief=buildOpeningBrief(input);
  const f=fixture({config:{language,tools:[{name:'request_conversation_target'}]},scope:{sessionId:'physical-call',studentId:null,confirmed:false}});
@@ -35,6 +35,11 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${l
   const acknowledgment=language==='en'?'Thanks.':'Gracias.';
   f.engine.receive({type:'session.output_transcript.delta',delta:acknowledgment});
   await until(()=>f.events.some(e=>e.type==='response.output_audio_transcript.delta'&&e.delta===acknowledgment));
+  const invitation=language==='en'?' What would you like help with?':' ¿Con qué te gustaría recibir ayuda?';
+  if(invitedEarly){
+   f.engine.receive({type:'session.output_transcript.delta',delta:invitation});
+   await until(()=>f.events.some(e=>e.type==='response.output_audio_transcript.delta'&&e.delta===invitation));
+  }
   await f.engine.configure({...config,language,...studentLiveUpdate(input)}, {sessionId:'physical-call',studentId:'aiden',confirmed:true},'first-selection');
   const packets=f.sent.filter(e=>e.type==='session.thinking.append'&&JSON.parse(e.content).kind==='selected-student-context');
   assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,0,'the ordinary introduction must not redirect or interrupt speech');
@@ -53,7 +58,13 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${l
   assert.equal(f.engine.command({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(receipt)}},lease),true);
   await until(()=>f.sent.some(e=>e.type==='response.create'));
   assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
-  assert.deepEqual(JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output),receipt);
+  const delivered=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+  assert.equal(delivered.status,receipt.status);
+  assert.equal(delivered.selectionDelivery.mode,callerAsks?'caller_first':invitedEarly?'leave_floor':'conditional_recap');
+  assert.equal(delivered.selectionDelivery.assistantQuestionObserved,invitedEarly);
+  assert.equal(delivered.selectionDelivery.callerSpeechObserved,callerAsks);
+  if(!callerAsks&&!invitedEarly)assert.equal(delivered.instruction,receipt.instruction);
+  else assert.doesNotMatch(delivered.instruction,/then invite their priority/);
   if(callerAsks){
    // The caller still owns the microphone when the receipt returns. Their
    // remaining words stay in the native conversation, never a replayed prompt.
@@ -62,7 +73,7 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${l
   }
   await f.engine.flush();
   assert.deepEqual(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').map(e=>e.transcript),callerAsks?['Aiden',questionParts.join('')]:['Aiden']);
-  assert.deepEqual(f.events.filter(e=>e.type==='response.output_audio_transcript.done').map(e=>e.transcript),[acknowledgment]);
+  assert.deepEqual(f.events.filter(e=>e.type==='response.output_audio_transcript.done').map(e=>e.transcript),[acknowledgment+(invitedEarly?invitation:'')]);
   assert.equal(f.sent.filter(e=>e.type==='response.item.create').length,1,'only the tool receipt is returned; no caller transcript is replayed');
 
   // A later brief refresh is factual context, not another invitation or recap.

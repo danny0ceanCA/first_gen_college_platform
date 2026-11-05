@@ -4,8 +4,30 @@ import {studentLiveChannel,liveBackendDeadlineMs} from './studentLiveChannel.mjs
 import {voiceProfileSaveConsent} from './voiceProfileSave.mjs';
 import {voiceHandoff,deferredVoiceHandoff} from './voiceHandoff.mjs';
 import {capturePayload} from './voiceCapture.mjs';
+import {voiceTargetResult} from './voiceTargetResult.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
+for(const language of ['en','es'])test(`${language}: a fast student choice cannot mistake the old scope question for a new invitation`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,isPlaybackIdle:()=>false});
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Aiden, Elodie, or college in general?':'¿Aiden, Elodie o la universidad en general?'});await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:'Aiden'});await pause(0);
+ clock.advance(1100);await pause(0);
+ f.backend('response.created','selection');await pause(0);
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?' Thanks, let me take a look.':' Gracias, déjame ver.'});await pause(0);
+ f.backend('response.output_item.done','selection',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{}'}});
+ f.backend('response.completed','selection');await pause(0);
+ const pending=f.sent.filter(e=>e.type==='session.thinking.append');
+ assert.equal(pending.length,1);assert.equal(JSON.parse(pending[0].content).kind,'student-selection-state');
+ assert.equal(f.events.filter(e=>e.type==='response.output_audio_transcript.done').length,0,'the displayed transcript still combines both utterances');
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ const result=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+ assert.equal(result.selectionDelivery.mode,'conditional_recap');assert.equal(result.selectionDelivery.assistantQuestionObserved,false);
+ assert.doesNotMatch(result.selectionDelivery.recentAssistantSpeech,/Elodie/);
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+ assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel','session.input_audio.mute'].includes(e.type)));
+ f.channel.close();
+});
 
 test('private diagnostics preserve request state without copying the question',()=>{
  const payload=capturePayload({type:'origen.research.state_changed',requestId:'r',jobId:'j',state:'running',question:'PRIVATE'});

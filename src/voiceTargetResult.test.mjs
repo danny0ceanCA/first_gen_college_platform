@@ -16,7 +16,9 @@ test('confirmed selection and a restarted handoff share a single conditional con
  assert.match(result.instruction,/If an invitation was already asked, leave the floor with the caller/);
  assert.match(result.instruction,/If the caller has started a question or concern, listen until they finish/);
  assert.match(result.instruction,/weave in only relevant brief details; skip a separate recap and generic invitation/);
- assert.match(result.instruction,/one short recap of at most two relevant facts in one or two connected sentences/);
+ assert.match(result.instruction,/one main thread from the brief in one short sentence/);
+ assert.match(result.instruction,/Keep the same relaxed pace through the question/);
+ assert.match(result.instruction,/No second thanks, greeting, reassurance/);
  assert.match(result.instruction,/If no meaningful brief facts are available, omit the recap/);
  assert.match(result.instruction,/General-family scope never uses a student recap/);
  assert.match(result.instruction,/Ordinary context refreshes never replay this opening/);
