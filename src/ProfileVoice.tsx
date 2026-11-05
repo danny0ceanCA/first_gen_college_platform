@@ -487,7 +487,14 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       }});resources.current.stopAudioDiagnostics=()=>audioDiagnostics.stop();
       pc.ontrack=e=>{if(generation.current!==version||closing.current?.active())return;void livePlayback.attach(e.streams[0]);if(audio.current){audio.current.srcObject=e.streams[0];void audio.current.play().then(()=>{if(generation.current===version)setAudioBlocked(false);}).catch(()=>{if(generation.current===version){onboardingVoice.current?.playback('blocked');setAudioBlocked(true);}});}};
       stream.getTracks().forEach(track=>pc.addTrack(track,stream));
-      const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),getPlaybackVersion:()=>livePlayback.audibleVersion(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted});resources.current.dc=dc;
+      const captureDisconnect=(details:Record<string,unknown>)=>{
+        if(generation.current!==version)return;
+        capture({type:'diagnostic',event:'connection_failure_detail',details:{
+          ...details,peerState:pc.connectionState,iceState:pc.iceConnectionState,
+          signalingState:pc.signalingState,browserOnline:navigator.onLine,
+        }});
+      };
+      const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),getPlaybackVersion:()=>livePlayback.audibleVersion(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted,onDisconnect:captureDisconnect});resources.current.dc=dc;
       let openingRequested=false;
       let playWelcome=onboarding;
       const saveConsent=voiceProfileSaveConsent();
@@ -959,7 +966,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
           if(called)turns.toolsCompleted(liveBackend);else turns.completed();
         }
       };
-      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
+      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;captureDisconnect({source:'rtc_peer_recovery_failed',dataChannelState:dc.readyState});log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
       const stopPlayback=resources.current.stopConnection;resources.current.stopConnection=()=>{stopPlayback?.();connection.stop();};
       let connectedRecorded=false;
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}

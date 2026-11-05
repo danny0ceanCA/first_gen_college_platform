@@ -285,7 +285,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(configuration){retireConfiguration(configuration);error.event_id=configuration.id;}
    const delivery=researchAcknowledgments.get(error.event_id);if(delivery){delivery.quietOnly=true;researchAcknowledgments.delete(error.event_id);await emit({type:'origen.research.context_failed',jobId:delivery.jobId,requestId:delivery.requestId,revision:delivery.revision});}
    await emit({...e,error});return;}
-  if(e.type==='session.closed'){stopBoundaries();clearConfigurations();clearBackendTimers();cancel(inputTimer);cancel(draftTimer);await finishSpeech(true);closed=true;handlers.onclose?.({});return;}
+  if(e.type==='session.closed'){stopBoundaries();clearConfigurations();clearBackendTimers();cancel(inputTimer);cancel(draftTimer);await finishSpeech(true);closed=true;handlers.onclose?.({type:'session.closed'});return;}
  }
  function send(text){
   if(!live)return raw.send(text);const event=JSON.parse(text);

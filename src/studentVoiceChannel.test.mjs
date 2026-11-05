@@ -9,8 +9,9 @@ function fixture(){
   send(text){this.sent.push(JSON.parse(text));}close(){this.readyState=3;this.onclose?.({});}
   open(){this.readyState=1;this.onopen();}receive(message){this.onmessage({data:JSON.stringify(message)});}
  }
- const channel=studentVoiceChannel(raw,{isPlaybackIdle:()=>true,getPlaybackVersion:()=>4});
- return {raw,sent,channel,get socket(){return socket;},async configure(){const promise=channel.configure({voiceControl:{protocol:'server-v1',id:'opaque-call'}},{token:'private-token',url:'https://api.example.test',WebSocketClass:Socket});socket.open();socket.receive({type:'ready'});await promise;},open(){raw.readyState='open';raw.onopen({});}};
+ const disconnects=[];
+ const channel=studentVoiceChannel(raw,{isPlaybackIdle:()=>true,getPlaybackVersion:()=>4,onDisconnect:details=>disconnects.push(details)});
+ return {raw,sent,channel,disconnects,get socket(){return socket;},async configure(){const promise=channel.configure({voiceControl:{protocol:'server-v1',id:'opaque-call'}},{token:'private-token',url:'https://api.example.test',WebSocketClass:Socket});socket.open();socket.receive({type:'ready'});await promise;},open(){raw.readyState='open';raw.onopen({});}};
 }
 test('audio open waits for server owner, token is a first message, and UI uses one lease',async()=>{
  const f=fixture(),events=[];let opened=0;f.channel.onopen=()=>opened++;f.channel.onmessage=e=>events.push(JSON.parse(e.data));
@@ -28,8 +29,10 @@ test('playback, cancellation and boundary RPC stay off the provider data channel
  }finally{f.channel.close();}
 });
 test('lost server control closes audio control with no browser tool fallback',async()=>{
- const f=fixture();let closed=0;f.channel.onclose=()=>closed++;await f.configure();f.open();f.socket.close();await tick();
+ const f=fixture();let closed=0;f.channel.onclose=()=>closed++;await f.configure();f.open();
+ f.socket.readyState=3;f.socket.onclose({code:1000,wasClean:true,reason:'provider_disconnected'});await tick();
  assert.equal(closed,1);assert.equal(f.raw.readyState,'closed');assert.deepEqual(f.sent.map(e=>e.type),['session.close']);
+ assert.deepEqual(f.disconnects,[{source:'control_socket_closed',closeCode:1000,wasClean:true,serverReason:'provider_disconnected',controlReady:true,dataChannelState:'open',controlSocketState:3}]);
 });
 test('feature off preserves the existing local adapter and open event',async()=>{
  const f=fixture();let opened=0;f.channel.onopen=()=>opened++;await f.channel.configure({voiceProvider:'realtime'});f.open();
