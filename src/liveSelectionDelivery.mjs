@@ -14,7 +14,9 @@ export function liveSelectionDelivery({send,emit,id,now,schedule=setTimeout,canc
    if(pending.has(callId))return;
    current=null;
    pending.set(callId,{startedAt:now(),scope,assistantText:assistantText.slice(-800),callerText:'',questionObserved:/[?？]/u.test(assistantText)});
-   context(callId,'Student selection is pending. Recap preparation is background context; only target_confirmed confirms readiness.');
+   // Pending selection is already covered by the session's standing policy.
+   // Observe locally: injecting that status during the acknowledgment can
+   // influence an unfinished phrase without supplying any new useful facts.
   },
   stageConfiguration(configurationId,value){
    if(current&&value?.scope){

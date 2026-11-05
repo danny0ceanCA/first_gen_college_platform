@@ -24,11 +24,29 @@ for(const language of ['en','es'])for(const callerAsks of [false,true])test(`${l
  assert.doesNotMatch(result.instruction,/then invite their priority/);
  assert.match(result.instruction,callerAsks?/Let them finish/:/Leave the floor with the caller/);
  assert.equal(f.events[0].durationMs,3200);
- assert.equal(f.sent.length,2);assert.ok(f.sent.every(e=>e.type==='session.thinking.append'&&e.delegation_id===null));
+ assert.equal(f.sent.length,1);assert.ok(f.sent.every(e=>e.type==='session.thinking.append'&&e.delegation_id===null));
  assert.ok(f.sent.every(e=>new TextEncoder().encode(e.content).length<=500));
  const captured=capturePayload({...f.events[0],transcript:'PRIVATE'});
  assert.equal(captured.deliveryMode,result.selectionDelivery.mode);assert.ok(!JSON.stringify(captured).includes('PRIVATE'));
 });
+for(const [language,head,tail]of [['en','Of ','course.'],['es','Por ','supuesto.']])test(`${language}: pending selection observes a complete acknowledgment without injecting provider context`,()=>{
+ const f=fixture();
+ try{
+  f.delivery.begin('selection',head,'student:aiden');
+  f.advance(2800);f.delivery.assistant(tail);
+  const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{name:'Aiden',school:'SAVED_SCHOOL'}}};
+  f.delivery.stageConfiguration('config',context);f.advance(800);f.delivery.configurationReady('config');
+  assert.deepEqual(f.sent,[],'neither dispatch, transcript fragments, staging nor readiness directs the voice');
+  const result=JSON.parse(f.delivery.complete(f.receipt()).output);
+  assert.equal(result.selectionDelivery.recentAssistantSpeech,head+tail);
+  assert.equal(result.selectionDelivery.mode,'conditional_recap');
+  assert.deepEqual(result.selectionContext,context);
+  assert.equal(f.sent.length,1);assert.equal(f.sent[0].type,'session.thinking.append');
+  const brief=JSON.parse(f.sent[0].content);assert.equal(brief.kind,'confirmed-student-brief');assert.equal(brief.profile.school,'SAVED_SCHOOL');
+  assert.equal(result.selectionDelivery.acknowledgmentHeard,undefined,'observing a complete transcript is not proof of heard audio');
+ }finally{f.delivery.clear();}
+});
+
 test('name-only selection retains one conditional short recap without claiming heard speech',()=>{
  const f=fixture();f.delivery.begin('selection','Thanks, let me take a look.');
  f.delivery.caller('}\r\n');const original=f.receipt(),result=JSON.parse(f.delivery.complete(original).output);
@@ -51,7 +69,7 @@ test('only matching dispatched selections get observations; failures keep their 
  assert.equal(f.events.length,0);assert.ok(!JSON.stringify(f.sent).includes('Aiden'));
 });
 test('duplicate dispatch and close cannot create another recap or leak earlier caller speech',()=>{
- const f=fixture();f.delivery.begin('selection');f.delivery.begin('selection');assert.equal(f.sent.length,1);
+ const f=fixture();f.delivery.begin('selection');f.delivery.begin('selection');assert.equal(f.sent.length,0);
  f.delivery.caller('PRIVATE EARLIER QUESTION');f.delivery.clear();const old=f.receipt();assert.equal(f.delivery.complete(old),old);
  f.delivery.begin('new');const result=JSON.parse(f.delivery.complete(f.receipt(true,'new')).output);
  assert.equal(result.selectionDelivery.mode,'conditional_recap');assert.ok(!JSON.stringify(result).includes('PRIVATE'));

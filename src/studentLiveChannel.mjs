@@ -4,7 +4,7 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-export const liveChannelRevision='natural-conversation-caller-first-recap-2026-11-05';
+export const liveChannelRevision='natural-conversation-complete-acknowledgment-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;

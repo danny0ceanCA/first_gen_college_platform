@@ -15,7 +15,7 @@ for(const language of ['en','es'])for(const callerFirst of [false,true])test(`${
  f.backend('response.completed','selection');await pause(0);
  const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{name:'Aiden',school:'SAVED_SCHOOL'},records:[{content:'Private detailed history. '.repeat(50)}]}};
  f.channel.send(JSON.stringify({type:'session.update',event_id:'selection-config',session:{language,instructions:'AUTHORIZED_BACKEND_HISTORY',tools:[],liveContext:context}}));
- assert.equal(f.sent.filter(e=>e.type==='session.thinking.append').length,1,'only the pending status, no partial facts');
+ assert.equal(f.sent.filter(e=>e.type==='session.thinking.append').length,0,'pending selection and staged facts remain off the voice stream');
  assert.ok(!f.sent.filter(e=>e.type==='session.thinking.append').some(e=>e.content.includes('SAVED_SCHOOL')));
  if(callerFirst){f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Could we talk about his essay':'¿Podemos hablar de su ensayo'});await pause(0);}
  f.receive({type:'session.updated',client_event_id:'selection-config'});await pause(0);
@@ -37,6 +37,43 @@ for(const language of ['en','es'])for(const callerFirst of [false,true])test(`${
  const speech=f.events.find(e=>e.type==='response.output_audio_transcript.delta');assert.equal(capturePayload(speech).startMs,1600);
  assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
  f.channel.close();
+});
+
+for(const [language,head,tail]of [['en','Of ','course.'],['es','Por ','supuesto.']])test(`${language}: selection dispatch during an acknowledgment does not redirect speech before its delayed receipt`,async()=>{
+ const clock=fakeClock();let idle=false;
+ const f=fixture({...clock,autoAcknowledge:false,isPlaybackIdle:()=>idle});
+ try{
+  f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Scope pending',tools:[{name:'request_conversation_target'}]}});
+  f.receive({type:'session.input_transcript.delta',delta:'Aiden'});await pause(0);clock.advance(1100);await pause(0);
+  f.backend('response.created','selection');await pause(0);
+  f.receive({type:'session.output_transcript.delta',delta:head});await pause(0);
+  f.backend('response.output_item.done','selection',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+  f.backend('response.completed','selection');await pause(0);
+  assert.deepEqual(f.sent,[],'dispatch cannot inject a pending cue into the unfinished acknowledgment');
+  clock.advance(2800);await pause(0);
+  assert.ok(!f.events.some(e=>e.type==='response.output_audio_transcript.done'),'active playback is not force-finished while context loads');
+  f.receive({type:'session.output_transcript.delta',delta:tail});await pause(0);
+  const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{studentId:'aiden',profile:{name:'Aiden',school:'SAVED_SCHOOL'}}};
+  f.channel.send(JSON.stringify({type:'session.update',event_id:'selection-config',session:{language,instructions:'Authorized backend',tools:[],liveContext:context}}));
+  clock.advance(800);await pause(0);
+  f.receive({type:'session.updated',client_event_id:'selection-config'});await pause(0);
+  assert.deepEqual(f.sent.map(e=>e.type),['session.update'],'only backend configuration is sent before the successful receipt');
+  assert.ok(!f.events.some(e=>e.type==='response.output_audio_transcript.done'));
+  idle=true;clock.advance(1800);await pause(0);
+  const finished=f.events.filter(e=>e.type==='response.output_audio_transcript.done');
+  assert.equal(finished.length,1);assert.equal(finished[0].transcript,head+tail);
+  f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+  f.channel.send(JSON.stringify({type:'response.create'}));
+  const packet=f.sent.find(e=>e.type==='session.thinking.append'),result=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+  assert.equal(JSON.parse(packet.content).kind,'confirmed-student-brief');assert.equal(JSON.parse(packet.content).profile.school,'SAVED_SCHOOL');
+  assert.equal(result.selectionDelivery.recentAssistantSpeech,head+tail);assert.equal(result.selectionDelivery.mode,'conditional_recap');
+  assert.deepEqual(result.selectionContext,context);
+  assert.deepEqual(f.sent.map(e=>e.type),['session.update','session.thinking.append','response.item.create','response.create']);
+  f.receive({type:'session.thinking.appended',client_event_id:packet.event_id});await pause(0);
+  clock.advance(2000);await pause(0);
+  assert.equal(f.sent.filter(e=>e.type==='response.create').length,1,'context acknowledgment cannot start another native continuation');
+  assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel','session.input_audio.mute','output_audio_buffer.clear'].includes(e.type)));
+ }finally{f.channel.close();}
 });
 
 for(const failure of ['backend-error','timeout','superseded','failed-receipt','close'])test(`staged selection facts are discarded on ${failure}`,async()=>{
@@ -92,7 +129,7 @@ for(const language of ['en','es'])test(`${language}: a fast student choice canno
  f.backend('response.output_item.done','selection',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{}'}});
  f.backend('response.completed','selection');await pause(0);
  const pending=f.sent.filter(e=>e.type==='session.thinking.append');
- assert.equal(pending.length,1);assert.equal(JSON.parse(pending[0].content).kind,'student-selection-state');
+ assert.equal(pending.length,0,'tracking the choice does not inject a pending status into live speech');
  assert.equal(f.events.filter(e=>e.type==='response.output_audio_transcript.done').length,0,'the displayed transcript still combines both utterances');
  f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
  f.channel.send(JSON.stringify({type:'response.create'}));
