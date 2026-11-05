@@ -210,7 +210,7 @@ test('brand pronunciation is consistent for English and Spanish across guides',(
  for(const language of ['en','es'])for(const mode of ['profile','finance','planning','admissions','loans']){
   const instructions=voiceSession({...input,language,mode},{}).instructions;
   assert.match(instructions,/English word origin: OR-ih-jin/);
-  assert.match(instructions,/never read headings or stage directions aloud/);
+  assert.match(instructions,/never read headings or stage directions aloud/i);
   assert.match(instructions,/Silent guidance; never explain, compare or spell the name aloud/);
  }
 });

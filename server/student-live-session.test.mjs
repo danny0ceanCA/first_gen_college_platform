@@ -15,7 +15,7 @@ for(const language of ['en','es'])for(const mode of ['profile','planning','admis
 });
 test('Live negotiation uses the documented WebRTC transport and preserves error responses',async()=>{
  let sent;const result=await negotiateStudentLive(async(url,options)=>{sent={url,body:JSON.parse(options.body)};return new Response(JSON.stringify({session:{id:'session-test'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});},'synthetic',{instructions:'Authorized scope',tools:[],tool_choice:'auto'},{sdp:'v=0\r\noffer',language:'en'});
- assert.equal(sent.url,'https://api.openai.com/v1/live/sessions');assert.deepEqual(sent.body.transport,{type:'webrtc',sdp:'v=0\r\noffer'});assert.equal(result.sdp,'v=0\r\nanswer');assert.equal(result.providerId,'session-test');
+ assert.equal(sent.url,'https://api.openai.com/v1/live/sessions');assert.deepEqual(sent.body.transport,{type:'webrtc',sdp:'v=0\r\noffer'});assert.equal(result.sdp,'v=0\r\nanswer');assert.equal(result.providerId,'session-test');assert.equal(result.requestedVoice,'marin');assert.equal(result.providerVoice,undefined,'HTTP creation does not confirm the provider voice');
  const failure=await negotiateStudentLive(async()=>new Response('{"error":{"code":"model_not_found"}}',{status:404}),'synthetic',{instructions:'',tools:[]},{sdp:'v=0',language:'es'});assert.equal(failure.response.status,404);assert.equal((await failure.response.json()).error.code,'model_not_found');
 });
 
@@ -87,6 +87,13 @@ for(const language of ['en','es'])test(`${language}: a caller question takes pre
  assert.match(live.instructions,/one main thread from the brief in one short sentence/);
  assert.match(live.instructions,/If an invitation was already asked, leave the floor with the caller/);
  assert.match(live.delegation.responses.instructions,/target-selection receipt may request one short recap when the caller has not yet asked a question/);
+ for(const prompt of [live.instructions,live.delegation.responses.instructions]){
+  assert.match(prompt,/provisional/);
+  assert.match(prompt,/student-selection-state/);
+  assert.match(prompt,/abandoned recap/);
+ }
+ assert.match(live.instructions,/even when it starts after this receipt or while the brief arrives/);
+ assert.match(live.delegation.responses.instructions,/including after the receipt/);
  assert.match(live.instructions,/this brief arriving never starts one/);
 });
 

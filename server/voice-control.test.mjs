@@ -9,6 +9,7 @@ import {buildOpeningBrief} from './voice-opening-brief.mjs';
 import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 import {voiceTargetResult} from '../src/voiceTargetResult.mjs';
+import {capturePayload} from '../src/voiceCapture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -189,7 +190,7 @@ async function transportFixture(options={}){
  let revision=1;const providers=[],urls=[],logs=[];
  const control=createVoiceControl({env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
  const server=createServer();control.attach(server);await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const receipt=()=>control.register({subject:'owner',permissionRevision:1,providerId:'live_session_prefixed',sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config:{...config,...options.config}});
+ const receipt=(providerId='live_session_prefixed')=>control.register({subject:'owner',permissionRevision:1,providerId,sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config:{...config,...options.config}});
  const connect=async(origin='http://allowed.test')=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}/api/voice-control`,{origin});ws.on('error',()=>{});const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');return {ws,messages};};
  return {control,receipt,connect,providers,urls,logs,base:`http://127.0.0.1:${server.address().port}`,revoke:()=>revision++,async close(){control.close();await new Promise(r=>server.close(r));}};
 }
@@ -200,6 +201,30 @@ test('bridge verifies ownership, preserves provider ID, and closes on permission
   assert.ok(!f.providers[0].sent.some(e=>e.type==='session.start'));
   f.revoke();await once(ws,'close');assert.ok(f.providers[0].sent.some(e=>e.type==='session.close'));
   assert.ok(!JSON.stringify(f.logs).includes('owner'));
+ }finally{await f.close();}
+});
+for(const language of ['en','es'])test(`${language}: provider voice is confirmed across the actual control socket on connect and reconnect without holding speech`,async()=>{
+ const f=await transportFixture({config:{language,requestedVoice:'marin'}});
+ try{
+  for(const [index,providerVoice] of [[0,'marin'],[1,'cedar']]){
+   const providerId=`live-connection-${index}`,receipt=f.receipt(providerId),{ws,messages}=await f.connect();
+   ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));
+   await until(()=>messages.some(e=>e.event?.type==='origen.provider.voice'));
+   const pending=messages.find(e=>e.event?.type==='origen.provider.voice').event;
+   assert.equal(pending.status,'pending');assert.equal(pending.providerVoice,null);assert.equal(pending.requestedVoice,'marin');assert.equal(pending.providerSessionId,providerId);
+   assert.ok(messages.some(e=>e.type==='ready'),'control readiness does not wait for voice confirmation');
+   const provider=f.providers[index],probe=provider.sent.find(e=>e.type==='session.update'&&Object.keys(e.session).length===0);
+   assert.ok(probe);assert.equal(provider.sent.filter(e=>e.type==='session.update').length,1);
+   provider.emit('message',Buffer.from(JSON.stringify({type:'session.output_transcript.delta',delta:language==='en'?'Of course.':'Claro.'})));
+   await until(()=>messages.some(e=>e.event?.type==='response.output_audio_transcript.delta'));
+   provider.emit('message',Buffer.from(JSON.stringify({type:'session.updated',event_id:'provider-confirmed',client_event_id:probe.event_id,session:{id:providerId,model:'gpt-live-1',audio:{output:{voice:providerVoice}},instructions:'PRIVATE',client_secret:'SECRET'}})));
+   await until(()=>messages.some(e=>e.event?.type==='origen.provider.voice'&&e.event.providerVoice));
+   const result=capturePayload(messages.find(e=>e.event?.type==='origen.provider.voice'&&e.event.providerVoice).event);
+   assert.equal(result.status,index?'mismatch':'confirmed');assert.equal(result.providerVoice,providerVoice);assert.equal(result.source,'session.updated');
+   assert.doesNotMatch(JSON.stringify(result),/PRIVATE|SECRET/);
+   assert.ok(!messages.some(e=>e.event?.type==='session.updated'),'diagnostic ACK cannot complete an application configuration update');
+   ws.close();await once(ws,'close');
+  }
  }finally{await f.close();}
 });
 test('overlapping callback batches keep their own lease and resume only after all results',async()=>{
@@ -235,7 +260,7 @@ test('guide updates are account/call bound, language-only changes use server pol
   const {ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(m=>m.type==='ready'));
   const {voiceLanguageInstructions}=await import('../src/voiceLanguage.mjs');
   ws.send(JSON.stringify({type:'event',event:{type:'session.update',event_id:'spanish',session:{controlLanguage:'es',instructions:voiceLanguageInstructions(config.instructions,'es')}}}));
-  await until(()=>f.providers[0].sent.some(e=>e.type==='session.update'));const update=f.providers[0].sent.find(e=>e.type==='session.update');assert.match(update.session.delegation.responses.instructions,/Spanish/);
+  await until(()=>f.providers[0].sent.some(e=>e.type==='session.update'&&e.event_id==='spanish'));const update=f.providers[0].sent.find(e=>e.type==='session.update'&&e.event_id==='spanish');assert.match(update.session.delegation.responses.instructions,/Spanish/);
   ws.send(JSON.stringify({type:'event',event:{type:'session.update',session:{controlLanguage:'es',instructions:'invented policy',tools:[]}}}));await once(ws,'close');
  }finally{await f.close();}
 });

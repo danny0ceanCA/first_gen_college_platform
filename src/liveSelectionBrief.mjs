@@ -1,10 +1,10 @@
 // One complete voice snapshot, never fragments of a dossier. Whole fields and
 // qualified records only: truncation could remove a correction or attribution.
 // UTF-8 bytes conservatively bound the Live append's 500-token limit.
-export function liveSelectionBrief(context,mode){
+export function liveSelectionBrief(context,mode,callId){
  const scope=context?.scope||{},brief=context?.openingBrief;
  mode=['caller_first','leave_floor','conditional_recap'].includes(mode)?mode:'leave_floor';
- const snapshot={kind:'confirmed-student-brief',studentId:scope.studentId??null,mode,partial:true,profile:{}};
+ const snapshot={kind:'confirmed-student-brief',...(callId?{callId}:{}),studentId:scope.studentId??null,mode,partial:true,profile:{}};
  const fits=value=>new TextEncoder().encode(JSON.stringify(value)).length<=480;
  if(!fits(snapshot))return null;
  if(!scope.confirmed||!brief||brief.studentId!==scope.studentId)return snapshot;

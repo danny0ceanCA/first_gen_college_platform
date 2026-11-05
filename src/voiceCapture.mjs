@@ -1,15 +1,17 @@
+import {providerVoiceCapture} from './providerVoice.mjs';
 // Separate private archive: never send transcript text to operational logging.
 export const CAPTURE_EMAIL='danielgojeda.1@gmail.com';
 export function capturePayload(event,direction='provider'){
  const type=event?.type;
  if(typeof type!=='string')return null;
  const base={type,direction,itemId:event.item_id||event.item?.id,responseId:event.response_id||event.response?.id};
+ if(type==='origen.provider.voice')return {...providerVoiceCapture(event),direction};
  if(type==='origen.client.build')return {...base,buildId:event.buildId};
  if(type==='origen.client.revision')return {...base,revision:event.revision};
  if(type==='origen.control.ready')return {...base,durationMs:event.durationMs};
  if(type==='origen.configuration.applied')return {...base,configurationId:event.configurationId,contextDelivery:event.contextDelivery,durationMs:event.durationMs,contextPacketCount:event.contextPacketCount,instructionPacketCount:event.instructionPacketCount};
  if(type==='origen.selection.context')return {...base,stage:event.stage,callId:event.callId,configurationId:event.configurationId,eventId:event.eventId,durationMs:event.durationMs,startMs:event.startMs,endMs:event.endMs,contextBytes:event.contextBytes};
- if(type==='origen.selection.delivery')return {...base,callId:event.callId,deliveryMode:event.deliveryMode,assistantQuestionObserved:event.assistantQuestionObserved,callerSpeechObserved:event.callerSpeechObserved,durationMs:event.durationMs};
+ if(type==='origen.selection.delivery')return {...base,callId:event.callId,deliveryMode:event.deliveryMode,assistantQuestionObserved:event.assistantQuestionObserved,callerSpeechObserved:event.callerSpeechObserved,durationMs:event.durationMs,stage:event.stage,eventId:event.eventId};
  if(type==='origen.control.tool_call')return {...base,name:event.item?.name,callId:event.item?.call_id,arguments:event.item?.arguments};
  if(type==='origen.control.tool_result')return {...base,callId:event.callId,output:event.output,durationMs:event.durationMs};
  if(type==='origen.research.state_changed')return {...base,requestId:event.requestId,revision:event.revision,jobId:event.jobId,state:event.state};

@@ -98,3 +98,10 @@ test('an unexpected delivery mode defaults to leaving the floor with the caller'
  assert.equal(snapshot.profile.name,'Aiden');
  assert.ok(byteLength(snapshot)<=480);
 });
+
+test('selection identity remains whole inside the bounded snapshot',()=>{
+ const callId='call_1234567890abcdef1234567890abcdef';
+ const snapshot=liveSelectionBrief(context({name:'Aiden',goals:'Transfer; campus undecided.',school:'Synthetic Community College'}),'conditional_recap',callId);
+ assert.equal(snapshot.callId,callId);assert.equal(snapshot.profile.name,'Aiden');assert.ok(byteLength(snapshot)<=480);
+ assert.equal(liveSelectionBrief(context({name:'Aiden'}),'conditional_recap','x'.repeat(500)),null);
+});

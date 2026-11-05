@@ -7,14 +7,16 @@ import {researchEvidence} from '../src/voiceResearchProgress.mjs';
 import {researchModeForTool} from '../src/liveConversation.mjs';
 import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 import {selectResearchReuse,cachedResearchForCoverage} from './research-reuse.mjs';
+import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
+export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
  const raw={get readyState(){return provider.readyState===undefined||provider.readyState===WebSocket.OPEN?'open':'closed';},send:text=>{if(raw.readyState==='open')provider.send(text);},close:()=>{}};
+ const voiceDiagnostics=liveVoiceDiagnostics({requestedVoice:config.requestedVoice,providerSessionId,send:event=>raw.send(JSON.stringify(event)),emit,now});
  const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,
   isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
@@ -85,8 +87,8 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   }finally{clearTimeout(timer);batches.delete(lease);finishedLeases.add(lease);if(finishedLeases.size>1000)finishedLeases.delete(finishedLeases.values().next().value);if(!closed&&!batches.size)send({type:'response.create'});}
  };
  return {
-  start(){void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});},
-  receive(event){if(!closed)raw.onmessage?.({data:JSON.stringify(event)});},
+  start(){void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});voiceDiagnostics.start();},
+  receive(event){if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
   command(event,lease){
    if(closed)return false;
    const batch=batches.get(lease);
@@ -113,7 +115,7 @@ export function voiceControlSession({provider,config,scope,jobRequest,emit,log=(
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
   async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
+  close(){if(closed)return;voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
  };
 }
 
@@ -181,7 +183,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
         const attachTimer=setTimeout(()=>dispose(run,'attach_timeout'),8000);run.attachTimer=attachTimer;attachTimer.unref();
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
-         run.engine=voiceControlSession({provider:run.provider,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
+         run.engine=voiceControlSession({provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
           jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
