@@ -1,9 +1,9 @@
 // Adapt Live's continuous speech/delegated tools to the application's existing
 // guarded tool handlers. No tool is executed here and no permission is granted.
-import {liveContextPackets,researchContextPackets} from './liveResearchContext.mjs';
+import {liveContextPackets,researchContextPackets,researchStateContext} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
-export const liveChannelRevision='natural-conversation-smooth-selection-2026-11-05';
+export const liveChannelRevision='natural-conversation-research-completion-2026-11-05';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -282,7 +282,13 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(researchState?.requestId!==event.request?.requestId||researchState?.revision!==event.request?.revision){researchVersion++;if(researchDeliveryV2)deliveryTracker.supersede('new_request',event.request?.question);else clearResearch();}
    const changed=JSON.stringify({...researchState,elapsedMs:undefined})!==JSON.stringify({...event.request,elapsedMs:undefined});
    researchState=event.request;
-   if(changed){quietContext('research-state',researchState?.requestId||'current',{...researchState,elapsedMs:undefined});
+   if(changed){
+    const snapshot=researchDeliveryV2?researchStateContext(researchState):{...researchState,elapsedMs:undefined};
+    quietContext('research-state',researchState?.requestId||'current',snapshot);
+    // Live's quiet context and the managed Responses conversation are separate.
+    // Retire its old pending tool receipt as well, without starting generation,
+    // replaying a function output, or interfering with the spoken conversation.
+    if(researchDeliveryV2&&['completed','failed','cancelled'].includes(snapshot.state))transmit({type:'response.item.create',event_id:id(),item:{type:'message',role:'developer',content:[{type:'input_text',text:'Application research task update, not a new caller request. The newest state or receipt for this task replaces its older state. '+JSON.stringify({requestId:researchState?.requestId,...snapshot})}]}});
     void emit({type:'origen.research.state_changed',requestId:event.request?.requestId,revision:event.request?.revision,jobId:event.request?.jobId,state:event.request?.state});}return;
   }
   if(event.type==='origen.research.cancel'){researchVersion++;researchState=null;clearResearch(event.reason==='scope_changed'?'scope_changed':'cancelled');quietContext('research-state','current',{state:'cancelled',acceptedActiveJob:false});return;}

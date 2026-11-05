@@ -1,4 +1,17 @@
 import {researchBriefSelection} from './researchBrief.mjs';
+// App-owned task state is separate from sourced evidence. Keep the latest state
+// compact so a long question cannot bury a terminal update across many packets.
+// The accepted question is already in the tool receipt; this replaces its state.
+export function researchStateContext(request={}){
+ const state=request.state||'unknown';
+ const researchPending=!!request.jobId&&['queued','running'].includes(state);
+ const meaning=researchPending?'An accepted source check is pending.':
+  state==='completed'?'This check has ended. No lookup is running. Missing facts remain unverified, not unpublished.':
+  state==='failed'?'This check has failed. No lookup is running. Retain any verified findings.':
+  state==='cancelled'?'Local delivery stopped. Worker cancellation requires its receipt.':
+  'No accepted running lookup is confirmed.';
+ return {jobId:request.jobId??null,revision:request.revision,state,researchPending,acceptedActiveJob:researchPending,meaning};
+}
 // UTF-8 bytes conservatively bound tokens, including JSON escaping. Each update
 // is valid, labeled reference data; reassembly preserves every qualification.
 export function liveContextPackets(kind,resultId,value){

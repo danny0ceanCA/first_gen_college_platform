@@ -141,6 +141,29 @@ test('active research does not generate repeated backend calls on conversational
  assert.ok(!f.sent.some(e=>e.type==='response.create'||e.type==='session.commentary.append'));
  assert.equal(f.events.filter(e=>e.type==='origen.research.state_changed').length,1);f.channel.close();
 });
+
+for(const language of ['en','es'])test(`${language}: completed partial research replaces pending state without interrupting conversation or starting a lookup`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
+ const request={requestId:'request',jobId:'job',revision:1,question:'Published cost of attendance with the requested scenario. '.repeat(25)};
+ f.channel.send(JSON.stringify({type:'origen.research.state',request:{...request,state:'running'}}));
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'The budget is an estimate':'El presupuesto es una estimación'});await pause(0);
+ f.channel.send(JSON.stringify({type:'origen.research.state',request:{...request,state:'completed'}}));
+ f.channel.send(JSON.stringify({type:'origen.research.state',request:{...request,state:'completed',elapsedMs:90000}}));
+ const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+ assert.equal(packets.length,2,'one compact state packet per change; elapsed time is not another update');
+ const states=packets.map(p=>JSON.parse(p.text));
+ assert.equal(states[0].researchPending,true);assert.equal(states[1].researchPending,false);
+ assert.equal(states[1].state,'completed');assert.match(states[1].meaning,/No lookup is running/);
+ const backend=f.sent.filter(e=>e.type==='response.item.create');
+ assert.equal(backend.length,1,'the backend pending receipt receives the terminal update once');
+ assert.equal(backend[0].item.role,'developer');assert.equal(backend[0].item.type,'message');
+ assert.match(backend[0].item.content[0].text,/"requestId":"request".*"state":"completed".*"researchPending":false/);
+ assert.ok(!backend[0].item.content[0].text.includes(request.question),'sourced/user text is never elevated into app instructions');
+ f.receive({type:'session.output_transcript.delta',delta:'.'});await pause(0);clock.advance(2000);await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'What does a budget mean?':'¿Qué significa un presupuesto?'});await pause(0);clock.advance(1100);await pause(0);clock.advance(4000);await pause(0);
+ assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append','session.commentary.append','output_audio_buffer.clear'].includes(e.type)));
+ f.channel.close();
+});
 test('a superseded research result cannot be announced as the current answer',async()=>{
  const clock=fakeClock(),f=fixture(clock);
  f.channel.send(JSON.stringify({type:'origen.research.state',request:{requestId:'new',jobId:'new-job',state:'running'}}));

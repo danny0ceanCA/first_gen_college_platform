@@ -160,3 +160,85 @@ test('quiet recovery updates still report failed context delivery without replay
  f.delivery.receive({type:'error',client_event_id:packet.event_id});f.advance(5000);
  assert.equal(f.announcements().length,1);assert.ok(f.events.some(e=>e.evidenceVersion===2&&e.deliveryReason==='context_error'));f.delivery.clear();
 });
+
+const budgetScripts={
+ en:{question:'What is Berkeley’s total cost of attendance?',scenario:'He will be living off campus.',housingOnly:'Just the housing cost, please.',
+  answer:'UC Berkeley’s 2026–27 off-campus total is $49,692. [1]',qualification:'Published undergraduate budget before aid; not a personal bill. [1]',
+  unknown:'I could not verify UC Berkeley’s off-campus total budget.',ack:'Thanks. We can talk about the essay while that runs.'},
+ es:{question:'¿Cuál es el presupuesto total de Berkeley?',scenario:'Estaría viviendo fuera del campus.',housingOnly:'Solo el costo de la vivienda, por favor.',
+  answer:'El total de UC Berkeley fuera del campus en 2026–27 es $49,692. [1]',qualification:'Presupuesto publicado antes de ayuda; no una factura personal. [1]',
+  unknown:'No pude verificar el presupuesto total de UC Berkeley fuera del campus.',ack:'Gracias. Podemos hablar del ensayo mientras se revisa eso.'},
+};
+function budgetResult(script,{unknown=false,extra=[]}={}){
+ const finding={subject:'UC Berkeley',aspect:'total_budget',status:unknown?'unverified':'verified',answer:unknown?script.unknown:script.answer,qualification:unknown?'The source did not establish this requested figure.':script.qualification};
+ return {sources:[{url:'https://example.edu/budget'}],voiceBrief:{status:unknown?'partial':'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding,...extra]}};
+}
+for(const [language,s] of Object.entries(budgetScripts)){
+ test(`${language}: housing scenario preserves the requested total and commentary includes its complete qualified finding`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);f.delivery.caller();f.delivery.callerStopped(s.scenario);
+  f.ready(language,{question:s.question,result:budgetResult(s)});f.ack();f.delivery.reply(s.ack,{audible:true});f.advance(500);
+  assert.equal(f.announcements().length,1);const content=f.announcements()[0].content;
+  assert.ok(content.includes(s.answer));assert.ok(content.includes(s.qualification));assert.match(content,/UC Berkeley/);
+  assert.match(content,/check has ended/);assert.match(content,/Do not say still checking/);
+  assert.ok(Buffer.byteLength(content)<=480);assert.ok(!f.events.some(e=>e.deliveryReason==='different_requested_portion'));f.delivery.clear();
+ });
+ test(`${language}: explicit housing-only follow-up is not satisfied by a total-budget finding`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);f.delivery.caller();f.delivery.callerStopped(s.housingOnly);
+  f.ready(language,{question:s.question,result:budgetResult(s)});f.ack();f.delivery.reply(s.ack,{audible:true});f.advance(500);
+  assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryReason==='different_requested_portion'));f.delivery.clear();
+ });
+ for(const initial of ['native','commentary'])test(`${language}: ${initial} partial answer does not suppress newly verified requested total`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);
+  f.ready(language,{question:s.question,evidenceVersion:1,researchPending:true,result:budgetResult(s,{unknown:true})});f.ack();
+  if(initial==='native')f.delivery.reply(s.unknown,{audible:true});
+  else f.advance(500);
+  const before=f.announcements().length;
+  f.ready(language,{question:s.question,evidenceVersion:2,researchPending:false,result:budgetResult(s)});f.ack();f.advance(500);
+  assert.equal(f.announcements().length,before+1);const content=f.announcements().at(-1).content;
+  assert.ok(content.includes(s.answer));assert.ok(content.includes(s.qualification));assert.doesNotMatch(content,/recovery is running/);
+  f.delivery.reply(s.answer+' '+s.qualification,{audible:true});f.advance(60000);
+  assert.equal(f.announcements().length,before+1);assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));f.delivery.clear();
+ });
+ test(`${language}: an unchanged completed finding remains quiet after its initial contribution`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);
+  f.ready(language,{question:s.question,evidenceVersion:1,researchPending:true,result:budgetResult(s)});f.ack();f.advance(500);
+  f.ready(language,{question:s.question,evidenceVersion:2,researchPending:false,result:budgetResult(s)});f.ack();f.advance(5000);
+  assert.equal(f.announcements().length,1);assert.ok(f.events.some(e=>e.deliveryReason==='recovery_context_only'));f.delivery.clear();
+ });
+ test(`${language}: unrelated recovery finding does not repeat the already supplied total`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);
+  f.ready(language,{question:s.question,evidenceVersion:1,researchPending:true,result:budgetResult(s)});f.ack();f.advance(500);
+  const housing={subject:'UC Berkeley',aspect:'housing',status:'verified',answer:'Housing allowance is $15000. [1]',qualification:'Estimated allowance, not billed tuition. [1]'};
+  f.ready(language,{question:s.question,evidenceVersion:2,researchPending:false,result:budgetResult(s,{extra:[housing]})});f.ack();f.advance(5000);
+  assert.equal(f.announcements().length,1);f.delivery.clear();
+ });
+ test(`${language}: pending new evidence stays eligible across a terminal status-only refresh`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',s.question);
+  f.ready(language,{question:s.question,evidenceVersion:1,researchPending:true,result:budgetResult(s,{unknown:true})});f.ack();f.advance(500);
+  f.quiet(false);
+  f.ready(language,{question:s.question,evidenceVersion:2,researchPending:true,result:budgetResult(s)});f.ack();f.advance(1000);
+  f.ready(language,{question:s.question,evidenceVersion:3,researchPending:false,result:budgetResult(s)});f.ack();f.quiet(true);f.advance(500);
+  assert.equal(f.announcements().length,2);assert.ok(f.announcements().at(-1).content.includes(s.answer));f.delivery.clear();
+ });
+}
+
+test('source-index and confidence-label changes alone do not repeat the same qualified facts',()=>{
+ const f=fixture(),s=budgetScripts.en,initial=budgetResult(s);initial.voiceBrief.findings[0].status='partial';
+ f.delivery.supersede('new_request',s.question);f.ready('en',{question:s.question,evidenceVersion:1,researchPending:true,result:initial});f.ack();f.advance(500);
+ const final=budgetResult(s);final.sources.unshift({url:'https://example.edu/other'});final.voiceBrief.findings[0].answer=final.voiceBrief.findings[0].answer.replace('[1]','[2]');final.voiceBrief.findings[0].qualification=final.voiceBrief.findings[0].qualification.replace('[1]','[2]');
+ f.ready('en',{question:s.question,evidenceVersion:2,researchPending:false,result:final});f.ack();f.advance(1000);
+ assert.equal(f.announcements().length,1);assert.ok(f.events.some(e=>e.deliveryReason==='recovery_context_only'));f.delivery.clear();
+});
+
+test('the reviewed off-campus result fits inline with its entire population, year, amount and qualification',()=>{
+ // Public historical research fixture; these figures are not current-cost advice.
+ const f=fixture(),finding={subject:'UC Berkeley — new California-resident undergraduate, off-campus apartment',aspect:'total_budget',status:'verified',
+  answer:'2026–27 published academic-year cost of attendance: USD $49,692 before aid. [1]',
+  qualification:'An estimated attendance budget, not an individual amount owed. [1]'};
+ const question='UC Berkeley off-campus total cost of attendance';
+ f.delivery.supersede('new_request',question);
+ f.ready('en',{question,result:{sources:[{url:'https://financialaid.berkeley.edu/how-aid-works/student-budgets-cost-of-attendance/'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}}});
+ f.ack();f.advance(500);const content=f.announcements()[0].content;
+ assert.ok(content.includes(finding.subject));assert.ok(content.includes(finding.answer));assert.ok(content.includes(finding.qualification));
+ assert.ok(Buffer.byteLength(content)<=480);assert.doesNotMatch(content,/Use only the relevant/,'the actual figure must not fall back to an opaque reference');f.delivery.clear();
+});

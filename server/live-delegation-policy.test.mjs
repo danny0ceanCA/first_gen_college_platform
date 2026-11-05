@@ -44,11 +44,16 @@ for(const language of ['en','es'])test(`${language} research lets the same live 
   assert.match(speech,/Initial findings can be used while an app-confirmed recovery check continues/);
   assert.match(speech,/do not automatically expand it to every residency category/);
   assert.match(speech,/Listen when the person wants a moment/);
+  assert.match(speech,/newest application task state replaces older pending receipts/);
+  assert.match(speech,/A completed lookup with a missing answer is not an active task/);
+  assert.match(speech,/A question about how research works can be answered directly/);
  }
  assert.equal(studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true}),'','ordinary updates rely on startup conversation policy');
  assert.match(c.instructions,/Keep the lookup question close to the caller's actual request/);
  assert.match(c.instructions,/name both campuses in institution/);
  assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
+ assert.match(c.instructions,/research only the unresolved portion if needed/);
+ assert.match(c.instructions,/status questions reuse actual task state/);
 });
 
 for(const language of ['en','es'])test(`${language} call-only speech keeps backend context and tool contracts`,()=>{
