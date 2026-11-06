@@ -8,6 +8,7 @@ import {runtimeLog} from './observability/logger.mjs';
 import {allowedRequest} from './origin.mjs';
 
 const fail=(status,message)=>Object.assign(new Error(message),{status});
+const unavailable=recapFailure=>Object.assign(fail(503,'recap_unavailable'),{recapFailure});
 const topics=['options','transfer','costs','applications'];
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function validateRecapRequest(value){
@@ -45,12 +46,12 @@ export const topicRecapInstructions=`Write one cohesive, informative topic recap
 const schema=refs=>({type:'object',properties:{paragraphs:{type:'array',maxItems:3,items:{type:'object',properties:{text:{type:'string'},refs:{type:'array',items:{type:'string',enum:refs},minItems:1,maxItems:20}},required:['text','refs'],additionalProperties:false}}},required:['paragraphs'],additionalProperties:false});
 export function validateRecapOutput(output,evidence){
  const refs=new Set(evidence.entries.map(e=>e.ref));
- if(!output||!Array.isArray(output.paragraphs)||output.paragraphs.length>3)throw fail(503,'recap_unavailable');
+ if(!output||!Array.isArray(output.paragraphs)||output.paragraphs.length>3)throw unavailable('output_validation');
  const paragraphs=output.paragraphs.map(p=>{
-  if(!p||typeof p.text!=='string'||!p.text.trim()||p.text.length>1800||!Array.isArray(p.refs)||!p.refs.length||p.refs.length>20||p.refs.some(ref=>!refs.has(ref)))throw fail(503,'recap_unavailable');
+  if(!p||typeof p.text!=='string'||!p.text.trim()||p.text.length>1800||!Array.isArray(p.refs)||!p.refs.length||p.refs.length>20||p.refs.some(ref=>!refs.has(ref)))throw unavailable('output_validation');
   return {text:p.text.trim(),refs:[...new Set(p.refs)]};
  });
- if(paragraphs.map(p=>p.text).join(' ').split(/\s+/u).length>260)throw fail(503,'recap_unavailable');
+ if(paragraphs.map(p=>p.text).join(' ').split(/\s+/u).length>260)throw unavailable('output_validation');
  const used=new Set(paragraphs.flatMap(p=>p.refs));
  return {paragraphs,sources:evidence.entries.filter(e=>used.has(e.ref)),omitted:evidence.omitted};
 }
@@ -59,7 +60,7 @@ export function createTopicRecapService({load,env={},request=fetch,now=Date.now,
  const cache=new Map(),pending=new Map(),budgets=new Map();
  return async(subject,raw,{mode='foreground'}={})=>{
   const input=validateRecapRequest(raw);
-  const started=clock();let sourceMs=0,generationMs=0,recapCache='none',outcome='completed';
+  const started=clock();let sourceMs=0,generationMs=0,recapCache='none',outcome='completed',recapFailure,phase='source',httpStatus;
   const read=async()=>{const at=clock();try{return await withRequestDeadline(async()=>recapEvidence(input,await load(subject,input)),{timeoutMs:sourceTimeoutMs});}finally{sourceMs+=clock()-at;}};
   try{
   const evidence=await read(); // Reauthorize and reread even on a cache hit.
@@ -71,30 +72,35 @@ export function createTopicRecapService({load,env={},request=fetch,now=Date.now,
   for(const [id,b] of budgets)if(b.reset<=time)budgets.delete(id);
   const budget=budgets.get(subject)||{count:0,reset:time+3600000};
   if(budget.count>=20||pending.size>=8||budgets.size>=500&&!budgets.has(subject))throw fail(429,'recap_limit');
-  if(!env.OPENAI_API_KEY)throw fail(503,'recap_unavailable');
+  if(!env.OPENAI_API_KEY)throw unavailable('configuration');
   budget.count++;budgets.set(subject,budget);
   recapCache='generated';
   const work=(async()=>{
    const model=env.OPENAI_MODEL_TOPIC_RECAP||'gpt-4.1';
    const fetchModel=providerOperation('notes.generate',request,{model});
-   const generationStarted=clock();
+   const generationStarted=clock();phase='provider';
    const data=await withRequestDeadline(async signal=>{
     const response=await fetchModel('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,store:false,max_output_tokens:1800,instructions:topicRecapInstructions+` Write in ${input.language==='es'?'Spanish':'English'}. Translate prose only; copy source ref identifiers exactly without translating or shortening them.`,input:JSON.stringify({topic:input.topic,entries:evidence.entries}),text:{format:{type:'json_schema',name:'binder_topic_recap',strict:true,schema:schema(evidence.entries.map(e=>e.ref))}}}),signal});
-    if(!response.ok)throw fail(503,'recap_unavailable');return response.json();
+    if(!response.ok){httpStatus=response.status;throw unavailable('provider_http');}
+    try{return await response.json();}catch(error){if(signal.aborted)throw signal.reason;throw unavailable('provider_body');}
    },{timeoutMs:30000}).finally(()=>{generationMs=clock()-generationStarted;});
-   if(data.status&&data.status!=='completed')throw fail(503,'recap_unavailable');
-   const text=(data.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join('');
-   let output;try{output=JSON.parse(text);}catch{throw fail(503,'recap_unavailable');}
+   phase='output';
+   if(!data||!Array.isArray(data.output))throw unavailable('provider_body');
+   if(data.status&&data.status!=='completed')throw unavailable(data.status==='incomplete'&&data.incomplete_details?.reason==='max_output_tokens'?'output_limit':'provider_incomplete');
+   const content=data.output.flatMap(item=>Array.isArray(item?.content)?item.content:[]);
+   if(content.some(item=>item?.type==='refusal'))throw unavailable('provider_refusal');
+   const text=content.filter(item=>item?.type==='output_text'&&typeof item.text==='string').map(item=>item.text).join('');
+   let output;try{output=JSON.parse(text);}catch{throw unavailable('output_json');}
    const result=validateRecapOutput(output,evidence);
    // Never publish a generation that finished after a correction, deletion,
    // account closure, or another source change. No persistent derived copies.
-   if(hash([input,await read()])!==fingerprint)throw fail(409,'recap_changed');
+   phase='source';if(hash([input,await read()])!==fingerprint)throw fail(409,'recap_changed');
    if(cache.size>=128)cache.delete(cache.keys().next().value);
    cache.set(key,{expires:now()+300000,result});return result;
   })();
   pending.set(key,work);try{return await work;}finally{pending.delete(key);}
-  }catch(error){outcome=error?.name==='AbortError'?'cancelled':'failed';throw error;}
-  finally{try{log({event:'recap.load.finished',topic:input.topic,language:input.language,recapMode:mode==='background'?'background':'foreground',recapCache,outcome,durationMs:clock()-started,sourceMs,generationMs});}catch{/* Timing must not affect recap delivery. */}}
+  }catch(error){outcome=error?.name==='AbortError'?'cancelled':'failed';recapFailure=error?.recapFailure||(error?.status===409?'source_changed':error?.status===429?'capacity':[401,403,404].includes(error?.status)?'authorization':error?.name==='TimeoutError'?'timeout':error?.name==='AbortError'?'cancelled':phase==='source'?'source_read':phase==='output'?'output_validation':'provider_request');throw error;}
+  finally{try{log({event:'recap.load.finished',topic:input.topic,language:input.language,recapMode:mode==='background'?'background':'foreground',recapCache,outcome,recapFailure,httpStatus,durationMs:clock()-started,sourceMs,generationMs});}catch{/* Timing must not affect recap delivery. */}}
  };
 }
 

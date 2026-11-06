@@ -188,10 +188,10 @@ class Provider extends EventEmitter{
 }
 async function transportFixture(options={}){
  let revision=1;const providers=[],urls=[],logs=[];
- const control=createVoiceControl({env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
+ const control=createVoiceControl({resumeGraceMs:options.resumeGraceMs,heartbeatIntervalMs:options.heartbeatIntervalMs,env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
  const server=createServer();control.attach(server);await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const receipt=(providerId='live_session_prefixed')=>control.register({subject:'owner',permissionRevision:1,providerId,sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config:{...config,...options.config}});
- const connect=async(origin='http://allowed.test')=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}/api/voice-control`,{origin});ws.on('error',()=>{});const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');return {ws,messages};};
+ const connect=async(origin='http://allowed.test',socketOptions={})=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}/api/voice-control`,{...socketOptions,origin});ws.on('error',()=>{});const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');return {ws,messages};};
  return {control,receipt,connect,providers,urls,logs,base:`http://127.0.0.1:${server.address().port}`,revoke:()=>revision++,async close(){control.close();await new Promise(r=>server.close(r));}};
 }
 test('bridge verifies ownership, preserves provider ID, and closes on permission revision',async()=>{
@@ -301,6 +301,133 @@ test('another account cannot claim a control ID or open a provider sideband',asy
 test('browser disconnect closes provider with no replay or second owner',async()=>{
  const f=await transportFixture();try{const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));ws.close();await once(ws,'close');await until(()=>f.providers[0].readyState===WebSocket.CLOSED);
   const next=await f.connect();next.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await once(next.ws,'close');assert.equal(f.providers.length,1);
+ }finally{await f.close();}
+});
+
+test('overlapping quiet-boundary RPCs share the observation without closing the call',async()=>{
+ const f=await transportFixture();try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  for(const id of ['wait-one','wait-two'])ws.send(JSON.stringify({type:'rpc',method:'settle',id}));
+  await pause(25);assert.equal(ws.readyState,WebSocket.OPEN);assert.equal(messages.filter(e=>e.type==='reply').length,0);
+  ws.send(JSON.stringify({type:'playback',idle:true,version:1}));
+  await until(()=>messages.filter(e=>e.type==='reply').length===2);
+  assert.deepEqual(messages.filter(e=>e.type==='reply').map(e=>[e.id,e.value]),[['wait-one',true],['wait-two',true]]);
+  assert.equal(f.providers.length,1);assert.ok(!f.logs.some(e=>e.event==='voice.control.closed'));
+ }finally{await f.close();}
+});
+
+test('abnormal transport loss resumes the same provider and research after fresh owner verification',async()=>{
+ const jobs=[],f=await transportFixture({request:async(token,method,path,body)=>{jobs.push({method,body});return method==='POST'?{id:'retained-job',status:'queued'}:{status:'running'};}});
+ try{
+  const receipt=f.receipt(),first=await f.connect();first.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>first.messages.some(e=>e.type==='ready'));
+  const provider=f.providers[0],native=event=>provider.emit('message',Buffer.from(JSON.stringify({type:'response.event',delegation_id:'delegation',event})));
+  for(const event of [{type:'response.created',response:{id:'lookup'}},{type:'response.output_item.done',response_id:'lookup',item:tool('lookup_financial_aid','lookup',{question:'Published cost',institution:'Example'})},{type:'response.completed',response:{id:'lookup'}}])native(event);
+  await until(()=>jobs.some(j=>j.method==='POST'));first.ws.terminate();await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));
+  assert.equal(provider.readyState,WebSocket.OPEN);assert.equal(jobs.filter(j=>j.method==='DELETE').length,0);
+  provider.emit('message',Buffer.from(JSON.stringify({type:'session.output_transcript.delta',delta:'Continuing the same conversation.'})));
+  const wrong=await f.connect();wrong.ws.send(JSON.stringify({type:'authenticate',token:'other',id:receipt.id}));assert.equal((await once(wrong.ws,'close'))[0],1008);
+  const resumed=await f.connect();resumed.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>resumed.messages.some(e=>e.type==='ready'));
+  assert.equal(resumed.messages[0].resumed,true);await until(()=>resumed.messages.some(e=>e.event?.type==='response.output_audio_transcript.delta'));
+  assert.equal(f.providers.length,1);assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs.filter(j=>j.method==='DELETE').length,0);
+  assert.equal(provider.sent.filter(e=>e.type==='session.close').length,0);
+  resumed.ws.send(JSON.stringify({type:'playback',idle:true,version:1}));resumed.ws.send(JSON.stringify({type:'rpc',method:'settle',id:'resumed-wait'}));
+  await until(()=>resumed.messages.some(e=>e.type==='reply'&&e.id==='resumed-wait'),3000);
+ }finally{await f.close();}
+});
+
+test('resume grace expires without keeping the provider or worker alive indefinitely',async()=>{
+ const f=await transportFixture({resumeGraceMs:50});try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  ws.terminate();await until(()=>f.logs.some(e=>e.reason==='resume_timeout'));
+  assert.equal(f.providers[0].readyState,WebSocket.CLOSED);assert.ok(f.providers[0].sent.some(e=>e.type==='session.close'));
+  const late=await f.connect();late.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));assert.equal((await once(late.ws,'close'))[0],1008);assert.equal(f.providers.length,1);
+ }finally{await f.close();}
+});
+
+test('detached event overflow closes safely instead of resuming an incomplete buffered stream',async()=>{
+ const f=await transportFixture();try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  ws.terminate();await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));
+  for(let i=0;i<270;i++)f.providers[0].emit('message',Buffer.from(JSON.stringify({type:'session.output_transcript.delta',delta:'word '})));
+  await until(()=>f.logs.some(e=>e.reason==='resume_buffer_exceeded'));
+  assert.equal(f.providers[0].readyState,WebSocket.CLOSED);
+  const reconnect=await f.connect();reconnect.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));assert.equal((await once(reconnect.ws,'close'))[0],1008);
+ }finally{await f.close();}
+});
+
+test('explicit close ends the session immediately instead of starting transport grace',async()=>{
+ const f=await transportFixture();try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  ws.send(JSON.stringify({type:'close'}));assert.equal((await once(ws,'close'))[0],1000);
+  assert.equal(f.providers[0].readyState,WebSocket.CLOSED);assert.ok(!f.logs.some(e=>e.event==='voice.control.detached'));
+ }finally{await f.close();}
+});
+
+test('revoked permission cannot reattach during transport grace',async()=>{
+ const f=await transportFixture();try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  ws.terminate();await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));f.revoke();
+  const reconnect=await f.connect();reconnect.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));assert.equal((await once(reconnect.ws,'close'))[0],1008);
+  await until(()=>f.providers[0].readyState===WebSocket.CLOSED,1500);assert.ok(f.logs.some(e=>e.reason==='permission_changed'));
+ }finally{await f.close();}
+});
+
+test('verified resume retries a still-attached socket without taking over its writer',async()=>{
+ const f=await transportFixture();try{
+  const receipt=f.receipt(),first=await f.connect();first.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>first.messages.some(e=>e.type==='ready'));
+  const early=await f.connect();early.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id,resume:true}));
+  const [code,reason]=await once(early.ws,'close');assert.equal(code,1013);assert.equal(reason.toString(),'control_still_attached');
+  assert.equal(first.ws.readyState,WebSocket.OPEN);assert.equal(f.providers.length,1);
+  const wrong=await f.connect();wrong.ws.send(JSON.stringify({type:'authenticate',token:'other',id:receipt.id,resume:true}));assert.equal((await once(wrong.ws,'close'))[0],1008);
+  first.ws.terminate();await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));
+  const resumed=await f.connect();resumed.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id,resume:true}));await until(()=>resumed.messages.some(e=>e.type==='ready'&&e.resumed));
+  assert.equal(f.providers.length,1);assert.ok(!f.providers[0].sent.some(e=>e.type==='session.close'));
+ }finally{await f.close();}
+});
+
+test('protocol heartbeat detects a half-open client and preserves its provider for resume',async()=>{
+ const f=await transportFixture({heartbeatIntervalMs:30});try{
+  const receipt=f.receipt(),first=await f.connect('http://allowed.test',{autoPong:false});let pings=0;first.ws.on('ping',()=>pings++);
+  first.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>first.messages.some(e=>e.type==='ready'));
+  assert.equal((await once(first.ws,'close'))[0],1006);assert.equal(pings,2);
+  await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));assert.equal(f.providers[0].readyState,WebSocket.OPEN);
+  const resumed=await f.connect();resumed.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id,resume:true}));await until(()=>resumed.messages.some(e=>e.type==='ready'&&e.resumed));
+  await pause(150);assert.equal(resumed.ws.readyState,WebSocket.OPEN,'responsive pongs keep a healthy transport open');assert.equal(f.providers.length,1);
+ }finally{await f.close();}
+});
+
+test('browser automatically resumes a real control socket and receives retained research once',async()=>{
+ const jobs=[],events=[],sockets=[];let finishResearch,opens=0;
+ const f=await transportFixture({env:{ORIGEN_RESEARCH_DELIVERY_V2:'true'},request:async(token,method)=>{
+  jobs.push(method);if(method==='POST')return {id:'persistent-job',status:'queued'};
+  if(method==='GET')return new Promise(resolve=>{finishResearch=resolve;});return {status:'cancelled'};
+ }});
+ const primaryWrites=[],raw={readyState:'open',send:text=>primaryWrites.push(JSON.parse(text)),close(){this.readyState='closed';this.onclose?.({});}};
+ const channel=studentVoiceChannel(raw,{isPlaybackIdle:()=>true,getPlaybackVersion:()=>1});channel.onopen=()=>opens++;channel.onmessage=e=>events.push(JSON.parse(e.data));
+ class BrowserSocket extends WebSocket{constructor(url){super(url,{origin:'http://allowed.test'});sockets.push(this);}}
+ try{
+  await channel.configure({voiceControl:f.receipt()},{token:'owner',url:f.base,WebSocketClass:BrowserSocket});
+  const provider=f.providers[0],native=event=>provider.emit('message',Buffer.from(JSON.stringify({type:'response.event',delegation_id:'delegation',event})));
+  for(const event of [{type:'response.created',response:{id:'lookup'}},{type:'response.output_item.done',response_id:'lookup',item:tool('lookup_financial_aid','lookup',{question:'Published cost',institution:'Example'})},{type:'response.completed',response:{id:'lookup'}}])native(event);
+  await until(()=>finishResearch,1500);sockets[0].terminate();await until(()=>f.logs.some(e=>e.event==='voice.control.detached'));
+  finishResearch({status:'completed',result:{text:'Verified published cost [1].',sources:[{url:'https://example.edu/costs'}]}});
+  await until(()=>f.logs.some(e=>e.event==='voice.control.resumed'),2000);
+  await until(()=>events.some(e=>e.type==='origen.research.result'&&e.status==='completed'));
+  assert.equal(events.filter(e=>e.type==='origen.research.result'&&e.status==='completed').length,1);
+  assert.equal(jobs.filter(m=>m==='POST').length,1);assert.equal(jobs.filter(m=>m==='DELETE').length,0);
+  assert.equal(opens,1);assert.equal(f.providers.length,1);assert.equal(primaryWrites.length,0);assert.equal(raw.readyState,'open');
+  channel.close();await until(()=>provider.readyState===WebSocket.CLOSED);
+ }finally{channel.close();await f.close();}
+});
+
+test('policy rejection records its actual safe reason and is never resumable',async()=>{
+ const {diagnosticRecord}=await import('./diagnostics.mjs');const f=await transportFixture();try{
+  const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));await until(()=>messages.some(e=>e.type==='ready'));
+  ws.send(JSON.stringify({type:'event',event:{type:'untrusted-command',secret:'never log this'}}));assert.equal((await once(ws,'close'))[0],1008);
+  await until(()=>f.logs.some(e=>e.event==='voice.control.closed'));
+  const record=diagnosticRecord(f.logs.find(e=>e.event==='voice.control.closed'));
+  assert.equal(record.reason,'invalid_command');assert.doesNotMatch(JSON.stringify(record),/never log this/);
+  const reconnect=await f.connect();reconnect.ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));assert.equal((await once(reconnect.ws,'close'))[0],1008);
  }finally{await f.close();}
 });
 

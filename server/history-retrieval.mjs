@@ -3,6 +3,8 @@ import {databaseQueryOperation} from './observability/dependencies.mjs';
 import {withRequestDeadline} from '../src/requestDeadline.mjs';
 import {savedSourceEvidence} from './conversation-continuity.mjs';
 import {binderEvidence,binderEvidenceInstructions,binderReporter} from './binder-context.mjs';
+import {runtimeLog} from './observability/logger.mjs';
+import {safeErrorCode} from './observability/error-codes.mjs';
 
 export const RETRIEVAL_VERSION='postgres-keyword-v3';
 export const RETRIEVAL_BUDGET=6500;
@@ -84,31 +86,41 @@ function selectItems(rows,terms,continuity){
  return items;
 }
 
-export async function retrieveStudentHistory(database,subject,{studentId,query,excludeRefs=[],excludeSummaryIds=[],minCoverage=0.34,timeoutMs=900,continuity=false}={}){
+export async function retrieveStudentHistory(database,subject,{studentId,query,excludeRefs=[],excludeSummaryIds=[],minCoverage=0.34,timeoutMs=900,continuity=false,log=runtimeLog}={}){
  if(studentId!==null&&(typeof studentId!=='string'||!studentId||studentId.length>128))throw fail(400,'memory_scope_required');
  const terms=retrievalTerms(query);if(!terms.length)return empty('no_query');if(!database)return empty('unavailable');
  const concepts=[...new Set(terms.map(expand))];
  const started=performance.now(),deadline=Math.max(1,Math.min(1500,timeoutMs));
+ let retrievalStage='acquire',outcome='completed',code;
  try{return await databaseQueryOperation('memory.retrieve',()=>withRequestDeadline(async signal=>{
   const c=await database.connect();let transaction=false;
-  const check=()=>{if(signal.aborted)throw signal.reason;};
+  const check=()=>{if(signal.aborted)throw signal.reason;if(performance.now()-started>=deadline)throw new DOMException('Request timed out','TimeoutError');};
+  // Guard queries can wait for another account operation. Once the caller has
+  // timed out, do not keep issuing guard/read queries and occupying the pool.
+  const guarded={...(c.setAccountScope?{setAccountScope:async(...args)=>{check();return c.setAccountScope(...args);}}:{}),query:async(...args)=>{check();return c.query(...args);}};
   try{
    check();await c.query('BEGIN');transaction=true;check();
    // Bound SQL too: a Promise timeout alone would leave work occupying the pool.
    await c.query(`SET LOCAL statement_timeout='${Math.max(1,Math.ceil(deadline-(performance.now()-started)))}ms'`);
-   await guardAccountTransaction(c,subject);check();
+   retrievalStage='guard';await guardAccountTransaction(guarded,subject);check();
+   retrievalStage='scope';
    const account=(await c.query('SELECT id,role FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0];
    if(!account)throw fail(404,'account_not_found');
-   if(studentId!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account.id,studentId])).rows.length)throw fail(404,'student_not_found');
+   check();if(studentId!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account.id,studentId])).rows.length)throw fail(404,'student_not_found');
    check();const ready=(await c.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql') AS ready")).rows[0]?.ready;
    if(!ready){await c.query('COMMIT');transaction=false;return empty('migration_pending');}
-   check();const rows=(await c.query(candidateSql(studentId,continuity),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
+   check();retrievalStage='search';
+   // The SQL search receives only the budget left after acquisition and guards.
+   // A fixed initial statement_timeout would let it run past the total deadline.
+   await c.query(`SET LOCAL statement_timeout='${Math.max(1,Math.ceil(deadline-(performance.now()-started)))}ms'`);check();
+   const rows=(await c.query(candidateSql(studentId,continuity),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
    const reportedBy=['parent','student'].includes(account.role)?account.role:'unknown';
-   const items=selectItems(rows.map(row=>['note','summary'].includes(row.kind)?{...row,reported_by:binderReporter({...row,organization_reported_by:row.reported_by},reportedBy)}:row),retrievalTerms(concepts.join(' ')),continuity);await c.query('COMMIT');transaction=false;check();
+   const items=selectItems(rows.map(row=>['note','summary'].includes(row.kind)?{...row,reported_by:binderReporter({...row,organization_reported_by:row.reported_by},reportedBy)}:row),retrievalTerms(concepts.join(' ')),continuity);check();retrievalStage='commit';await c.query('COMMIT');transaction=false;check();
    return {available:true,method:RETRIEVAL_VERSION,reason:items.length?'matched':'no_relevant_history',items};
   }finally{if(transaction)await c.query('ROLLBACK').catch(()=>{});c.release();}
  },{timeoutMs:deadline}));}
- catch(error){if([400,403,404].includes(error?.status))throw error;return empty(error?.name==='TimeoutError'||error?.name==='AbortError'||error?.code==='57014'?'deadline':'unavailable');}
+ catch(error){outcome='failed';code=safeErrorCode(error);if([400,403,404].includes(error?.status))throw error;return empty(error?.name==='TimeoutError'||error?.name==='AbortError'||error?.code==='57014'?'deadline':'unavailable');}
+ finally{try{log({event:'memory.retrieval.finished',retrievalStage,outcome,code,durationMs:performance.now()-started});}catch{/* Diagnostics cannot affect retrieval. */}}
 }
 
 // At session start, the server has a selected binder topic/item and profile.

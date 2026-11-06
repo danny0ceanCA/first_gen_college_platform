@@ -7,6 +7,7 @@ import {retrieveStudentHistory,retrievalTerms,retrievalExcerpt,retrievalInstruct
 import {createProfileVoiceHandler} from './profile-voice.mjs';
 import {createPrivacyRepository} from './privacy-controls.mjs';
 import {exportDeletionManifest,replayDeletionManifest} from '../ops/privacy-recovery.mjs';
+import {diagnosticRecord} from './observability/event-schema.mjs';
 
 test('retrieval query tokens are bounded data; queries use the latest user turn or selected item',()=>{
  assert.deepEqual(retrievalTerms("What did I say about FAFSA? '); DROP TABLE --"),['fafsa','drop','table']);
@@ -22,6 +23,35 @@ test('pool acquisition deadline returns fallback and releases a connection that 
  let release,finish;const database={connect:()=>new Promise(r=>{finish=()=>r({release:()=>{release=true;},query:()=>{throw Error('late client must not query');}});})};
  const result=await retrieveStudentHistory(database,'reader',{studentId:'alex',query:'transfer',timeoutMs:10});
  assert.equal(result.available,false);assert.equal(result.reason,'deadline');finish();await new Promise(r=>setImmediate(r));assert.equal(release,true);
+});
+
+test('a timed-out account guard stops issuing reads, rolls back, and releases its pool connection',async()=>{
+ let resume,released=false;const queries=[],logs=[];
+ const database={connect:async()=>({release(){released=true;},async query(sql){
+  queries.push(sql);
+  if(sql.startsWith('INSERT INTO origen_subject_locks'))await new Promise(resolve=>{resume=resolve;});
+  return {rows:[]};
+ }})};
+ const result=await retrieveStudentHistory(database,'private-account',{studentId:'alex',query:'private detail',timeoutMs:40,log:event=>logs.push(diagnosticRecord(event))});
+ assert.equal(result.reason,'deadline');assert.equal(logs[0].retrievalStage,'guard');
+ resume();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(released,true);assert.equal(queries.at(-1),'ROLLBACK');
+ assert.ok(!queries.some(sql=>sql.includes('FOR UPDATE')||sql.includes('FROM origen_accounts')),'No new reads after caller received the timeout fallback');
+ assert.doesNotMatch(JSON.stringify(logs),/private-account|private detail/);
+});
+
+test('history search receives the remaining SQL budget after slow guard work',async()=>{
+ const limits=[];
+ const database={connect:async()=>({release(){},async query(sql){
+  if(sql.startsWith('SET LOCAL statement_timeout'))limits.push(Number(sql.match(/'(\d+)ms'/)[1]));
+  if(sql.startsWith('INSERT INTO origen_subject_locks'))await new Promise(resolve=>setTimeout(resolve,50));
+  if(sql.includes('FROM origen_accounts WHERE auth0_subject'))return {rows:[{id:'owner',role:'parent'}]};
+  if(sql.includes('FROM origen_students WHERE'))return {rows:[{id:'alex'}]};
+  if(sql.includes("name='045_historical_retrieval.sql'"))return {rows:[{ready:true}]};
+  return {rows:[]};
+ }})};
+ assert.equal((await retrieveStudentHistory(database,'owner',{studentId:'alex',query:'transfer',timeoutMs:500,log:()=>{}})).available,true);
+ assert.equal(limits.length,2);assert.ok(limits[1]<limits[0]-30,'The search must not inherit a fresh full deadline');
 });
 test('history retrieval with real PostgreSQL and restricted RLS',{skip:!process.env.DATABASE_TEST_URL},async t=>{
  const f=await retrievalFixture();

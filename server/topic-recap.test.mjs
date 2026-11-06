@@ -24,6 +24,33 @@ test('recap logs distinguish background generation, source reads, cache reuse, a
  failed=true;await assert.rejects(run('owner',{...input,language:'es'},{mode:'background'}));assert.equal(logs[2].outcome,'failed');assert.equal(logs[2].generationMs,20);
  assert.ok(!JSON.stringify(logs).includes('secret-account'));assert.ok(!JSON.stringify(logs).includes('private note'));assert.ok(!JSON.stringify(logs).includes('Alex'));
 });
+
+test('recap diagnostics identify provider, token, refusal and validation failures without exposing response content',async()=>{
+ const cases=[
+  ['provider_http',()=>new Response('secret provider body',{status:429}),429],
+  ['provider_body',()=>new Response('secret invalid json')],
+  ['output_limit',()=>new Response(JSON.stringify({status:'incomplete',incomplete_details:{reason:'max_output_tokens'},output:[]}))],
+  ['provider_refusal',()=>new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'refusal',refusal:'secret refusal text'}]}]}))],
+  ['output_json',()=>new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:'secret malformed output'}]}]}))],
+  ['output_validation',()=>response({paragraphs:[{text:'secret unsupported paragraph',refs:['secret foreign ref']}]})],
+ ];
+ for(const [reason,request,httpStatus] of cases){
+  const logs=[];const run=createTopicRecapService({load:async()=>data(),env:{OPENAI_API_KEY:'synthetic'},request,log:event=>logs.push(diagnosticRecord(event))});
+  await assert.rejects(run('owner',input),{status:503,message:'recap_unavailable'});
+  assert.equal(logs[0].recapFailure,reason);assert.equal(logs[0].httpStatus,httpStatus);assert.doesNotMatch(JSON.stringify(logs),/secret|Alex|foreign/);
+ }
+ const rejected=diagnosticRecord({event:'recap.load.finished',recapFailure:'secret injected reason'});
+ assert.equal(rejected.recapFailure,undefined);
+});
+
+test('a coalesced invalid recap reports the same output cause to both callers',async()=>{
+ let release;const gate=new Promise(resolve=>{release=resolve;}),logs=[];
+ const run=createTopicRecapService({load:async()=>data(),env:{OPENAI_API_KEY:'synthetic'},request:async()=>{await gate;return response({paragraphs:[{text:'Invalid reference',refs:['missing']}]});},log:event=>logs.push(diagnosticRecord(event))});
+ const work=Promise.allSettled([run('owner',input),run('owner',input)]);
+ await new Promise(resolve=>setImmediate(resolve));release();
+ assert.ok((await work).every(result=>result.status==='rejected'));
+ assert.deepEqual(logs.map(event=>event.recapFailure),['output_validation','output_validation']);
+});
 async function invoke(handler,body,{authorized=true,authorization='Bearer synthetic',origin='http://127.0.0.1:5173'}={}){
  const req=Readable.from([JSON.stringify(body)]);Object.assign(req,{url:'/api/topic-recap',method:'POST',headers:{'content-type':'application/json',host:'127.0.0.1:5173',origin,authorization},origenAuthorized:authorized,origenIdentity:{sub:'owner'}});
  let status,result;const res={writeHead(code){status=code;},end(body){result=JSON.parse(body);}};

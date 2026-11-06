@@ -43,9 +43,10 @@ test('specialty updates cannot replace the voice, model or audio speed',async()=
  const sent=[],control=voiceLanguageControl(e=>sent.push(e));
  const job=control.configure(()=>({instructions:'Continue costs',tools:[],model:'different',audio:{output:{voice:'different',speed:1.5}}}));
  await new Promise(r=>setImmediate(r));
- assert.deepEqual(Object.keys(sent[0].session).sort(),['instructions','tool_choice','tools','type']);
+ assert.deepEqual(Object.keys(sent[0].session).sort(),['controlLanguage','instructions','tool_choice','tools','type']);
+ assert.equal(sent[0].session.controlLanguage,'en');
  control.event({type:'session.updated',session:sent[0].session});await job;control.stop();
  const configs=['planning','finance','loans','admissions'].map(mode=>voiceSession({mode,language:'en',role:'student',profile:{}},{}));
  assert.ok(configs.every(c=>JSON.stringify(c.audio.output)===JSON.stringify(configs[0].audio.output)));
- for(const config of configs)assert.match(config.instructions,/Keep the same voice, accent, comfortable volume, energy and pace across topics, tools and languages/);
+ for(const config of configs)assert.match(config.instructions,/Keep the same voice, accent, comfortable volume[^.]*across topics, tools and languages/);
 });

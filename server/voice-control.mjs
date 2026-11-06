@@ -112,6 +112,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    return false;
   },
   playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version)playback={idle:value.idle,version:value.version,at:now()};},
+  suspend(){playback={...playback,idle:false,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
   async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
@@ -119,13 +120,13 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  };
 }
 
-export function createVoiceControl({env,authenticate,authorize,request,log=()=>{},connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
+export function createVoiceControl({env,authenticate,authorize,request,log=()=>{},resumeGraceMs=12000,heartbeatIntervalMs=3000,connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
  const sessions=new Map(),clients=new Set();let wss,serverRef,upgrade;
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  function dispose(run,reason='closed'){
-  if(run.closed)return;run.closed=true;clearTimeout(run.expiry);clearTimeout(run.attachTimer);clearInterval(run.check);sessions.delete(run.id);
+  if(run.closed)return;run.closed=true;clearTimeout(run.expiry);clearTimeout(run.attachTimer);clearTimeout(run.resumeTimer);clearInterval(run.check);sessions.delete(run.id);run.buffer=[];run.bufferBytes=0;
   const couldClose=run.provider?.readyState===WebSocket.OPEN;
   run.engine?.close();
   // session.close is supported on WebRTC sidebands; the REST hangup endpoint is SIP-only.
@@ -148,7 +149,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
    if(!enabled||!wss||!input.providerId)throw Error('voice_control_unavailable');
    if(!input.subject||input.permissionRevision===undefined||!input.sessionId)throw Error('voice_control_permission_required');
    if(sessions.size>=100||[...sessions.values()].filter(run=>run.subject===input.subject).length>=2)throw Error('voice_control_limit');
-   const run={...input,id:randomUUID(),updates:new Map(),closed:false,claimed:false};sessions.set(run.id,run);
+   const run={...input,id:randomUUID(),updates:new Map(),closed:false,claimed:false,buffer:[],bufferBytes:0,rpcs:new Map(),chain:Promise.resolve()};sessions.set(run.id,run);
    run.expiry=setTimeout(()=>dispose(run,'expired'),30000);run.expiry.unref();return {protocol:'server-v1',id:run.id};
   },
   stage(id,subject,config,scope){const run=sessions.get(id);if(!run||run.closed||run.subject!==subject||scope.sessionId!==run.sessionId)throw Object.assign(Error('voice_control_unavailable'),{status:409});const key=randomUUID();run.updates.clear();run.updates.set(key,{config,scope,expires:Date.now()+30000});return key;},
@@ -159,24 +160,59 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
     if(req.url!=='/api/voice-control')return;
     if(!origins.has(req.headers.origin)||clients.size>=200){socket.destroy();return;}
     wss.handleUpgrade(req,socket,head,client=>{
-     clients.add(client);let run,authenticating=false,chain=Promise.resolve(),count=0,window=Date.now();const rpcs=new Set();
-     const send=message=>{if(client.readyState===WebSocket.OPEN){if(client.bufferedAmount>1024*1024)return client.terminate();client.send(JSON.stringify(message));}};
-     const authTimer=setTimeout(()=>client.close(1008,'authentication_required'),5000);authTimer.unref();
+     clients.add(client);let run,authenticating=false,count=0,window=Date.now(),rejection;
+     const reject=reason=>{rejection=reason;client.close(1008,reason);};
+     // Engine callbacks outlive a transient browser socket. Send through its
+     // current authenticated owner; retain bounded, unsent events during grace.
+     const send=message=>{
+      if(run?.closed)return;const encoded=JSON.stringify(message),target=run?run.client:client;
+      if(target?.readyState===WebSocket.OPEN){if(target.bufferedAmount>1024*1024){if(run)dispose(run,'control_backpressure');else target.terminate();return;}target.send(encoded);}
+      else if(run?.claimed){const bytes=Buffer.byteLength(encoded);if(run.buffer.length>=256||run.bufferBytes+bytes>1024*1024)return dispose(run,'resume_buffer_exceeded');run.buffer.push(encoded);run.bufferBytes+=bytes;}
+     };
+     const authTimer=setTimeout(()=>reject('authentication_required'),5000);authTimer.unref();
+     // Browser WebSockets answer protocol pings without JS timer scheduling.
+     // Detect an old half-open TCP connection within the client's resume window.
+     let unansweredPings=0;client.on('pong',()=>{unansweredPings=0;});
+     const heartbeat=setInterval(()=>{
+      if(client.readyState!==WebSocket.OPEN)return;
+      if(unansweredPings>=2){client.terminate();return;}
+      unansweredPings++;client.ping();
+     },heartbeatIntervalMs);heartbeat.unref();
      client.on('error',()=>{});
-     client.on('close',()=>{clearTimeout(authTimer);clients.delete(client);if(run)dispose(run,'browser_disconnected');});
+     client.on('close',code=>{
+      clearTimeout(authTimer);clearInterval(heartbeat);clients.delete(client);if(!run||run.closed||run.client!==client)return;
+      if(code===1006&&!rejection&&run.engine&&run.provider?.readyState===WebSocket.OPEN){
+       run.client=null;run.detached=true;run.resumeUntil=Date.now()+resumeGraceMs;run.engine.suspend();
+       run.resumeTimer=setTimeout(()=>dispose(run,'resume_timeout'),resumeGraceMs);run.resumeTimer.unref();
+       log({event:'voice.control.detached',reason:'transport_lost',sessionId:run.sessionId});
+      }else dispose(run,rejection||'browser_disconnected');
+     });
      client.on('message',data=>{
-      if(Date.now()-window>1000){window=Date.now();count=0;}if(++count>80)return client.close(1008,'rate_limited');
-      let message;try{message=JSON.parse(data);if(!message||typeof message!=='object'||Array.isArray(message))throw Error();}catch{return client.close(1008,'invalid_message');}
+      if(Date.now()-window>1000){window=Date.now();count=0;}if(++count>80)return reject('rate_limited');
+      let message;try{message=JSON.parse(data);if(!message||typeof message!=='object'||Array.isArray(message))throw Error();}catch{return reject('invalid_message');}
       if(!run){
-       if(authenticating||message.type!=='authenticate'||typeof message.token!=='string'||message.token.length>16000)return client.close(1008,'authentication_required');
+       if(authenticating||message.type!=='authenticate'||typeof message.token!=='string'||message.token.length>16000)return reject('authentication_required');
        authenticating=true;
        void (async()=>{
         const identity=await authenticate(message.token),candidate=sessions.get(message.id);
-        if(!identity?.sub||!candidate||candidate.subject!==identity.sub||candidate.claimed||candidate.closed)throw Error('invalid_control');
+        const resumable=()=>candidate?.claimed&&candidate.detached&&!candidate.client&&candidate.resumeUntil>Date.now()&&candidate.provider?.readyState===WebSocket.OPEN;
+        if(!identity?.sub||!candidate||candidate.subject!==identity.sub||candidate.closed||candidate.claimed&&!resumable()&&message.resume!==true)throw Error('invalid_control');
         const revision=await authorize(identity);if(revision!==candidate.permissionRevision)throw Error('permission_changed');
         if(client.readyState!==WebSocket.OPEN)return;
-        if(candidate.closed||candidate.claimed)throw Error('control_claimed');
-        run=candidate;run.claimed=true;run.client=client;run.token=message.token;clearTimeout(authTimer);clearTimeout(run.expiry);
+        if(candidate.closed)throw Error('control_claimed');
+        if(candidate.claimed&&!resumable()){
+         // A mobile browser can detect loss before the server's socket does.
+         // Do not take over that writer; a verified resume may retry briefly.
+         if(message.resume===true&&candidate.client&&candidate.provider?.readyState===WebSocket.OPEN){client.close(1013,'control_still_attached');return;}
+         throw Error('control_claimed');
+        }
+        const resumed=candidate.claimed;run=candidate;run.claimed=true;run.client=client;run.token=message.token;clearTimeout(authTimer);
+        if(resumed){
+         clearTimeout(run.resumeTimer);run.detached=false;send({type:'ready',resumed:true});
+         const buffered=run.buffer;run.buffer=[];run.bufferBytes=0;for(const encoded of buffered)send(JSON.parse(encoded));
+         log({event:'voice.control.resumed',sessionId:run.sessionId});return;
+        }
+        clearTimeout(run.expiry);
         const attachStarted=Date.now();run.provider=connect(`wss://api.openai.com/v1/live/sessions/${encodeURIComponent(run.providerId)}/attach`);
         run.provider.on('error',()=>dispose(run,'provider_disconnected'));
         run.provider.on('close',()=>dispose(run,'provider_disconnected'));
@@ -190,7 +226,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
         run.provider.on('message',data=>{try{run.engine?.receive(JSON.parse(data));}catch{dispose(run,'invalid_provider_event');}});
         run.expiry=setTimeout(()=>dispose(run,'expired'),10*60000);run.expiry.unref();let checking=false;
         run.check=setInterval(()=>{if(checking)return;checking=true;void (async()=>{const fresh=await authenticate(run.token);if(fresh.sub!==run.subject||await authorize(fresh)!==run.permissionRevision)throw Error('permission_changed');})().catch(()=>dispose(run,'permission_changed')).finally(()=>checking=false);},1000);run.check.unref();
-       })().catch(()=>client.close(1008,'control_unavailable'));return;
+       })().catch(()=>reject('control_unavailable'));return;
       }
       if(run.closed||!run.engine)return;
       if(message.type==='playback'){run.engine.playback(message);return;}
@@ -199,21 +235,25 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
       if(message.type==='event'){
        if(message.event?.type==='session.update'){
         const proposed=message.event.session||{},language=proposed.controlLanguage;
-        if(!['en','es'].includes(language))return client.close(1008,'invalid_update');
+        if(!['en','es'].includes(language))return reject('invalid_update');
         const update=run.updates.get(proposed.controlUpdateId);run.updates.clear();
-        if(proposed.controlUpdateId&&(!update||update.expires<Date.now()))return client.close(1008,'invalid_update');
+        if(proposed.controlUpdateId&&(!update||update.expires<Date.now()))return reject('invalid_update');
         const next={...(update?.config||run.config),language,instructions:voiceLanguageInstructions((update?.config||run.config).instructions,language)};
-        if(!update&&(proposed.tools||proposed.liveInstructions||proposed.liveContext||proposed.instructions!==next.instructions))return client.close(1008,'invalid_update');
+        if(!update&&(proposed.tools||proposed.liveInstructions||proposed.liveContext||proposed.instructions!==next.instructions))return reject('invalid_update');
         const nextScope=update?.scope||run.scope;run.config=next;run.scope=nextScope;
-        chain=chain.then(()=>run.engine.configure(next,nextScope,message.event.event_id)).catch(()=>dispose(run,'update_failed'));
-       }else if(!run.engine.command(message.event||{},message.lease))client.close(1008,'invalid_command');
+        run.chain=run.chain.then(()=>run.engine.configure(next,nextScope,message.event.event_id)).catch(()=>dispose(run,'update_failed'));
+       }else if(!run.engine.command(message.event||{},message.lease))reject('invalid_command');
        return;
       }
-      if(message.type==='rpc'&&['settle','prepareClose','flush','cancel'].includes(message.method)&&typeof message.id==='string'){
-       if(rpcs.has(message.method)||rpcs.size>=4)return client.close(1008,'control_busy');rpcs.add(message.method);
-       void run.engine[message.method]().then(value=>send({type:'reply',id:message.id,value})).catch(()=>dispose(run,'control_failed')).finally(()=>rpcs.delete(message.method));return;
+      if(message.type==='rpc'&&['settle','prepareClose','flush','cancel'].includes(message.method)&&typeof message.id==='string'&&message.id.length<=100){
+       const pending=run.rpcs.get(message.method);
+       // Mobile scheduling can overlap two waits for the same quiet boundary.
+       // Share that observation, never tear down a healthy call or replay work.
+       if(pending){if(pending.has(message.id))return;if(pending.size>=16){send({type:'reply',id:message.id,value:false});return;}pending.add(message.id);return;}
+       const ids=new Set([message.id]);run.rpcs.set(message.method,ids);
+       void Promise.resolve().then(()=>run.engine[message.method]()).then(value=>{for(const id of ids)send({type:'reply',id,value});}).catch(()=>dispose(run,'control_failed')).finally(()=>run.rpcs.delete(message.method));return;
       }
-      if(message.type==='close'){dispose(run);return;}client.close(1008,'invalid_command');
+      if(message.type==='close'){dispose(run);return;}reject('invalid_command');
      });
     });
    };

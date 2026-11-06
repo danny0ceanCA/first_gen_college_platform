@@ -2,6 +2,7 @@
 // OpenAI calls, STUN/TURN servers, production API, or application server needed.
 // Uses the existing cached Playwright CLI; does not install browser/packages.
 // Run: node scripts/audio-diagnostics-browser-smoke.mjs
+// Mobile emulation: node scripts/audio-diagnostics-browser-smoke.mjs --mobile
 import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
@@ -9,11 +10,12 @@ import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const artifact=join(root,'output/playwright/audio-diagnostics-loopback');
-const session=`audio-diagnostics-${process.pid}`;
+const mobile=process.argv.includes('--mobile');
+const artifact=join(root,`output/playwright/audio-diagnostics-loopback${mobile?'-mobile':''}`);
+const session=`audio-diagnostics-${mobile?'mobile-':''}${process.pid}`;
 const npmCli=process.env.npm_execpath||join(dirname(process.execPath),'node_modules/npm/bin/npm-cli.js');
 const npxCli=join(dirname(npmCli),'npx-cli.js');
-const html=`<!doctype html><html><head><title>Synthetic audio diagnostics</title></head><body><button id="start">Run local loopback</button><p id="status">Ready</p><script type="module">
+const html=`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Synthetic audio diagnostics</title></head><body><button id="start">Run local loopback</button><p id="status">Ready</p><script type="module">
 import {startLiveAudioDiagnostics} from '/src/liveAudioDiagnostics.mjs';
 import {createVoiceCapture} from '/src/voiceCapture.mjs';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -47,10 +49,10 @@ async function run(){
   check(events.length===stoppedCount,'Diagnostics continued after cleanup');await archive.flush();
   const archived=batches.flat();check(archived.filter(entry=>entry.data.event==='audio_transport_sample').length===samples.length,'Audio samples were not preserved by private batch archive');
   check(archived.every(entry=>entry.sessionId===scope.sessionId&&entry.attemptId===scope.attemptId),'Archive lost call scope');
-  return {passed:true,browser:'Chromium',syntheticAudio:true,microphoneUsed:false,externalServicesUsed:false,physicalPlaybackAudited:false,sampleCount:samples.length,inboundSampleCount:active.length,positivePacketIntervals:active.filter(stream=>stream.delta.packetsReceived>0).length,maxJitterMs:Math.max(...active.map(stream=>stream.jitterMs||0)),archiveBatches:batches.length,archivedSamples:samples.length,mediaPlayingObserved:true,remoteTrackObserved:true,callbacksAfterStop:events.length-stoppedCount};
+  return {passed:true,browser:'Chromium',mode:${JSON.stringify(mobile?'mobile-emulation':'desktop')},physicalAndroidTest:false,viewport:{width:innerWidth,height:innerHeight,deviceScaleFactor:devicePixelRatio},touchPoints:navigator.maxTouchPoints,userAgent:navigator.userAgent,syntheticAudio:true,microphoneUsed:false,externalServicesUsed:false,physicalPlaybackAudited:false,sampleCount:samples.length,inboundSampleCount:active.length,positivePacketIntervals:active.filter(stream=>stream.delta.packetsReceived>0).length,maxJitterMs:Math.max(...active.map(stream=>stream.jitterMs||0)),archiveBatches:batches.length,archivedSamples:samples.length,mediaPlayingObserved:true,remoteTrackObserved:true,callbacksAfterStop:events.length-stoppedCount};
  }finally{monitor.stop();sender.close();receiver.close();try{oscillator?.stop();}catch{}if(context.state!=='closed')await context.close();audio.remove();await archive.flush();}
 }
-document.querySelector('#start').onclick=()=>{document.querySelector('#status').textContent='Running';window.audioSmokeDone=run().catch(error=>({passed:false,error:error.message})).then(async result=>{window.audioSmokeResult=result;document.querySelector('#status').textContent=result.passed?'Passed':'Failed';await fetch('/result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(result)});return result;});};
+document.querySelector('#start').onclick=()=>{document.querySelector('#status').textContent='Running';window.audioSmokeDone=run().catch(error=>({passed:false,error:error.message})).then(result=>{window.audioSmokeResult=result;document.querySelector('#status').textContent=result.passed?'Passed':'Failed';return result;});};
 </script></body></html>`;
 
 function cli(args,timeoutMs=45000){
@@ -69,7 +71,7 @@ const server=createServer(async(req,res)=>{
   if(req.method==='POST'&&req.url==='/result'){let body='';for await(const chunk of req){body+=chunk;if(body.length>10000)throw Error('Result exceeded limit');}result=JSON.parse(body);res.writeHead(204).end();return;}
   if(req.method!=='GET'){res.writeHead(405).end();return;}
   if(req.url==='/'){res.writeHead(200,{'content-type':'text/html'}).end(html);return;}
-  if(['/src/liveAudioDiagnostics.mjs','/src/voiceCapture.mjs'].includes(req.url)){res.writeHead(200,{'content-type':'application/javascript'}).end(await readFile(join(root,req.url.slice(1))));return;}
+  if(['/src/liveAudioDiagnostics.mjs','/src/voiceCapture.mjs','/src/providerVoice.mjs'].includes(req.url)){res.writeHead(200,{'content-type':'application/javascript'}).end(await readFile(join(root,req.url.slice(1))));return;}
   res.writeHead(404).end();
  }catch{res.writeHead(400).end();}
 });
@@ -77,7 +79,26 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 try{
  const origin=`http://127.0.0.1:${server.address().port}`;
  const runFile=join(artifact,'run.js');
- await writeFile(runFile,`async page=>{let blocked=0;await page.route('**/*',route=>{if(new URL(route.request().url()).origin===${JSON.stringify(origin)})return route.continue();blocked++;return route.abort();});await page.goto(${JSON.stringify(origin)});await page.getByRole('button',{name:'Run local loopback'}).click();await page.waitForFunction(()=>!!window.audioSmokeResult,{},{timeout:25000});const result=await page.evaluate(()=>window.audioSmokeDone);if(blocked)throw Error('External request attempted');if(!result.passed)throw Error(result.error);return result;}`);
+ await writeFile(runFile,`async page=>{
+  let blocked=0,mobileContext;
+  try{
+   if(${mobile}){
+    const browser=page.context().browser();if(!browser)throw Error('Browser unavailable for mobile emulation');
+    mobileContext=await browser.newContext({viewport:{width:393,height:851},screen:{width:393,height:851},deviceScaleFactor:2.75,isMobile:true,hasTouch:true,serviceWorkers:'block',userAgent:'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/'+browser.version()+' Mobile Safari/537.36'});
+    page=await mobileContext.newPage();
+   }
+   await page.route('**/*',route=>{if(new URL(route.request().url()).origin===${JSON.stringify(origin)})return route.continue();blocked++;return route.abort();});
+   await page.goto(${JSON.stringify(origin)});
+   await page.getByRole('button',{name:'Run local loopback'}).${mobile?'tap':'click'}();
+   await page.waitForFunction(()=>!!window.audioSmokeResult,{},{timeout:25000});
+   const result=await page.evaluate(()=>window.audioSmokeDone);
+   if(blocked)throw Error('External request attempted');if(!result.passed)throw Error(result.error);
+   if(${mobile}&&!(result.touchPoints>0&&result.viewport.width===393&&/Android/.test(result.userAgent)))throw Error('Mobile emulation was not applied');
+   // Persist success only after the CLI's network and emulation checks pass.
+   await page.evaluate(result=>fetch('/result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(result)}),result);
+   return result;
+  }finally{await mobileContext?.close();}
+ }`);
  const launch=await cli(['open','about:blank']);opened=launch.code===0;
  if(!opened)result={passed:false,status:'browser_unavailable',diagnostic:launch.output.slice(-2500)};
  else{

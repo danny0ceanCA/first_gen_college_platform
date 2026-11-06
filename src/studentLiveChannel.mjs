@@ -146,7 +146,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   },1200);
  }
  async function finishSpeech(force=false){
-  if(outputTimer)cancel(outputTimer);outputTimer=null;if(!outputId)return;
+  if(outputTimer)cancel(outputTimer);outputTimer=null;if(closed||!outputId)return;
   if(!force&&!isPlaybackIdle()){outputTimer=schedule(()=>void finishSpeech(),250);return;}
   const response_id=outputId,text=output,metadata=outputMetadata,interrupted=outputInterrupted;outputId='';output='';outputMetadata={};
   if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
@@ -195,7 +195,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     input=continued?recentInput.transcript:'';recentInput=null;
     epoch++;inputId=id();turnItemId=inputId;await emit({type:'input_audio_buffer.speech_started',item_id:inputId,liveBoundary:continued?'transcript_continuation':'transcript_observed'});
    }
-   lastInput=now();
+   if(closed)return;lastInput=now();
    input+=e.delta;if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
   }
   if(e.type==='session.output_transcript.delta'&&typeof e.delta==='string'){
@@ -219,7 +219,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});
    }
    output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta,start_ms:e.start_ms,end_ms:e.end_ms});
-   if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
+   if(closed)return;if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }
   if(e.type==='session.updated'){
    const job=e.client_event_id?updates.get(e.client_event_id):[...updates.values()].find(job=>job.session.instructions===e.session?.delegation?.responses?.instructions);

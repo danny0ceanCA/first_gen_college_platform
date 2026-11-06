@@ -34,17 +34,51 @@ export function capturePayload(event,direction='provider'){
  return null;
 }
 export function createVoiceCapture(post){
- let queue=[],timer,busy=false,enabled=false,sequence=0,failures=0,paused=false;
+ // Keep events as groups so pressure cannot orphan half of a context payload.
+ // Two reserved rows allow a loss marker in flight plus new losses during upload.
+ const maxRows=126;
+ let queue=[],timer,pending,busy=false,enabled=false,sequence=0,failures=0,paused=false;
+ const row=(data,scope)=>({...scope,id:crypto.randomUUID(),sequence:++sequence,clientAt:new Date().toISOString(),data});
+ const priority=data=>data.partial?0:data.type==='diagnostic'&&['audio_transport_sample','server_event','client_event'].includes(data.event)?1:2;
+ function recordLoss(count,scope){
+  const existing=queue.find(group=>group.gap&&!group.started);
+  // This counts queue losses, potentially spanning connection attempts. It is
+  // deliberately not evidence of missing audio or a complete session transcript.
+  if(existing)existing.rows[0].data.dropped+=count;
+  else queue.push({gap:true,started:false,rows:[row({type:'capture.gap',dropped:count,lossScope:'queue'},scope)]});
+ }
+ function bound(scope){
+  let count=queue.reduce((n,group)=>n+(group.gap?0:group.rows.length),0),dropped=0;
+  while(count>maxRows){
+   // Started groups include in-flight retries and unsent tails. Finish those
+   // groups before discarding any of their fragments.
+   const candidates=queue.filter(group=>!group.gap&&!group.started);
+   const candidate=candidates.reduce((best,group)=>!best||group.priority<best.priority?group:best,null);
+   if(!candidate)break;
+   queue.splice(queue.indexOf(candidate),1);count-=candidate.rows.length;dropped+=candidate.rows.length;
+  }
+  if(dropped)recordLoss(dropped,scope);
+ }
  async function flush(){
   clearTimeout(timer);timer=undefined;if(busy||paused||!queue.length)return;
-  busy=true;const batch=[];
-  while(queue.length&&batch.length<8){if(batch.length&&new TextEncoder().encode(JSON.stringify([...batch,queue[0]])).length>48000)break;batch.push(queue.shift());}
-  try{await post(batch);failures=0;}catch(error){failures++;paused=error?.retryable===false;queue.unshift(...batch);if(queue.length>128)queue=queue.slice(0,128);}
+  busy=true;const batch=pending||[];
+  if(!pending){outer:for(const group of queue)for(const entry of group.rows){
+    if(batch.length===8||batch.length&&new TextEncoder().encode(JSON.stringify([...batch,entry])).length>48000)break outer;
+    batch.push(entry);group.started=true;
+   }pending=batch;
+  }
+  try{
+   await post(batch);failures=0;pending=undefined;
+   const saved=new Set(batch);for(const group of queue)group.rows=group.rows.filter(entry=>!saved.has(entry));
+   queue=queue.filter(group=>group.rows.length);
+  }catch(error){failures++;paused=error?.retryable===false;}
+  // Keep the same IDs and payloads until acknowledged. New events cannot trim
+  // a failed batch; retrying it is safe against the server's idempotent insert.
   finally{busy=false;if(queue.length&&!paused)timer=setTimeout(()=>void flush(),failures?Math.min(30000,1500*2**Math.min(failures-1,5)):300);}
  }
  return {enable(value){enabled=value===true;},event(event,scope){if(!enabled||!scope.sessionId)return;const data=capturePayload(event);if(!data)return;const encoded=JSON.stringify(data),fragmentId=crypto.randomUUID();const chunks=[];for(let i=0;i<encoded.length;i+=8000)chunks.push(encoded.slice(i,i+8000));
-  for(let i=0;i<chunks.length;i++)queue.push({...scope,id:crypto.randomUUID(),sequence:++sequence,clientAt:new Date().toISOString(),data:chunks.length===1?data:{type:'capture.fragment',originalType:data.type,fragmentId,index:i,count:chunks.length,text:chunks[i]}});
-  if(queue.length>128){const dropped=queue.length-127;queue.splice(0,dropped);queue.push({...scope,id:crypto.randomUUID(),sequence:++sequence,clientAt:new Date().toISOString(),data:{type:'capture.gap',dropped}});}
+  queue.push({priority:priority(data),started:false,rows:chunks.map((text,index)=>row(chunks.length===1?data:{type:'capture.fragment',originalType:data.type,fragmentId,index,count:chunks.length,text},scope))});
+  bound(scope);
   if(!timer&&!paused)timer=setTimeout(()=>void flush(),300);
  },flush};
 }

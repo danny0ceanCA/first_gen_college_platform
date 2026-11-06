@@ -672,6 +672,14 @@ function fixture(options={}){
  return {sent,events,consent,channel,receive,backend,raw};
 }
 test('Realtime remains an unchanged pass-through',()=>{const sent=[];const raw={send:value=>sent.push(value)};const dc=studentLiveChannel(raw);dc.send('{"type":"response.create"}');assert.deepEqual(sent,['{"type":"response.create"}']);});
+
+for(const [type,closeOn]of [['session.input_transcript.delta','input_audio_buffer.speech_started'],['session.output_transcript.delta','response.output_audio_transcript.delta']])test(`closing during ${type} cannot restart transcript timers`,async()=>{
+ let scheduled=0;const timers=new Map();
+ const f=fixture({isPlaybackIdle:()=>false,schedule:(fn,ms)=>{const id=++scheduled;timers.set(id,{fn,ms});return id;},cancel:id=>timers.delete(id)});
+ await pause(0);f.channel.onmessage=({data})=>{if(JSON.parse(data).type===closeOn)f.channel.close();};
+ f.receive({type,delta:'Synthetic words.'});await pause(0);
+ assert.equal(f.raw.readyState,'closed');assert.equal(timers.size,0);assert.equal(scheduled,0,'no timers are created by continuations after close');
+});
 test('routing policy reaches timing metadata but is not an unsupported provider session option',async()=>{
  const f=fixture();f.channel.configure({voiceProvider:'live',voiceSession:{routingPolicy:'bounded-follow-up-v1',instructions:'Backend',tools:[]}});
  f.receive({type:'session.started'});await pause(0);

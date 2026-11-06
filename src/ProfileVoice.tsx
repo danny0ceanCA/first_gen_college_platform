@@ -494,7 +494,11 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
           signalingState:pc.signalingState,browserOnline:navigator.onLine,
         }});
       };
-      const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),getPlaybackVersion:()=>livePlayback.audibleVersion(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted,onDisconnect:captureDisconnect});resources.current.dc=dc;
+      const dc=studentLiveChannel(pc.createDataChannel('oai-events'),{getTurn:()=>saveConsent.token(),getPlaybackVersion:()=>livePlayback.audibleVersion(),isPlaybackIdle:()=>livePlayback.idle()&&audio.current?.paused===false&&!audio.current.muted,onDisconnect:captureDisconnect,onRecovery:details=>{
+        if(generation.current!==version)return;
+        capture({type:'diagnostic',event:'control_connection_recovery',details});
+        setNotice(details.state==='reconnecting'?t('Reconnecting your conversation…','Reconectando tu conversación…'):t('Your conversation is connected again.','Tu conversación está conectada de nuevo.'));
+      }});resources.current.dc=dc;
       let openingRequested=false;
       let playWelcome=onboarding;
       const saveConsent=voiceProfileSaveConsent();

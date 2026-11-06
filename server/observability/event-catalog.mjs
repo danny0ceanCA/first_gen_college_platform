@@ -9,6 +9,8 @@ export const serverEvents=Object.freeze({
  'voice.context_timing':spec(['contextStage','durationMs','outcome']),
  'voice.control.ready':spec(['durationMs']),
  'voice.control.closed':spec(['reason']),
+ 'voice.control.detached':spec(['reason']),
+ 'voice.control.resumed':spec([]),
  'voice.control.callback_timeout':spec(['sourceCount'],'warn'),
  'voice.control.close_failed':spec([],'error'),
  'voice.research.finished':spec(['outcome','durationMs','sourceCount','model','inputTokens','outputTokens']),
@@ -32,7 +34,8 @@ export const serverEvents=Object.freeze({
  'summary.save.finished':spec(['outcome','code']),
  'history.operation.finished':spec(['outcome','code']),
  'note.operation.finished':spec(['outcome','code']),
- 'recap.load.finished':spec(['topic','language','recapMode','recapCache','outcome','durationMs','sourceMs','generationMs']),
+ 'recap.load.finished':spec(['topic','language','recapMode','recapCache','recapFailure','httpStatus','outcome','durationMs','sourceMs','generationMs']),
+ 'memory.retrieval.finished':spec(['retrievalStage','outcome','code','durationMs']),
  'binder.scope.changed':spec(['outcome']),
  'provider.operation.finished':spec(['operation','outcome','durationMs','requestMs','bodyMs','failureStage','httpStatus','model','code','usageState','inputTokens','outputTokens','totalTokens','samplingProbability']),
  'db.operation.finished':spec(['operation','outcome','durationMs','acquireMs','executeMs','commitMs','rowBucket','code','samplingProbability']),
@@ -53,6 +56,8 @@ export const enumFields=Object.freeze({
  routingObservation:Object.freeze(['backend_observed','no_backend_observed','unavailable']),
  topic:Object.freeze(['options','transfer','costs','applications']),
  recapMode:Object.freeze(['background','foreground']),recapCache:Object.freeze(['none','generated','hit','coalesced','empty']),
+ recapFailure:Object.freeze(['configuration','provider_http','provider_body','provider_incomplete','output_limit','provider_refusal','output_json','output_validation','source_changed','capacity','authorization','timeout','cancelled','source_read','provider_request']),
+ retrievalStage:Object.freeze(['acquire','guard','scope','search','commit']),
  sourceEvent:Object.freeze([...Object.keys(serverEvents),...clientEvents]),
  contextStage:Object.freeze(['version','memory','profile','history','workspace','retrieval','continuity','coordinator','session_guards','opening','brief','teachings','negotiate']),
  timingStage:Object.freeze(['speech_started','speech_end','backend_started','backend_model','answer_candidate','first_audio','candidate_audio','turn_complete','call_complete','tool','history_tool','research_tool','context_request','configuration_ack','memory_request','research_request','workflow_request']),
@@ -66,7 +71,7 @@ export const enumFields=Object.freeze({
  job:Object.freeze(['conversation-checkpoints','conversation-recovery','permission-data','diagnostic-maps','metrics','invites','private-summaries','privacy-events','inquiries','outreach','guidance','progress','report-snapshots','quality','onboarding','admin-reviews','privacy-alerts','permission-supervisor','binder-processing','coordinator-lifecycle','registration-email','recommendation-previews','recommendation-evaluation']),
  parameter:Object.freeze(['item_id']),method:Object.freeze(['GET','POST','OPTIONS','PUT','PATCH','DELETE','HEAD','OTHER']),
  outcome:Object.freeze(['completed','failed','cancelled','unknown','skipped-lock','deferred','existing','changed']),
- reason:Object.freeze(['expired','browser_disconnected','provider_disconnected','invalid_provider_event','permission_changed','attach_timeout','update_failed','control_failed','server_shutdown','unknown_event','queue_full','sink_failed','sink_timeout','release_unknown','closed','shutdown_timeout','capacity','mapping_capacity','mapping_expired','mapping_unavailable','mapping_scope_unavailable','export_loss','volume_limit']),
+ reason:Object.freeze(['expired','browser_disconnected','provider_disconnected','invalid_provider_event','permission_changed','attach_timeout','update_failed','control_failed','server_shutdown','authentication_required','rate_limited','invalid_message','control_unavailable','invalid_update','invalid_command','control_backpressure','resume_buffer_exceeded','resume_timeout','transport_lost','unknown_event','queue_full','sink_failed','sink_timeout','release_unknown','closed','shutdown_timeout','capacity','mapping_capacity','mapping_expired','mapping_unavailable','mapping_scope_unavailable','export_loss','volume_limit']),
 });
 export const numericFields=Object.freeze({packetCount:10000,contextBytes:10000000,observedDelegations:1000,turnIndex:10000,offsetMs:3600000,firstAudioMs:600000,answerCandidateMs:600000,candidateAudioMs:600000,boundaryOverlapMs:600000,occurrenceCount:100000000,exportDropped:100000000,exportPending:2000,durationMs:600000,sourceMs:600000,generationMs:600000,sourceCount:10000,sequence:100000,speechDurationMs:600000,toolCount:1000,httpStatus:599,requestMs:600000,bodyMs:600000,acquireMs:600000,executeMs:600000,commitMs:600000,inputTokens:100000000,outputTokens:100000000,totalTokens:100000000,samplingProbability:1,backlog:1000000,oldestMs:31536000000,rssBytes:1099511627776,heapBytes:1099511627776,eventLoopDelayMs:600000,poolTotal:100,poolIdle:100,poolWaiting:100000,queueDepth:10000,deletedCount:1000000,queryCount:1000000,lastSuccessAgeMs:31536000000,queueDropped:Number.MAX_SAFE_INTEGER});
 export const clientFields=Object.freeze(['routingPolicy','routingObservation','observedDelegations','timingStage','contextStage','boundary','timingOutcome','turnIndex','offsetMs','firstAudioMs','answerCandidateMs','candidateAudioMs','boundaryOverlapMs','code','mode','language','connectionState','status','durationMs','sourceCount','sequence','speechDurationMs','toolCount']);
