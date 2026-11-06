@@ -1,4 +1,5 @@
 import WebSocket,{WebSocketServer} from 'ws';
+import {liveMeasurements} from './live-measurements.mjs';
 import {randomUUID} from 'node:crypto';
 import {studentLiveChannel} from '../src/studentLiveChannel.mjs';
 import {backgroundResearch} from '../src/backgroundResearch.mjs';
@@ -12,6 +13,7 @@ import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
 export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
+ const measurements=liveMeasurements({log,config,researchDeliveryV2});
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
@@ -52,6 +54,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  }
  channel.onmessage=async message=>{
   const event=JSON.parse(message.data);if(closed)return;
+  measurements.application(event);
   const deliveryStages={'origen.research.supplied':'supplied','origen.research.context_acknowledged':'context_acknowledged','origen.research.context_failed':'context_failed','origen.research.announced':'commentary_requested','origen.research.native_reply_observed':'native_reply_observed'};
   if(deliveryStages[event.type]&&!(researchDeliveryV2&&event.type==='origen.research.announced'))log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
   if(event.type==='origen.research.delivery')log({event:'voice.research.delivery',deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs});
@@ -87,8 +90,8 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   }finally{clearTimeout(timer);batches.delete(lease);finishedLeases.add(lease);if(finishedLeases.size>1000)finishedLeases.delete(finishedLeases.values().next().value);if(!closed&&!batches.size)send({type:'response.create'});}
  };
  return {
-  start(){void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});voiceDiagnostics.start();},
-  receive(event){if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
+  start(){measurements.start();void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});voiceDiagnostics.start();},
+  receive(event){measurements.native(event);if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
   command(event,lease){
    if(closed)return false;
    const batch=batches.get(lease);
@@ -116,7 +119,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
   async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
+  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
  };
 }
 

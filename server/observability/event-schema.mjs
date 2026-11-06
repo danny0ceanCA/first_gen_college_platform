@@ -22,7 +22,8 @@ const defaults=createMetadata();
 function attributes(input,keys,out,browser=false){
  for(const key of keys){
   const v=value(input,key);
-  if(key==='code'){if(typeof v==='string')out.code=(browser?clientCodes.includes(v)&&v:safeCode(v))||'other';}
+  if(!browser&&['measurementRun','configurationHash'].includes(key)){if(typeof v==='string'&&new RegExp('^[a-f0-9]{'+(key==='measurementRun'?32:64)+'}$').test(v))out[key]=v;}
+  else if(key==='code'){if(typeof v==='string')out.code=(browser?clientCodes.includes(v)&&v:safeCode(v))||'other';}
   else if(Object.hasOwn(enumFields,key)){if(enumFields[key].includes(v))out[key]=v;}
   else if(Object.hasOwn(numericFields,key)&&Number.isFinite(v)&&v>=0){
    if(key==='httpStatus'&&(v<100||v>599||!Number.isInteger(v)))continue;

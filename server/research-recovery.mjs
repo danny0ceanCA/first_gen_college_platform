@@ -1,3 +1,4 @@
+import {responseMeasurement} from './live-measurements.mjs';
 import {researchBriefSelection} from '../src/researchBrief.mjs';
 
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -49,7 +50,7 @@ const official=url=>{try{const u=new URL(url);return u.protocol==='https:'&&!u.u
 export function researchAttemptDiagnostics(data,{pass,durationMs,outcome,httpStatus}={}){
  const calls=(data?.output||[]).filter(item=>item.type==='web_search_call');
  const consultedSources=[...new Set(calls.flatMap(item=>item.action?.sources||[]).map(source=>official(source.url)).filter(Boolean))].slice(0,24);
- return {pass,outcome,durationMs:Math.max(0,durationMs||0),...(Number.isInteger(httpStatus)?{httpStatus}:{}),toolCalls:calls.length,
+ return {pass,outcome,...responseMeasurement(data,httpStatus),durationMs:Math.max(0,durationMs||0),...(Number.isInteger(httpStatus)?{httpStatus}:{}),toolCalls:calls.length,
   actions:calls.slice(0,8).map(item=>({type:['search','open_page','find_in_page'].includes(item.action?.type)?item.action.type:'unknown',
    status:['completed','failed','incomplete','in_progress'].includes(item.status)?item.status:'unknown',...(official(item.action?.url)?{url:official(item.action.url)}:{})})),consultedSources};
 }

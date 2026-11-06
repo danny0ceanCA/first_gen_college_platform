@@ -92,7 +92,7 @@ export function liveSelectionDelivery({send,emit,id,now,schedule=setTimeout,canc
    const scope=job.staged?.value?.scope;
    current={callId:item.call_id,mode,startedAt:job.startedAt,
     scope:scope?(scope.studentId===null?'family':`student:${scope.studentId}`):job.scope};
-   const snapshot=job.staged?liveSelectionBrief(job.staged.value,mode,item.call_id):null;
+   const snapshot=job.staged?liveSelectionBrief(job.staged.value,mode,item.call_id,metrics=>emit({type:'origen.live.context',...metrics})):null;
    if(job.staged&&snapshot){
     const eventId=id(),configurationId=job.staged.configurationId;
     const delivery={callId:item.call_id,configurationId,sentAt:now()};

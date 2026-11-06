@@ -34,3 +34,7 @@ Consult these alongside the Responses overview when changing the voice integrati
 - [Voice server controls](https://developers.openai.com/api/docs/guides/voice-server-controls?api=live)
 
 Origen's priority is natural, warm conversation while research happens in the background. Review the current implementation and these references together; the standalone Responses API and Live's managed Responses delegation do not have interchangeable event contracts.
+
+## Local documentation library
+
+See the [Responses documentation library](responses/README.md) for the official Markdown snapshot workflow, including the Python Responses reference. The library contains downloaded official pages; consult its manifest for sources and retrieval dates.

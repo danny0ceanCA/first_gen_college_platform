@@ -1,3 +1,5 @@
+import {responseMeasurement} from './live-measurements.mjs';
+import {randomBytes} from 'node:crypto';
 import {financeResearchRequest,parseFinanceResearch} from './finance-research.mjs';
 import {admissionsResearchRequest,parseAdmissionsResearch} from './admissions-research.mjs';
 import {runtimeLog} from './observability/logger.mjs';
@@ -11,6 +13,7 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
  await database.query('DELETE FROM origen_voice_research_jobs WHERE expires_at<now()');
  const job=(await database.query("UPDATE origen_voice_research_jobs SET status='running',started_at=now() WHERE id=(SELECT id FROM origen_voice_research_jobs WHERE status='queued' AND expires_at>now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,input")).rows[0];
  if(!job)return false;
+ const measurementRun=randomBytes(16).toString('hex');
  const started=now(),attempts=[];let publishedResult;
  const controller=new AbortController();
  // Every pass shares this deadline and cancellation. A recovery never buys
@@ -25,7 +28,7 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
   body.max_tool_calls=2;
   let latestData;const usage={inputTokens:0,outputTokens:0};
   async function run(requestBody,pass){
-   const passStarted=now();let data,httpStatus;
+   const passStarted=now();let data,httpStatus,passOutcome;
    try{
     jobSignal.throwIfAborted();
     const response=await request('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(requestBody),signal:jobSignal});
@@ -35,8 +38,9 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
     const result=env.ORIGEN_RESEARCH_BRIEFS==='false'?parsed:parseResearchBrief(parsed);
     if(!result)throw new Error('sources_unverified');
     attempts.push(researchAttemptDiagnostics(data,{pass,outcome:'completed',durationMs:now()-passStarted,httpStatus}));
-    return result;
+    passOutcome='completed';return result;
    }catch(error){attempts.push(researchAttemptDiagnostics(data,{pass,outcome:jobSignal.aborted?'aborted':'failed',durationMs:now()-passStarted,httpStatus}));throw error;}
+   finally{runtimeLog({event:'voice.live.measurement',measurementRun,measurementStage:'research_attempt',durationMs:now()-passStarted,...responseMeasurement(data,httpStatus),...(passOutcome!=='completed'&&responseMeasurement(data,httpStatus).failureKind==='none'?{failureKind:'invalid_output'}:{})});}
   }
   // A new wording can be entirely covered by a server-selected prior result.
   // Reuse it without forcing a web call merely because this job was queued.
