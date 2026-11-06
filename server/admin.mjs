@@ -19,11 +19,12 @@ import {adminCoordinatorActivation} from './coordinator-activation.mjs';
 import {guardAccountTransaction} from './account-guard.mjs';
 import {ADMIN_ACTIONS,adminCapabilities,requireStaffAccess,staffPermissions} from './staff-access.mjs';
 import {runAsAnalytics} from './account-isolation.mjs';
+import {adminNetworkEffects,isNetworkEffectsAction} from './network-effects/admin.mjs';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isAdmin(subject,env){return (env.ADMIN_SUBJECTS||'').split(',').map(x=>x.trim()).filter(Boolean).includes(subject);}
 export function hasAdminAccess(identity,env){return adminCapabilities(identity,env).admin;}
 export function creditedSeconds(seconds,gap,age){return Math.min(600,seconds+Math.max(0,Math.min(30,gap,600-age)));}
-export function createAdminHandler(database,env){
+export function createAdminHandler(database,env,{networkRepository}={}){
  return async(req,res,next)=>{
   const path=req.url?.split('?')[0];if(!['/api/admin','/api/activity'].includes(path))return next();
   const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -31,16 +32,21 @@ export function createAdminHandler(database,env){
   if(path==='/api/admin'&&!hasAdminAccess(req.origenIdentity,env))return send(403,{error:'admin_required'});
   if(req.method!=='POST')return send(405,{error:'method_not_allowed'});
   if(!database)return send(503,{error:'database_unavailable'});
-  let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(413,{error:'request_too_large'});}
+  let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8192)return send(413,{error:'request_too_large'});}
   let data;try{data=JSON.parse(raw);}catch{return send(400,{error:'invalid_request'});}
   if(!data||typeof data!=='object'||Array.isArray(data))return send(400,{error:'invalid_request'});
+  if(!isNetworkEffectsAction(data.action)&&Buffer.byteLength(raw)>2048)return send(413,{error:'request_too_large'});
   if(path==='/api/admin'){
    if(data.action==='access')return send(200,adminCapabilities(req.origenIdentity,env));
    const permission=Object.hasOwn(ADMIN_ACTIONS,data.action)?ADMIN_ACTIONS[data.action]:null;
    if(!permission)return send(400,{error:'invalid_action'});
-   try{await requireStaffAccess(database,req.origenIdentity,{scope:'admin',action:data.action,permission,env,fresh:permission.startsWith('write:'),target:data.accountId||data.id||data.organizationId});}
+   try{await requireStaffAccess(database,req.origenIdentity,{scope:'admin',action:data.action,permission,env,fresh:permission.startsWith('write:'),target:data.accountId||data.id||data.organizationId||data.episodeId});}
    catch(error){return send(error.status||503,{error:error.status?error.message:'staff_access_unavailable'});}
    const execute=async()=>{
+   if(isNetworkEffectsAction(data.action)){
+    try{return send(200,await adminNetworkEffects(data,req.origenIdentity,env,networkRepository));}
+    catch(error){const known=[400,403,404,409,503].includes(error.status);return send(known?error.status:503,{error:known?error.message:'network_effects_unavailable'});}
+   }
    if(data.action==='coordinator-activation'){
     try{return send(200,await adminCoordinatorActivation(database,data,env));}
     catch(error){const known=[400,404].includes(error.status);return send(known?error.status:503,{error:known?error.message:'coordinator_activation_unavailable'});}

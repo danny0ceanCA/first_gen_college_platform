@@ -4,6 +4,8 @@ import {coordinatorTestMfaExempt} from '../src/coordinatorTestAccess.mjs';
 
 export const MFA_TIME_CLAIM='https://origenedu.ai/mfa_time';
 export const ADMIN_ACTIONS=Object.freeze({
+ 'network-overview':'read:network-effects','network-episodes':'read:network-effects','network-episode':'read:network-effects',
+ 'network-jobs':'read:network-effects','network-verification':'read:network-effects','network-evaluations':'read:network-effects','network-evaluation':'read:network-effects','network-review':'write:network-effects-review',
  overview:'read:activity',engagement:'read:users','progress-report':'read:activity',
  users:'read:users','user-detail':'read:users','user-history':'read:users','user-conversations':'read:users',
  'onboarding-timeline':'read:users','onboarding-attempt':'read:users','onboarding-metrics':'read:activity','onboarding-alerts':'read:activity',

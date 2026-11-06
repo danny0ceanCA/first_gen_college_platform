@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Origen · Evidence review</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to review workspace</a>
+    <div class="shell">
+      <header class="masthead">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">o.</span><div><span class="wordmark">origen</span><span class="brand-caption">Research workbench</span></div></div>
+        <div class="environment"><span class="status-dot" aria-hidden="true"></span>Isolated · local only</div>
+      </header>
+
+      <section class="intro" aria-labelledby="page-title">
+        <div><p class="eyebrow">Network effects / Evidence review</p><h1 id="page-title">Every concern has a story.</h1><p class="intro-copy">Trace questions, actions, and reported outcomes back to their sources. Keep each student and family’s context in view.</p></div>
+        <button id="refresh-button" class="button secondary" type="button"><span aria-hidden="true">↻</span> Refresh evidence</button>
+      </section>
+
+      <aside class="scope-note"><span class="note-icon" aria-hidden="true">i</span><p><strong>Offline research prototype.</strong> Synthetic fixtures are labeled throughout. Review decisions stay in this local workspace; this interface does not update the live conversation or production records.</p></aside>
+      <div id="error-banner" class="error-banner" role="alert" hidden></div>
+      <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+
+      <section class="metrics" aria-label="Evidence counts">
+        <div class="metric"><span id="metric-sources" class="metric-value">—</span><span class="metric-label">Source records</span></div>
+        <div class="metric"><span id="metric-episodes" class="metric-value">—</span><span class="metric-label">Concern episodes</span></div>
+        <div class="metric"><span id="metric-items" class="metric-value">—</span><span class="metric-label">Current evidence items</span></div>
+        <div class="metric"><span id="metric-pending" class="metric-value">—</span><span class="metric-label">Pending concerns</span></div>
+      </section>
+
+      <main id="workspace" tabindex="-1">
+        <section class="filter-panel" aria-labelledby="filter-title">
+          <div class="section-heading"><h2 id="filter-title">Find a concern</h2><button id="clear-filters" class="text-button" type="button">Clear filters</button></div>
+          <div class="filters">
+            <div class="field search-field"><label for="search-input">Search evidence</label><input id="search-input" type="search" placeholder="Topic, question, student, or source…" autocomplete="off"></div>
+            <div class="field"><label for="topic-filter">Topic</label><select id="topic-filter"><option value="">All topics</option></select></div>
+            <div class="field"><label for="language-filter">Language</label><select id="language-filter"><option value="">All languages</option></select></div>
+            <div class="field"><label for="reporter-filter">Reporter</label><select id="reporter-filter"><option value="">All reporters</option></select></div>
+            <div class="field"><label for="status-filter">Review status</label><select id="status-filter"><option value="">All statuses</option><option value="unreviewed">Unreviewed</option><option value="needs-review">Needs review</option><option value="reviewed">Reviewed</option></select></div>
+          </div>
+        </section>
+
+        <div class="review-layout">
+          <section class="episode-rail" aria-labelledby="episode-list-title">
+            <div class="rail-heading"><h2 id="episode-list-title">Concern episodes</h2><span id="result-count" class="count-pill">—</span></div>
+            <p class="rail-caption">Separate contexts. A traceable history.</p>
+            <div id="episode-list" class="episode-list" aria-label="Concern episodes" aria-busy="true"><p class="empty-message">Loading local evidence…</p></div>
+          </section>
+
+          <section id="episode-detail" class="detail-panel" aria-label="Selected concern episode" aria-busy="true">
+            <div class="empty-detail"><span class="empty-symbol" aria-hidden="true">◎</span><h2>Evidence belongs in context.</h2><p>Select a concern to inspect its history and supporting sources.</p></div>
+          </section>
+        </div>
+
+        <section class="jobs-panel" aria-labelledby="jobs-title">
+          <div class="section-heading"><div><p class="eyebrow">Processing visibility</p><h2 id="jobs-title">Extraction jobs</h2></div><span id="job-summary" class="muted">Waiting for local state</span></div>
+          <p class="section-copy">Attempts and timings are shown independently of review decisions.</p>
+          <div id="job-list" class="job-list"><p class="empty-message">Loading job history…</p></div>
+        </section>
+      </main>
+      <footer><span>Origen / Network effects research</span><span id="last-updated">Local evidence only</span></footer>
+    </div>
+  </body>
+</html>

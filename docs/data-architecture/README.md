@@ -6,6 +6,8 @@ Origen already has a useful operational PostgreSQL database. The next improvemen
 
 ## Deliverables
 
+- [Network Effect Architecture](NETWORK_EFFECT_ARCHITECTURE.md) explains how Origen records outcomes, evaluates patterns across students, and uses reviewed evidence to improve shared guidance.
+
 - [Architecture and collection rules](ARCHITECTURE.md): identity, conversation scope, history, research separation and lifecycle.
 - [Data dictionary](DATA_DICTIONARY.md): existing tables and proposed records, including evidence limitations.
 - [Event catalog](EVENT_CATALOG.md): collection contracts and defensible measurement definitions.

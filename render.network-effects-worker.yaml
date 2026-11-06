@@ -1,0 +1,26 @@
+# Optional standalone Blueprint. Not applied, and intentionally separate from render.yaml.
+services:
+  - type: worker
+    name: origen-network-effects-worker
+    runtime: node
+    branch: v1.2
+    plan: 0.5c-512mb
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --omit=dev
+    startCommand: node scripts/network-effects.mjs worker
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_VERSION
+        value: 24.15.0
+      - key: NODE_ENV
+        value: production
+      - key: NETWORK_EFFECTS_WORKER_ENABLED
+        value: "false"
+      - key: NETWORK_EFFECTS_DATABASE_URL
+        sync: false
+      - key: NETWORK_EFFECTS_OPENAI_API_KEY
+        sync: false
+      - key: NETWORK_EFFECTS_BUDGET_ID
+        sync: false
+      - key: NETWORK_EFFECTS_BUDGET_USD
+        sync: false
