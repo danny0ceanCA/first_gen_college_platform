@@ -12,6 +12,17 @@ import {boundedLiveRouting,liveDelegationInstructions,studentLiveRouting} from '
 import {confirmedTargetContinuation} from '../src/voiceHandoff.mjs';
 
 const conversationalMode=input=>input.onboarding!==true&&!input.collectAccount&&!input.saveOnboarding&&['parent','student'].includes(input.role)&&['planning','finance','loans','admissions'].includes(input.mode);
+// Local adapter metadata only: names identify a possible missed handoff, never
+// authorize a student or carry private brief facts into the conversation.
+export function studentSelectionRecovery(input,tools=[]){
+ const routing=input.onboarding!==true&&!input.targetConfirmed?scopeRouting(input):null;
+ if(!routing||!tools.some(tool=>tool.name==='request_conversation_target'))return {pending:false,names:[]};
+ const scopes=new Set(routing.tool.parameters.properties.scope.enum);
+ const names=(Array.isArray(input.students)?input.students:[])
+  .filter(student=>student&&typeof student.id==='string'&&scopes.has(`student:${student.id}`)&&typeof student.name==='string'&&student.name.trim())
+  .slice(0,100).map(student=>student.name.slice(0,100));
+ return {pending:true,names};
+}
 function speechContracts(input,tools){
  const has=name=>tools.some(tool=>tool.name===name);
  const reviewRequests=has('prepare_coordinator_review_request')&&has('confirm_coordinator_review_request');
@@ -35,7 +46,7 @@ export function studentLiveUpdate(input,entries=[],tools=[],routingPolicy=studen
  // No instruction update is needed for ordinary scope/context changes: even
  // one instructions.append can interrupt speech. Only new mandatory workflow
  // speech contracts need instructions; the adapter deduplicates unchanged ones.
- return {liveInstructions:speechContracts(input,tools),liveContext};
+ return {liveInstructions:speechContracts(input,tools),liveContext,selectionRecovery:studentSelectionRecovery(input,tools)};
 }
 
 export function studentVoiceModel(input,env={}){

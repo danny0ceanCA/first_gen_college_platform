@@ -6,7 +6,7 @@ const http=['httpStatus','durationMs','code'];
 const errors=['code'];
 const spec=(fields,level='info')=>Object.freeze({fields:Object.freeze(fields),level});
 export const serverEvents=Object.freeze({
- 'voice.live.measurement':spec(['measurementRun','configurationHash','measurementStage','speechOutcome','completedPortions','unfinishedPortion','playbackObserved','overlapCount','closeReason','failureKind','language','routingPolicy','deliveryStage','deliveryReason','durationMs','offsetMs','responseIndex','researchIndex','requestRevision','toolCount','contextAvailable','contextIncluded','packetCount','contextBytes','inputTokens','outputTokens','reasoningTokens','cachedTokens','voiceSeconds','httpStatus']),
+ 'voice.live.measurement':spec(['measurementRun','configurationHash','measurementStage','turnIndex','recoveryStage','recoveryReason','speechOutcome','completedPortions','unfinishedPortion','playbackObserved','overlapCount','closeReason','failureKind','language','routingPolicy','deliveryStage','deliveryReason','durationMs','offsetMs','responseIndex','researchIndex','requestRevision','toolCount','contextAvailable','contextIncluded','packetCount','contextBytes','inputTokens','outputTokens','reasoningTokens','cachedTokens','voiceSeconds','httpStatus']),
  'voice.context_timing':spec(['contextStage','durationMs','outcome']),
  'voice.control.ready':spec(['durationMs']),
  'voice.control.closed':spec(['reason']),
@@ -53,7 +53,9 @@ export const enumFields=Object.freeze({
  speechOutcome:Object.freeze(['complete','acknowledgment_overlap','substantive_interruption','uncertain_overlap','forced_flush']),
  unfinishedPortion:Object.freeze([true,false]),playbackObserved:Object.freeze([true,false]),
  closeReason:Object.freeze(['close_requested','expired','content','remote_hangup','connection_lost','unknown']),
- measurementStage:Object.freeze(['configuration','backend_started','tool_ready','tool_dispatched','backend_finished','research_delivery','context_selection','voice_usage','session_closed','control_closed','research_attempt','speech_observation']),
+ measurementStage:Object.freeze(['configuration','backend_started','tool_ready','tool_dispatched','backend_finished','research_delivery','context_selection','voice_usage','session_closed','control_closed','research_attempt','speech_observation','selection_recovery']),
+ recoveryStage:Object.freeze(['scheduled','suppressed','requested','backend_started','selection_dispatched','selection_completed','unconfirmed']),
+ recoveryReason:Object.freeze(['native_delegation','new_input','configuration_changed','call_ended','provider_error','backend_not_observed','scope_confirmed','unavailable','target_confirmed','target_update_failed','target_unconfirmed']),
  failureKind:Object.freeze(['none','output_limit','incomplete','refusal','provider_error','rate_limited','http_error','invalid_output','unknown']),
  evidenceFormat:Object.freeze(['brief-v1','full-report']),
  deliveryStage:Object.freeze(['supplied','context_acknowledged','context_failed','commentary_requested','native_reply_observed','native_portion_observed','enabled','deferred','commentary_acknowledged','delivery_unconfirmed','interrupted','superseded','reply_observed','evidence_overlap_observed','repeat_suppressed']),

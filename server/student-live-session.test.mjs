@@ -1,8 +1,50 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,studentLiveUpdate,negotiateStudentLive,studentVoiceModel} from './student-live-session.mjs';
+import {Readable} from 'node:stream';import {createProfileVoiceHandler,voiceSession} from './profile-voice.mjs';import {studentLiveSession,studentLiveInstructions,studentLiveUpdate,negotiateStudentLive,studentVoiceModel,studentSelectionRecovery} from './student-live-session.mjs';
+import {fixture} from './family-fixture.mjs';
 import {buildOpeningBrief} from './voice-opening-brief.mjs';
 import {confirmedTargetContinuation} from '../src/voiceHandoff.mjs';
 const teaching={id:'published-teaching',revision:14,content:{topic:'admissions',title:'Student background',deliveryStyle:'Warm, patient and encouraging.',conversationApproach:'Acknowledge uncertainty, then offer concrete choices.',example:'Your experiences are worth exploring.'}};
+for(const language of ['en','es'])test(`${language}: selection recovery metadata is bounded and restricted to an unconfirmed routed scope`,()=>{
+ const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:false,
+  students:[{id:'private-id-a',name:'Aiden',notes:'PRIVATE_NOTES'},{id:'private-id-e',name:'Élodie'}],profile:{name:'PRIVATE_PROFILE'}};
+ const tools=voiceSession(input,{}).tools;
+ assert.deepEqual(studentSelectionRecovery(input,tools),{pending:true,names:['Aiden','Élodie']});
+ assert.deepEqual(studentLiveUpdate(input,[],tools).selectionRecovery,{pending:true,names:['Aiden','Élodie']});
+ for(const change of [{targetConfirmed:true,studentId:'private-id-a'},{targetConfirmed:true,studentId:null},{onboarding:true},{routeConversations:false},{role:'student'},{mode:'profile'}]){
+  assert.deepEqual(studentSelectionRecovery({...input,...change},tools),{pending:false,names:[]});
+  assert.deepEqual(studentLiveUpdate({...input,...change},[],tools).selectionRecovery,{pending:false,names:[]});
+ }
+ assert.deepEqual(studentSelectionRecovery(input,[]),{pending:false,names:[]});
+ assert.deepEqual(studentSelectionRecovery({...input,students:[]},tools),{pending:true,names:[]},'general-family selection can recover without inventing students');
+ const bounded=studentSelectionRecovery({...input,students:[null,{id:'x'.repeat(129),name:'Invalid'},...Array.from({length:130},(_,i)=>({id:String(i),name:'A'.repeat(120)}))]},tools);
+ assert.equal(bounded.names.length,100);assert.ok(bounded.names.every(name=>name.length===100));
+ assert.doesNotMatch(JSON.stringify(studentSelectionRecovery(input,tools)),/PRIVATE_|private-id/);
+ const provider=studentLiveSession({...voiceSession(input,{}),selectionRecovery:studentSelectionRecovery(input,tools)},input);
+ assert.equal(provider.selectionRecovery,undefined);assert.equal(provider.delegation.responses.selectionRecovery,undefined);
+});
+
+test('authorized initial control and direct-client receipts share server-owned selection metadata, never provider settings',async()=>{
+ const f=await fixture(),registered=[],provider=[];
+ try{
+  await f.run('selection-parent',{action:'complete-onboarding',account:{firstName:'Parent',email:'',role:'parent'},student:{id:'aiden',name:'Aiden',stage:'College',interest:'PRIVATE_INTEREST',gpa:'',color:'lilac'}});
+  const control={available:true,register:value=>{registered.push(value);return {protocol:'server-v1',id:'test-control'};}};
+  const handler=createProfileVoiceHandler({OPENAI_API_KEY:'synthetic',ORIGEN_LIVE_SERVER_CONTROL:'true'},async(_url,options)=>{
+   provider.push(JSON.parse(options.body).session);return new Response(JSON.stringify({session:{id:'synthetic-session'},transport:{sdp:'v=0\r\nanswer'}}),{status:201});
+  },()=>{},f.pool,control);
+  for(const language of ['en','es'])for(const serverControl of [true,false]){
+   let status,data;
+   const body={sdp:'v=0\r\noffer',voiceProtocol:'live-v1',voiceControlProtocol:serverControl?'server-v1':undefined,role:'parent',mode:'planning',language,routeConversations:true,targetConfirmed:false,
+    students:[{id:'forged-id',name:'FORGED_NAME'}],selectionRecovery:{pending:true,names:['FORGED_NAME']}};
+   const req=Object.assign(Readable.from([JSON.stringify(body)]),{url:'/api/profile-voice',method:'POST',headers:{'content-type':'application/json','x-origen-session':crypto.randomUUID()},origenAuthorized:true,origenIdentity:{sub:'selection-parent'},origenPermissionRevision:1});
+   await handler(req,{writeHead:value=>status=value,end:value=>data=JSON.parse(value)},()=>assert.fail('wrong route'));
+   assert.equal(status,200,JSON.stringify(data));
+   assert.deepEqual(data.voiceSession.selectionRecovery,{pending:true,names:['Aiden']});
+   if(serverControl)assert.deepEqual(registered.at(-1).config.selectionRecovery,data.voiceSession.selectionRecovery);
+   assert.equal(provider.at(-1).selectionRecovery,undefined);assert.equal(provider.at(-1).delegation.responses.selectionRecovery,undefined);
+   assert.doesNotMatch(JSON.stringify(data.voiceSession.selectionRecovery),/FORGED_NAME|PRIVATE_INTEREST/);
+  }
+ }finally{await f.pool.end();}
+});
 for(const language of ['en','es'])for(const mode of ['profile','planning','admissions','finance','loans'])test(`Live retains ${language} ${mode} backend instructions and tool contracts`,()=>{
  const input={language,mode,onboarding:mode==='profile',role:'student',saveOnboarding:true,profile:{name:'Synthetic student',stage:'Community college'}};
  const legacy=voiceSession(input,{OPENAI_MODEL_VOICE:'gpt-realtime-2.1'}),live=studentLiveSession(legacy,input,[teaching]);

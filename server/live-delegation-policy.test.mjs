@@ -8,6 +8,13 @@ const config=()=>voiceSession(input,{OPENAI_MODEL_VOICE:'gpt-live-1'});
 
 test('cross-topic conversation does not force retrieval, while evidence and action boundaries remain',()=>{
  const speech=liveDelegationInstructions(boundedLiveRouting);
+ for(const policy of [baselineLiveRouting,boundedLiveRouting]){
+  const instructions=liveDelegationInstructions(policy);
+  assert.match(instructions,/## Backend tools\n/);
+  assert.match(instructions,/## Generate <\|SpawnThinking\|> when:/);
+  assert.match(instructions,/## Do not generate <\|SpawnThinking\|> when:/);
+  assert.doesNotMatch(instructions,/## Answer directly without/);
+ }
  assert.match(speech,/Respond directly to feelings, encouragement, reflection and phrasing help, even across topics/);
  assert.match(speech,/Topic changes alone do not require delegation/);
  assert.match(speech,/New or unverified college requirements/);

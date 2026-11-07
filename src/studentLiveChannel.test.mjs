@@ -5,7 +5,165 @@ import {voiceProfileSaveConsent} from './voiceProfileSave.mjs';
 import {voiceHandoff,deferredVoiceHandoff} from './voiceHandoff.mjs';
 import {capturePayload} from './voiceCapture.mjs';
 import {voiceTargetResult} from './voiceTargetResult.mjs';
+import {selectionRecoveryDelayMs,selectionRecoveryStartDeadlineMs} from './liveSelectionRecovery.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+function pendingSelection(f,language='en',liveContext){
+ f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Scope pending',selectionRecovery:{pending:true,names:['Aiden','Elodie']},tools:[{name:'request_conversation_target'}],...(liveContext?{liveContext}:{})}});
+}
+async function selectionQuiet(f,clock,text='Aiden'){
+ f.receive({type:'session.input_transcript.delta',delta:text});await pause(0);clock.advance(1100);await pause(0);
+}
+for(const [language,choice,ack]of [['en','Aiden','Of course.'],['es','Hablemos de Aiden','Claro.']])test(`${language}: missed selection wakes the guarded backend once without changing speech`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f,language);
+ await selectionQuiet(f,clock,choice);
+ f.receive({type:'session.output_transcript.delta',delta:ack});await pause(0);
+ clock.advance(selectionRecoveryDelayMs-1);await pause(0);assert.equal(f.sent.length,0);
+ clock.advance(1);await pause(0);
+ assert.equal(f.sent.length,1);assert.deepEqual(Object.keys(f.sent[0]).sort(),['event_id','type']);assert.equal(f.sent[0].type,'response.create');
+ assert.deepEqual(f.events.filter(e=>e.type==='origen.selection.recovery').map(e=>e.stage),['scheduled','requested']);
+ assert.ok(!f.events.some(e=>e.type==='response.done'&&e.response.output.some(i=>i.type==='function_call')),'no student is selected by the timer');
+ clock.advance(selectionRecoveryStartDeadlineMs);await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='origen.selection.recovery').at(-1).reason,'backend_not_observed');
+ await selectionQuiet(f,clock,choice);clock.advance(30000);await pause(0);
+ assert.equal(f.sent.length,1,'unobserved request is logged, never retried');f.channel.close();
+});
+for(const native of ['delegation','response'])test(`${native}: a normal provider handoff suppresses missed-selection recovery`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);
+ if(native==='delegation')f.receive({type:'session.delegation.created',delegation:{id:'d',target:'responses'},response_id:'native'});
+ else f.backend('response.created','native');
+ await pause(0);clock.advance(selectionRecoveryDelayMs+100);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,0);
+ assert.ok(f.events.some(e=>e.type==='origen.selection.recovery'&&e.stage==='suppressed'&&e.reason==='native_delegation'));
+ f.channel.close();
+});
+test('delegation observed before input quiet prevents recovery even when nested start is delayed',async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);
+ f.receive({type:'session.input_transcript.delta',delta:'Aiden'});await pause(0);
+ f.receive({type:'session.delegation.created',delegation:{id:'d',target:'responses'},response_id:'native'});await pause(0);
+ clock.advance(1100);await pause(0);clock.advance(8000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,0);f.channel.close();
+});
+for(const text of ['Okay.','Hola.','Can you hear me?','¿Puedes oírme?','I feel overwhelmed.','Aidenberg'])test(`ordinary opening speech never triggers selection recovery: ${text}`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock,text);clock.advance(2000);await pause(0);
+ assert.equal(f.sent.length,0);f.channel.close();
+});
+for(const variation of ['confirmed','onboarding','no-tool','no-metadata'])test(`${variation}: selection recovery is not a general conversation timer`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);
+ const session={selectionRecovery:{pending:variation!=='confirmed',names:['Aiden']},onboarding:variation==='onboarding',tools:variation==='no-tool'?[]:[{name:'request_conversation_target'}]};
+ if(variation==='no-metadata')delete session.selectionRecovery;
+ f.channel.configure({voiceProvider:'live',voiceSession:session});await selectionQuiet(f,clock);clock.advance(2000);await pause(0);
+ assert.equal(f.sent.length,0);f.channel.close();
+});
+for(const [language,correction]of [['en','No, Elodie instead.'],['es','No, mejor Elodie.']])test(`${language}: continued speech cancels the earlier candidate before requesting latest context`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f,language);await selectionQuiet(f,clock);
+ clock.advance(500);f.receive({type:'session.input_transcript.delta',delta:correction});await pause(0);
+ clock.advance(1100);await pause(0);assert.equal(f.sent.length,0);
+ clock.advance(selectionRecoveryDelayMs);await pause(0);assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);
+ assert.ok(f.events.some(e=>e.type==='origen.selection.recovery'&&e.reason==='new_input'));
+ assert.equal(f.events.filter(e=>e.type==='origen.selection.recovery'&&e.stage==='requested').at(-1).item_id,f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').at(-1).item_id);
+ f.channel.close();
+});
+for(const stop of ['close','farewell','configuration'])test(`${stop}: pending recovery cannot run after its lifetime ends`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);
+ if(stop==='close')f.channel.close();
+ if(stop==='farewell')f.channel.send(JSON.stringify({type:'response.create',response:{metadata:{topic:'origen_farewell'}}}));
+ if(stop==='configuration')f.channel.send(JSON.stringify({type:'session.update',event_id:'u',session:{selectionRecovery:{pending:false,names:[]},tools:[]}}));
+ const before=f.sent.length;clock.advance(3000);await pause(0);assert.equal(f.sent.length,before);f.channel.close();
+});
+test('recovery request rejection is logged once without another request or spoken warning',async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ const event=f.sent[0];f.receive({type:'error',error:{code:'responses_validation_failed',client_event_id:event.event_id}});await pause(0);
+ clock.advance(10000);await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='origen.selection.recovery'&&e.stage==='unconfirmed').length,1);
+ assert.equal(f.sent.length,1);f.channel.close();
+});
+for(const language of ['en','es'])test(`${language}: recovery keeps the quick acknowledgment and excludes the old scope-question tail`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f,language);
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Is this about Elodie, Aiden, or':'¿Es sobre Elodie, Aiden o'});await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:'Aiden'});await pause(0);
+ f.receive({type:'session.output_transcript.delta',delta:language==='en'?' college in general?':' la universidad en general?'});await pause(0);
+ const ack=language==='en'?' Of course.':' Claro.';
+ f.receive({type:'session.output_transcript.delta',delta:ack});await pause(0);
+ clock.advance(1100);await pause(0);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ f.backend('response.created','recovery');await pause(0);
+ f.backend('response.output_item.done','recovery',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','recovery');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+ const receipt=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);
+ assert.equal(receipt.selectionDelivery.mode,'conditional_recap');assert.equal(receipt.selectionDelivery.recentAssistantSpeech,ack);
+ f.channel.close();
+});
+test('failed recovered selection does not expose a brief, repeat the choice, or request another recovery',async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ f.backend('response.created','recovery');await pause(0);
+ f.backend('response.output_item.done','recovery',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{}'}});
+ f.backend('response.completed','recovery');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify({status:'target_update_failed'})}}));
+ assert.equal(f.events.filter(e=>e.type==='origen.selection.recovery').at(-1).reason,'target_update_failed');
+ assert.ok(!f.sent.some(e=>e.content?.includes('confirmed-student-brief')));
+ await selectionQuiet(f,clock,'Aiden');clock.advance(10000);await pause(0);
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,1);f.channel.close();
+});
+for(const status of ['target_update_failed','callback_unconfirmed'])test(`late native selection receives the original ${status} result without authorizing context`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ for(const responseId of ['recovery','native']){
+  f.backend('response.created',responseId);await pause(0);
+  f.backend('response.output_item.done',responseId,{item:{type:'function_call',name:'request_conversation_target',call_id:responseId,arguments:'{"scope":"student:aiden"}'}});
+  f.backend('response.completed',responseId);await pause(0);
+ }
+ assert.equal(f.events.filter(e=>e.type==='response.done'&&e.response.output.some(i=>i.type==='function_call')).length,1);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'recovery',output:JSON.stringify({status})}}));
+ for(const callId of ['recovery','native'])assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id===callId).item.output).status,status);
+ assert.ok(!f.sent.some(e=>e.content?.includes('confirmed-student-brief')));f.channel.close();
+});
+for(const change of ['other-student','unconfirmed','same-student','unchanged-pending-scope'])test(`late recovery alias respects ${change} configuration before acknowledgment`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false}),unchanged=change==='unchanged-pending-scope';pendingSelection(f,'en',unchanged?{scope:{confirmed:false,studentId:null}}:undefined);await selectionQuiet(f,clock);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ f.backend('response.created','first');await pause(0);
+ f.backend('response.output_item.done','first',{item:{type:'function_call',name:'request_conversation_target',call_id:'first',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','first');await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'first',output:JSON.stringify({status:'target_confirmed'})}}));
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'changed-scope',session:unchanged?{language:'en'}:{liveContext:{scope:{confirmed:change!=='unconfirmed',studentId:change==='other-student'?'elodie':'aiden'}}}}));
+ // A late result must respect even an unacknowledged newer scope, without
+ // invoking another callback or pretending the old choice is still current.
+ f.backend('response.created','late');await pause(0);
+ f.backend('response.output_item.done','late',{item:{type:'function_call',name:'request_conversation_target',call_id:'late',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','late');await pause(0);
+ const receipt=JSON.parse(f.sent.find(e=>e.item?.call_id==='late').item.output);
+ assert.equal(receipt.status,change==='same-student'||unchanged?'target_confirmed':'target_update_failed');
+ assert.equal(f.events.filter(e=>e.type==='response.done'&&e.response.output.some(i=>i.type==='function_call')).length,1);
+ assert.ok(!f.sent.some(e=>['session.commentary.append','session.instructions.append','response.cancel'].includes(e.type)));f.channel.close();
+});
+for(const change of ['different-scope','new-input'])test(`recovery never coalesces a ${change} selection`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock);clock.advance(selectionRecoveryDelayMs);await pause(0);
+ f.backend('response.created','first');await pause(0);
+ f.backend('response.output_item.done','first',{item:{type:'function_call',name:'request_conversation_target',call_id:'first',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','first');await pause(0);
+ if(change==='new-input')await selectionQuiet(f,clock,'No, Aiden after all.');
+ f.backend('response.created','second');await pause(0);
+ f.backend('response.output_item.done','second',{item:{type:'function_call',name:'request_conversation_target',call_id:'second',arguments:JSON.stringify({scope:change==='different-scope'?'student:elodie':'student:aiden'})}});
+ f.backend('response.completed','second');await pause(0);
+ assert.equal(f.events.filter(e=>e.type==='response.done'&&e.response.output.some(i=>i.type==='function_call')).length,2,'genuine choices still require their own guarded handler');f.channel.close();
+});
+for(const [text,invitation,mode]of [['Aiden','','conditional_recap'],['Aiden','What matters most today?','leave_floor'],['Aiden, can you help with his essay?','','caller_first'],['Aiden, ¿podemos hablar de su ensayo?','','caller_first']])test(`recovered selection preserves existing delivery mode: ${mode} / ${text}`,async()=>{
+ const clock=fakeClock(),f=fixture(clock);pendingSelection(f);await selectionQuiet(f,clock,text);
+ if(invitation){f.receive({type:'session.output_transcript.delta',delta:invitation});await pause(0);}
+ clock.advance(selectionRecoveryDelayMs);await pause(0);
+ f.backend('response.created','recovery');await pause(0);
+ f.backend('response.output_item.done','recovery',{item:{type:'function_call',name:'request_conversation_target',call_id:'choose',arguments:'{"scope":"student:aiden"}'}});
+ f.backend('response.completed','recovery');await pause(0);
+ assert.ok(f.events.some(e=>e.type==='response.done'&&e.response.output.some(i=>i.call_id==='choose')));
+ const context={scope:{confirmed:true,studentId:'aiden'},openingBrief:{profile:{name:'Aiden',school:'Synthetic College'}}};
+ f.channel.send(JSON.stringify({type:'session.update',event_id:'u',session:{selectionRecovery:{pending:false,names:[]},liveContext:context,tools:[]}}));
+ f.receive({type:'session.updated',client_event_id:'u'});await pause(0);
+ f.channel.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id:'choose',output:JSON.stringify(voiceTargetResult(true,'Aiden'))}}));
+ f.channel.send(JSON.stringify({type:'response.create'}));
+ const result=JSON.parse(f.sent.find(e=>e.item?.call_id==='choose').item.output);assert.equal(result.selectionDelivery.mode,mode);
+ assert.equal(f.events.filter(e=>e.type==='origen.selection.recovery').at(-1).reason,'target_confirmed');
+ assert.equal(f.sent.filter(e=>e.type==='response.create').length,2,'one recovery plus one required tool continuation');
+ assert.ok(!f.sent.some(e=>['session.instructions.append','session.commentary.append','response.cancel','session.input_audio.mute'].includes(e.type)));
+ f.channel.close();
+});
 
 for(const language of ['en','es'])for(const callerFirst of [false,true])test(`${language}: selected brief stays off the voice stream until its successful receipt (${callerFirst?'caller first':'short recap'})`,async()=>{
  const clock=fakeClock(),f=fixture({...clock,autoAcknowledge:false});

@@ -32,7 +32,7 @@ for(const language of ['en','es'])for(const {name,input} of voicePayloadCases(la
  assert.equal(live.delegation.responses.parallel_tool_calls,false);
  assert.equal(live.delegation.responses.service_tier,'default');
  if(!input.onboarding)assert.match(live.instructions,/Current-call context only/);
- if(['planning','finance','loans','admissions'].includes(input.mode)&&input.targetConfirmed)assert.match(live.instructions,/Answer directly without/);
+ if(['planning','finance','loans','admissions'].includes(input.mode)&&input.targetConfirmed)assert.match(live.instructions,/Do not generate <\|SpawnThinking\|> when:/);
  const size=measureVoicePayload(input),[speech,backend,count]=budgets[name];
  assert.ok(size.speechCharacters<=speech,JSON.stringify(size));assert.ok(size.backendCharacters<=backend,JSON.stringify(size));assert.equal(size.toolCount,count-(realtime.tools.some(t=>t.name==='highlight_binder_topics')?1:0));
 });

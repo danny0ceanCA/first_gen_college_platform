@@ -19,12 +19,15 @@ The research worker independently emits one `research_attempt` record for each a
 | `tool_ready` / `tool_dispatched` | Complete function item to application dispatch interval | NC-008 |
 | `research_delivery` | Supplied/acknowledged/deferred/expired/interrupted/overlap stages, reason, packets/bytes; local research index and revision where available | NC-006/009 |
 | `context_selection` | Number of eligible profile fields available/included and total snapshot bytes | NC-007 |
+| `selection_recovery` | Recovery scheduled/suppressed/requested, backend observed, selection dispatched/completed or unconfirmed; fixed reason and elapsed duration | Missed initial selection handoff |
 | `voice_usage` | Latest cumulative provider voice seconds | LC-004 |
 | `session_closed` | Final provider voice seconds, only if the native event is actually received | LC-003/004 |
 | `control_closed` | Application control shutdown, independent of provider finalization | LC-003 |
 | `research_attempt` | Pass duration, HTTP status, incomplete/refusal/provider/rate-limit/invalid-output categories and token details | RS-001/002 |
 
 `measurementRun` is a random connection- or worker-job key, not a user/student/provider ID. `responseIndex`, `researchIndex`, and `turnIndex` are local sequence numbers; turn indices use the existing estimated boundaries, not semantic ground truth. Native IDs are held only in bounded in-memory maps. They are never emitted by this instrumentation.
+
+Selection recovery records use `recoveryStage` and `recoveryReason`. A requested recovery is not a successful selection; a completed selection is not proof of a spoken recap or playback. The existing authorized private archive separately stores `origen.selection.recovery` with its opaque recovery, input, response, and request-event IDs for exact correlation, without adding conversation text to that event. Operational reports count lifecycle stages and reasons; those counts must not be interpreted as a success rate or unique attempts.
 
 `configurationHash` covers structural settings (models, tool schemas, language, routing policy, output limit, delivery-policy variant). It excludes instructions, student input, credentials, and private context. Existing log `release` identifies the deployment commit. This is not a hash of the entire prompt: a prompt-only change must be compared by release. Worker attempts have independent run keys and no configuration fingerprint; there is no cross-worker-to-call join yet.
 

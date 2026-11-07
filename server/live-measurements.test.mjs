@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {liveMeasurements,responseMeasurement} from './live-measurements.mjs';
 import {diagnosticRecord} from './observability/event-schema.mjs';
 import {liveMeasurementReport} from '../scripts/live-measurement-report.mjs';
+import {enumFields} from './observability/event-catalog.mjs';
 test('native-to-dispatch correlation works without response_id and never records content',()=>{
  let time=0;const records=[];const m=liveMeasurements({now:()=>time,log:e=>records.push(diagnosticRecord(e)),config:{language:'en',instructions:'PRIVATE',tools:[]}});
  m.start();m.native({type:'response.event',delegation_id:'PRIVATE-d',event:{type:'response.created',response:{id:'PRIVATE-r'}}});
@@ -52,5 +53,31 @@ test('speech observations keep playback evidence separate from completed text',(
  assert.equal(speech.speechOutcomes.substantive_interruption,1);
  assert.equal(speech.playbackObservations.activity_not_observed,1);
  assert.equal(report.groups.find(group=>group.stage==='research_delivery').deliveryOutcomes.repeat_suppressed,1);
+ measurements.close();
+});
+
+test('selection recovery measurements preserve fixed lifecycle categories and timing without private identifiers',()=>{
+ const raw=[],records=[];let time=0;
+ const measurements=liveMeasurements({now:()=>time,log:event=>{raw.push(event);records.push(diagnosticRecord(event));}});
+ measurements.application({type:'input_audio_buffer.speech_started'});
+ for(const stage of enumFields.recoveryStage){time+=100;measurements.application({type:'origen.selection.recovery',stage,reason:'native_delegation',durationMs:time,
+  recoveryId:'PRIVATE-ID',item_id:'PRIVATE-ITEM',response_id:'PRIVATE-RESPONSE',eventId:'PRIVATE-EVENT',transcript:'PRIVATE-TEXT',name:'PRIVATE-NAME'});}
+ assert.equal(records.length,enumFields.recoveryStage.length);
+ assert.ok(records.every(event=>event.measurementStage==='selection_recovery'&&event.turnIndex===1));
+ assert.equal(new Set(records.map(event=>event.measurementRun)).size,1);
+ assert.equal(JSON.stringify(raw).includes('PRIVATE'),false);
+ assert.equal(JSON.stringify(records).includes('PRIVATE'),false);
+ measurements.application({type:'origen.selection.recovery',stage:'PRIVATE-STAGE',reason:'PRIVATE-REASON',durationMs:'PRIVATE-DURATION'});
+ assert.equal(records.length,enumFields.recoveryStage.length,'unknown stages must not create operational records');
+ measurements.application({type:'origen.selection.recovery',stage:'unconfirmed',reason:'PRIVATE-REASON',durationMs:NaN});
+ assert.equal(records.at(-1).recoveryReason,undefined);assert.equal(records.at(-1).durationMs,undefined);
+ const sanitized=diagnosticRecord({event:'voice.live.measurement',measurementStage:'selection_recovery',recoveryStage:'PRIVATE-STAGE',recoveryReason:'PRIVATE-REASON',text:'PRIVATE-TEXT',recoveryId:'PRIVATE-ID'});
+ assert.equal(JSON.stringify(sanitized).includes('PRIVATE'),false);
+ const report=liveMeasurementReport([...records,{event:'voice.live.measurement',measurementStage:'selection_recovery',recoveryStage:'PRIVATE-STAGE',recoveryReason:'PRIVATE-REASON'}]);
+ const group=report.groups.find(row=>row.stage==='selection_recovery');
+ assert.equal(group.recoveryStages.requested,1);assert.equal(group.recoveryStages.unconfirmed,2);
+ assert.equal(group.recoveryReasons.native_delegation,enumFields.recoveryStage.length);
+ assert.equal(group.metrics.durationMs.samples,enumFields.recoveryStage.length);
+ assert.equal(JSON.stringify(report).includes('PRIVATE'),false);
  measurements.close();
 });

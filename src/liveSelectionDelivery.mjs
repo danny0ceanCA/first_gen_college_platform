@@ -10,10 +10,10 @@ export function liveSelectionDelivery({send,emit,id,now,schedule=setTimeout,canc
  const context=(callId,state)=>send({type:'session.thinking.append',event_id:id(),delegation_id:null,
   content:JSON.stringify({kind:'student-selection-state',callId,state})});
  return {
-  begin(callId,assistantText='',scope){
+  begin(callId,assistantText='',scope,callerText=''){
    if(pending.has(callId))return;
    current=null;
-   pending.set(callId,{startedAt:now(),scope,assistantText:assistantText.slice(-800),callerText:'',questionObserved:/[?？]/u.test(assistantText)});
+   pending.set(callId,{startedAt:now(),scope,assistantText:assistantText.slice(-800),callerText:callerText.slice(-800),questionObserved:/[?？]/u.test(assistantText)});
    // Pending selection is already covered by the session's standing policy.
    // Observe locally: injecting that status during the acknowledgment can
    // influence an unfinished phrase without supplying any new useful facts.

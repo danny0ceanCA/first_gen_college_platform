@@ -1,4 +1,5 @@
 import {createHash,randomBytes} from 'node:crypto';
+import {enumFields} from './observability/event-catalog.mjs';
 // Only fixed categories, counts and a random per-connection key cross this boundary.
 // Native IDs stay in bounded, connection-local maps; content never enters a record.
 export function responseMeasurement(data={},httpStatus){
@@ -53,6 +54,10 @@ export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,
    if(e.type==='origen.configuration.applied'){config=e.session||config;write('configuration',{durationMs:e.durationMs});}
    if(e.type==='session.updated'){config={...config,...e.session};configurationHash=fingerprint(config);write('configuration',{language:config.language,routingPolicy:config.routingPolicy});}
    if(e.type==='origen.live.context')write('context_selection',{contextAvailable:e.contextAvailable,contextIncluded:e.contextIncluded,contextBytes:e.contextBytes});
+   if(e.type==='origen.selection.recovery'&&enumFields.recoveryStage.includes(e.stage))write('selection_recovery',{
+    recoveryStage:e.stage,recoveryReason:enumFields.recoveryReason.includes(e.reason)?e.reason:undefined,
+    durationMs:Number.isFinite(e.durationMs)&&e.durationMs>=0?Math.min(e.durationMs,600000):undefined,
+   });
    if(e.type==='origen.research.speech_observed')write('speech_observation',{
     speechOutcome:e.speechOutcome,completedPortions:e.completedPortions,
     unfinishedPortion:e.unfinishedPortion,playbackObserved:e.playbackObserved,overlapCount:e.overlapCount,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createVoiceCapture} from './voiceCapture.mjs';
+import {createVoiceCapture,capturePayload} from './voiceCapture.mjs';
 import {validateCapture} from '../server/private-voice-capture.mjs';
 
 const scope={subject:'synthetic',sessionId:'00000000-0000-4000-8000-000000000001',attemptId:'00000000-0000-4000-8000-000000000002'};
@@ -88,4 +88,19 @@ test('retrying a loss marker never changes its acknowledged identity or silently
  recovered=true;await drain(archive);
  const losses=saved.filter(row=>row.data.type==='capture.gap').reduce((n,row)=>n+row.data.dropped,0);
  assert.equal(saved.filter(row=>row.data.partial).length+losses,500);
+});
+
+test('selection recovery capture keeps diagnostic identity and fixed categories, never conversation content',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=[],archive=createVoiceCapture(async rows=>saved.push(...structuredClone(rows)));
+ const event={type:'origen.selection.recovery',recoveryId:'00000000-0000-4000-8000-000000000003',item_id:'caller-item',response_id:'backend-response',eventId:'recovery-request',
+  stage:'backend_started',reason:'native_delegation',durationMs:1350,transcript:'PRIVATE-TEXT',name:'PRIVATE-NAME',instructions:'PRIVATE-INSTRUCTIONS'};
+ archive.enable(true);archive.event(event,scope);await drain(archive);
+ assert.equal(saved.length,1);validateCapture({action:'append',events:saved});
+ const payload=saved[0].data;
+ assert.equal(payload.recoveryId,event.recoveryId);assert.equal(payload.itemId,event.item_id);assert.equal(payload.responseId,event.response_id);assert.equal(payload.eventId,event.eventId);
+ assert.equal(payload.stage,'backend_started');assert.equal(payload.reason,'native_delegation');assert.equal(payload.durationMs,1350);
+ assert.equal(JSON.stringify(saved).includes('PRIVATE'),false);
+ const invalid=capturePayload({type:'origen.selection.recovery',recoveryId:'PRIVATE-ID',eventId:'PRIVATE TEXT',stage:'PRIVATE-STAGE',reason:'PRIVATE-REASON',durationMs:-5,transcript:'PRIVATE-TEXT'});
+ assert.equal(JSON.stringify(invalid).includes('PRIVATE'),false);assert.equal(invalid.durationMs,undefined);
 });
