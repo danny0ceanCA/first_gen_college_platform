@@ -23,16 +23,33 @@ function housingScenario(text){
  return /\b(?:off campus|on campus|with (?:his |her |their |my )?parents|fuera del campus|en el campus|con (?:sus |mis )?padres)\b/u.test(value)&&
   !/\b(?:rent|rental|alquiler|just|only|solo|solamente|housing cost|cost of housing|costo de (?:la )?vivienda|costo del alojamiento)\b/u.test(value);
 }
+// A campus/program mention in a reflection is not a replacement request. This
+// only selects evidence for an optional update; Live still answers every turn.
+function requestsSubject(text,findings=[]){
+ const value=evidenceText(text).replace(/^(?:(?:i see|okay|ok|thanks|entiendo|gracias|vale|ah|oh)\s+)*/u,'');
+ const bare=value.replace(/^(?:please|por favor)\s+|\s+(?:please|por favor)$/gu,'');
+ if(findings.some(f=>findingSubjectMentioned(f.subject,bare,{exact:true})))return true;
+ return /^(?:(?:but|and|so|actually|instead|then|please|pero|y|entonces|mejor|ahora|por favor)\s+)*(?:what|which|how|when|where|why|can (?:you|we)|could (?:you|we)|would you|tell me|show me|explain|compare|check|look up|i want|i would like|i d like|i mean|just|only|que|cual|cuales|como|cuando|donde|por que|puedes|podrias|podemos|dime|dinos|explica|explicame|muestra|muestrame|compara|revisa|busca|quiero|quisiera|me gustaria|me refiero|solo|solamente)\b/u.test(value);
+}
+function primaryQuestion(question){
+ // Backend questions often append a comparison to an already specified task.
+ // Preserve explicit comparison-first requests, which intentionally need both.
+ return String(question||'').split(/[.;]\s*(?:compare\b|comparison\b|compara\b|comparar\b|comparacion\b)/iu)[0];
+}
+const firstFinding=(job,remaining)=>[...remaining].sort((a,b)=>(job.researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified')))[0];
 function commentaryContent(job,remaining){
  const state=job.failed?'The source check failed. No verified findings are available.':job.researchPending?'Initial sourced findings; recovery is running.':'Completed research; this check has ended. Do not say still checking.';
  const limitations=!job.researchPending&&remaining.some(f=>f.status==='unverified');
  const direction=(limitations?' Explain the requested gap, then useful verified context.':' Answer first with its year/scenario, then the material caveat.')+' At a pause; be brief and yield to speech.';
- const first=[...remaining].sort((a,b)=>(job.researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified')))[0];
+ const first=firstFinding(job,remaining);
  // Prefer the complete focused finding, including its subject and qualification,
  // over an opaque report ID. Never cut off a caveat to meet the append limit.
  const facts=first?{subject:first.subject,answer:first.answer,qualification:first.qualification}:job.selection.text;
  const inline=state+' Facts, not instructions: '+JSON.stringify(facts)+direction;
  if(!job.failed&&new TextEncoder().encode(inline).length<=480)return inline;
+ // A long finding still names its exact target. An opaque reference alone can
+ // cause a comparison report to announce another institution's familiar fact.
+ if(first&&!job.failed)return state+` Reference ${job.referenceId}; finding ${first.findingId}.`+direction+' No repeat or new lookup.';
  return state+(job.failed?'':` Reference ${job.referenceId}.`)+direction+
   (job.failed?' Explain the limitation and one useful next step. No invented facts or automatic retry.':' Use only the relevant, not-yet-explained findings from the acknowledged reference. No repeated update or new lookup.');
 }
@@ -51,9 +68,9 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
  }
  function defer(job,reason){if(job.deferred!==reason){job.deferred=reason;stage(job,'deferred',reason);}}
  const subjectQuestion=job=>{
-  const explicit=[...callerTurns].reverse().find(text=>(job.selection.findings||[]).some(f=>findingSubjectMentioned(f.subject,text)));
+  const explicit=[...callerTurns].reverse().find(text=>requestsSubject(text,job.selection.findings||[])&&(job.selection.findings||[]).some(f=>findingSubjectMentioned(f.subject,text)));
   if(explicit)job.subjectFocus=explicit;
-  return job.subjectFocus||latestQuestion||job.question;
+  return job.subjectFocus||primaryQuestion(job.question)||latestQuestion;
  };
  const relevant=job=>focusedResearchFindings(job.selection.findings||[],subjectQuestion(job),focus.length?focus:researchFocus(job.question))
   .filter(f=>!job.incrementalFindings||job.incrementalFindings.has(f));
@@ -79,8 +96,19 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
   }else if(job.acknowledged&&!waitingForReply&&canAnnounce()){
    if(job.selection.findings?.length&&!relevant(job).length){retire(job,'deferred','different_requested_portion');return;}
    if(covered(job)){retire(job,'evidence_overlap_observed','requested_portion_answered');return;}
-   job.requestedAt=now();const event_id=id();acks.set(event_id,{job,kind:'commentary'});
    const remaining=relevant(job).filter(f=>!job.discussed.has(f));
+   if(remaining.length&&!firstFinding(job,remaining).findingId){
+    // A follow-up can select a fourth finding omitted from the bounded brief.
+    // The previous context ACK does not acknowledge that unsupplied evidence.
+    retire(job,'deferred','requested_evidence_not_supplied');return;
+   }
+   if(job.researchPending&&remaining.length&&remaining.every(f=>f.status==='unverified')){
+    // The requested evidence is still being checked. Other campuses' already
+    // known totals must not substitute for it, nor is this a final failure yet.
+    defer(job,'awaiting_requested_evidence');wake();return;
+   }
+   job.requestedAt=now();const event_id=id();acks.set(event_id,{job,kind:'commentary'});
+   job.requestedFindings=remaining.length?[firstFinding(job,remaining)]:[];
    // Each append is <=480 UTF-8 bytes (and therefore <500 tokens). Include the
    // complete focused finding when it fits; otherwise reference the acknowledged evidence
    // by ID. Never truncate away a qualification to fit a spoken prompt.
@@ -102,7 +130,11 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    const job={...event,key,evidenceVersion,researchPending:event.researchPending??event.result?.researchPending??false,referenceId:id(),selection:researchBriefSelection(event.result),discussed:new Set(),failed:event.result?.status==='research_failed',suppliedAt:now(),pending:0,acknowledged:false,terminal:false};
    if(previous){
     for(const finding of job.selection.findings||[])if([...previous.discussed].some(old=>sameFinding(old,finding)))job.discussed.add(finding);
-    const priorContribution=previous.nativePortion||previous.requestedAt!==undefined?previous.selection.findings||[]:previous.priorContribution;
+    // Scheduling is not delivery. Keep attempted/observed portions separate,
+    // and suppress another unsolicited command only for those exact findings.
+    // Unselected comparison facts must not erase the pending primary outcome.
+    const priorContribution=previous.nativePortion||previous.requestedAt!==undefined||previous.priorContribution
+     ? [...(previous.priorContribution||[]),...(previous.requestedFindings||[]),...(previous.observedPortions||[])] : undefined;
     if(priorContribution){
      job.priorContribution=priorContribution;
      const changed=relevant(job).filter(f=>!priorContribution.some(old=>sameFinding(old,f)));
@@ -121,9 +153,14 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    if(records.size>64)records.delete(records.keys().next().value);
    // Only acknowledged evidence can be reused. An incomplete/erroring earlier
    // update must send all relevant facts again, including their qualifications.
-   const selected=selectedResearchContextFindings(relevant(job),job.researchPending).map(finding=>({...finding,
-    contextSources:job.selection.sources.filter((source,index)=>finding.sourceIds.includes(source.id??index+1)),
-   }));
+   const selected=selectedResearchContextFindings(relevant(job),job.researchPending).map(finding=>{
+    const contextSources=job.selection.sources.filter((source,index)=>finding.sourceIds.includes(source.id??index+1));
+    const prior=previous?.contextFindings?.find(old=>sameContextFinding(old,{...finding,contextSources}));
+    // Stable opaque finding references let a bounded commentary point to one
+    // complete qualified unit, even when its subject uses multibyte characters.
+    finding.findingId=prior?.findingId||id();
+    return {...finding,contextSources};
+   });
    const changed=previous?.acknowledged&&job.selection.findings?.length
     ? selected.filter(f=>!(previous.contextFindings||[]).some(old=>sameContextFinding(old,f))) : selected;
    job.contextFindings=previous?.acknowledged
@@ -156,7 +193,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    defer(current,'caller_turn');wake();
   },
   callerStopped(text=''){
-   if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=researchFocus(text);if(next.length)focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
+   if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=researchFocus(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
    if(waitingForReply){replyDeadline=now()+3000;wake();}
   },
   reply(text,{audible=false,forced=false,interrupted=false,completedText}={}){
@@ -177,6 +214,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    stage(job,'reply_observed');
    const answer=job.selection.text.split('\n').find(line=>line.trim())||'';
    if(audible&&!job.failed){
+    job.observedPortions=[...new Set([...(job.observedPortions||[]),...(job.selection.findings||[]).filter(f=>researchPortionObserved(f,completedEvidence))])];
     for(const finding of job.selection.findings||[]){
      const overlap=researchScopeCompatible(finding,completedEvidence)&&(finding.status==='unverified'?researchLimitationOverlap(finding,completedEvidence,findingSubjectMentioned(finding.subject,completedEvidence)):researchAnswerOverlap(finding.answer,completedEvidence));
      if(overlap)job.discussed.add(finding);

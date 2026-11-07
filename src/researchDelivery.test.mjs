@@ -269,10 +269,11 @@ for(const [language,s] of Object.entries(budgetScripts)){
  test(`${language}: pending new evidence stays eligible across a terminal status-only refresh`,()=>{
   const f=fixture();f.delivery.supersede('new_request',s.question);
   f.ready(language,{question:s.question,evidenceVersion:1,researchPending:true,result:budgetResult(s,{unknown:true})});f.ack();f.advance(500);
+  assert.equal(f.announcements().length,0,'an unresolved initial pass remains quiet while recovery runs');
   f.quiet(false);
   f.ready(language,{question:s.question,evidenceVersion:2,researchPending:true,result:budgetResult(s)});f.ack();f.advance(1000);
   f.ready(language,{question:s.question,evidenceVersion:3,researchPending:false,result:budgetResult(s)});f.ack();f.quiet(true);f.advance(500);
-  assert.equal(f.announcements().length,2);assert.ok(f.announcements().at(-1).content.includes(s.answer));f.delivery.clear();
+  assert.equal(f.announcements().length,1);assert.ok(f.announcements().at(-1).content.includes(s.answer));f.delivery.clear();
  });
 }
 
@@ -367,6 +368,28 @@ test('findings omitted by the three-unit limit are supplied when the caller sele
  f.ready('en',{question:'Compare college budgets',evidenceVersion:2,result});
  const context=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
  assert.equal(context.findings.length,1);assert.equal(context.findings[0].subject,'Campus4');f.delivery.clear();
+});
+
+test('a newly selected unsupplied finding cannot use another finding context acknowledgment',()=>{
+ const f=fixture(),result=budgetResult(budgetScripts.en);
+ result.voiceBrief.findings=Array.from({length:5},(_,index)=>({subject:`Campus${index}`,aspect:'total_budget',status:'verified',answer:`Campus${index} annual budget is $${40000+index}. [1]`,qualification:'2026–27 estimate before aid. [1]'}));
+ f.quiet(false);f.ready('en',{question:'Compare college budgets',result});f.ack();
+ f.delivery.caller();f.delivery.callerStopped('What is the total budget for Campus4?');
+ f.delivery.reply('We can compare those costs together.',{audible:true});f.quiet(true);f.advance(500);
+ assert.equal(f.announcements().length,0);
+ assert.ok(f.events.some(e=>e.deliveryReason==='requested_evidence_not_supplied'));f.delivery.clear();
+});
+
+test('long multibyte finding names use an acknowledged opaque reference within append bounds',()=>{
+ const f=fixture(),result=budgetResult(budgetScripts.es),finding=result.voiceBrief.findings[0];
+ finding.subject='Universidad '+ '學'.repeat(140);finding.answer+=' '+ 'é'.repeat(500);
+ f.ready('es',{question:'¿Cuál es el presupuesto total?',result});f.ack();f.advance(500);
+ const context=decodedResearchContext(f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ assert.equal(context.findings[0].subject,finding.subject);
+ assert.equal(context.findings[0].qualification,finding.qualification);
+ assert.ok(f.announcements()[0].content.includes('finding '+context.findings[0].findingId));
+ assert.ok(f.sent.every(e=>Buffer.byteLength(e.content)<=480));
+ assert.equal(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'),false);f.delivery.clear();
 });
 
 test('updated verification and source provenance reach quiet context without repeating speech',()=>{

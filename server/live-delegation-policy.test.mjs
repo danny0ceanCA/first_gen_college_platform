@@ -58,6 +58,9 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
   assert.match(speech,/newest application task state replaces older pending receipts/);
   assert.match(speech,/researchPending false means the check ended, even with unverified findings/);
   assert.match(speech,/Explain research directly; never announce checking when answering from existing findings/);
+  assert.match(speech,/retained report needs a backend read, omit a lookup preamble before delegating/);
+  assert.match(speech,/State only qualifications supported by the findings/);
+  assert.match(speech,/different amounts alone do not establish different inclusions or rules/);
   assert.match(speech,/A changed scenario outside its searched question is not researched, not searched-and-unverified/);
   assert.match(speech,/Lead with the useful answer to the latest question, keeping its year and scenario/);
   assert.match(speech,/A rejected replacement or reading an old report performs no search/);
@@ -79,6 +82,8 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
  assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
  assert.match(c.instructions,/research only the unresolved portion if needed/);
  assert.match(c.instructions,/status questions reuse actual task state/);
+ assert.match(c.instructions,/Read retained details without a checking preamble; the read starts no search/);
+ assert.match(c.instructions,/Comparison qualifications must come from the source findings/);
 });
 
 for(const language of ['en','es'])test(`${language} call-only speech keeps backend context and tool contracts`,()=>{

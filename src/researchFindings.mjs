@@ -33,15 +33,15 @@ export function researchSubjectIdentity(subject){
  return normalizeSubject(String(subject).split(/\s+[—–]\s+|\s*\(/u)[0])
   .replace(/\s+(?=(?:(?:california|in state|out of state) )?(?:residents?|nonresidents?)\b|(?:new |entering )?(?:undergraduates?|graduates?|transfers?)\b|off campus\b|on campus\b|residence halls?\b|apartments?\b|(?:estudiantes |alumnos )|residentes? de\b|fuera del campus\b|dentro del campus\b|20\d{2}\b).*/u,'').trim();
 }
-export function findingSubjectMentioned(subject,text){
+export function findingSubjectMentioned(subject,text,{exact=false}={}){
  const normalized=normalizeSubject(text),name=researchSubjectIdentity(subject);
  if(!name)return false;
  const parts=name.split(' ').filter(w=>!['university','universidad','college','of','de','the','california','uc','csu'].includes(w));
  if(!parts.length)return false;
  const acronym=name.split(' ').map(w=>['uc','csu'].includes(w)?w:w[0]).join('');
- const contains=phrase=>` ${normalized} `.includes(` ${phrase} `);
+ const contains=phrase=>exact?normalized===phrase:` ${normalized} `.includes(` ${phrase} `);
  return !!normalized&&(contains(name)||(parts.length&&contains(parts.join(' ')))||
-  (acronym.length>=3&&new RegExp(`\\b${acronym}\\b`,'u').test(normalized)));
+  (acronym.length>=3&&contains(acronym)));
 }
 export function focusedResearchFindings(findings,text,aspects=researchFocus(text)){
  const subjects=findings.filter(f=>findingSubjectMentioned(f.subject,text));

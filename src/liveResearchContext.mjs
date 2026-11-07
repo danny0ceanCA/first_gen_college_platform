@@ -77,6 +77,7 @@ export function researchContextPackets(job,resultId,{completedState=false,focus=
   return [
    ...researchUnitPackets(resultId,evidenceVersion,'state',state,'state'),
    ...findings.flatMap((finding,index)=>researchUnitPackets(resultId,evidenceVersion,'finding',{
+    ...(finding.findingId?{findingId:finding.findingId}:{}),
     subject:finding.subject,aspect:finding.aspect,status:finding.status,
     answer:finding.answer,qualification:finding.qualification,sourceIds:finding.sourceIds,
    },`finding-${index+1}`)),

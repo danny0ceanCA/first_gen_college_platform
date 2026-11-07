@@ -59,7 +59,7 @@ export const enumFields=Object.freeze({
  failureKind:Object.freeze(['none','output_limit','incomplete','refusal','provider_error','rate_limited','http_error','invalid_output','unknown']),
  evidenceFormat:Object.freeze(['brief-v1','full-report']),
  deliveryStage:Object.freeze(['supplied','context_acknowledged','context_failed','commentary_requested','native_reply_observed','native_portion_observed','enabled','deferred','commentary_acknowledged','delivery_unconfirmed','interrupted','superseded','reply_observed','evidence_overlap_observed','repeat_suppressed']),
- deliveryReason:Object.freeze(['context_timeout','context_error','commentary_error','speech_not_observed','opportunity_expired','caller_turn','new_result','new_request','scope_changed','call_ended','cancelled','answer_overlap','requested_portion_answered','different_requested_portion','optional_announcement_unneeded','recovery_context_only','repeated_version','unchanged_context','interrupted_tail']),
+ deliveryReason:Object.freeze(['context_timeout','context_error','commentary_error','speech_not_observed','opportunity_expired','caller_turn','new_result','new_request','scope_changed','call_ended','cancelled','answer_overlap','requested_portion_answered','different_requested_portion','optional_announcement_unneeded','recovery_context_only','repeated_version','unchanged_context','interrupted_tail','awaiting_requested_evidence','requested_evidence_not_supplied']),
  routingPolicy:Object.freeze(['backend-first','bounded-follow-up-v1','mixed','unavailable']),
  routingObservation:Object.freeze(['backend_observed','no_backend_observed','unavailable']),
  topic:Object.freeze(['options','transfer','costs','applications']),

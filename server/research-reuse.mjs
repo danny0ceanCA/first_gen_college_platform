@@ -44,7 +44,9 @@ const labels=(patterns,text)=>patterns.filter(([,re])=>re.test(fold(text))).map(
 function coverageScopeMatches(question,previous,findings,required){
  const current=context(question).sort().join(','),prior=context(previous).sort().join(',');
  if(current!==prior||specialized(question)||specialized(previous))return false;
- const evidence=findings.map(f=>f.answer+' '+f.qualification).join(' ');
+ // A comparison's broad question cannot override a narrower population or
+ // scenario written on an individual finding, including its subject label.
+ const evidence=findings.map(f=>f.subject+' '+f.answer+' '+f.qualification).join(' ');
  // Explicit population facts in the result must not silently become caller
  // assumptions when neither question established them.
  if(context(evidence).some(value=>!context(question).includes(value)))return false;
@@ -64,44 +66,55 @@ function coverageScopeMatches(question,previous,findings,required){
 // Never call this with browser-supplied result bodies or private student context.
 export function selectResearchReuse(input,records,{now=Date.now()}={}){
  if(input.forceRefresh===true)return {};
- const requested=campuses(input.institution),reusedEvidence=[],covered=new Set();let ref=0;
+ const requested=campuses(input.institution),reusedEvidence=[],covered=new Set();let ref=0,findingCount=0;
+ const fresh=value=>{const at=Date.parse(value);return Number.isFinite(at)&&now-at>=0&&now-at<300000;};
  for(const row of records.slice(0,8)){
-  if(reusedEvidence.length>=2)break;
-  const previous=row.input||{},result=row.result||{},at=Date.parse(row.finished_at||result.checkedAt);
-  if(row.status!=='completed'||previous.mode!==input.mode||!Number.isFinite(at)||now-at<0||now-at>=300000)continue;
-  const known=campuses(previous.institution);if(known.length!==1)continue;
-  // A comparison often names only the NEW campus in institution. Retain the
-  // explicitly named prior campus without adding it to the new lookup plan.
-  const primary=requested.some(name=>campus(name)===campus(known[0]));
-  if(!primary&&!(comparative(input.question)&&mentionsCampus(input.question,known[0])&&requested.some(name=>mentionsCampus(input.question,name))))continue;
-  if(reusedEvidence.some(entry=>campus(entry.institution)===campus(known[0])))continue;
+  if(reusedEvidence.length>=4||findingCount>=8)break;
+  const previous=row.input||{},result=row.result||{};
+  if(row.status!=='completed'||previous.mode!==input.mode||!fresh(row.finished_at||result.checkedAt))continue;
+  const known=campuses(previous.institution);
   const selected=researchBriefSelection(result),brief=result.voiceBrief;
   const oldYear=years(previous.question),nextYear=years(input.question);
   if(!nextYear||oldYear&&oldYear!==nextYear)continue;
-  const valid=(selected.findings||[]).filter(f=>{
-   const scope=f.subject+' '+f.answer+' '+f.qualification,year=years(scope);
-   // A generic earlier question may resolve to a specific published year.
-   // Infer that year only from this validated, cited finding, never its URL,
-   // timestamps, another finding, or the model's broad report.
-   return f.status==='verified'&&subjectCampus(f.subject)===campus(known[0])&&(!year||year===nextYear)&&
-    compatible(input.question,oldYear?previous.question:previous.question+' '+scope);
-  }).slice(0,4);
-  // Legacy partial briefs remain explicitly partial reference material. They do
-  // not earn coverage or remove a campus from the lookup plan.
-  const findings=valid.length?valid:!Array.isArray(brief?.findings)&&compatible(input.question,previous.question)&&brief&&['verified','partial'].includes(brief.status)&&typeof brief.answer==='string'&&typeof brief.qualification==='string'?
-   [{subject:known[0],aspect:'other',status:'partial',answer:brief.answer,qualification:brief.qualification}]:[];
-  if(!findings.length||findings.some(f=>f.answer.length>1400||f.qualification.length>1400))continue;
-  const ids=[...new Set(findings.flatMap(f=>[...`${f.answer} ${f.qualification}`.matchAll(/\[(\d+)\]/gu)].map(m=>Number(m[1]))))];
-  const sourceById=new Map((result.sources||[]).map((source,index)=>[source.id??index+1,source]));
-  if(!ids.length||ids.some(id=>!sourceById.has(id)||!official(sourceById.get(id).url)))continue;
-  const sourceMap=new Map(),sources=ids.map(id=>{const s=sourceById.get(id),token='R'+(++ref);sourceMap.set(id,token);return {ref:token,url:s.url,title:String(s.title||new URL(s.url).hostname).slice(0,200),checkedAt:s.checkedAt||result.checkedAt};});
-  const remap=text=>text.replace(/\[(\d+)\]/gu,(_,id)=>'['+sourceMap.get(Number(id))+']');
-  // Program/term-specific exceptions need the backend's scope check. They may
-  // reuse reference facts, but never short-circuit a newly qualified request.
-  const required=aspects(input.question),complete=valid.length>0&&required.length>0&&coverageScopeMatches(input.question,previous.question,valid,required)&&required.every(aspect=>valid.some(f=>f.aspect===aspect));
-  if(complete)covered.add(campus(known[0]));
-  reusedEvidence.push({institution:known[0],question:previous.question,checkedAt:result.checkedAt||row.finished_at,coverage:complete?'verified':'reference',
-   findings:findings.map(({subject,aspect,status,answer,qualification})=>({subject,aspect,status,answer:remap(answer),qualification:remap(qualification)})),sources});
+  // A completed comparison contains independently cited campus findings. Reuse
+  // those units, never attribute its broad answer or another campus's sources
+  // to every institution named in the request.
+  for(const institution of known){
+   if(reusedEvidence.length>=4||findingCount>=8)break;
+   // A comparison often names only the NEW campus in institution. Retain the
+   // explicitly named prior campus without adding it to the new lookup plan.
+   const primary=requested.some(name=>campus(name)===campus(institution));
+   if(!primary&&!(comparative(input.question)&&mentionsCampus(input.question,institution)&&requested.some(name=>mentionsCampus(input.question,name))))continue;
+   if(reusedEvidence.some(entry=>campus(entry.institution)===campus(institution)))continue;
+   const valid=(selected.findings||[]).filter(f=>{
+    const scope=f.subject+' '+f.answer+' '+f.qualification,year=years(scope);
+    // A generic earlier question may resolve to a specific published year.
+    // Infer that year only from this validated, cited finding, never its URL,
+    // timestamps, another finding, or the model's broad report.
+    return f.status==='verified'&&subjectCampus(f.subject)===campus(institution)&&(!year||year===nextYear)&&
+     compatible(input.question,oldYear?previous.question:previous.question+' '+scope);
+   }).slice(0,Math.min(4,8-findingCount));
+   // Legacy partial briefs remain explicitly partial reference material. They do
+   // not earn coverage or remove a campus from the lookup plan.
+   const findings=valid.length?valid:known.length===1&&!Array.isArray(brief?.findings)&&compatible(input.question,previous.question)&&brief&&['verified','partial'].includes(brief.status)&&typeof brief.answer==='string'&&typeof brief.qualification==='string'?
+    [{subject:institution,aspect:'other',status:'partial',answer:brief.answer,qualification:brief.qualification}]:[];
+   if(!findings.length||findings.some(f=>f.answer.length>1400||f.qualification.length>1400))continue;
+   const ids=[...new Set(findings.flatMap(f=>[...`${f.answer} ${f.qualification}`.matchAll(/\[(\d+)\]/gu)].map(m=>Number(m[1]))))];
+   const sourceById=new Map((result.sources||[]).map((source,index)=>[source.id??index+1,source]));
+   // Carry the original check time through comparisons. A new report must not
+   // make inherited evidence appear freshly checked.
+   if(!ids.length||ids.some(id=>!sourceById.has(id)||!official(sourceById.get(id).url)||!fresh(sourceById.get(id).checkedAt||result.checkedAt||row.finished_at)))continue;
+   const sourceMap=new Map(),sources=ids.map(id=>{const s=sourceById.get(id),token='R'+(++ref);sourceMap.set(id,token);return {ref:token,url:s.url,title:String(s.title||new URL(s.url).hostname).slice(0,200),checkedAt:s.checkedAt||result.checkedAt||row.finished_at};});
+   const remap=text=>text.replace(/\[(\d+)\]/gu,(_,id)=>'['+sourceMap.get(Number(id))+']');
+   // Program/term-specific exceptions need the backend's scope check. They may
+   // reuse reference facts, but never short-circuit a newly qualified request.
+   const required=aspects(input.question),complete=valid.length>0&&required.length>0&&coverageScopeMatches(input.question,previous.question,valid,required)&&required.every(aspect=>valid.some(f=>f.aspect===aspect));
+   if(complete)covered.add(campus(institution));
+   const checkedAt=new Date(Math.min(...sources.map(source=>Date.parse(source.checkedAt||row.finished_at)))).toISOString();
+   reusedEvidence.push({institution,question:previous.question,checkedAt,coverage:complete?'verified':'reference',
+    findings:findings.map(({subject,aspect,status,answer,qualification})=>({subject,aspect,status,answer:remap(answer),qualification:remap(qualification)})),sources});
+   findingCount+=findings.length;
+  }
  }
  if(!reusedEvidence.length)return {};
  return {reusedEvidence,lookupInstitutions:requested.filter(name=>!covered.has(campus(name)))};

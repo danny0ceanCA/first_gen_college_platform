@@ -150,10 +150,12 @@ test('detail follow-ups read the retained report without another external job an
   f.call([tool('read_research_details','details',{jobId:'job-1',revision:1})],'read');await until(()=>f.sent.some(e=>e.item?.call_id==='details'));
   const retained=JSON.parse(f.sent.find(e=>e.item?.call_id==='details').item.output);
   assert.equal(retained.text,full);assert.equal(posts,1);
+  assert.equal(retained.searchStarted,false);assert.equal(retained.reportState,'completed');
   assert.equal(retained.searchedQuestion,'Costs');assert.equal(retained.institution,'Example');assert.equal(retained.requestId,'lookup');assert.equal(retained.revision,1);
   assert.match(retained.instruction,/not researched, not a failed verification/);assert.match(retained.instruction,/reading it performs no new search/);
   f.call([tool('read_research_details','stale-revision',{jobId:'job-1',revision:2})],'read-stale');await until(()=>f.sent.some(e=>e.item?.call_id==='stale-revision'));
   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='stale-revision').item.output).status,'research_details_unavailable');
+  assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='stale-revision').item.output).searchStarted,false);
   await f.engine.configure({...config,tools},{sessionId:'physical-call',studentId:'other',confirmed:true},'scope');
   f.call([tool('read_research_details','wrong-scope',{jobId:'job-1',revision:1})],'read-other');await until(()=>f.sent.some(e=>e.item?.call_id==='wrong-scope'));
   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='wrong-scope').item.output).status,'research_details_unavailable');assert.equal(posts,1);
@@ -181,6 +183,7 @@ for(const language of ['en','es'])test(`${language}: managed research corrects a
    await until(()=>f.sent.some(e=>e.item?.call_id===`detail-${index}`));
    const report=JSON.parse(f.sent.find(e=>e.item?.call_id===`detail-${index}`).item.output);
    assert.equal(report.searchedQuestion,questions[index-1]);assert.equal(report.researchPending,false);assert.equal(report.revision,revision);
+    assert.equal(report.searchStarted,false);assert.equal(report.reportState,'completed');
   }
   assert.equal(posted.length,2);assert.deepEqual(deleted,[]);
   assert.ok(f.events.some(e=>e.type==='origen.research.state_changed'&&e.revision===2&&e.state==='completed'));
@@ -200,11 +203,36 @@ for(const language of ['en','es'])test(`${language}: server forwards first check
   await until(()=>f.sent.some(e=>e.item?.call_id==='initial-detail'));
   const details=JSON.parse(f.sent.find(e=>e.item?.call_id==='initial-detail').item.output);
   assert.equal(details.text,initial.text);assert.equal(details.researchPending,true);assert.equal(posts,1);
+  assert.equal(details.searchStarted,false);assert.equal(details.reportState,'running','reading the partial report does not restart its existing recovery');
   complete=true;
   await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.status==='completed'),1500);
   assert.equal(f.events.filter(e=>e.type==='origen.research.result').length,2);
   assert.equal(f.events.filter(e=>e.type==='origen.research.active').at(-1).active,false);
   assert.equal(posts,1);
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: a completed unverified report is a terminal answer, not a new or pending search`,async()=>{
+ const question=language==='en'?'What is the off-campus total at UC Irvine?':'¿Cuál es el costo total fuera del campus en UC Irvine?';
+ const text=language==='en'?'The requested UC Irvine off-campus total could not be verified from the checked official sources.':'No se pudo verificar el costo total solicitado fuera del campus en UC Irvine con las fuentes oficiales consultadas.';
+ let posts=0;
+ const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,{name:'read_research_details'}]},jobRequest:async method=>method==='POST'?(posts++,{id:'irvine',status:'queued'}):{status:'completed',result:{text,sources:[{url:'https://www.uci.edu/'}]}}});
+ try{
+  f.call([tool('lookup_financial_aid','irvine-search',{question,institution:'UC Irvine'})],'search');
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.status==='completed'));
+  const beforeRead=f.sent.length;
+  f.call([tool('read_research_details','irvine-detail',{jobId:'irvine',revision:1})],'read');
+  await until(()=>f.sent.some(e=>e.item?.call_id==='irvine-detail'));
+  const receipt=JSON.parse(f.sent.find(e=>e.item?.call_id==='irvine-detail').item.output);
+  assert.equal(receipt.status,'cached_research_details');assert.equal(receipt.searchStarted,false);
+  assert.equal(receipt.reportState,'completed');assert.equal(receipt.researchPending,false);
+  assert.equal(receipt.text,text);assert.equal(receipt.searchedQuestion,question);assert.equal(posts,1);
+  assert.match(receipt.instruction,/completed means the check ended, even when a requested fact remains unverified/);
+  assert.match(receipt.instruction,/Do not announce checking when reusing this report/);
+  assert.match(receipt.instruction,/source-supported material qualification/);
+  const followup=f.sent.slice(beforeRead);
+  assert.equal(followup.filter(e=>e.type==='response.item.create').length,1);
+  assert.equal(followup.filter(e=>e.type==='response.create').length,1,'one normal tool continuation');
+  assert.ok(!followup.some(e=>['session.commentary.append','session.instructions.append','response.cancel','output_audio_buffer.clear'].includes(e.type)),'local report read adds no spoken announcement or interruption');
  }finally{f.engine.close();}
 });
 test('provider session ACL blocks primary tool/control writes only when negotiated',()=>{

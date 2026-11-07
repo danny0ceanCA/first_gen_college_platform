@@ -107,3 +107,98 @@ test('per-call cache exposes only bounded public query records and clears on sco
  assert.equal(cache.records().length,1);assert.equal(cache.records()[0].input.studentId,undefined);assert.equal(cache.records()[0].input.secret,undefined);
  cache.clear();assert.deepEqual(cache.records(),[]);assert.equal(cache.get(row.input),undefined);
 });
+
+function comparisonFixture(institutions,language='en'){
+ const question=language==='es'?
+  `Compara matrícula y cuotas de pregrado y presupuesto total fuera del campus 2026–27 para residentes de California: ${institutions.join(' y ')}`:
+  `Compare 2026–27 undergraduate tuition and mandatory fees and off-campus total budget for California residents: ${institutions.join(' and ')}`;
+ const sources=institutions.map((institution,index)=>({url:`https://campus${index}.edu/costs`,title:institution+' official budget',checkedAt:new Date(now-1000).toISOString()}));
+ const findings=institutions.flatMap((institution,index)=>[
+  {subject:institution+' — entering undergraduates, 2026–27',aspect:'tuition_fees',status:'verified',answer:`${institution} tuition and fees are $18,000 for 2026–27. [${index+1}]`,qualification:`California-resident academic-year estimate; health insurance is separate. [${index+1}]`},
+  {subject:institution+' — entering undergraduates, 2026–27',aspect:'total_budget',status:'verified',answer:`${institution} off-campus total is $48,000 for 2026–27. [${index+1}]`,qualification:`California-resident academic-year estimate before aid. [${index+1}]`},
+ ]);
+ return {status:'completed',finished_at:new Date(now-500).toISOString(),input:{mode:'finance',institution:institutions.join('; '),question},result:{checkedAt:new Date(now-1000).toISOString(),sources,text:findings.map(f=>f.answer+' '+f.qualification).join(' '),voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}}};
+}
+
+for(const language of ['en','es'])test(`${language}: Berkeley to Davis to UCLA to Irvine reuses findings from prior comparisons`,()=>{
+ const berkeley=comparisonFixture(['UC Berkeley'],language);
+ const davis=comparisonFixture(['UC Davis','UC Berkeley'],language);
+ const ucla=comparisonFixture(['UCLA','UC Berkeley','UC Davis'],language);
+ const irvine=comparisonFixture(['UC Irvine','UCLA','UC Berkeley','UC Davis'],language);
+ for(const [next,history,expected] of [[davis,[berkeley],['UC Berkeley']],[ucla,[davis,berkeley],['UC Davis','UC Berkeley']],[irvine,[ucla,davis,berkeley],['UCLA','UC Berkeley','UC Davis']]]){
+  const reuse=selectResearchReuse(next.input,history,{now});
+  assert.deepEqual(reuse.lookupInstitutions,[next.input.institution.split('; ')[0]]);
+  assert.deepEqual(reuse.reusedEvidence.map(e=>e.institution).sort(),expected.sort());
+  assert.ok(reuse.reusedEvidence.every(e=>e.coverage==='verified'));
+  for(const entry of reuse.reusedEvidence){
+   assert.equal(entry.findings.length,2);
+   assert.equal(entry.sources.length,1);
+   assert.equal(entry.sources[0].title,entry.institution+' official budget');
+   assert.ok(entry.findings.every(f=>f.subject.startsWith(entry.institution+' —')));
+   assert.ok(entry.findings.every(f=>f.answer.includes(`[${entry.sources[0].ref}]`)));
+  }
+ }
+ // A later narrow follow-up can use the same comparison's Davis portion with
+ // no new search, without importing UCLA's or Berkeley's findings as Davis.
+ const followup=comparisonFixture(['UC Davis'],language).input;
+ const reuse=selectResearchReuse(followup,[ucla],{now}),cached=cachedResearchForCoverage(reuse);
+ assert.deepEqual(reuse.lookupInstitutions,[]);assert.ok(cached);
+ assert.equal(cached.sources.length,1);assert.ok(cached.voiceBrief.findings.every(f=>f.subject.startsWith('UC Davis —')));
+ assert.doesNotMatch(cached.text,/UCLA|Berkeley/);
+});
+
+test('comparison reuse rejects ambiguous subjects, wrong-year portions and legacy mixed-campus prose',()=>{
+ const previous=comparisonFixture(['UC Davis','UC Berkeley']),input=comparisonFixture(['UCLA','UC Davis','UC Berkeley']).input;
+ const ambiguous=structuredClone(previous);ambiguous.result.voiceBrief.findings.forEach(f=>{f.subject='UC Davis and UC Berkeley';});
+ assert.deepEqual(selectResearchReuse(input,[ambiguous],{now}),{});
+ const wrongYear=structuredClone(previous);wrongYear.result.voiceBrief.findings.filter(f=>f.subject.startsWith('UC Davis')).forEach(f=>{f.subject=f.subject.replace('2026–27','2025–26');f.answer=f.answer.replace('2026–27','2025–26');});
+ const reuse=selectResearchReuse(input,[wrongYear],{now});
+ assert.deepEqual(reuse.reusedEvidence.map(e=>e.institution),['UC Berkeley']);
+ assert.deepEqual(reuse.lookupInstitutions,['UCLA','UC Davis']);
+ const legacy=structuredClone(previous);delete legacy.result.voiceBrief.findings;
+ assert.deepEqual(selectResearchReuse(input,[legacy],{now}),{});
+});
+
+test('a newer comparison cannot refresh an inherited stale source or upgrade partial campus findings',()=>{
+ const previous=comparisonFixture(['UCLA','UC Berkeley']),input=comparisonFixture(['UC Irvine','UCLA','UC Berkeley']).input;
+ previous.result.sources[1].checkedAt=new Date(now-300000).toISOString();
+ previous.result.voiceBrief.findings.find(f=>f.subject.startsWith('UCLA')&&f.aspect==='tuition_fees').status='partial';
+ const reuse=selectResearchReuse(input,[previous],{now});
+ assert.deepEqual(reuse.reusedEvidence.map(e=>e.institution),['UCLA']);
+ assert.deepEqual(reuse.lookupInstitutions,['UC Irvine','UCLA','UC Berkeley']);
+ assert.equal(reuse.reusedEvidence[0].coverage,'reference');
+ assert.deepEqual(reuse.reusedEvidence[0].findings.map(f=>f.aspect),['total_budget']);
+ assert.equal(reuse.reusedEvidence[0].checkedAt,previous.result.sources[0].checkedAt);
+ const wrongSource=structuredClone(previous);wrongSource.result.sources[0].url='https://unofficial.example/costs';
+ assert.deepEqual(selectResearchReuse(input,[wrongSource],{now}),{});
+});
+
+test('comparison reuse stays within four campuses and eight source-linked findings',()=>{
+ const names=['UC Irvine','UCLA','UC Berkeley','UC Davis','UC Santa Cruz'];
+ const records=names.map(name=>comparisonFixture([name]));
+ const input=comparisonFixture(names).input;
+ const reuse=selectResearchReuse(input,records,{now});
+ assert.equal(reuse.reusedEvidence.length,4);
+ assert.equal(reuse.reusedEvidence.flatMap(e=>e.findings).length,8);
+ assert.deepEqual(reuse.lookupInstitutions,['UC Santa Cruz']);
+ assert.ok(reuse.reusedEvidence.every(e=>e.coverage==='verified'));
+});
+
+test('per-campus subject population and housing limitations cannot inherit broader comparison coverage',()=>{
+ for(const language of ['en','es']){
+  const previous=comparisonFixture(['UC Davis','UC Berkeley'],language);
+  const input={...previous.input,question:previous.input.question+(language==='es'?' para estudiantes de transferencia':' for transfer students')};
+  previous.input.question=input.question;
+  for(const subject of [
+   language==='es'?'UC Davis — estudiantes de primer año, 2026–27':'UC Davis — first-year undergraduates, 2026–27',
+   language==='es'?'UC Davis — estudiantes de transferencia, en el campus, 2026–27':'UC Davis — undergraduate transfers, on-campus, 2026–27',
+  ]){
+   const limited=structuredClone(previous);limited.result.voiceBrief.findings.filter(f=>f.subject.startsWith('UC Davis')).forEach(f=>{f.subject=subject;});
+   const reuse=selectResearchReuse(input,[limited],{now});
+   const davis=reuse.reusedEvidence.find(e=>e.institution==='UC Davis');
+   assert.equal(davis.coverage,'reference',subject);
+   assert.deepEqual(reuse.lookupInstitutions,['UC Davis'],subject);
+   assert.equal(cachedResearchForCoverage(reuse),null);
+  }
+ }
+});

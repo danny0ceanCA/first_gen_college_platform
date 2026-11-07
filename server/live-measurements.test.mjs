@@ -81,3 +81,14 @@ test('selection recovery measurements preserve fixed lifecycle categories and ti
  assert.equal(JSON.stringify(report).includes('PRIVATE'),false);
  measurements.close();
 });
+
+test('research deferrals distinguish a pending requested fact from evidence not supplied to Live',()=>{
+ const records=[],measurements=liveMeasurements({log:event=>records.push(diagnosticRecord(event))});
+ for(const reason of ['awaiting_requested_evidence','requested_evidence_not_supplied']){
+  measurements.application({type:'origen.research.delivery',jobId:'PRIVATE-ID',deliveryStage:'deferred',deliveryReason:reason,question:'PRIVATE-TEXT'});
+  assert.equal(records.at(-1).deliveryReason,reason);
+  assert.equal(records.at(-1).deliveryStage,'deferred');
+ }
+ assert.ok(!JSON.stringify(records).includes('PRIVATE'));
+ assert.equal(liveMeasurementReport(records).acceptedRecords,2);measurements.close();
+});
