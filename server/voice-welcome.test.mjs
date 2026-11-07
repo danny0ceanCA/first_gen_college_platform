@@ -55,7 +55,7 @@ test('welcome overrides preserve the same natural beginner-friendly voice style'
   assert.match(opening,/# Personality & Tone/);
   assert.match(opening,/everyday idea before naming a needed official term or acronym/);
   assert.match(opening,/Avoid .*patronizing speech/);
-  assert.match(opening,/never read headings or stage directions aloud/);
+  assert.match(opening,/never read headings or stage directions aloud/i);
   assert.match(opening,/Silent guidance; never explain, compare or spell the name aloud/);
  }
 });

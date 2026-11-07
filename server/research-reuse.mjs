@@ -1,4 +1,5 @@
 import {researchBriefSelection} from '../src/researchBrief.mjs';
+import {requestedResearchAspects} from '../src/researchQuestion.mjs';
 
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[–—]/gu,'-');
 const campus=value=>fold(value).replace(/university of california|universidad de california/gu,'uc').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -9,7 +10,17 @@ const mentionsCampus=(text,name)=>{
  return normalized.includes(' '+key+' ')||!!alias&&normalized.includes(' '+alias+' ');
 };
 const comparative=text=>/\b(?:compar\w*|versus|vs|side.by.side|contra|frente a)\b/u.test(fold(text));
-const years=value=>[...new Set([...fold(value).matchAll(/\b(20\d{2})(?:\s*-\s*(20\d{2}|\d{2}))?\b/gu)].map(m=>m[1]+(m[2]?'-'+m[2].slice(-2):'')))].sort().join(',');
+const years=value=>{
+ const text=fold(value),matches=[...text.matchAll(/\b(20\d{2})(?:\s*-\s*(20\d{2}|\d{2}))?\b/gu)];
+ const ranges=new Set(matches.filter(m=>m[2]).map(m=>m[1]+'-'+m[2].slice(-2)));
+ return [...new Set(matches.filter(m=>{
+  if(m[2]||![...ranges].some(range=>range.startsWith(m[1]+'-')))return true;
+  // A matching fall-entry cohort is scope for the academic year, not a
+  // second conflicting year. Other cohorts/years remain distinct.
+  const before=text.slice(Math.max(0,m.index-24),m.index),after=text.slice(m.index+m[0].length,m.index+m[0].length+16);
+  return !/(?:fall|otono|cohort(?:e)?(?: of| de)?)\s*$/u.test(before)&&!/^\s*cohort(?:e)?\b/u.test(after);
+ }).map(m=>m[1]+(m[2]?'-'+m[2].slice(-2):'')))].sort().join(',');
+};
 const contexts=[
  ['graduate',/\b(?:graduate|postgraduate|masters?|doctoral|phd|posgrado|maestria|doctorado)\b/u],
  ['undergraduate',/\b(?:undergraduate|undergraduates|pregrado|licenciatura)\b/u],
@@ -29,13 +40,6 @@ function compatible(current,previous){
   ![['resident','nonresident'],['undergraduate','graduate'],['transfer','first_year']].some(([a,b])=>next.includes(a)&&!next.includes(b)&&old.includes(b)&&!old.includes(a)||next.includes(b)&&!next.includes(a)&&old.includes(a)&&!old.includes(b));
 }
 const official=url=>{try{const u=new URL(url);return u.protocol==='https:'&&(u.hostname.endsWith('.edu')||['studentaid.gov','universityofcalifornia.edu','ucop.edu','calstate.edu','assist.org','commonapp.org','cccapply.org'].some(d=>u.hostname===d||u.hostname.endsWith('.'+d)));}catch{return false;}};
-const aspects=question=>{
- const text=fold(question),result=[];
- if(/tuition|mandatory fees|matricula|cuotas/u.test(text))result.push('tuition_fees');
- if(/total|cost.of.attendance|presupuesto|costo de asistencia/u.test(text))result.push('total_budget');
- if(/housing|alojamiento|vivienda/u.test(text))result.push('housing');
- return result;
-};
 const specialized=question=>/\b(?:major|program(?:me)?|degree|department|engineering|nursing|law|medical|medicine|mba|certificate|summer|part.time|per.credit|carrera|programa|departamento|ingenieria|enfermeria|derecho|medicina|certificado|verano|por credito)\b/u.test(fold(question));
 const housing=[['home',/\b(?:at home|with (?:parents|family)|en casa|con (?:padres|familia))\b/u],['off_campus',/\b(?:off.campus|fuera del campus)\b/u],['on_campus',/\b(?:on.campus|residence halls?|dorms?|en el campus|residencias universitarias)\b/u]];
 const periods=[['quarter',/\b(?:quarter(?:ly)?|trimestre|trimestral)\b/u],['semester',/\b(?:semester|semestre|semestral)\b/u],['month',/\b(?:monthly|per month|mensual|al mes)\b/u],['annual',/\b(?:annual|academic.year|per year|anual|ano academico|por ano)\b/u]];
@@ -53,8 +57,10 @@ function coverageScopeMatches(question,previous,findings,required){
  const nextPeriod=labels(periods,question),oldPeriod=labels(periods,previous+' '+evidence);
  // An academic-year question supplies the annual period; a semester/monthly
  // request cannot reuse it. Otherwise an omitted period stays a reference.
- const period=nextPeriod||(years(question)&&!oldPeriod.includes('quarter')&&!oldPeriod.includes('semester')&&!oldPeriod.includes('month')?'annual':'');
- if(oldPeriod&&oldPeriod!==period)return false;
+ const period=nextPeriod||(years(question)&&(oldPeriod.split(',').includes('annual')||!oldPeriod.includes('quarter')&&!oldPeriod.includes('semester')&&!oldPeriod.includes('month'))?'annual':'');
+ // A cited annual amount can include a semester/quarter breakdown. This does
+ // not authorize deriving an annual amount from term-only evidence.
+ if(oldPeriod&&oldPeriod!==period&&!(period==='annual'&&oldPeriod.split(',').includes('annual')&&findings.every(f=>labels(periods,f.answer+' '+f.qualification).split(',').includes('annual'))))return false;
  const nextCurrency=labels(currencies,question),oldCurrency=labels(currencies,previous+' '+evidence);
  if(labels(currencies,previous)!==nextCurrency)return false;
  if(nextCurrency&&nextCurrency!==oldCurrency)return false;
@@ -108,7 +114,7 @@ export function selectResearchReuse(input,records,{now=Date.now()}={}){
    const remap=text=>text.replace(/\[(\d+)\]/gu,(_,id)=>'['+sourceMap.get(Number(id))+']');
    // Program/term-specific exceptions need the backend's scope check. They may
    // reuse reference facts, but never short-circuit a newly qualified request.
-   const required=aspects(input.question),complete=valid.length>0&&required.length>0&&coverageScopeMatches(input.question,previous.question,valid,required)&&required.every(aspect=>valid.some(f=>f.aspect===aspect));
+   const required=requestedResearchAspects(input.question),complete=valid.length>0&&required.length>0&&coverageScopeMatches(input.question,previous.question,valid,required)&&required.every(aspect=>valid.some(f=>f.aspect===aspect));
    if(complete)covered.add(campus(institution));
    const checkedAt=new Date(Math.min(...sources.map(source=>Date.parse(source.checkedAt||row.finished_at)))).toISOString();
    reusedEvidence.push({institution,question:previous.question,checkedAt,coverage:complete?'verified':'reference',
@@ -153,6 +159,43 @@ export function cachedResearchForCoverage(reuse){
  if(!merged)return null;
  const value=JSON.parse(merged.text),checkedAt=reuse.reusedEvidence.map(e=>e.checkedAt).sort()[0];
  return {mode:'live',text:value.report,parts:[{text:value.report}],voiceBrief:value.voiceBrief,sources:merged.sources,checkedAt};
+}
+
+// Retained evidence is selected by the server for this account/session and
+// request scope. A failed repeat lookup is not new evidence disproving it.
+// Only exact covered claim types are restored; a cited conflicting/new result
+// or differently scoped reference must remain available for explicit review.
+export function retainVerifiedResearch(result,input){
+ const findings=researchBriefSelection(result).findings||[];
+ const sources=[...(result.sources||[])],retained=[];
+ const replacements=findings.map(finding=>{
+  // A cited new observation is evidence even when applicability is uncertain.
+  // Do not erase it merely because it lacks words such as "conflict".
+  if(finding.status!=='unverified'||finding.sourceIds?.length||/\b(?:conflict\w*|contradict\w*|discrepan\w*|supersed\w*|withdraw\w*|retirad\w*|reemplazad\w*|obsolet\w*)\b/iu.test(finding.answer+' '+finding.qualification))return finding;
+  if(!/\b(?:could not|cannot|unable to|failed to|couldn.t|did not|no se pudo|no pude|no fue posible)\b.{0,80}\b(?:verif\w*|confirm\w*|open\w*|read|load\w*|access\w*|abrir|leer|acced\w*)\b/u.test(fold(finding.answer+' '+finding.qualification)))return finding;
+  const entry=(input.reusedEvidence||[]).find(e=>e.coverage==='verified'&&subjectCampus(finding.subject)===campus(e.institution));
+  const previous=entry?.findings?.find(f=>f.status==='verified'&&f.aspect===finding.aspect&&subjectCampus(f.subject)===subjectCampus(finding.subject));
+  if(!previous)return finding;
+  const currentYear=years(finding.subject+' '+finding.answer+' '+finding.qualification);
+  if(currentYear&&currentYear!==years(input.question))return finding;
+  if(context(finding.subject+' '+finding.answer+' '+finding.qualification).some(value=>!context(input.question).includes(value)))return finding;
+  const references=new Map((entry.sources||[]).map(s=>[s.ref,s]));
+  const used=[...new Set([...`${previous.answer} ${previous.qualification}`.matchAll(/\[(R\d+)\]/gu)].map(m=>m[1]))];
+  if(!used.length||used.some(ref=>!official(references.get(ref)?.url)))return finding;
+  const ids=new Map();
+  for(const ref of used){
+   const source=references.get(ref);let at=sources.findIndex(s=>s.url===source.url&&s.checkedAt===source.checkedAt);
+   if(at<0){at=sources.length;const {ref:ignored,...publicSource}=source;sources.push(publicSource);}
+   ids.set(ref,at+1);
+  }
+  const remap=text=>text.replace(/\[(R\d+)\]/gu,(_,ref)=>`[${ids.get(ref)}]`);
+  const restored={...previous,answer:remap(previous.answer),qualification:remap(previous.qualification),sourceIds:[...ids.values()]};
+  retained.push(restored);return restored;
+ });
+ if(!retained.length)return result;
+ const lead=replacements.find(f=>f.status!=='unverified')||replacements[0];
+ const text=`Retained verified evidence (a failed recheck does not invalidate these findings):\n${retained.map(f=>f.answer+' '+f.qualification).join('\n')}\n\nLatest lookup report; any failed recheck above remains covered by the retained evidence:\n${result.text}`;
+ return {...result,text,parts:[{text}],sources,voiceBrief:{...result.voiceBrief,status:replacements.every(f=>f.status==='verified')?'verified':'partial',answer:lead.answer,qualification:lead.qualification,nextStep:'',findings:replacements},retainedFindingCount:retained.length};
 }
 
 // A new source check may fail while the only usable citations are retained R

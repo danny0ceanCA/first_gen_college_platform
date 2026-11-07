@@ -1,5 +1,6 @@
 import {responseMeasurement} from './live-measurements.mjs';
 import {researchBriefSelection} from '../src/researchBrief.mjs';
+import {requestedResearchAspects} from '../src/researchQuestion.mjs';
 
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const subjectKey=value=>{
@@ -11,9 +12,10 @@ const accessFailure=/failed to (?:open|load|retrieve)|(?:page|source).{0,30}(?:f
 
 // A partial answer is not itself a retry instruction. Only explicit unresolved
 // requested findings, or a legacy brief's source-access failure, qualify.
-export function researchRecoveryPlan(result){
+export function researchRecoveryPlan(result,{question}={}){
  const selected=researchBriefSelection(result),findings=selected.findings||[];
- const gaps=findings.filter(f=>f.status==='unverified');
+ const requested=requestedResearchAspects(question);
+ const gaps=findings.filter(f=>f.status==='unverified'&&(!requested.length||requested.includes(f.aspect)));
  if(gaps.length)return {reason:'unverified_portion',gaps:gaps.map(({subject,aspect,answer,qualification})=>({subject,aspect,answer,qualification}))};
  if(!findings.length&&result.voiceBrief?.status!=='verified'&&accessFailure.test(result.voiceBrief?.qualification||'')){
   return {reason:'source_access',gaps:[{subject:'',aspect:'other',answer:'',qualification:result.voiceBrief.qualification}]};

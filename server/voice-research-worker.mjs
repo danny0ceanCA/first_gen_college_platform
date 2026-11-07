@@ -5,7 +5,7 @@ import {admissionsResearchRequest,parseAdmissionsResearch} from './admissions-re
 import {runtimeLog} from './observability/logger.mjs';
 import {researchBriefRequest,parseResearchBrief} from './research-brief.mjs';
 import {researchRecoveryPlan,recoveryResearchRequest,researchAttemptDiagnostics,mergeRecoveryResearch,parseUnverifiedResearch} from './research-recovery.mjs';
-import {mergeReusedResearchSources,reuseResearchRequest,parseReusedOnlyResearch,cachedResearchForCoverage} from './research-reuse.mjs';
+import {mergeReusedResearchSources,reuseResearchRequest,parseReusedOnlyResearch,cachedResearchForCoverage,retainVerifiedResearch} from './research-reuse.mjs';
 import {researchBriefSelection} from '../src/researchBrief.mjs';
 export async function processResearchJob(database,env,{request=fetch,signal,now=Date.now}={}){
  // Atomic claim; a crashed job is failed, never retried automatically at extra cost.
@@ -35,7 +35,8 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
     httpStatus=response.status;if(!response.ok)throw new Error('research_failed');
     data=await response.json();latestData=data;usage.inputTokens+=data.usage?.input_tokens||0;usage.outputTokens+=data.usage?.output_tokens||0;
     const parsed=mergeReusedResearchSources((finance?parseFinanceResearch:parseAdmissionsResearch)(data,job.input.institution)||parseReusedOnlyResearch(data,job.input)||parseUnverifiedResearch(data),job.input);
-    const result=env.ORIGEN_RESEARCH_BRIEFS==='false'?parsed:parseResearchBrief(parsed);
+    const parsedBrief=env.ORIGEN_RESEARCH_BRIEFS==='false'?parsed:parseResearchBrief(parsed);
+    const result=parsedBrief?retainVerifiedResearch(parsedBrief,job.input):null;
     if(!result)throw new Error('sources_unverified');
     attempts.push(researchAttemptDiagnostics(data,{pass,outcome:'completed',durationMs:now()-passStarted,httpStatus}));
     passOutcome='completed';return result;
@@ -45,7 +46,7 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
   // A new wording can be entirely covered by a server-selected prior result.
   // Reuse it without forcing a web call merely because this job was queued.
   let result=cachedResearchForCoverage(job.input)||await run(body,'initial');
-  const plan=env.ORIGEN_RESEARCH_BRIEFS==='false'?null:researchRecoveryPlan(result);
+  const plan=env.ORIGEN_RESEARCH_BRIEFS==='false'?null:researchRecoveryPlan(result,job.input);
   let recoveryStatus='not_needed';
   // Leave a useful first result intact if time is almost exhausted. Recovery
   // failure is not failure of the verified evidence already obtained.
@@ -68,7 +69,7 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
     }
     const recovered=await run(recoveryResearchRequest(body,result,plan),'recovery');
     const merged=mergeRecoveryResearch(result,recovered,job.input.language);
-    if(merged!==result){result=merged;recoveryStatus=researchRecoveryPlan(result)?'partial':'recovered';}
+    if(merged!==result){result=merged;recoveryStatus=researchRecoveryPlan(result,job.input)?'partial':'recovered';}
    }catch{recoveryStatus=jobSignal.aborted?'aborted':'failed';}
   }else if(plan)recoveryStatus='deadline';
   // A cancelled/shutdown job must not publish even an earlier partial answer.

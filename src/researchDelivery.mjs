@@ -1,7 +1,8 @@
 import {researchContextPackets,selectedResearchContextFindings} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchAnswerOverlap,researchLimitationOverlap,researchPortionObserved,researchScopeCompatible} from './researchDiscussion.mjs';
-import {researchFocus,focusedResearchFindings,findingSubjectMentioned} from './researchFindings.mjs';
+import {focusedResearchFindings,findingSubjectMentioned} from './researchFindings.mjs';
+import {requestedResearchAspects} from './researchQuestion.mjs';
 export {researchAnswerOverlap} from './researchDiscussion.mjs';
 
 // A delivery opportunity is separate from a completed job. This controller never
@@ -28,13 +29,18 @@ function housingScenario(text){
 function requestsSubject(text,findings=[]){
  const value=evidenceText(text).replace(/^(?:(?:i see|okay|ok|thanks|entiendo|gracias|vale|ah|oh)\s+)*/u,'');
  const bare=value.replace(/^(?:please|por favor)\s+|\s+(?:please|por favor)$/gu,'');
- if(findings.some(f=>findingSubjectMentioned(f.subject,bare,{exact:true})))return true;
+ const continuation=bare.replace(/^(?:(?:and|y|then|entonces|instead|mejor|actually|ahora|but|pero)\s+)+/u,'');
+ const correction=/^\s*no\s*[,;:]\s*/iu.test(text)?evidenceText(String(text).replace(/^\s*no\s*[,;:]\s*/iu,'')):'';
+ if(findings.some(f=>[bare,continuation,correction].some(candidate=>findingSubjectMentioned(f.subject,candidate,{exact:true}))))return true;
  return /^(?:(?:but|and|so|actually|instead|then|please|pero|y|entonces|mejor|ahora|por favor)\s+)*(?:what|which|how|when|where|why|can (?:you|we)|could (?:you|we)|would you|tell me|show me|explain|compare|check|look up|i want|i would like|i d like|i mean|just|only|que|cual|cuales|como|cuando|donde|por que|puedes|podrias|podemos|dime|dinos|explica|explicame|muestra|muestrame|compara|revisa|busca|quiero|quisiera|me gustaria|me refiero|solo|solamente)\b/u.test(value);
 }
 function primaryQuestion(question){
- // Backend questions often append a comparison to an already specified task.
- // Preserve explicit comparison-first requests, which intentionally need both.
- return String(question||'').split(/[.;]\s*(?:compare\b|comparison\b|compara\b|comparar\b|comparacion\b)/iu)[0];
+ // A backend may prepend comparison context before the actual question. That
+ // context is not a caller request to announce every comparison's outcome.
+ // Explicit "Compare A and B" requests still keep both subjects.
+ return String(question||'')
+  .replace(/^(?:for comparison with|compared (?:with|to)|en comparaci[oó]n con|comparado con)\b[\s\S]*?[,;:]\s*(?=¿?(?:what|which|how|when|where|find|show|cu[aá]l|cu[aá]les|cu[aá]nto|qu[eé]|busca|muestra)\b)/iu,'')
+  .split(/[.;]\s*(?:compare\b|comparison\b|compara\b|comparar\b|comparaci[oó]n\b)/iu)[0];
 }
 const firstFinding=(job,remaining)=>[...remaining].sort((a,b)=>(job.researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified')))[0];
 function commentaryContent(job,remaining){
@@ -55,7 +61,7 @@ function commentaryContent(job,remaining){
 }
 
 export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=setTimeout,cancel=clearTimeout,id=()=>globalThis.crypto.randomUUID()}){
- const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',focus=[];const callerTurns=[];
+ const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',focus=[],acceptedCallerTurns=[];const callerTurns=[];
  const stage=(job,deliveryStage,deliveryReason)=>emit({type:'origen.research.delivery',jobId:job?.jobId,requestId:job?.requestId,revision:job?.revision,
   evidenceVersion:job?.evidenceVersion,researchPending:job?.researchPending,deliveryStage,deliveryReason,durationMs:job?now()-job.suppliedAt:0});
  const legacy=(job,type,extra={})=>emit({type,jobId:job.jobId,requestId:job.requestId,revision:job.revision,evidenceVersion:job.evidenceVersion,researchPending:job.researchPending,...extra});
@@ -70,9 +76,13 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
  const subjectQuestion=job=>{
   const explicit=[...callerTurns].reverse().find(text=>requestsSubject(text,job.selection.findings||[])&&(job.selection.findings||[]).some(f=>findingSubjectMentioned(f.subject,text)));
   if(explicit)job.subjectFocus=explicit;
+  // The research-state handoff arrives AFTER the utterance that requested it.
+  // Retain that utterance across the task reset; acknowledgments and unfinished
+  // reflections during research must not expand it into a multi-campus recap.
+  if(!job.subjectFocus)job.subjectFocus=[...(job.acceptedCallerTurns||[])].reverse().find(text=>requestsSubject(text,job.selection.findings||[])&&(job.selection.findings||[]).some(f=>findingSubjectMentioned(f.subject,text)));
   return job.subjectFocus||primaryQuestion(job.question)||latestQuestion;
  };
- const relevant=job=>focusedResearchFindings(job.selection.findings||[],subjectQuestion(job),focus.length?focus:researchFocus(job.question))
+ const relevant=job=>focusedResearchFindings(job.selection.findings||[],subjectQuestion(job),focus.length?focus:requestedResearchAspects(primaryQuestion(job.question)))
   .filter(f=>!job.incrementalFindings||job.incrementalFindings.has(f));
  function covered(job){
   const findings=relevant(job);
@@ -127,7 +137,8 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    const identity=JSON.stringify([key,event.requestId,event.revision,evidenceVersion]);
    if(records.has(identity))return;
    if(current)retire(current,'superseded','new_result');
-   const job={...event,key,evidenceVersion,researchPending:event.researchPending??event.result?.researchPending??false,referenceId:id(),selection:researchBriefSelection(event.result),discussed:new Set(),failed:event.result?.status==='research_failed',suppliedAt:now(),pending:0,acknowledged:false,terminal:false};
+   const job={...event,key,evidenceVersion,researchPending:event.researchPending??event.result?.researchPending??false,referenceId:id(),selection:researchBriefSelection(event.result),discussed:new Set(),failed:event.result?.status==='research_failed',suppliedAt:now(),pending:0,acknowledged:false,terminal:false,
+    acceptedCallerTurns:previous?.acceptedCallerTurns||[...acceptedCallerTurns],subjectFocus:previous?.subjectFocus};
    if(previous){
     for(const finding of job.selection.findings||[])if([...previous.discussed].some(old=>sameFinding(old,finding)))job.discussed.add(finding);
     // Scheduling is not delivery. Keep attempted/observed portions separate,
@@ -193,7 +204,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    defer(current,'caller_turn');wake();
   },
   callerStopped(text=''){
-   if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=researchFocus(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
+   if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=requestedResearchAspects(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
    if(waitingForReply){replyDeadline=now()+3000;wake();}
   },
   reply(text,{audible=false,forced=false,interrupted=false,completedText}={}){
@@ -242,8 +253,9 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    if(current)retire(current,'superseded',reason);
    // A new task may concern an entirely different aspect. Preserve focus only
    // within a request; tuition from a previous check must not hide course work.
-   focus=researchFocus(question);latestQuestion='';callerTurns.length=0;
+   acceptedCallerTurns=reason==='new_request'?[...callerTurns]:[];
+   focus=requestedResearchAspects(primaryQuestion(question));latestQuestion='';callerTurns.length=0;
   },
-  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';focus=[];callerTurns.length=0;},
+  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';focus=[];acceptedCallerTurns=[];callerTurns.length=0;},
  };
 }

@@ -6,6 +6,7 @@ import {voiceHandoff,deferredVoiceHandoff} from './voiceHandoff.mjs';
 import {capturePayload} from './voiceCapture.mjs';
 import {voiceTargetResult} from './voiceTargetResult.mjs';
 import {selectionRecoveryDelayMs,selectionRecoveryStartDeadlineMs} from './liveSelectionRecovery.mjs';
+import {decodedResearchContext} from './researchContext.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 function pendingSelection(f,language='en',liveContext){
@@ -836,6 +837,87 @@ test('results arriving during the caller turn are available to that reply withou
  clock.advance(5000);await pause(0);
  assert.ok(!f.sent.some(e=>e.type==='session.commentary.append'));f.channel.close();
 });
+// Exercise the transport ordering, not only the delivery controller: caller
+// transcript -> accepted task state -> quiet evidence -> native spoken answer
+// -> recovery. Playback versions here are fixture observations, not real audio.
+for(const language of ['en','es']){
+ const es=language==='es';
+ const question=es
+  ?'En comparación con UC Berkeley y UC Irvine, ¿cuál es la matrícula de UC Riverside para 2026–27? Separa la matrícula del costo total de asistencia.'
+  :'For comparison with UC Berkeley and UC Irvine, what is UC Riverside tuition for 2026–27? Separate tuition from total cost of attendance.';
+ const primary={subject:'UC Riverside',aspect:'tuition_fees',status:'verified',
+  answer:es?'La matrícula y las cuotas anuales de UC Riverside para 2026–27 son $16,790. [1]':'UC Riverside annual tuition and fees for 2026–27 are $16,790. [1]',
+  qualification:es?'Estimación publicada antes de ayuda; la vivienda es aparte. [1]':'Published estimate before aid; housing is separate. [1]'};
+ const comparator={subject:'UC Irvine',aspect:'tuition_fees',status:'unverified',
+  answer:es?'No pude verificar la matrícula de UC Irvine para 2026–27.':'I could not verify UC Irvine tuition for 2026–27.',
+  qualification:es?'Esta comprobación no confirmó una cifra; no significa que no esté publicada.':'This check did not confirm a figure; that does not mean it is unpublished.'};
+ const result={status:'source_check_completed',sources:[{url:'https://example.edu/tuition-fixture',title:'Historical test fixture'}],
+  voiceBrief:{status:'partial',answer:primary.answer,qualification:primary.qualification,nextStep:'',findings:[primary,comparator]}};
+ const task={requestId:'tuition-request',revision:1,jobId:'tuition-job',question,state:'running'};
+ const ready=(version,pending)=>({type:'origen.research.ready',jobId:task.jobId,requestId:task.requestId,revision:task.revision,question,evidenceVersion:version,researchPending:pending,result});
+ const evidence=f=>decodedResearchContext(f.sent.filter(e=>e.type==='session.thinking.append')
+  .map(e=>JSON.parse(e.content)).filter(packet=>packet.kind==='untrusted-research-evidence'));
+
+ test(`${language}: accepted caller focus survives the adapter handoff and answered recovery stays quiet`,async()=>{
+  const clock=fakeClock();let playback=0;
+  const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>playback});
+  try{
+   f.receive({type:'session.input_transcript.delta',delta:es?'¿Qué pasa con la matrícula de UCR?':'What about UCR tuition?'});await pause(0);
+   clock.advance(1100);await pause(0);
+   assert.ok(f.events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'));
+   f.channel.send(JSON.stringify({type:'origen.research.state',request:task}));await pause(0);
+   f.receive({type:'session.output_transcript.delta',delta:es?'Claro, podemos ver ese costo juntos.':'Of course, we can look at that cost together.'});await pause(0);playback++;
+   clock.advance(1800);await pause(0);
+   f.receive({type:'session.input_transcript.delta',delta:es?'Me imagino que será parecido a Irvine.':'I imagine it will be similar to Irvine.'});await pause(0);
+   clock.advance(1100);await pause(0);
+   f.receive({type:'session.output_transcript.delta',delta:es?'Podemos ponerlo en perspectiva. ':'We can put it in perspective. '});await pause(0);playback++;
+   f.channel.send(JSON.stringify(ready(1,true)));await pause(0);
+   assert.deepEqual(evidence(f).findings.map(finding=>[finding.subject,finding.aspect]),[['UC Riverside','tuition_fees']]);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0,'research arriving during a native answer must remain quiet');
+   f.receive({type:'session.output_transcript.delta',delta:primary.answer+' '+primary.qualification});await pause(0);playback++;
+   clock.advance(1800);await pause(0);clock.advance(1000);await pause(0);
+   assert.ok(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'||e.deliveryStage==='native_portion_observed'));
+   f.receive({type:'session.input_transcript.delta',delta:es?'Entiendo.':'I see.'});await pause(0);
+   clock.advance(1100);await pause(0);
+   f.receive({type:'session.output_transcript.delta',delta:es?'Sí, podemos seguir desde ahí.':'Yes, we can go from there.'});await pause(0);playback++;
+   clock.advance(1800);await pause(0);
+   f.channel.send(JSON.stringify({type:'origen.research.state',request:{...task,state:'completed'}}));
+   f.channel.send(JSON.stringify(ready(2,false)));await pause(0);
+   clock.advance(1000);await pause(0);clock.advance(10000);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0,'unchanged recovery must not announce the irrelevant comparator gap');
+   assert.ok(f.events.some(e=>e.deliveryReason==='recovery_context_only'));
+   assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));
+  }finally{f.channel.close();}
+ });
+
+ test(`${language}: an actual comparison remains a comparison after the adapter accepts a narrowed research question`,async()=>{
+  const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
+  try{
+   f.receive({type:'session.input_transcript.delta',delta:es?'Compara la matrícula de UC Riverside y UC Irvine.':'Compare UC Riverside and UC Irvine tuition.'});await pause(0);
+   clock.advance(1100);await pause(0);
+   f.channel.send(JSON.stringify({type:'origen.research.state',request:task}));await pause(0);
+   f.channel.send(JSON.stringify(ready(1,false)));await pause(0);
+   assert.deepEqual(new Set(evidence(f).findings.map(finding=>finding.subject)),new Set(['UC Riverside','UC Irvine']),'the accepted caller request must preserve both subjects despite a narrower generated question');
+  }finally{f.channel.close();}
+ });
+
+ for(const shortFollowup of [es?'¿Y UCI?':'And UC Irvine?','No, UC Irvine.'])test(`${language}: short follow-up "${shortFollowup}" after task acceptance replaces saved caller focus`,async()=>{
+  const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
+  try{
+   f.receive({type:'session.input_transcript.delta',delta:es?'¿Cuál es la matrícula de UC Riverside?':'What is UC Riverside tuition?'});await pause(0);
+   clock.advance(1100);await pause(0);
+   f.channel.send(JSON.stringify({type:'origen.research.state',request:task}));await pause(0);
+   f.receive({type:'session.output_transcript.delta',delta:es?'Claro, estoy contigo.':'Of course, I am with you.'});await pause(0);
+   clock.advance(1800);await pause(0);
+   f.receive({type:'session.input_transcript.delta',delta:shortFollowup});await pause(0);
+   clock.advance(1100);await pause(0);
+   f.channel.send(JSON.stringify(ready(1,false)));await pause(0);
+   assert.deepEqual(evidence(f).findings.map(finding=>finding.subject),['UC Irvine'],'the latest correction must win over the accepted Riverside question');
+   assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));
+  }finally{f.channel.close();}
+ });
+}
+
 function fixture(options={}){
  const {autoAcknowledge=true,...channelOptions}=options;
  const sent=[],events=[],consent=voiceProfileSaveConsent();

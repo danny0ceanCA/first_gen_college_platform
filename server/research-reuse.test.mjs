@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectResearchReuse,reuseResearchRequest,mergeReusedResearchSources,cachedResearchForCoverage,parseReusedOnlyResearch} from './research-reuse.mjs';
+import {selectResearchReuse,reuseResearchRequest,mergeReusedResearchSources,cachedResearchForCoverage,parseReusedOnlyResearch,retainVerifiedResearch} from './research-reuse.mjs';
 import {voiceResearchCache} from '../src/voiceResearchCache.mjs';
 const now=Date.parse('2026-11-05T17:00:00Z');
 const question='2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley';
@@ -8,6 +8,45 @@ const finding={subject:'UC Berkeley',aspect:'tuition_fees',status:'verified',ans
 const result={text:finding.answer+' '+finding.qualification,sources:[{url:'https://financialaid.berkeley.edu/costs',title:'Official costs',checkedAt:new Date(now-1000).toISOString()}],checkedAt:new Date(now-1000).toISOString(),voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
 const row={status:'completed',finished_at:new Date(now-1000).toISOString(),input:{mode:'finance',institution:'UC Berkeley',question},result};
 const query={mode:'finance',institution:'UC Berkeley and UC Santa Cruz',question:'Compare 2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley and UC Santa Cruz'};
+
+for(const language of ['en','es'])test(`${language}: same fall cohort and annual total with term breakdown remain reusable`,()=>{
+ const previous=structuredClone(row);
+ previous.input.question=language==='en'?'2026–27 undergraduate transfer tuition and mandatory fees for California residents at UC Berkeley':'Matrícula y cuotas 2026–27 de pregrado y transferencia para residentes de California en UC Berkeley';
+ const f=previous.result.voiceBrief.findings[0];
+ f.subject=language==='en'?'UC Berkeley — California-resident undergraduate transfer, fall 2026 cohort':'UC Berkeley — pregrado y transferencia, residentes de California, cohorte de otoño 2026';
+ f.answer=language==='en'?'UC Berkeley 2026–27 annual tuition is $18,214; the semester breakdown is $9,107 [1].':'La matrícula anual de UC Berkeley 2026–27 es $18,214; por semestre son $9,107 [1].';
+ const input={...previous.input,question:previous.input.question+(language==='en'?'. Separate tuition from total cost of attendance.':'. Separa la matrícula del costo total.')};
+ const reuse=selectResearchReuse(input,[previous],{now});
+ assert.equal(reuse.reusedEvidence[0].coverage,'verified');assert.deepEqual(reuse.lookupInstitutions,[]);
+ assert.match(cachedResearchForCoverage(reuse).voiceBrief.findings[0].answer,/18,214/);
+ const changed=structuredClone(previous);changed.result.voiceBrief.findings[0].subject=f.subject.replace('2026','2025');
+ assert.deepEqual(selectResearchReuse(input,[changed],{now}),{});
+ const terms=structuredClone(previous);terms.result.voiceBrief.findings[0].answer='UC Berkeley 2026–27 semester tuition is $9,107 [1].';terms.result.voiceBrief.findings[0].qualification='California-resident semester estimate before aid [1].';
+ assert.equal(selectResearchReuse(input,[terms],{now}).reusedEvidence[0].coverage,'reference');
+ assert.equal(selectResearchReuse({...input,question:input.question+' per semester'},[previous],{now}).reusedEvidence[0].coverage,'reference');
+});
+
+for(const language of ['en','es'])test(`${language}: a failed duplicate lookup keeps the canonical covered finding and its original check time`,()=>{
+ const input={...query,...selectResearchReuse(query,[row],{now})};
+ const failed={...structuredClone(result),voiceBrief:{status:'unverified',answer:'Could not confirm.',qualification:'Source unavailable.',nextStep:'',findings:[{subject:'UC Berkeley',aspect:'tuition_fees',status:'unverified',answer:language==='en'?'Could not verify 2026–27 tuition.':'No se pudo verificar la matrícula 2026–27.',qualification:language==='en'?'The page failed to open.':'No se pudo abrir la página.'}]}};
+ failed.sources=[];
+ const restored=retainVerifiedResearch(failed,input);
+ assert.equal(restored.voiceBrief.findings[0].status,'verified');assert.equal(restored.voiceBrief.findings[0].answer,finding.answer);
+ assert.equal(restored.voiceBrief.findings[0].qualification,finding.qualification);assert.equal(restored.sources[0].checkedAt,row.finished_at);
+ assert.equal(restored.retainedFindingCount,1);
+ for(const changed of [
+  {...input,reusedEvidence:input.reusedEvidence.map(e=>({...e,coverage:'reference'}))},
+  {...input,reusedEvidence:input.reusedEvidence.map(e=>({...e,findings:e.findings.map(f=>({...f,status:'partial'}))}))},
+ ])assert.equal(retainVerifiedResearch(failed,changed),failed);
+ for(const changes of [{aspect:'total_budget'},{answer:'2027–28 tuition could not be verified.'},{subject:'UC Berkeley — graduate tuition'},{qualification:'New official evidence contradicts the prior amount [1].'},{answer:'Amount applicability is uncertain.',qualification:'The population is unspecified.'}]){
+  const other=structuredClone(failed);Object.assign(other.voiceBrief.findings[0],changes);
+  assert.equal(retainVerifiedResearch(other,input),other);
+ }
+ const cited=structuredClone(failed);cited.sources=[{url:'https://registrar.berkeley.edu/current-fees',title:'New official table'}];
+ cited.voiceBrief.findings[0].answer=language==='en'?'2026–27 tuition is now listed as $19,000; exact applicability is not confirmed [1].':'La matrícula 2026–27 ahora aparece como $19,000; no se confirma su aplicabilidad [1].';
+ cited.voiceBrief.findings[0].qualification=language==='en'?'The new official page does not identify the population [1].':'La nueva página oficial no identifica la población [1].';
+ assert.equal(retainVerifiedResearch(cited,input),cited);
+});
 
 test('comparison reuses supported Berkeley findings and searches only the missing campus',()=>{
  const reuse=selectResearchReuse(query,[row],{now});

@@ -188,3 +188,64 @@ for(const language of ['en','es'])test(`${language}: scholarship deadline resear
  assert.equal(r.announcements().length,1);assert.match(r.announcements()[0].content,/North Scholars/);
  assert.doesNotMatch(r.announcements()[0].content,/January 15|15 de enero/);r.close();
 });
+
+for(const language of ['en','es']){
+ const es=language==='es';
+ const question=es
+  ?'En comparación con UC Berkeley y UC Irvine, ¿cuál es la matrícula y las cuotas anuales de UC Riverside para 2026–27? Separa la matrícula del costo de asistencia.'
+  :'For comparison with UC Berkeley and UC Irvine, what are UC Riverside tuition and mandatory fees for 2026–27? Separate tuition from total cost of attendance.';
+ const primary={subject:'UC Riverside',aspect:'tuition_fees',status:'verified',
+  answer:es?'La matrícula y las cuotas de UC Riverside para 2026–27 son $16,790. [1]':'UC Riverside tuition and fees for 2026–27 are $16,790. [1]',
+  qualification:es?'Para nuevos estudiantes residentes; no incluye seguro. [1]':'For new resident undergraduates; excludes insurance. [1]'};
+ const comparator={subject:'UC Irvine',aspect:'tuition_fees',status:'unverified',
+  answer:es?'No pude verificar la matrícula de UC Irvine.':'I could not verify UC Irvine tuition.',
+  qualification:es?'La nueva consulta no recuperó la tabla.':'The new check did not retrieve the table.'};
+ const research={status:'source_check_completed',sources:[{url:'https://example.edu/fees',title:'Official fixture'}],
+  voiceBrief:{status:'partial',answer:primary.answer,qualification:primary.qualification,nextStep:'',findings:[primary,comparator,
+   {...primary,aspect:'total_budget',status:'unverified',answer:es?'No se confirmó el presupuesto total.':'The total budget was not confirmed.',qualification:''}]}};
+
+ for(const useCaller of [true,false])test(`${language}: ${useCaller?'accepted caller request survives the handoff':'comparison preface leaves the primary question intact'}`,()=>{
+  const r=replay({...scripts[language],question},research);
+  if(useCaller){
+   r.caller(es?'¿Y UCR?':'What about UCR?');
+   // Production ordering: caller transcript, then application task acceptance.
+   r.delivery.supersede('new_request',question);
+  }
+  r.caller(es?'Me imagino que':'I would think that');
+  r.ready(1,true);r.ack();r.answer(es?'Podemos comparar esos costos juntos.':'We can compare those costs together.');r.advance(500);
+  assert.equal(r.announcements().length,1);
+  const context=r.context();
+  assert.equal(context.findings.length,1);
+  assert.equal(context.findings[0].subject,'UC Riverside');
+  assert.equal(context.findings[0].aspect,'tuition_fees');
+  r.close();
+ });
+
+ test(`${language}: answering the primary question leaves an unrelated failed recheck quiet after recovery`,()=>{
+  const r=replay({...scripts[language],question},research);
+  r.caller(es?'¿Y UCR?':'What about UCR?');r.delivery.supersede('new_request',question);
+  r.ready(1,true);r.ack();r.answer(primary.answer+' '+primary.qualification);r.advance(500);
+  r.caller(es?'Entiendo.':'I see.');r.answer(es?'Sí.':'Yes.');
+  r.ready(2,false);r.ack();r.advance(10000);
+  assert.equal(r.announcements().length,0,'an Irvine gap must not follow the Riverside answer');
+  assert.ok(r.events.some(e=>['requested_portion_answered','recovery_context_only'].includes(e.deliveryReason)));
+  r.close();
+ });
+
+ test(`${language}: an explicit comparison before task acceptance still requests both outcomes`,()=>{
+  const r=replay({...scripts[language],question},research);
+  r.caller(es?'Compara la matrícula de UC Riverside y UC Irvine.':'Compare UC Riverside and UC Irvine tuition.');
+  r.delivery.supersede('new_request',question);r.ready(1,false);r.ack();
+  assert.deepEqual(new Set(r.context().findings.map(f=>f.subject)),new Set(['UC Riverside','UC Irvine']));
+  r.close();
+ });
+
+ test(`${language}: a new explicit request after acceptance takes priority over the saved caller question`,()=>{
+  const r=replay({...scripts[language],question},research);
+  r.caller(es?'¿Y UCR?':'What about UCR?');r.delivery.supersede('new_request',question);
+  r.caller(es?'Mejor dime la matrícula de UC Irvine.':'Tell me the UC Irvine tuition instead.');
+  r.ready(1,false);r.ack();r.answer(scripts[language].reply);r.advance(500);
+  assert.equal(r.context().findings.length,1);assert.equal(r.context().findings[0].subject,'UC Irvine');
+  assert.equal(r.announcements().length,1);r.close();
+ });
+}

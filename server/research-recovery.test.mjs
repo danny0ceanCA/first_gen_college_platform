@@ -62,6 +62,19 @@ test('a verified result needs no additional request',async()=>{
  assert.equal(calls,1);assert.equal(saved(db).researchDiagnostics.recoveryStatus,'not_needed');
 });
 
+for(const language of ['en','es'])test(`${language}: a tuition-only contrast does not spend another call recovering an unsolicited budget`,async()=>{
+ const question=language==='en'?'Compare current 2026–27 undergraduate tuition at UC Berkeley and UC Santa Cruz. Separate tuition from total cost of attendance.':'Compara matrícula de pregrado 2026–27 de UC Berkeley y UC Santa Cruz. Separa la matrícula del costo total.';
+ const db=fixture(language,{question});let calls=0;
+ const response=output({language}),value=JSON.parse(response.output[1].content[0].text);
+ value.brief.findings[1]={...value.brief.findings[1],aspect:'total_budget'};
+ const text=JSON.stringify(value);response.output[1].content[0].text=text;
+ response.output[1].content[0].annotations=[...text.matchAll(/CITE/gu)].map(m=>({type:'url_citation',url:berkeley,title:'Official fees',start_index:m.index,end_index:m.index+4}));
+ await processResearchJob(db,{}, {request:async()=>{calls++;return new Response(JSON.stringify(response));}});
+ assert.equal(calls,1);assert.equal(saved(db).researchDiagnostics.recoveryStatus,'not_needed');
+ assert.equal(saved(db).voiceBrief.findings[1].status,'unverified');
+ assert.ok(researchRecoveryPlan(saved(db),{question:question+(language==='en'?' Also verify total budget.':' También verifica el presupuesto total.')}));
+});
+
 test('near the deadline the first useful result is returned without resetting the timeout',async()=>{
  const db=fixture();let clock=0,calls=0;
  await processResearchJob(db,{}, {now:()=>clock,request:async()=>{calls++;clock=76000;return new Response(JSON.stringify(output()));}});
@@ -127,6 +140,28 @@ test('a queued request fully covered by retained evidence makes no provider requ
  const db=fixture('en',{institution:'UC Berkeley',question:'2026–27 undergraduate tuition',reusedEvidence:[retained],lookupInstitutions:[]});
  await processResearchJob(db,{}, {request:()=>assert.fail('reused facts must not be researched again')});
  assert.equal(saved(db).sources[0].url,berkeley);assert.equal(saved(db).researchDiagnostics.attempts.length,0);
+});
+
+for(const language of ['en','es'])test(`${language}: worker keeps covered Irvine tuition when a new-campus check repeats a failed Irvine lookup`,async()=>{
+ const es=language==='es',checkedAt='2026-11-05T17:00:00.000Z';
+ const previous={institution:'UC Irvine',coverage:'verified',checkedAt,
+  findings:[{subject:'UC Irvine — California-resident undergraduate transfer, fall 2026 cohort',aspect:'tuition_fees',status:'verified',
+   answer:es?'UC Irvine: matrícula y cuotas anuales 2026–27 de $18,214 [R1].':'UC Irvine annual 2026–27 tuition and fees are $18,214 [R1].',
+   qualification:es?'El subtotal incluye eTech, que el total publicado parece omitir [R1].':'The subtotal includes required eTech that the displayed total appears to omit [R1].'}],
+  sources:[{ref:'R1',url:'https://reg.uci.edu/fees',title:'UCI official fees',checkedAt}]};
+ const question=es?'Compara matrícula y cuotas de pregrado para transferencia y residentes de California 2026–27 de UC Riverside y UC Irvine. Separa la matrícula del costo total.':'Compare 2026–27 undergraduate transfer tuition and mandatory fees for California residents at UC Riverside and UC Irvine. Separate tuition from total cost of attendance.';
+ const db=fixture(language,{institution:'UC Riverside and UC Irvine',question,reusedEvidence:[previous],lookupInstitutions:['UC Riverside']});
+ const findings=[{subject:'UC Riverside',aspect:'tuition_fees',status:'verified',answer:'UC Riverside 2026–27 annual tuition is $18,100 CITE.',qualification:'California-resident undergraduate transfer estimate before aid CITE.'},
+  {subject:'UC Irvine',aspect:'tuition_fees',status:'unverified',answer:es?'No se pudo verificar la matrícula de UC Irvine.':'UC Irvine tuition could not be verified.',qualification:es?'No se pudo abrir la página.':'The source page could not be opened.'}];
+ const text=JSON.stringify({brief:{status:'partial',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings},report:findings.map(f=>f.answer+' '+f.qualification).join(' ')});
+ const annotations=[...text.matchAll(/CITE/gu)].map(m=>({type:'url_citation',url:'https://registrar.ucr.edu/fees',title:'UCR official fees',start_index:m.index,end_index:m.index+4}));
+ const response={status:'completed',output:[{type:'web_search_call',status:'completed'},{type:'message',content:[{type:'output_text',text,annotations}]}]};
+ let calls=0;await processResearchJob(db,{}, {request:async()=>{calls++;return new Response(JSON.stringify(response));}});
+ assert.equal(calls,1);const final=saved(db);assert.ok(final);
+ assert.equal(final.researchDiagnostics.recoveryStatus,'not_needed');assert.equal(final.retainedFindingCount,1);
+ assert.equal(final.voiceBrief.findings[0].subject,'UC Riverside');assert.equal(final.voiceBrief.findings[1].status,'verified');
+ assert.match(final.voiceBrief.findings[1].answer,/18,214/);assert.match(final.voiceBrief.findings[1].qualification,/eTech/);
+ assert.equal(final.sources.find(s=>s.url==='https://reg.uci.edu/fees').checkedAt,checkedAt);
 });
 
 test('attempt diagnostics retain observed actions and official URLs without search queries or arbitrary errors',()=>{
