@@ -30,3 +30,27 @@ test('logging failure cannot break the call and reports do not echo unknown data
  const m=liveMeasurements({log:()=>{throw Error('sink unavailable');}});assert.doesNotThrow(()=>{m.start();m.close();});
  const report=liveMeasurementReport([{event:'voice.live.measurement',measurementStage:'PRIVATE',text:'PRIVATE'}]);assert.equal(report.acceptedRecords,0);assert.equal(JSON.stringify(report).includes('PRIVATE'),false);
 });
+
+test('speech observations keep playback evidence separate from completed text',()=>{
+ const records=[];
+ const measurements=liveMeasurements({log:event=>records.push(diagnosticRecord(event))});
+ measurements.application({type:'origen.research.speech_observed',speechOutcome:'substantive_interruption',
+  completedPortions:1,unfinishedPortion:true,playbackObserved:false,overlapCount:2,text:'PRIVATE'});
+ const observation=records[0];
+ assert.equal(observation.measurementStage,'speech_observation');
+ assert.equal(observation.speechOutcome,'substantive_interruption');
+ assert.equal(observation.completedPortions,1);
+ assert.equal(observation.playbackObserved,false);
+ assert.equal(observation.unfinishedPortion,true);
+ assert.equal(observation.overlapCount,2);
+ assert.ok(!JSON.stringify(records).includes('PRIVATE'));
+ measurements.application({type:'origen.research.delivery',jobId:'PRIVATE',deliveryStage:'repeat_suppressed',deliveryReason:'unchanged_context'});
+ assert.equal(records[1].deliveryReason,'unchanged_context');
+ const report=liveMeasurementReport(records);
+ assert.equal(report.acceptedRecords,2);
+ const speech=report.groups.find(group=>group.stage==='speech_observation');
+ assert.equal(speech.speechOutcomes.substantive_interruption,1);
+ assert.equal(speech.playbackObservations.activity_not_observed,1);
+ assert.equal(report.groups.find(group=>group.stage==='research_delivery').deliveryOutcomes.repeat_suppressed,1);
+ measurements.close();
+});

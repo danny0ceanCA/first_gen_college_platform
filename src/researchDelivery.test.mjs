@@ -1,3 +1,4 @@
+import {decodedResearchContext} from './researchContext.fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchDelivery,researchAnswerOverlap} from './researchDelivery.mjs';
@@ -51,7 +52,7 @@ for(const language of ['en','es']){
  test(`${language}: long briefs keep complete qualifications in quiet context and never exceed append bounds`,()=>{
   const f=fixture(),text=x.answer+'\n'+x.qualification.repeat(50);f.ready(language,{result:{text}});f.ack();f.advance(500);
   const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
-  const evidence=JSON.parse(packets.map(p=>p.text).join(''));
+  const evidence=decodedResearchContext(packets);
   assert.equal(evidence.text,text);assert.equal(evidence.taskState,'completed');assert.equal(evidence.researchPending,false);
   assert.ok(f.sent.every(e=>Buffer.byteLength(e.content)<=480));assert.match(f.announcements()[0].content,/Completed research/);f.delivery.clear();
  });
@@ -153,13 +154,13 @@ for(const language of ['en','es'])test(`${language}: initial findings are usable
  const result={sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'partial',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
  f.ready(language,{question:'UC Santa Cruz tuition',evidenceVersion:1,researchPending:true,result});f.ack();
  let packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
- let context=JSON.parse(packets.map(p=>p.text).join(''));assert.equal(context.researchPending,true);assert.equal(context.taskState,'running');
+ let context=decodedResearchContext(packets);assert.equal(context.researchPending,true);assert.equal(context.taskState,'running');
  f.delivery.reply(language==='en'?'UC Santa Cruz tuition is about seventeen thousand four hundred dollars annually.':'La matrícula de UC Santa Cruz es de unos diecisiete mil cuatrocientos dólares al año.',{audible:true});
  f.advance(1000);assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryStage==='native_portion_observed'));
  const count=f.sent.length;
  f.ready(language,{question:'UC Santa Cruz tuition',evidenceVersion:2,researchPending:false,result});f.ack();f.advance(10000);
  assert.equal(f.announcements().length,0);packets=f.sent.slice(count).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
- context=JSON.parse(packets.map(p=>p.text).join(''));assert.equal(context.researchPending,false);assert.equal(context.evidenceVersion,2);
+ context=decodedResearchContext(packets);assert.equal(context.researchPending,false);assert.equal(context.evidenceVersion,2);
  f.ready(language,{evidenceVersion:1,researchPending:true,result});assert.equal(f.sent.length,count+packets.length,'late initial revision cannot replace final facts');f.delivery.clear();
 });
 
@@ -257,4 +258,111 @@ test('the reviewed off-campus result fits inline with its entire population, yea
  f.ack();f.advance(500);const content=f.announcements()[0].content;
  assert.ok(content.includes(finding.subject));assert.ok(content.includes(finding.answer));assert.ok(content.includes(finding.qualification));
  assert.ok(Buffer.byteLength(content)<=480);assert.doesNotMatch(content,/Use only the relevant/,'the actual figure must not fall back to an opaque reference');f.delivery.clear();
+});
+
+for(const language of ['en','es']) {
+ const script=budgetScripts[language];
+ test(`${language}: a completed portion survives overlap without counting the unfinished tail`,()=>{
+  const f=fixture();
+  f.ready(language,{question:script.question,result:budgetResult(script)});f.ack();
+  f.delivery.caller();f.delivery.callerStopped(language==='en'?'Which is higher?':'¿Cuál es más alto?');
+  f.delivery.reply(script.answer+' '+script.qualification+' An unfinished tail',{
+   audible:true,interrupted:true,completedText:script.answer+' '+script.qualification,
+  });
+  f.advance(5000);
+  assert.equal(f.announcements().length,0);
+  assert.ok(f.events.some(e=>e.deliveryReason==='requested_portion_answered'));
+  f.delivery.clear();
+ });
+ test(`${language}: a cut-off fact remains quietly available across a final status update`,()=>{
+  const f=fixture();
+  f.ready(language,{question:script.question,evidenceVersion:1,researchPending:true,result:budgetResult(script)});f.ack();
+  f.delivery.caller();f.delivery.callerStopped(language==='en'?'Wait, explain that term.':'Espera, explícame ese término.');
+  f.delivery.reply(script.answer,{audible:true,interrupted:true,completedText:''});
+  f.advance(5000);
+  assert.equal(f.announcements().length,0);
+  assert.ok(f.events.some(e=>e.deliveryReason==='interrupted_tail'));
+  assert.ok(!f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'));
+  const before=f.sent.length;
+  f.ready(language,{question:script.question,evidenceVersion:2,researchPending:false,result:budgetResult(script)});f.ack();f.advance(5000);
+  const context=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+  assert.equal(context.taskState,'completed');
+  assert.equal(context.findings.length,0,'acknowledged facts are retained, not resent');
+  assert.equal(f.announcements().length,0);
+  f.delivery.clear();
+ });
+ test(`${language}: final context sends only changed qualifications and preserves version diagnostics`,()=>{
+  const f=fixture(),result=budgetResult(script);
+  f.ready(language,{question:script.question,evidenceVersion:1,researchPending:true,result});f.ack();
+  let before=f.sent.length;
+  f.ready(language,{question:script.question,evidenceVersion:2,researchPending:false,result});f.ack();
+  const status=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+  assert.equal(status.findings.length,0);
+  const changed=structuredClone(result);
+  changed.voiceBrief.findings[0].qualification+=' This year is provisional. [1]';
+  before=f.sent.length;
+  f.ready(language,{question:script.question,evidenceVersion:3,result:changed});
+  const update=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+  assert.equal(update.findings.length,1);
+  assert.match(update.findings[0].qualification,/provisional/);
+  f.ready(language,{question:script.question,evidenceVersion:2,result});
+  assert.ok(f.events.some(e=>e.deliveryReason==='repeated_version'));
+  f.delivery.clear();
+ });
+}
+
+test('unacknowledged earlier evidence is supplied again on final update',()=>{
+ const f=fixture(),script=budgetScripts.en,result=budgetResult(script);
+ f.ready('en',{question:script.question,evidenceVersion:1,researchPending:true,result});
+ const before=f.sent.length;
+ f.ready('en',{question:script.question,evidenceVersion:2,result});
+ const context=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ assert.equal(context.findings.length,1);
+ f.delivery.clear();
+});
+
+test('findings omitted by the three-unit limit are supplied when the caller selects them',()=>{
+ const f=fixture(),result=budgetResult(budgetScripts.en);
+ result.voiceBrief.findings=Array.from({length:5},(_,index)=>({subject:`Campus${index}`,aspect:'total_budget',status:'verified',answer:`Campus${index} annual budget is $${40000+index}. [1]`,qualification:'2026–27 undergraduate estimate before aid. [1]'}));
+ f.ready('en',{question:'Compare college budgets',evidenceVersion:1,researchPending:true,result});f.ack();
+ f.delivery.caller();f.delivery.callerStopped('What is the total budget for Campus4?');
+ const before=f.sent.length;
+ f.ready('en',{question:'Compare college budgets',evidenceVersion:2,result});
+ const context=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ assert.equal(context.findings.length,1);assert.equal(context.findings[0].subject,'Campus4');f.delivery.clear();
+});
+
+test('updated verification and source provenance reach quiet context without repeating speech',()=>{
+ const f=fixture(),result=budgetResult(budgetScripts.en);result.voiceBrief.findings[0].status='partial';
+ f.ready('en',{evidenceVersion:1,researchPending:true,result});f.ack();f.advance(500);
+ const final=structuredClone(result);final.voiceBrief.findings[0].status='verified';final.sources[0].url='https://example.edu/corrected-budget';
+ const before=f.sent.length;
+ f.ready('en',{evidenceVersion:2,result:final});f.ack();f.advance(500);
+ const context=decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ assert.equal(context.findings[0].status,'verified');assert.equal(context.sources[0].url,final.sources[0].url);
+ assert.equal(f.announcements().length,1);f.delivery.clear();
+});
+
+test('context references stay connected across changed selections and later reuse',()=>{
+ const f=fixture(),result=budgetResult(budgetScripts.en);
+ result.voiceBrief.findings.push({...result.voiceBrief.findings[0],subject:'UCLA',answer:'UCLA annual total is $47,800. [1]'});
+ const update=(version,question)=>{
+  f.delivery.caller();f.delivery.callerStopped(question);const before=f.sent.length;
+  f.ready('en',{question:'Compare Berkeley and UCLA',evidenceVersion:version,result});f.ack();
+  return decodedResearchContext(f.sent.slice(before).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ };
+ const first=update(1,'What is Berkeley’s total?');
+ const second=update(2,'What is UCLA’s total?');
+ const third=update(3,'What was Berkeley’s total?');
+ assert.equal(first.findings[0].subject,'UC Berkeley');assert.equal(second.findings[0].subject,'UCLA');
+ assert.ok(second.unchangedEvidenceFrom);assert.ok(third.unchangedEvidenceFrom);assert.equal(third.findings.length,0);
+ const states=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)).filter(e=>e.unit==='state');
+ assert.equal(second.unchangedEvidenceFrom,states[0].resultId);assert.equal(third.unchangedEvidenceFrom,states[1].resultId);f.delivery.clear();
+});
+
+test('a non-interrupted unfinished transcript clause cannot count as a completed finding',()=>{
+ const f=fixture(),script=budgetScripts.en;
+ f.ready('en',{question:script.question,result:budgetResult(script)});f.ack();
+ f.delivery.reply(script.answer,{audible:true,completedText:''});
+ assert.ok(!f.events.some(e=>['evidence_overlap_observed','native_portion_observed'].includes(e.deliveryStage)));f.delivery.clear();
 });

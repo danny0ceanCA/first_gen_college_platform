@@ -1,3 +1,4 @@
+import {decodedResearchContext} from './researchContext.fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchDelivery} from './researchDelivery.mjs';
@@ -92,7 +93,7 @@ for(const language of ['en','es']){
   assert.equal(r.announcements().length,1);assert.match(r.announcements()[0].content,/unverified part first/);
   assert.match(r.announcements()[0].content,/check has ended/);
   const parts=r.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
-  const context=JSON.parse(parts.map(p=>p.text).join(''));
+  const context=decodedResearchContext(parts);
   assert.equal(context.taskState,'completed');assert.equal(context.researchPending,false);
   assert.ok(context.findings.some(f=>f.subject==='UC Santa Cruz'&&f.status==='unverified'));
   assert.ok(context.findings.every(f=>f.subject==='UC Santa Cruz'),'latest campus focus excludes previously supplied Berkeley findings');

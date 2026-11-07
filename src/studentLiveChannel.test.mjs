@@ -274,7 +274,7 @@ for(const language of ['en','es'])for(const interrupted of [false,true])test(`${
   f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',requestId:'request',revision:1,question:'Tuition',result:{text:answer}}));await pause(0);
   clock.advance(200);await pause(0);
   assert.ok(!f.events.some(e=>e.type==='conversation.item.input_audio_transcription.completed'));
-  f.receive({type:'session.output_transcript.delta',delta:answer});await pause(0);playbackVersion++;
+  f.receive({type:'session.output_transcript.delta',delta:interrupted?answer.slice(0,-1):answer});await pause(0);playbackVersion++;
   if(interrupted){f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Wait, stop.':'Espera, para.'});await pause(0);}
   clock.advance(1800);await pause(0);
   assert.equal(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'),!interrupted);
@@ -283,6 +283,25 @@ for(const language of ['en','es'])for(const interrupted of [false,true])test(`${
    clock.advance(1100);await pause(0);clock.advance(6000);await pause(0);
    assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
   }
+  assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));
+ }finally{f.channel.close();}
+});
+
+for(const language of ['en','es'])test(`${language}: a short acknowledgment preserves completed research and forwards native overlap timing`,async()=>{
+ const clock=fakeClock();let playbackVersion=0;
+ const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>playbackVersion});
+ const answer=language==='en'?'The published annual tuition is 12345 dollars at Example University.':'La matrícula anual publicada es de 12345 dólares en la Universidad Ejemplo.';
+ try{
+  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',requestId:'request',revision:1,question:'Tuition',result:{text:answer}}));await pause(0);
+  f.receive({type:'session.output_transcript.delta',delta:answer,start_ms:100,end_ms:2000});await pause(0);playbackVersion++;
+  const native={type:'session.input_transcript.delta',event_id:'native-input',delta:language==='en'?'Yes, okay.':'Sí, entiendo.',start_ms:1800,end_ms:2200};
+  f.receive(native);await pause(0);clock.advance(1100);await pause(0);clock.advance(1000);await pause(0);
+  const observed=f.events.find(e=>e.type==='origen.research.speech_observed');
+  assert.equal(observed.speechOutcome,'acknowledgment_overlap');assert.equal(observed.completedPortions,1);
+  assert.equal(observed.playbackObserved,true);assert.equal(observed.overlapCount,1);assert.equal(observed.unfinishedPortion,false);
+  assert.deepEqual(f.events.find(e=>e.type==='session.input_transcript.delta'),native);
+  assert.ok(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'));
+  clock.advance(10000);await pause(0);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
   assert.ok(!f.sent.some(e=>['response.create','response.cancel','session.instructions.append'].includes(e.type)));
  }finally{f.channel.close();}
 });

@@ -35,7 +35,7 @@ test('current-call follow-ups are the default on production and development Live
 });
 for(const [name,change] of Object.entries({onboarding:{onboarding:true},profile:{mode:'profile'},collectAccount:{collectAccount:true},saveProfile:{saveOnboarding:true},unknownRole:{role:'unknown'},unselectedStudent:{studentId:undefined},pendingScope:{targetConfirmed:false},unconfirmedParent:{role:'parent',routeConversations:true,targetConfirmed:undefined}}))test(`backend policy retained during ${name}`,()=>assert.equal(studentLiveRouting(config(),{...input,...change}),baselineLiveRouting));
 
-for(const language of ['en','es'])test(`${language} research lets the same live voice support the caller without another delegation`,()=>{
+for(const language of ['en','es'])test(`${language} research keeps latest questions, concerns and verified comparisons conversational`,()=>{
  const i={...input,language},c=voiceSession(i,{OPENAI_MODEL_VOICE:'gpt-live-1'});
  for(const speech of [studentLiveSession(c,i).instructions]){
   assert.match(speech,/respond to their understandable comments.*promptly, without waiting for research/);
@@ -51,6 +51,15 @@ for(const language of ['en','es'])test(`${language} research lets the same live 
   assert.match(speech,/newest application task state replaces older pending receipts/);
   assert.match(speech,/A completed lookup with a missing answer is not an active task/);
   assert.match(speech,/A question about how research works can be answered directly/);
+  assert.match(speech,/Answer the latest question first using relevant verified findings/);
+  assert.match(speech,/simple comparison or calculation when their year and scenario support it/);
+  assert.match(speech,/direct answer before the qualifications that materially affect it/);
+  assert.match(speech,/A concern deserves a thoughtful response, not another promise to check/);
+  assert.match(speech,/A brief acknowledgment is not a request to repeat/);
+  assert.match(speech,/After a genuine interruption, answer the caller's latest question and keep unfinished information/);
+  assert.match(speech,/Independently verified findings remain usable/);
+  assert.match(speech,/transcript text alone does not prove playback/);
+  assert.doesNotMatch(speech,/timed-out answer is not completed evidence/);
  }
  assert.equal(studentLiveInstructions({...i,continuing:true},[],c.tools,boundedLiveRouting,{update:true}),'','ordinary updates rely on startup conversation policy');
  assert.match(c.instructions,/Keep the lookup question close to the caller's actual request/);

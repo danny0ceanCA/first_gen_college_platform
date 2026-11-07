@@ -53,6 +53,10 @@ export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,
    if(e.type==='origen.configuration.applied'){config=e.session||config;write('configuration',{durationMs:e.durationMs});}
    if(e.type==='session.updated'){config={...config,...e.session};configurationHash=fingerprint(config);write('configuration',{language:config.language,routingPolicy:config.routingPolicy});}
    if(e.type==='origen.live.context')write('context_selection',{contextAvailable:e.contextAvailable,contextIncluded:e.contextIncluded,contextBytes:e.contextBytes});
+   if(e.type==='origen.research.speech_observed')write('speech_observation',{
+    speechOutcome:e.speechOutcome,completedPortions:e.completedPortions,
+    unfinishedPortion:e.unfinishedPortion,playbackObserved:e.playbackObserved,overlapCount:e.overlapCount,
+   });
    const stages={...(!researchDeliveryV2?{'origen.research.announced':'commentary_requested','origen.research.native_reply_observed':'native_reply_observed'}:{}),'origen.research.supplied':'supplied','origen.research.context_acknowledged':'context_acknowledged','origen.research.context_failed':'context_failed'};
    if(e.type==='origen.research.delivery'||stages[e.type]){
     const key=e.requestId||e.jobId;

@@ -4,7 +4,8 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-export const liveChannelRevision='natural-conversation-research-follow-through-2026-11-05';
+import {researchSpeechObservation} from './researchSpeechObservation.mjs';
+export const liveChannelRevision='research-portions-qualified-updates-2026-11-06';
 export const liveBackendDeadlineMs=25000;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
@@ -21,7 +22,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  // timed speech prompts compete with its native delegation and listening.
  let researchState=null;
  let continuationRequested=false,emptyRecoveryEpoch=-1;
- let outputInterrupted=false;
+ const speechObservation=researchSpeechObservation();
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
  const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
@@ -134,7 +135,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   recentInput=repliedSinceInput?null:{transcript,lastInput};
   await emit({type:'input_audio_buffer.speech_stopped',item_id,liveBoundary:'transcript_quiet_estimate'});
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
-  if(researchDeliveryV2)deliveryTracker.callerStopped(transcript);
+  if(researchDeliveryV2){speechObservation.callerStopped();deliveryTracker.callerStopped(transcript);}
   // Live can acknowledge a profile answer without delegating it. Give natural
   // delegation a brief head start, then ask the same guarded backend to process
   // this complete answer. This never parses or saves a profile in the adapter.
@@ -148,14 +149,19 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  async function finishSpeech(force=false){
   if(outputTimer)cancel(outputTimer);outputTimer=null;if(closed||!outputId)return;
   if(!force&&!isPlaybackIdle()){outputTimer=schedule(()=>void finishSpeech(),250);return;}
-  const response_id=outputId,text=output,metadata=outputMetadata,interrupted=outputInterrupted;outputId='';output='';outputMetadata={};
+  const response_id=outputId,text=output,metadata=outputMetadata;outputId='';output='';outputMetadata={};
+  const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
+  const observation=researchDeliveryV2?speechObservation.finish({forced:force,playbackObserved:audible}):null;
   if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
   // Continuous Live has no output-audio-done event. This is a conservative idle
   // boundary for UI/drain scheduling, never a claim that a person heard speech.
-  const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
   await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
-  if(researchDeliveryV2)deliveryTracker.reply(text,{audible,forced:force,interrupted});
+  if(observation){
+   const {completedText,interrupted,...diagnostic}=observation;
+   await emit({type:'origen.research.speech_observed',response_id,...diagnostic});
+   deliveryTracker.reply(text,{audible,forced:force,interrupted,completedText});
+  }
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
@@ -180,8 +186,11 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(e.type==='session.input_transcript.delta'&&typeof e.delta==='string'){
    if(ending)return;
+   // Keep the provider interval intact for overlap diagnostics. Grouped input
+   // below remains an estimated turn and must not replace this timing evidence.
+   void emit(e);if(closed)return;
    selectionDelivery.caller(e.delta);
-   if(researchDeliveryV2){deliveryTracker.caller();if(outputId)outputInterrupted=true;}
+   if(researchDeliveryV2){deliveryTracker.caller();if(outputId)speechObservation.caller(e);}
    // Live already has the facts. Let it use them in this caller-led exchange
    // without an additional application-requested announcement afterward.
    if(researchReady){researchReady.quietOnly=true;cancel(researchTimer);researchTimer=null;}
@@ -213,12 +222,14 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(!outputId){
     // inputId may still be waiting for the transcript grouping timer after the
     // caller has finished. A fast answer is not evidence of an interruption.
-    // New caller fragments arriving during this output mark it interrupted.
-    outputInterrupted=false;outputId=id();
+    // New caller fragments are classified after their quiet boundary, rather
+    // than treating every "yes" as a cutoff of the whole research answer.
+    outputId=id();
     await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});
     await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});
    }
-   output+=e.delta;await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta,start_ms:e.start_ms,end_ms:e.end_ms});
+   output+=e.delta;if(researchDeliveryV2)speechObservation.output(e);
+   await emit({type:'response.output_audio_transcript.delta',response_id:outputId,delta:e.delta,start_ms:e.start_ms,end_ms:e.end_ms});
    if(closed)return;if(outputTimer)cancel(outputTimer);outputTimer=schedule(()=>void finishSpeech(),outputMetadata.topic==='origen_farewell'?3000:1800);return;
   }
   if(e.type==='session.updated'){

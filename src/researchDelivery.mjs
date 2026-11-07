@@ -1,4 +1,4 @@
-import {researchContextPackets} from './liveResearchContext.mjs';
+import {researchContextPackets,selectedResearchContextFindings} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchAnswerOverlap,researchLimitationOverlap,researchPortionObserved} from './researchDiscussion.mjs';
 import {researchFocus,focusedResearchFindings,findingSubjectMentioned} from './researchFindings.mjs';
@@ -11,6 +11,10 @@ export {researchAnswerOverlap} from './researchDiscussion.mjs';
 const words=text=>String(text||'').replace(/\[\d+\]/gu,'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
 const evidenceText=text=>words(text).join(' ');
 const sameFinding=(a,b)=>a.aspect===b.aspect&&(a.status==='unverified')===(b.status==='unverified')&&['subject','answer','qualification'].every(key=>evidenceText(a[key])===evidenceText(b[key]));
+// Speech dedup tolerates paraphrases and citation renumbering. Transport reuse
+// must also preserve exact status and provenance for later answers/citations.
+const sameContextFinding=(a,b)=>['subject','aspect','status','answer','qualification','sourceIds','contextSources']
+ .every(key=>JSON.stringify(a[key])===JSON.stringify(b[key]));
 // A housing choice can narrow an existing total-budget question. It does not
 // silently replace that question with a rent-only request. Explicit requests
 // for the housing component still select only that component.
@@ -22,7 +26,7 @@ function housingScenario(text){
 function commentaryContent(job,remaining){
  const state=job.failed?'The source check failed. No verified findings are available.':job.researchPending?'Initial sourced findings; recovery is running.':'Completed research; this check has ended. Do not say still checking.';
  const limitations=!job.researchPending&&remaining.some(f=>f.status==='unverified');
- const direction=(limitations?' Explain the unverified part first.':'')+' At a pause, share once warmly in the current language. Keep qualifications; yield to speech.';
+ const direction=(limitations?' Explain the unverified part first.':'')+' At a pause, answer the latest question briefly. Keep qualifications; yield to speech.';
  const first=[...remaining].sort((a,b)=>(job.researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified')))[0];
  // Prefer the complete focused finding, including its subject and qualification,
  // over an opaque report ID. Never cut off a caveat to meet the append limit.
@@ -91,7 +95,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    // Server-issued IDs are untrusted reference values, never prompt syntax.
    const key=event.jobId||event.requestId||id(),evidenceVersion=event.evidenceVersion||event.result?.evidenceVersion||1;
    const previous=[...records.values()].reverse().find(j=>j.key===key&&j.requestId===event.requestId&&j.revision===event.revision);
-   if(previous&&previous.evidenceVersion>=evidenceVersion)return;
+   if(previous&&previous.evidenceVersion>=evidenceVersion){stage(previous,'repeat_suppressed','repeated_version');return;}
    const identity=JSON.stringify([key,event.requestId,event.revision,evidenceVersion]);
    if(records.has(identity))return;
    if(current)retire(current,'superseded','new_result');
@@ -108,11 +112,27 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
      if(changed.length)job.incrementalFindings=new Set(changed);
      else job.quietOnly=true;
     }
+    if(previous.interruptedPortion&&!relevant(job).some(f=>!(previous.selection.findings||[]).some(old=>sameFinding(old,f)))){
+     job.interruptedPortion=true;job.quietOnly=true;
+    }
    }
    current=job;records.set(identity,job);waitingForReply=waitingForReply||awaitingReply;
    // Bounded per-call duplicate ledger; the server also limits research jobs.
    if(records.size>64)records.delete(records.keys().next().value);
-   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,priorityFindings:relevant(job)});
+   // Only acknowledged evidence can be reused. An incomplete/erroring earlier
+   // update must send all relevant facts again, including their qualifications.
+   const selected=selectedResearchContextFindings(relevant(job),job.researchPending).map(finding=>({...finding,
+    contextSources:job.selection.sources.filter((source,index)=>finding.sourceIds.includes(source.id??index+1)),
+   }));
+   const changed=previous?.acknowledged&&job.selection.findings?.length
+    ? selected.filter(f=>!(previous.contextFindings||[]).some(old=>sameContextFinding(old,f))) : selected;
+   job.contextFindings=previous?.acknowledged
+    ? [...(previous.contextFindings||[]).filter(old=>!selected.some(f=>f.subject===old.subject&&f.aspect===old.aspect)),...selected]
+    : selected;
+   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,
+    priorityFindings:job.selection.findings?.length?changed:undefined,
+    unchangedEvidenceFrom:previous?.acknowledged&&previous.contextFindings?.length?previous.referenceId:undefined});
+   if(changed.length<selected.length)stage(job,'repeat_suppressed','unchanged_context');
    for(const content of packets){const event_id=id();job.pending++;acks.set(event_id,{job,kind:'context'});send({type:'session.thinking.append',event_id,delegation_id:null,content});}
    legacy(job,'origen.research.supplied',{packetCount:packets.length,contextBytes:packets.reduce((n,p)=>n+new TextEncoder().encode(p).length,0),evidenceFormat:job.selection.evidenceFormat});
    if(job.quietOnly){job.nativePortion=previous.nativePortion;wake();return;}
@@ -139,26 +159,41 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=researchFocus(text);if(next.length)focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
    if(waitingForReply){replyDeadline=now()+3000;wake();}
   },
-  reply(text,{audible=false,forced=false,interrupted=false}={}){
+  reply(text,{audible=false,forced=false,interrupted=false,completedText}={}){
    // A transcript boundary alone is provisional, especially after barge-in.
-   if(forced||interrupted)return;
+   if(forced)return;
+   if(interrupted){
+    // Completed portions are selected by the speech observer. Never use the
+    // unfinished raw answer or infer precise playback from transcript timing.
+    if(!completedText){
+     if(current){current.interruptedPortion=true;retire(current,'deferred','interrupted_tail');}
+     return;
+    }
+   }
    const substantive=words(text).length>=5;
-   if(substantive)waitingForReply=false;
+   const completedEvidence=completedText??text;
+   if(substantive&&!interrupted)waitingForReply=false;
    const job=current;if(!job)return;
    stage(job,'reply_observed');
    const answer=job.selection.text.split('\n').find(line=>line.trim())||'';
    if(audible&&!job.failed){
     for(const finding of job.selection.findings||[]){
-     const overlap=finding.status==='unverified'?researchLimitationOverlap(finding,text,findingSubjectMentioned(finding.subject,text)):researchAnswerOverlap(finding.answer,text);
+     const overlap=finding.status==='unverified'?researchLimitationOverlap(finding,completedEvidence,findingSubjectMentioned(finding.subject,completedEvidence)):researchAnswerOverlap(finding.answer,completedEvidence);
      if(overlap)job.discussed.add(finding);
     }
-    if(covered(job)||(!job.selection.findings?.length&&researchAnswerOverlap(answer,text))){
+    if(covered(job)||(!job.selection.findings?.length&&researchAnswerOverlap(answer,completedEvidence))){
      job.nativePortion=true;
      retire(job,'evidence_overlap_observed',job.selection.findings?.length?'requested_portion_answered':'answer_overlap');return;
     }
-    if(relevant(job).some(f=>researchPortionObserved(f,text))){
+    if(!interrupted&&relevant(job).some(f=>researchPortionObserved(f,completedEvidence))){
      job.nativePortion=true;retire(job,'native_portion_observed','optional_announcement_unneeded');return;
     }
+   }
+   if(interrupted){
+    // Keep unfinished evidence in quiet context for the caller's follow-up.
+    // An interruption does not authorize an unsolicited replay of its tail.
+    job.interruptedPortion=true;
+    retire(job,'deferred','interrupted_tail');return;
    }
    // Unrelated speech or a backchannel is not research delivery. A single
    // optional contribution may still follow a substantive, completed reply.

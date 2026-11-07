@@ -16,6 +16,7 @@ export function capturePayload(event,direction='provider'){
  if(type==='origen.control.tool_result')return {...base,callId:event.callId,output:event.output,durationMs:event.durationMs};
  if(type==='origen.research.state_changed')return {...base,requestId:event.requestId,revision:event.revision,jobId:event.jobId,state:event.state};
  if(type==='origen.research.delivery')return {...base,requestId:event.requestId,revision:event.revision,jobId:event.jobId,evidenceVersion:event.evidenceVersion,researchPending:event.researchPending,deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs};
+ if(type==='origen.research.speech_observed')return {...base,speechOutcome:event.speechOutcome,completedPortions:event.completedPortions,unfinishedPortion:event.unfinishedPortion,playbackObserved:event.playbackObserved,overlapCount:event.overlapCount};
  if(['origen.research.supplied','origen.research.context_acknowledged','origen.research.context_failed','origen.research.announced','origen.research.native_reply_observed'].includes(type))return {...base,requestId:event.requestId,revision:event.revision,jobId:event.jobId,evidenceVersion:event.evidenceVersion,researchPending:event.researchPending,durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat};
  if(type==='origen.research.turn_preserved')return base;
  if(type==='origen.backend.empty')return base;

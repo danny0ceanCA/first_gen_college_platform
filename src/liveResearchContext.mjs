@@ -30,20 +30,60 @@ export function liveContextPackets(kind,resultId,value){
  return parts.map((text,index)=>JSON.stringify({kind,resultId,part:index+1,total:parts.length,text}));
 }
 
-export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings}={}){
+// A finding is useful only with its scope and qualifications. Most fit in one
+// quiet append; do not split them merely because the preceding state took space.
+// Oversized units remain explicitly grouped reference data, never standalone
+// partial claims. The delivery controller waits for all context acknowledgments
+// before requesting speech. UTF-8 bytes bound tokens without an extra API call.
+function researchUnitPackets(resultId,evidenceVersion,unit,value,group){
+ const encoder=new TextEncoder(),limit=480,kind='untrusted-research-evidence';
+ const complete=JSON.stringify({kind,resultId,evidenceVersion,unit,...value});
+ if(encoder.encode(complete).length<=limit)return [complete];
+ const envelope={kind,resultId,evidenceVersion,unit,group:`${evidenceVersion}-${group}`,use:'only-after-all-parts'};
+ const packet=text=>JSON.stringify({...envelope,part:9999,total:9999,text});
+ const parts=[];let text='';
+ for(const word of JSON.stringify(value).match(/\S+\s*|\s+/gu)||[]){
+  if(encoder.encode(packet(text+word)).length<=limit){text+=word;continue;}
+  if(text){parts.push(text);text='';}
+  for(const character of word){
+   if(encoder.encode(packet(text+character)).length>limit){parts.push(text);text='';}
+   text+=character;
+  }
+ }
+ if(text)parts.push(text);
+ return parts.map((text,index)=>JSON.stringify({...envelope,part:index+1,total:parts.length,text}));
+}
+
+export function selectedResearchContextFindings(findings,researchPending){
+ return [...findings].sort((a,b)=>(researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified'))).slice(0,3);
+}
+
+export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings,unchangedEvidenceFrom}={}){
  const original=job.result||{},result=researchBriefSelection(original);
  const researchPending=job.researchPending??original.researchPending??false;
  const taskState=original.status==='research_failed'?'failed':researchPending?'running':'completed';
- if(result.findings?.length){
+ const evidenceVersion=job.evidenceVersion||original.evidenceVersion||1;
+ if(result.findings?.length||Array.isArray(priorityFindings)){
   // Supply only complete, relevant answer units; don't inject both the brief
   // and all of its repeated claims. The complete report stays in the backend.
-  const candidates=priorityFindings?.length?priorityFindings:result.findings;
-  const findings=[...candidates].sort((a,b)=>(researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified'))).slice(0,3);
+  // An explicit empty selection is intentional (e.g. unchanged findings).
+  const candidates=Array.isArray(priorityFindings)?priorityFindings:result.findings;
+  const findings=selectedResearchContextFindings(candidates,researchPending);
   const ids=new Set(findings.flatMap(f=>f.sourceIds));
-  return liveContextPackets('untrusted-research-evidence',resultId,{checkedAt:result.checkedAt,status:original.status,
-   taskState,researchPending,evidenceVersion:job.evidenceVersion||original.evidenceVersion||1,...(original.recoveryUnavailable?{recoveryUnavailable:true}:{}),
-   focus,findings,remainingFindings:result.findings.length-findings.length,
-   sources:result.sources.filter((s,index)=>ids.has(s.id??index+1)),verification:result.verification,detailAvailable:true,evidenceFormat:'brief-v1'});
+  const state={checkedAt:result.checkedAt,status:original.status,
+   taskState,researchPending,evidenceVersion,...(original.recoveryUnavailable?{recoveryUnavailable:true}:{}),
+   focus,...(unchangedEvidenceFrom?{unchangedEvidenceFrom}:{}),remainingFindings:Math.max(0,(result.findings?.length||0)-findings.length),
+   verification:result.verification,detailAvailable:true,evidenceFormat:result.evidenceFormat};
+  return [
+   ...researchUnitPackets(resultId,evidenceVersion,'state',state,'state'),
+   ...findings.flatMap((finding,index)=>researchUnitPackets(resultId,evidenceVersion,'finding',{
+    subject:finding.subject,aspect:finding.aspect,status:finding.status,
+    answer:finding.answer,qualification:finding.qualification,sourceIds:finding.sourceIds,
+   },`finding-${index+1}`)),
+   ...result.sources.flatMap((source,index)=>ids.has(source.id??index+1)?researchUnitPackets(resultId,evidenceVersion,'source',{
+    id:source.id??index+1,title:source.title,url:source.url,
+   },`source-${source.id??index+1}`):[]),
+  ];
  }
  return liveContextPackets('untrusted-research-evidence',resultId,{question:job.question,checkedAt:result.checkedAt,
   status:original.status,...(completedState||researchPending?{taskState,researchPending}:{}),
