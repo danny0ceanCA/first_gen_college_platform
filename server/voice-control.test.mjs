@@ -148,12 +148,43 @@ test('detail follow-ups read the retained report without another external job an
  const f=fixture({config:{tools},jobRequest:async method=>method==='POST'?(posts++,{id:'job-1',status:'queued'}):{status:'completed',result:{text:full,sources:[{url:'https://example.edu/policy'}]}}});
  try{f.call([tool('lookup_financial_aid','lookup',{question:'Costs',institution:'Example'})]);await until(()=>f.events.some(e=>e.type==='origen.research.result'));
   f.call([tool('read_research_details','details',{jobId:'job-1',revision:1})],'read');await until(()=>f.sent.some(e=>e.item?.call_id==='details'));
-  assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='details').item.output).text,full);assert.equal(posts,1);
+  const retained=JSON.parse(f.sent.find(e=>e.item?.call_id==='details').item.output);
+  assert.equal(retained.text,full);assert.equal(posts,1);
+  assert.equal(retained.searchedQuestion,'Costs');assert.equal(retained.institution,'Example');assert.equal(retained.requestId,'lookup');assert.equal(retained.revision,1);
+  assert.match(retained.instruction,/not researched, not a failed verification/);assert.match(retained.instruction,/reading it performs no new search/);
   f.call([tool('read_research_details','stale-revision',{jobId:'job-1',revision:2})],'read-stale');await until(()=>f.sent.some(e=>e.item?.call_id==='stale-revision'));
   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='stale-revision').item.output).status,'research_details_unavailable');
   await f.engine.configure({...config,tools},{sessionId:'physical-call',studentId:'other',confirmed:true},'scope');
   f.call([tool('read_research_details','wrong-scope',{jobId:'job-1',revision:1})],'read-other');await until(()=>f.sent.some(e=>e.item?.call_id==='wrong-scope'));
   assert.equal(JSON.parse(f.sent.find(e=>e.item?.call_id==='wrong-scope').item.output).status,'research_details_unavailable');assert.equal(posts,1);
+ }finally{f.engine.close();}
+});
+
+for(const language of ['en','es'])test(`${language}: managed research corrects a finished scenario and preserves the searched scope of each report`,async()=>{
+ const posted=[],deleted=[];const questions=language==='en'?['Berkeley residence-hall budget for 2026–27','Berkeley off-campus budget for 2026–27']:['Presupuesto de Berkeley en residencia universitaria para 2026–27','Presupuesto de Berkeley fuera del campus para 2026–27'];
+ const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,{name:'read_research_details'}]},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posted.push(body);return {id:`job-${posted.length}`,status:'queued'};}
+  if(method==='DELETE'){deleted.push(id);return {status:'cancelled'};}
+  return {status:'completed',result:{text:`Sourced answer for ${id} [1].`,sources:[{url:'https://example.edu/costs'}]}};
+ }});
+ try{
+  f.call([tool('lookup_financial_aid','initial',{question:questions[0],institution:'UC Berkeley'})],'initial-response');
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.status==='completed'),1500);
+  f.call([tool('lookup_financial_aid','correction',{question:questions[1],institution:'UC Berkeley',replaceRequestId:'initial',replaceRevision:1,
+   replacementChange:{kind:'correct_scope',uncoveredNeed:language==='en'?'Off-campus housing replaces the residence-hall assumption.':'Vivienda fuera del campus sustituye la residencia universitaria.'}})],'correction-response');
+  await until(()=>f.sent.some(e=>e.item?.call_id==='correction'));
+  const corrected=JSON.parse(f.sent.find(e=>e.item?.call_id==='correction').item.output);
+  assert.equal(corrected.status,'research_pending');assert.equal(corrected.revision,2);assert.equal(corrected.requestId,'initial');
+  await until(()=>f.events.filter(e=>e.type==='origen.research.result'&&e.status==='completed').length===2,1500);
+  for(const [index,revision]of [[1,1],[2,2]]){
+   f.call([tool('read_research_details',`detail-${index}`,{jobId:`job-${index}`,revision})],`detail-response-${index}`);
+   await until(()=>f.sent.some(e=>e.item?.call_id===`detail-${index}`));
+   const report=JSON.parse(f.sent.find(e=>e.item?.call_id===`detail-${index}`).item.output);
+   assert.equal(report.searchedQuestion,questions[index-1]);assert.equal(report.researchPending,false);assert.equal(report.revision,revision);
+  }
+  assert.equal(posted.length,2);assert.deepEqual(deleted,[]);
+  assert.ok(f.events.some(e=>e.type==='origen.research.state_changed'&&e.revision===2&&e.state==='completed'));
+  assert.equal(f.sent.some(e=>e.type==='session.instructions.append'),false,'research cannot interrupt speech with steering');
  }finally{f.engine.close();}
 });
 

@@ -6,7 +6,7 @@ export function researchStateContext(request={}){
  const state=request.state||'unknown';
  const researchPending=!!request.jobId&&['queued','running'].includes(state);
  const meaning=researchPending?'An accepted source check is pending.':
-  state==='completed'?'This check has ended. No lookup is running. Missing facts remain unverified, not unpublished.':
+  state==='completed'?'Check ended. No lookup is running. Unaddressed scope: not researched. Searched but unconfirmed: unverified, not unpublished.':
   state==='failed'?'This check has failed. No lookup is running. Retain any verified findings.':
   state==='cancelled'?'Local delivery stopped. Worker cancellation requires its receipt.':
   'No accepted running lookup is confirmed.';

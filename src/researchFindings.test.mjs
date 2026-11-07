@@ -28,3 +28,15 @@ test('English/Spanish focus selects a campus and requested aspect without changi
  assert.deepEqual(researchFocus('Just tuition and fees, not a new search.'),['tuition_fees']);
  assert.deepEqual(focusedResearchFindings(findings,'What is the deadline?'),[]);
 });
+
+for(const subject of ['UC Berkeley California-resident undergraduate, off-campus apartment','UC Berkeley — 2026–27 entering transfers','UC Berkeley estudiantes de pregrado fuera del campus','University of California, Berkeley (undergraduate costs)'])test(`rich subject keeps campus identity: ${subject}`,()=>{
+ for(const text of ['Berkeley’s off-campus budget is…','El presupuesto de Berkeley fuera del campus es…'])assert.equal(findingSubjectMentioned(subject,text),true);
+ for(const text of ['UC Santa Cruz budget','University of California, Davis','Berkeleyville budget'])assert.equal(findingSubjectMentioned(subject,text),false);
+});
+test('campus name components are not mistaken for scenario suffixes',()=>{
+ assert.equal(findingSubjectMentioned('University of California, Santa Cruz California-resident undergraduate','UCSC tuition'),true);
+ assert.equal(findingSubjectMentioned('North Campus undergraduate','North Campus costs'),true);
+ assert.equal(findingSubjectMentioned('North Campus undergraduate','South Campus costs'),false);
+ assert.equal(findingSubjectMentioned('California State University, Long Beach undergraduate','Long Beach tuition'),true);
+ assert.equal(findingSubjectMentioned('UC undergraduate','UC Berkeley tuition'),false,'a generic system label cannot identify a campus');
+});

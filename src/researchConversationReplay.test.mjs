@@ -90,7 +90,7 @@ for(const language of ['en','es']){
   const r=replay();r.caller(s.ucsc);r.ready('comparison',language,true);r.acknowledge();r.advance(5000);
   assert.equal(r.announcements().length,0);
   r.answer(s.reaction);r.advance(500);
-  assert.equal(r.announcements().length,1);assert.match(r.announcements()[0].content,/unverified part first/);
+  assert.equal(r.announcements().length,1);assert.match(r.announcements()[0].content,/requested gap, then useful verified context/);
   assert.match(r.announcements()[0].content,/check has ended/);
   const parts=r.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
   const context=decodedResearchContext(parts);

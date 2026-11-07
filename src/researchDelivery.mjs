@@ -1,6 +1,6 @@
 import {researchContextPackets,selectedResearchContextFindings} from './liveResearchContext.mjs';
 import {researchBriefSelection} from './researchBrief.mjs';
-import {researchAnswerOverlap,researchLimitationOverlap,researchPortionObserved} from './researchDiscussion.mjs';
+import {researchAnswerOverlap,researchLimitationOverlap,researchPortionObserved,researchScopeCompatible} from './researchDiscussion.mjs';
 import {researchFocus,focusedResearchFindings,findingSubjectMentioned} from './researchFindings.mjs';
 export {researchAnswerOverlap} from './researchDiscussion.mjs';
 
@@ -26,7 +26,7 @@ function housingScenario(text){
 function commentaryContent(job,remaining){
  const state=job.failed?'The source check failed. No verified findings are available.':job.researchPending?'Initial sourced findings; recovery is running.':'Completed research; this check has ended. Do not say still checking.';
  const limitations=!job.researchPending&&remaining.some(f=>f.status==='unverified');
- const direction=(limitations?' Explain the unverified part first.':'')+' At a pause, answer the latest question briefly. Keep qualifications; yield to speech.';
+ const direction=(limitations?' Explain the requested gap, then useful verified context.':' Answer first with its year/scenario, then the material caveat.')+' At a pause; be brief and yield to speech.';
  const first=[...remaining].sort((a,b)=>(job.researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified')))[0];
  // Prefer the complete focused finding, including its subject and qualification,
  // over an opaque report ID. Never cut off a caveat to meet the append limit.
@@ -178,7 +178,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    const answer=job.selection.text.split('\n').find(line=>line.trim())||'';
    if(audible&&!job.failed){
     for(const finding of job.selection.findings||[]){
-     const overlap=finding.status==='unverified'?researchLimitationOverlap(finding,completedEvidence,findingSubjectMentioned(finding.subject,completedEvidence)):researchAnswerOverlap(finding.answer,completedEvidence);
+     const overlap=researchScopeCompatible(finding,completedEvidence)&&(finding.status==='unverified'?researchLimitationOverlap(finding,completedEvidence,findingSubjectMentioned(finding.subject,completedEvidence)):researchAnswerOverlap(finding.answer,completedEvidence));
      if(overlap)job.discussed.add(finding);
     }
     if(covered(job)||(!job.selection.findings?.length&&researchAnswerOverlap(answer,completedEvidence))){

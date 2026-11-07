@@ -180,3 +180,46 @@ for(const failure of ['deadline','read_404','read_503_deadline','worker_crash','
   assert.equal(delivered[1].result.evidenceVersion,2);assert.equal(delivered[1].result.researchPending,false);assert.equal(delivered[1].result.recoveryUnavailable,true);
  }finally{q.close();}
 });
+
+for(const language of ['en','es'])for(const terminal of ['completed','failed'])test(`${language}: correction after ${terminal} keeps identity and starts only the missing scenario`,async()=>{
+ let tick;const posted=[],removed=[],delivered=[];
+ const q=backgroundResearch({requireReplacementChange:true,post:async query=>(posted.push(query),{id:`job-${posted.length}`}),
+  read:async()=>({status:terminal,result:terminal==='completed'?{text:'Residence-hall results only'}:undefined}),remove:async id=>removed.push(id),
+  isCurrent:()=>true,isQuiet:()=>true,deliver:job=>delivered.push(job),schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ const initial={question:language==='en'?'Berkeley residence-hall total for 2026–27':'Total en residencia universitaria de Berkeley para 2026–27',institution:'UC Berkeley',mode:'finance',language,studentId:'a',sessionId:'call',requestKey:'first'};
+ try{
+  const first=await q.start(initial);await tick();assert.equal(delivered.length,1);
+  const correction={...initial,requestKey:'correction',question:language==='en'?'Berkeley off-campus total for 2026–27':'Total fuera del campus de Berkeley para 2026–27',replaceRequestId:first.requestId,replaceRevision:1,
+   replacementChange:{kind:'correct_scope',uncoveredNeed:language==='en'?'Off-campus apartment, not the residence-hall scenario previously checked.':'Apartamento fuera del campus, no la residencia universitaria ya consultada.'}};
+  const next=await q.start(correction);
+  assert.equal(next.status,'research_pending');assert.equal(next.requestId,first.requestId);assert.equal(next.revision,2);
+  assert.equal(posted.length,2);assert.equal(posted[1].question,correction.question);assert.equal(posted[1].replacementChange,undefined);
+  assert.deepEqual(removed,[],'no cancellation claim or DELETE for already finished work');
+  const stale=await q.start(correction);assert.equal(stale.status,'research_request_changed');assert.equal(stale.searchStarted,false);assert.equal(stale.activeTask.revision,2);assert.equal(stale.activeTask.status,'research_pending');assert.equal(posted.length,2);
+  await tick();assert.equal(delivered.at(-1).revision,2);
+  const retried=await q.start({...correction,replaceRequestId:undefined,replaceRevision:undefined});
+  assert.equal(retried.status,`research_${terminal}`);assert.equal(posted.length,2,'same call identity cannot rerun completed work');
+ }finally{q.close();}
+});
+
+for(const invalidation of ['cancel','scope','new_task'])test(`terminal receipt cannot replace work after ${invalidation}`,async()=>{
+ let tick,current=true,posts=0;const q=backgroundResearch({requireReplacementChange:true,post:async()=>({id:`j${++posts}`}),read:async()=>({status:'completed'}),remove:async()=>{},isCurrent:input=>input.studentId==='a'?current:true,isQuiet:()=>true,deliver:()=>{},schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ try{
+  const first=await q.start({question:'Initial campus costs',studentId:'a',sessionId:'call'});await tick();
+  if(invalidation==='cancel')await q.cancel();
+  if(invalidation==='scope')current=false;
+  if(invalidation==='new_task')await q.start({question:'Different task',studentId:'a',sessionId:'call'});
+  const changed=await q.start({question:'New scope costs',studentId:invalidation==='scope'?'b':'a',sessionId:'call',replaceRequestId:first.requestId,replaceRevision:1,replacementChange:{kind:'correct_scope',uncoveredNeed:'A materially different published scenario'}});
+  assert.equal(changed.status,'research_request_changed');assert.equal(posts,invalidation==='new_task'?2:1);
+ }finally{q.close();}
+});
+
+test('focusing a covered completed check returns a terminal receipt, never another pending promise',async()=>{
+ let tick,posts=0;const q=backgroundResearch({requireReplacementChange:true,post:async()=>({id:`j${++posts}`}),read:async()=>({status:'completed'}),remove:async()=>{},isCurrent:()=>true,isQuiet:()=>true,deliver:()=>{},schedule:fn=>(tick=fn,1),cancel:()=>{}});
+ try{
+  const first=await q.start({question:'Costs including tuition and housing',institution:'Example'});await tick();
+  const result=await q.start({question:'Just tuition please',institution:'Example',replaceRequestId:first.requestId,replaceRevision:1,replacementChange:{kind:'focus_existing',uncoveredNeed:''}});
+  assert.equal(result.status,'research_completed');assert.equal(result.researchPending,false);assert.equal(result.replacementApplied,false);assert.equal(posts,1);
+  assert.match(result.instruction,/check has ended/);assert.doesNotMatch(result.instruction,/source check is already accepted/);
+ }finally{q.close();}
+});

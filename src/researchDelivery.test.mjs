@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchDelivery,researchAnswerOverlap} from './researchDelivery.mjs';
 import {capturePayload} from './voiceCapture.mjs';
-import {discussionExamples} from './researchDiscussion.fixture.mjs';
+import {discussionExamples,correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 
 const examples={
  en:{answer:'The published annual tuition is 12345 dollars at Example University.',qualification:'Housing is separate, and this is not a personalized aid award.',reply:'We can take this one step at a time.',caller:'Can we talk about the essays while you check?',ack:'Mm-hmm.'},
@@ -19,6 +19,43 @@ function fixture(){
   ack(){for(const e of sent.filter(e=>e.type==='session.thinking.append'))delivery.receive({type:'session.thinking.appended',client_event_id:e.event_id});},
   announcements:()=>sent.filter(e=>e.type==='session.commentary.append'),
  };
+}
+
+for(const [language,example]of Object.entries(correctedBudgetExamples)){
+ const result={sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'partial',answer:example.finding.answer,qualification:example.finding.qualification,nextStep:'',findings:[example.finding]}};
+ test(`${language}: a complete paraphrased total retires the optional announcement even with a rich subject`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',example.question);f.quiet(false);
+  f.ready(language,{question:example.question,result});f.ack();f.delivery.reply(example.spoken,{audible:true});f.quiet(true);f.advance(5000);
+  assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryStage==='native_portion_observed'));
+  assert.ok(!f.events.some(e=>e.deliveryStage==='commentary_requested'));f.delivery.clear();
+ });
+ test(`${language}: a supplied total waits for mid-answer speech and then asks for the answer before its caveat`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',example.question);f.quiet(false);
+  f.ready(language,{question:example.question,result});f.ack();f.advance(3000);
+  assert.equal(f.announcements().length,0);
+  f.delivery.reply(language==='en'?'We can work through the costs together.':'Podemos entender los costos juntos.',{audible:true});
+  f.quiet(true);f.advance(500);assert.equal(f.announcements().length,1);
+  const prompt=f.announcements()[0].content;assert.match(prompt,/Answer first with its year\/scenario, then the material caveat/);
+  assert.doesNotMatch(prompt,/unverified part first/);assert.ok(Buffer.byteLength(prompt)<=480);
+  const evidence=decodedResearchContext(f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+  assert.ok(JSON.stringify(evidence).includes(example.finding.qualification));
+  assert.equal(f.sent.some(e=>['session.instructions.append','response.create'].includes(e.type)),false);f.delivery.clear();
+ });
+ test(`${language}: an interrupted unfinished total stays quietly available without a forced replay`,()=>{
+  const f=fixture();f.delivery.supersede('new_request',example.question);f.quiet(false);f.ready(language,{question:example.question,result});f.ack();
+  f.delivery.reply(example.spoken,{audible:true,interrupted:true,completedText:''});f.quiet(true);f.advance(5000);
+  assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryReason==='interrupted_tail'));
+  assert.ok(f.sent.some(e=>e.type==='session.thinking.append'));f.delivery.clear();
+ });
+ test(`${language}: a limitation about a different scenario does not retire the requested finding`,()=>{
+  const f=fixture(),finding={...example.finding,status:'unverified',answer:example.limitation,qualification:''};
+  f.delivery.supersede('new_request',example.question);f.quiet(false);
+  f.ready(language,{question:example.question,result:{...result,voiceBrief:{...result.voiceBrief,status:'unverified',answer:finding.answer,qualification:'',findings:[finding]}}});f.ack();
+  f.delivery.reply(example.wrongLimitation,{audible:true});
+  assert.ok(!f.events.some(e=>['evidence_overlap_observed','native_portion_observed'].includes(e.deliveryStage)));
+  f.delivery.reply(example.limitation,{audible:true});f.quiet(true);f.advance(1000);
+  assert.equal(f.announcements().length,0);assert.ok(f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'));f.delivery.clear();
+ });
 }
 
 for(const language of ['en','es']){

@@ -52,12 +52,15 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
   assert.match(speech,/carry that preference forward; do not re-ask it/);
   assert.match(speech,/A brief relevant explanation is enough when no clarification is needed/);
   assert.match(speech,/A pause alone is not a request for questions/);
-  assert.match(speech,/Initial findings can be used while an app-confirmed recovery check continues/);
+  assert.match(speech,/Use initial findings while app-confirmed recovery continues/);
   assert.match(speech,/do not automatically expand it to every residency category/);
   assert.match(speech,/Listen when the person wants a moment/);
   assert.match(speech,/newest application task state replaces older pending receipts/);
-  assert.match(speech,/A completed lookup with a missing answer is not an active task/);
-  assert.match(speech,/A question about how research works can be answered directly/);
+  assert.match(speech,/researchPending false means the check ended, even with unverified findings/);
+  assert.match(speech,/Explain research directly; never announce checking when answering from existing findings/);
+  assert.match(speech,/A changed scenario outside its searched question is not researched, not searched-and-unverified/);
+  assert.match(speech,/Lead with the useful answer to the latest question, keeping its year and scenario/);
+  assert.match(speech,/A rejected replacement or reading an old report performs no search/);
   assert.match(speech,/Answer the latest question first using relevant verified findings/);
   assert.match(speech,/simple comparison or calculation when their year and scenario support it/);
   assert.match(speech,/direct answer before the qualifications that materially affect it/);

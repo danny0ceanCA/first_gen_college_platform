@@ -1,4 +1,4 @@
-import {researchFocus,findingSubjectMentioned} from './researchFindings.mjs';
+import {researchFocus,findingSubjectMentioned,researchSubjectIdentity} from './researchFindings.mjs';
 // Local duplicate suppression, not an answer-quality grader or proof of hearing.
 // Compare the finding's quantities and distinctive words, allowing spoken number
 // formats and paraphrases. Nothing here initiates model work or controls playback.
@@ -114,20 +114,39 @@ function concretePortion(source,aspect){
  return value||rule;
 }
 
+// Explicitly conflicting years/scenarios cannot retire a different finding.
+// Omitted details alone do not make an otherwise relevant paraphrase a mismatch.
+export function researchScopeCompatible(finding,statement){
+ const source=`${finding.subject} ${finding.answer}`;
+ const years=text=>tokens(text).filter(t=>/^20\d{2}$/u.test(t));
+ const expectedYears=years(source),spokenYears=years(statement);
+ if(expectedYears.length&&spokenYears.some(year=>!expectedYears.includes(year)))return false;
+ const scenarios=text=>{
+  const normalized=fold(text).toLowerCase().replace(/[-–]/gu,' ');
+  return [
+   ['off',/\b(?:off campus|fuera del campus)\b/gu],
+   ['on',/\b(?:on campus|residence halls?|dorms?|dormitor(?:y|ies)|dentro del campus|residencias? universitarias?)\b/gu],
+   ['family',/\b(?:with (?:their |his |her |your )?(?:parents|relatives|family)|con (?:sus |tus )?(?:padres|familiares|familia))\b/gu],
+  ].filter(([,pattern])=>[...normalized.matchAll(pattern)].some(match=>!/(?:\bnot|\bno|\bni)\s*$/u.test(normalized.slice(0,match.index)))).map(([name])=>name);
+ };
+ const expected=scenarios(source),claimed=scenarios(statement);
+ return !expected.length||claimed.every(scenario=>expected.includes(scenario));
+}
 // Retire an optional announcement when a native answer already explained a
 // relevant portion. This does not certify completeness or numerical accuracy.
 export function researchPortionObserved(finding,spoken){
  if(!findingSubjectMentioned(finding.subject,spoken))return false;
- if(finding.status==='unverified')return researchLimitationOverlap(finding,spoken,true);
+ if(finding.status==='unverified')return researchScopeCompatible(finding,spoken)&&researchLimitationOverlap(finding,spoken,true);
  const uncertain=/\b(?:checking|verifying|still trying|will check|going to check|pending|might|may|hypothetical|suppose|not verified|not confirmed|have not verified|have not confirmed|haven['’]?t verified|haven['’]?t confirmed|revisando|verificando|voy a revisar|pendiente|podria|hipotetic\w*|supongamos|no he verificado|no he confirmado|sin verificar|sin confirmar)\b/u;
  const statements=String(spoken||'').split(/(?<=[.!?])\s+/u).filter(s=>!/[?？]\s*$/u.test(s)&&!uncertain.test(fold(s).toLowerCase()));
  const amounts=text=>tokens(text).filter(t=>/^\d+$/u.test(t)).map(Number).filter(n=>n>=1000&&(n<1900||n>2100));
  const expected=amounts(finding.answer);
  const sourceSentences=String(finding.answer||'').split(/(?<=[.!?;])\s+/u);
- const subject=String(finding.subject).split(/\s+[—–]\s+|\s*\(/u)[0];
+ const subject=researchSubjectIdentity(finding.subject);
  const negative=text=>/\b(?:no|not|never|without|cannot|can['’]?t|don['’]?t|doesn['’]?t|isn['’]?t|aren['’]?t|won['’]?t|sin|nunca)\b/u.test(fold(text).toLowerCase());
  return statements.some(statement=>{
   if(!findingSubjectMentioned(finding.subject,statement))return false;
+  if(!researchScopeCompatible(finding,statement))return false;
   const aspects=researchFocus(statement);
   if(aspects.length&&finding.aspect!=='other'&&!aspects.includes(finding.aspect))return false;
   // An explained requirement or deadline is useful delivery too. Compare one

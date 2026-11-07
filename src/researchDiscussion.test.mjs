@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchAnswerOverlap,researchPortionObserved} from './researchDiscussion.mjs';
 
-import {discussionExamples} from './researchDiscussion.fixture.mjs';
+import {discussionExamples,correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 
 for(const [language,{answer,spoken}] of Object.entries(discussionExamples)){
  test(`${language}: a naturally reordered answer is recognized without six verbatim words`,()=>assert.equal(researchAnswerOverlap(answer,spoken),true));
@@ -85,6 +85,21 @@ test('a GPA answer from a compound finding does not require the unused year and 
  assert.equal(researchPortionObserved(finding,spoken.replace('two five','five')),false);
  assert.equal(researchPortionObserved(finding,spoken.replace('North','South')),false);
  assert.equal(researchPortionObserved(finding,'North Campus scholarships use the admission application; I am checking the published minimum GPA.'),false);
+});
+
+for(const [language,example]of Object.entries(correctedBudgetExamples))test(`${language}: rich labels recognize a paraphrased total without losing campus, year or housing boundaries`,()=>{
+ assert.equal(researchPortionObserved(example.finding,example.spoken),true);
+ for(const wrong of [example.wrongScenario,example.spoken.replaceAll('Berkeley','Davis'),example.spoken.replace('2026–27','2025–26'),example.spoken.replace('2026–27','2027–28'),example.concern]){
+  assert.equal(researchPortionObserved(example.finding,wrong),false,wrong);
+ }
+});
+
+for(const [language,example]of Object.entries(correctedBudgetExamples))test(`${language}: an explained limitation must concern the same research scope`,()=>{
+ const finding={...example.finding,status:'unverified',answer:example.limitation,qualification:''};
+ assert.equal(researchPortionObserved(finding,example.limitation),true);
+ for(const wrong of [example.wrongLimitation,example.limitation.replace('2026–27','2025–26'),example.limitation.replace('Berkeley','Davis')]){
+  assert.equal(researchPortionObserved(finding,wrong),false,wrong);
+ }
 });
 
 for(const [language,examples]of Object.entries({

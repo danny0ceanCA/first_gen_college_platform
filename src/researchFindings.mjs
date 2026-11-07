@@ -24,12 +24,23 @@ const aspectPatterns={
 export function researchFocus(text){
  return Object.entries(aspectPatterns).filter(([,pattern])=>pattern.test(fold(text))).map(([aspect])=>aspect);
 }
+const normalizeSubject=value=>fold(value).replace(/\b(?:university of california|universidad de california)\b/gu,'uc')
+ .replace(/\b(?:california state university|universidad estatal de california)\b/gu,'csu');
+export function researchSubjectIdentity(subject){
+ // Generated subjects sometimes append population/housing without a delimiter.
+ // Strip only recognizable scenario suffixes, not arbitrary name words (e.g.
+ // Santa Cruz, North Campus, or California State University).
+ return normalizeSubject(String(subject).split(/\s+[—–]\s+|\s*\(/u)[0])
+  .replace(/\s+(?=(?:(?:california|in state|out of state) )?(?:residents?|nonresidents?)\b|(?:new |entering )?(?:undergraduates?|graduates?|transfers?)\b|off campus\b|on campus\b|residence halls?\b|apartments?\b|(?:estudiantes |alumnos )|residentes? de\b|fuera del campus\b|dentro del campus\b|20\d{2}\b).*/u,'').trim();
+}
 export function findingSubjectMentioned(subject,text){
- const normalize=value=>fold(value).replace(/\b(?:university of california|universidad de california)\b/gu,'uc');
- const normalized=normalize(text),name=normalize(String(subject).split(/\s+[—–]\s+|\s*\(/u)[0]);
+ const normalized=normalizeSubject(text),name=researchSubjectIdentity(subject);
+ if(!name)return false;
  const parts=name.split(' ').filter(w=>!['university','universidad','college','of','de','the','california','uc','csu'].includes(w));
+ if(!parts.length)return false;
  const acronym=name.split(' ').map(w=>['uc','csu'].includes(w)?w:w[0]).join('');
- return !!normalized&&(normalized.includes(name)||(parts.length&&normalized.includes(parts.join(' ')))||
+ const contains=phrase=>` ${normalized} `.includes(` ${phrase} `);
+ return !!normalized&&(contains(name)||(parts.length&&contains(parts.join(' ')))||
   (acronym.length>=3&&new RegExp(`\\b${acronym}\\b`,'u').test(normalized)));
 }
 export function focusedResearchFindings(findings,text,aspects=researchFocus(text)){

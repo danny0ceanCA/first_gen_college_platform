@@ -327,7 +327,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       const backgroundResearch=env.ORIGEN_BACKGROUND_RESEARCH==='true'&&config.model==='gpt-live-1'&&input.onboarding!==true&&!!database&&req.origenAuthorized===true;
       if(backgroundResearch){
         config.tools=config.tools.map(tool=>['lookup_financial_aid','lookup_college_applications','lookup_education_planning'].includes(tool.name)?{...tool,parameters:{...tool.parameters,properties:{...tool.parameters.properties,
-          replaceRequestId:{type:'string',description:'Only for a material caller-requested change to active research. Copy the current receipt requestId. Omit for rephrasing, support, repeats or ordinary follow-ups.'},
+          replaceRequestId:{type:'string',description:'Only for a material caller-requested change to the latest accepted research, including a completed check. Copy its current requestId/revision. Omit for rephrasing, support, repeats or ordinary follow-ups.'},
           replaceRevision:{type:'integer',minimum:1,description:'Current receipt revision paired with replaceRequestId. A stale revision cannot replace newer research.'},
           ...(env.ORIGEN_RESEARCH_DELIVERY_V2==='true'?{replacementChange:{type:'object',additionalProperties:false,
             description:'Required with replacement IDs. Compare the accepted question with the latest request. Selecting from already covered alternatives is focus_existing, not a correction, and preserves the job. Only correct_scope or expand_scope with a concrete uncoveredNeed permits replacement. Public research facts only, no private student data.',
