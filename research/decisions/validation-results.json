@@ -1,0 +1,3049 @@
+{
+  "sourceRun": "phase12-provider",
+  "model": "gpt-6-luna",
+  "sourceHashes": {
+    "fixtures.mjs": "251fba65a024ac8ab2b182742e3794de6ef94dadbedebbe873e188045d84f250",
+    "rubric.mjs": "bf1d06407e755544c3df711ec1c77ba86342632b51c32dd6d1be726cb9818d36",
+    "client.mjs": "0e8091430205e77ec2d9f1abeb2644139ef5a80b96b675013fcec071a0eedc1c",
+    "state.mjs": "7aecab9a90644252c8d5dae9f83b2a9f5039033b923da02058117dbc83ed9d50"
+  },
+  "evaluation": {
+    "overall": {
+      "sampleSize": 36,
+      "fixtureCount": 36,
+      "available": 36,
+      "unavailable": 0,
+      "invalidSuccessfulResults": 0,
+      "availabilityRate": 1,
+      "supportNeed": {
+        "correct": 36,
+        "accuracy": 1,
+        "confusion": {
+          "none": {
+            "none": 14,
+            "starting_point": 0,
+            "simpler_explanation": 0,
+            "next_step": 0,
+            "unclear": 0
+          },
+          "starting_point": {
+            "none": 0,
+            "starting_point": 6,
+            "simpler_explanation": 0,
+            "next_step": 0,
+            "unclear": 0
+          },
+          "simpler_explanation": {
+            "none": 0,
+            "starting_point": 0,
+            "simpler_explanation": 6,
+            "next_step": 0,
+            "unclear": 0
+          },
+          "next_step": {
+            "none": 0,
+            "starting_point": 0,
+            "simpler_explanation": 0,
+            "next_step": 5,
+            "unclear": 0
+          },
+          "unclear": {
+            "none": 0,
+            "starting_point": 0,
+            "simpler_explanation": 0,
+            "next_step": 0,
+            "unclear": 5
+          }
+        }
+      },
+      "alreadyAddressed": {
+        "correct": 36,
+        "accuracy": 1,
+        "confusion": {
+          "false": {
+            "false": 33,
+            "true": 0
+          },
+          "true": {
+            "false": 0,
+            "true": 3
+          }
+        }
+      },
+      "jointAccuracy": 1,
+      "optionalHelp": {
+        "truePositives": 14,
+        "falsePositives": 0,
+        "trueNegatives": 22,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "timing": {
+        "samples": 36,
+        "p50Ms": 152.0906,
+        "p95Ms": 481.72209999999995,
+        "method": "nearest_rank"
+      },
+      "availableTiming": {
+        "samples": 36,
+        "p50Ms": 152.0906,
+        "p95Ms": 481.72209999999995,
+        "method": "nearest_rank"
+      },
+      "statusCounts": {
+        "completed": 36
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "sampleSize": 14,
+        "fixtureCount": 14,
+        "available": 14,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 14,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 5,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 3,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 2,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 2,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 2
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 14,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 13,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 1
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 6,
+          "falsePositives": 0,
+          "trueNegatives": 8,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 14,
+          "p50Ms": 152.0906,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 14,
+          "p50Ms": 152.0906,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 14
+        }
+      },
+      "es": {
+        "sampleSize": 14,
+        "fixtureCount": 14,
+        "available": 14,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 14,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 5,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 3,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 2,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 2,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 2
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 14,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 13,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 1
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 6,
+          "falsePositives": 0,
+          "trueNegatives": 8,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 14,
+          "p50Ms": 132.7497999999996,
+          "p95Ms": 380.38520000000017,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 14,
+          "p50Ms": 132.7497999999996,
+          "p95Ms": 380.38520000000017,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 14
+        }
+      },
+      "mixed": {
+        "sampleSize": 8,
+        "fixtureCount": 8,
+        "available": 8,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 8,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 4,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 2,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 1,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 1
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 8,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 7,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 1
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 2,
+          "falsePositives": 0,
+          "trueNegatives": 6,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 8,
+          "p50Ms": 169.85210000000006,
+          "p95Ms": 481.72209999999995,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 8,
+          "p50Ms": 169.85210000000006,
+          "p95Ms": 481.72209999999995,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 8
+        }
+      }
+    },
+    "bySplit": {
+      "calibration": {
+        "sampleSize": 18,
+        "fixtureCount": 18,
+        "available": 18,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 18,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 7,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 3,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 4,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 2,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 2
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 18,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 16,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 2
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 7,
+          "falsePositives": 0,
+          "trueNegatives": 11,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 18,
+          "p50Ms": 147.84969999999998,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 18,
+          "p50Ms": 147.84969999999998,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 18
+        }
+      },
+      "holdout": {
+        "sampleSize": 18,
+        "fixtureCount": 18,
+        "available": 18,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 18,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 7,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 3,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 2,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 3,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 3
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 18,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 17,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 1
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 7,
+          "falsePositives": 0,
+          "trueNegatives": 11,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 18,
+          "p50Ms": 162.1233000000002,
+          "p95Ms": 481.72209999999995,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 18,
+          "p50Ms": 162.1233000000002,
+          "p95Ms": 481.72209999999995,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 18
+        }
+      }
+    },
+    "byLanguageAndSplit": {
+      "en": {
+        "calibration": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 2,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 2,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 1,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 1,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 1
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 6,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 1
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 3,
+            "falsePositives": 0,
+            "trueNegatives": 4,
+            "falseNegatives": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "timing": {
+            "samples": 7,
+            "p50Ms": 166.6434999999999,
+            "p95Ms": 971.2341999999999,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 7,
+            "p50Ms": 166.6434999999999,
+            "p95Ms": 971.2341999999999,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 7
+          }
+        },
+        "holdout": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 3,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 1,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 1,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 1,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 1
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 7,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 0
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 3,
+            "falsePositives": 0,
+            "trueNegatives": 4,
+            "falseNegatives": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "timing": {
+            "samples": 7,
+            "p50Ms": 152.0906,
+            "p95Ms": 258.2761999999998,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 7,
+            "p50Ms": 152.0906,
+            "p95Ms": 258.2761999999998,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 7
+          }
+        }
+      },
+      "es": {
+        "calibration": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 4,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 1,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 1,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 1
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 7,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 0
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 2,
+            "falsePositives": 0,
+            "trueNegatives": 5,
+            "falseNegatives": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "timing": {
+            "samples": 7,
+            "p50Ms": 130.86430000000018,
+            "p95Ms": 240.29309999999987,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 7,
+            "p50Ms": 130.86430000000018,
+            "p95Ms": 240.29309999999987,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 7
+          }
+        },
+        "holdout": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 1,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 2,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 1,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 2,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 1
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 7,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 6,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 1
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 4,
+            "falsePositives": 0,
+            "trueNegatives": 3,
+            "falseNegatives": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "timing": {
+            "samples": 7,
+            "p50Ms": 149.34009999999944,
+            "p95Ms": 380.38520000000017,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 7,
+            "p50Ms": 149.34009999999944,
+            "p95Ms": 380.38520000000017,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 7
+          }
+        }
+      },
+      "mixed": {
+        "calibration": {
+          "sampleSize": 4,
+          "fixtureCount": 4,
+          "available": 4,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 4,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 1,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 2,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 1,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 4,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 3,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 1
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 2,
+            "falsePositives": 0,
+            "trueNegatives": 2,
+            "falseNegatives": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "timing": {
+            "samples": 4,
+            "p50Ms": 136.4966000000004,
+            "p95Ms": 227.23970000000008,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 4,
+            "p50Ms": 136.4966000000004,
+            "p95Ms": 227.23970000000008,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 4
+          }
+        },
+        "holdout": {
+          "sampleSize": 4,
+          "fixtureCount": 4,
+          "available": 4,
+          "unavailable": 0,
+          "invalidSuccessfulResults": 0,
+          "availabilityRate": 1,
+          "supportNeed": {
+            "correct": 4,
+            "accuracy": 1,
+            "confusion": {
+              "none": {
+                "none": 3,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "starting_point": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "simpler_explanation": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "next_step": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 0
+              },
+              "unclear": {
+                "none": 0,
+                "starting_point": 0,
+                "simpler_explanation": 0,
+                "next_step": 0,
+                "unclear": 1
+              }
+            }
+          },
+          "alreadyAddressed": {
+            "correct": 4,
+            "accuracy": 1,
+            "confusion": {
+              "false": {
+                "false": 4,
+                "true": 0
+              },
+              "true": {
+                "false": 0,
+                "true": 0
+              }
+            }
+          },
+          "jointAccuracy": 1,
+          "optionalHelp": {
+            "truePositives": 0,
+            "falsePositives": 0,
+            "trueNegatives": 4,
+            "falseNegatives": 0,
+            "precision": null,
+            "recall": null
+          },
+          "timing": {
+            "samples": 4,
+            "p50Ms": 203.3135999999995,
+            "p95Ms": 481.72209999999995,
+            "method": "nearest_rank"
+          },
+          "availableTiming": {
+            "samples": 4,
+            "p50Ms": 203.3135999999995,
+            "p95Ms": 481.72209999999995,
+            "method": "nearest_rank"
+          },
+          "statusCounts": {
+            "completed": 4
+          }
+        }
+      }
+    },
+    "byRole": {
+      "family": {
+        "sampleSize": 6,
+        "fixtureCount": 6,
+        "available": 6,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 6,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 1,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 4,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 1,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 6,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 4,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 2
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 3,
+          "falsePositives": 0,
+          "trueNegatives": 3,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 6,
+          "p50Ms": 151.3096999999998,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 6,
+          "p50Ms": 151.3096999999998,
+          "p95Ms": 971.2341999999999,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 6
+        }
+      },
+      "student": {
+        "sampleSize": 30,
+        "fixtureCount": 30,
+        "available": 30,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": 1,
+        "supportNeed": {
+          "correct": 30,
+          "accuracy": 1,
+          "confusion": {
+            "none": {
+              "none": 13,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 2,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 6,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 4,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 5
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 30,
+          "accuracy": 1,
+          "confusion": {
+            "false": {
+              "false": 29,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 1
+            }
+          }
+        },
+        "jointAccuracy": 1,
+        "optionalHelp": {
+          "truePositives": 11,
+          "falsePositives": 0,
+          "trueNegatives": 19,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "timing": {
+          "samples": 30,
+          "p50Ms": 152.0906,
+          "p95Ms": 310.6015,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 30,
+          "p50Ms": 152.0906,
+          "p95Ms": 310.6015,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {
+          "completed": 30
+        }
+      },
+      "unknown": {
+        "sampleSize": 0,
+        "fixtureCount": 0,
+        "available": 0,
+        "unavailable": 0,
+        "invalidSuccessfulResults": 0,
+        "availabilityRate": null,
+        "supportNeed": {
+          "correct": 0,
+          "accuracy": null,
+          "confusion": {
+            "none": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "starting_point": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "simpler_explanation": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "next_step": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            },
+            "unclear": {
+              "none": 0,
+              "starting_point": 0,
+              "simpler_explanation": 0,
+              "next_step": 0,
+              "unclear": 0
+            }
+          }
+        },
+        "alreadyAddressed": {
+          "correct": 0,
+          "accuracy": null,
+          "confusion": {
+            "false": {
+              "false": 0,
+              "true": 0
+            },
+            "true": {
+              "false": 0,
+              "true": 0
+            }
+          }
+        },
+        "jointAccuracy": null,
+        "optionalHelp": {
+          "truePositives": 0,
+          "falsePositives": 0,
+          "trueNegatives": 0,
+          "falseNegatives": 0,
+          "precision": null,
+          "recall": null
+        },
+        "timing": {
+          "samples": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "method": "nearest_rank"
+        },
+        "availableTiming": {
+          "samples": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "method": "nearest_rank"
+        },
+        "statusCounts": {}
+      }
+    },
+    "interpretation": "Accuracy and candidate precision/recall use available classifications only. Unavailable results and timings are reported separately. Classification is not an instruction to act."
+  },
+  "calibration": {
+    "sourceSplit": "calibration",
+    "sampleSize": 18,
+    "availableSampleSize": 18,
+    "unavailableSampleSize": 0,
+    "scoredCandidateSampleSize": 7,
+    "missingCandidateScoreCount": 0,
+    "positiveEvidence": 7,
+    "negativeEvidence": 11,
+    "interpretation": "Zero observed false positives on a small calibration set does not establish production safety or calibrated probabilities. Holdout outcomes are not used to select this threshold.",
+    "enabled": true,
+    "threshold": 0.58,
+    "reason": "zero_observed_calibration_false_positives",
+    "acceptedCandidates": 7,
+    "truePositives": 7,
+    "falsePositives": 0,
+    "trueNegatives": 11,
+    "falseNegatives": 0,
+    "precision": 1,
+    "recall": 1
+  },
+  "thresholdEvaluation": {
+    "enabled": true,
+    "threshold": 0.58,
+    "sourceSplit": "calibration",
+    "calibrationSampleSize": 18,
+    "overall": {
+      "sampleSize": 36,
+      "fixtureCount": 36,
+      "available": 36,
+      "unavailable": 0,
+      "rawCandidates": 14,
+      "missingCandidateScoreCount": 0,
+      "acceptedCandidates": 14,
+      "acceptedCorrectSubtype": 14,
+      "acceptedSubtypePrecision": 1,
+      "truePositives": 14,
+      "falsePositives": 0,
+      "trueNegatives": 22,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1
+    },
+    "byLanguage": {
+      "en": {
+        "sampleSize": 14,
+        "fixtureCount": 14,
+        "available": 14,
+        "unavailable": 0,
+        "rawCandidates": 6,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 6,
+        "acceptedCorrectSubtype": 6,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 6,
+        "falsePositives": 0,
+        "trueNegatives": 8,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "es": {
+        "sampleSize": 14,
+        "fixtureCount": 14,
+        "available": 14,
+        "unavailable": 0,
+        "rawCandidates": 6,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 6,
+        "acceptedCorrectSubtype": 6,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 6,
+        "falsePositives": 0,
+        "trueNegatives": 8,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "mixed": {
+        "sampleSize": 8,
+        "fixtureCount": 8,
+        "available": 8,
+        "unavailable": 0,
+        "rawCandidates": 2,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 2,
+        "acceptedCorrectSubtype": 2,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 2,
+        "falsePositives": 0,
+        "trueNegatives": 6,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      }
+    },
+    "bySplit": {
+      "calibration": {
+        "sampleSize": 18,
+        "fixtureCount": 18,
+        "available": 18,
+        "unavailable": 0,
+        "rawCandidates": 7,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 7,
+        "acceptedCorrectSubtype": 7,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 7,
+        "falsePositives": 0,
+        "trueNegatives": 11,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "holdout": {
+        "sampleSize": 18,
+        "fixtureCount": 18,
+        "available": 18,
+        "unavailable": 0,
+        "rawCandidates": 7,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 7,
+        "acceptedCorrectSubtype": 7,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 7,
+        "falsePositives": 0,
+        "trueNegatives": 11,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      }
+    },
+    "byLanguageAndSplit": {
+      "en": {
+        "calibration": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "rawCandidates": 3,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 3,
+          "acceptedCorrectSubtype": 3,
+          "acceptedSubtypePrecision": 1,
+          "truePositives": 3,
+          "falsePositives": 0,
+          "trueNegatives": 4,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "holdout": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "rawCandidates": 3,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 3,
+          "acceptedCorrectSubtype": 3,
+          "acceptedSubtypePrecision": 1,
+          "truePositives": 3,
+          "falsePositives": 0,
+          "trueNegatives": 4,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "es": {
+        "calibration": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "rawCandidates": 2,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 2,
+          "acceptedCorrectSubtype": 2,
+          "acceptedSubtypePrecision": 1,
+          "truePositives": 2,
+          "falsePositives": 0,
+          "trueNegatives": 5,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "holdout": {
+          "sampleSize": 7,
+          "fixtureCount": 7,
+          "available": 7,
+          "unavailable": 0,
+          "rawCandidates": 4,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 4,
+          "acceptedCorrectSubtype": 4,
+          "acceptedSubtypePrecision": 1,
+          "truePositives": 4,
+          "falsePositives": 0,
+          "trueNegatives": 3,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "mixed": {
+        "calibration": {
+          "sampleSize": 4,
+          "fixtureCount": 4,
+          "available": 4,
+          "unavailable": 0,
+          "rawCandidates": 2,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 2,
+          "acceptedCorrectSubtype": 2,
+          "acceptedSubtypePrecision": 1,
+          "truePositives": 2,
+          "falsePositives": 0,
+          "trueNegatives": 2,
+          "falseNegatives": 0,
+          "precision": 1,
+          "recall": 1
+        },
+        "holdout": {
+          "sampleSize": 4,
+          "fixtureCount": 4,
+          "available": 4,
+          "unavailable": 0,
+          "rawCandidates": 0,
+          "missingCandidateScoreCount": 0,
+          "acceptedCandidates": 0,
+          "acceptedCorrectSubtype": 0,
+          "acceptedSubtypePrecision": null,
+          "truePositives": 0,
+          "falsePositives": 0,
+          "trueNegatives": 4,
+          "falseNegatives": 0,
+          "precision": null,
+          "recall": null
+        }
+      }
+    },
+    "byRole": {
+      "family": {
+        "sampleSize": 6,
+        "fixtureCount": 6,
+        "available": 6,
+        "unavailable": 0,
+        "rawCandidates": 3,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 3,
+        "acceptedCorrectSubtype": 3,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 3,
+        "falsePositives": 0,
+        "trueNegatives": 3,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "student": {
+        "sampleSize": 30,
+        "fixtureCount": 30,
+        "available": 30,
+        "unavailable": 0,
+        "rawCandidates": 11,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 11,
+        "acceptedCorrectSubtype": 11,
+        "acceptedSubtypePrecision": 1,
+        "truePositives": 11,
+        "falsePositives": 0,
+        "trueNegatives": 19,
+        "falseNegatives": 0,
+        "precision": 1,
+        "recall": 1
+      },
+      "unknown": {
+        "sampleSize": 0,
+        "fixtureCount": 0,
+        "available": 0,
+        "unavailable": 0,
+        "rawCandidates": 0,
+        "missingCandidateScoreCount": 0,
+        "acceptedCandidates": 0,
+        "acceptedCorrectSubtype": 0,
+        "acceptedSubtypePrecision": null,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "trueNegatives": 0,
+        "falseNegatives": 0,
+        "precision": null,
+        "recall": null
+      }
+    },
+    "interpretation": "The calibration threshold is applied unchanged to every evaluated group. Unavailable classifications are excluded from precision/recall and counted separately. This measures label/probability filtering, not the full observer disposition or authorization to act."
+  },
+  "budget": {
+    "capUsd": 5,
+    "reservationUsd": 0.05,
+    "maxRequests": 60,
+    "requestCount": 39,
+    "spentUsd": 0.0027367,
+    "reservedUsd": 0.15,
+    "availableUsd": 4.8472633,
+    "overspentUsd": 0,
+    "unknownCount": 3
+  },
+  "records": [
+    {
+      "fixtureId": "en-exploration-start",
+      "language": "en",
+      "role": "family",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.98,
+        "confidence": 0.98,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.98,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 971.2341999999999,
+      "reason": null,
+      "usage": {
+        "input_tokens": 725,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 725
+      }
+    },
+    {
+      "fixtureId": "en-application-simplify",
+      "language": "en",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.87,
+        "confidence": 0.84,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.12,
+          "simpler_explanation": 0.87,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 310.6015,
+      "reason": null,
+      "usage": {
+        "input_tokens": 715,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 715
+      }
+    },
+    {
+      "fixtureId": "en-office-next",
+      "language": "en",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.93,
+        "confidence": 0.91,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.04,
+          "next_step": 0.93,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 166.6434999999999,
+      "reason": null,
+      "usage": {
+        "input_tokens": 795,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 795
+      }
+    },
+    {
+      "fixtureId": "en-paying-factual",
+      "language": "en",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.97,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 253.7736,
+      "reason": null,
+      "usage": {
+        "input_tokens": 717,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 717
+      }
+    },
+    {
+      "fixtureId": "en-brief-ack",
+      "language": "en",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.97,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 116.00900000000001,
+      "reason": null,
+      "usage": {
+        "input_tokens": 793,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 793
+      }
+    },
+    {
+      "fixtureId": "en-interrupted-request",
+      "language": "en",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 1,
+        "confidence": 1,
+        "probabilities": {
+          "none": 0,
+          "starting_point": 0,
+          "simpler_explanation": 0,
+          "next_step": 0,
+          "unclear": 1
+        }
+      },
+      "status": "completed",
+      "durationMs": 147.84969999999998,
+      "reason": null,
+      "usage": {
+        "input_tokens": 707,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 707
+      }
+    },
+    {
+      "fixtureId": "en-changed-question",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.97,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 152.0906,
+      "reason": null,
+      "usage": {
+        "input_tokens": 762,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 762
+      }
+    },
+    {
+      "fixtureId": "en-quoted-request",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.99,
+        "confidence": 0.99,
+        "probabilities": {
+          "none": 0.99,
+          "starting_point": 0.01,
+          "simpler_explanation": 0,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 258.2761999999998,
+      "reason": null,
+      "usage": {
+        "input_tokens": 747,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 747
+      }
+    },
+    {
+      "fixtureId": "en-declined-help",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.93,
+        "confidence": 0.91,
+        "probabilities": {
+          "none": 0.93,
+          "starting_point": 0.03,
+          "simpler_explanation": 0.02,
+          "next_step": 0.01,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 162.1233000000002,
+      "reason": null,
+      "usage": {
+        "input_tokens": 772,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 772
+      }
+    },
+    {
+      "fixtureId": "en-start-already-addressed",
+      "language": "en",
+      "role": "family",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": true
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": true,
+        "addressedProbability": 1,
+        "selectedProbability": 0.94,
+        "confidence": 0.93,
+        "probabilities": {
+          "none": 0.03,
+          "starting_point": 0.94,
+          "simpler_explanation": 0.02,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 151.3096999999998,
+      "reason": null,
+      "usage": {
+        "input_tokens": 798,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 798
+      }
+    },
+    {
+      "fixtureId": "en-incomplete-next",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.83,
+        "confidence": 0.79,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0.14,
+          "unclear": 0.83
+        }
+      },
+      "status": "completed",
+      "durationMs": 139.72940000000017,
+      "reason": null,
+      "usage": {
+        "input_tokens": 709,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 709
+      }
+    },
+    {
+      "fixtureId": "en-research-mid-explanation",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.98,
+        "confidence": 0.98,
+        "probabilities": {
+          "none": 0,
+          "starting_point": 0.02,
+          "simpler_explanation": 0.98,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 176.35040000000026,
+      "reason": null,
+      "usage": {
+        "input_tokens": 899,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 899
+      }
+    },
+    {
+      "fixtureId": "en-adult-learner-start",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.96,
+        "confidence": 0.95,
+        "probabilities": {
+          "none": 0.02,
+          "starting_point": 0.96,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 114.89179999999988,
+      "reason": null,
+      "usage": {
+        "input_tokens": 739,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 739
+      }
+    },
+    {
+      "fixtureId": "en-campus-support-next",
+      "language": "en",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.78,
+        "confidence": 0.73,
+        "probabilities": {
+          "none": 0.04,
+          "starting_point": 0.04,
+          "simpler_explanation": 0.11,
+          "next_step": 0.78,
+          "unclear": 0.03
+        }
+      },
+      "status": "completed",
+      "durationMs": 150.42079999999987,
+      "reason": null,
+      "usage": {
+        "input_tokens": 797,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 797
+      }
+    },
+    {
+      "fixtureId": "es-exploration-start",
+      "language": "es",
+      "role": "family",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 1,
+        "confidence": 1,
+        "probabilities": {
+          "none": 0,
+          "starting_point": 1,
+          "simpler_explanation": 0,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 380.38520000000017,
+      "reason": null,
+      "usage": {
+        "input_tokens": 727,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 727
+      }
+    },
+    {
+      "fixtureId": "es-application-simplify",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.92,
+        "confidence": 0.9,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.07,
+          "simpler_explanation": 0.92,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 126.56320000000005,
+      "reason": null,
+      "usage": {
+        "input_tokens": 725,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 725
+      }
+    },
+    {
+      "fixtureId": "es-office-next",
+      "language": "es",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.84,
+        "confidence": 0.8,
+        "probabilities": {
+          "none": 0.04,
+          "starting_point": 0.02,
+          "simpler_explanation": 0.08,
+          "next_step": 0.84,
+          "unclear": 0.02
+        }
+      },
+      "status": "completed",
+      "durationMs": 249.83460000000014,
+      "reason": null,
+      "usage": {
+        "input_tokens": 800,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 800
+      }
+    },
+    {
+      "fixtureId": "es-paying-factual",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.94,
+        "confidence": 0.93,
+        "probabilities": {
+          "none": 0.94,
+          "starting_point": 0.02,
+          "simpler_explanation": 0.02,
+          "next_step": 0.01,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 240.29309999999987,
+      "reason": null,
+      "usage": {
+        "input_tokens": 725,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 725
+      }
+    },
+    {
+      "fixtureId": "es-brief-ack",
+      "language": "es",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0.01,
+        "selectedProbability": 0.9,
+        "confidence": 0.87,
+        "probabilities": {
+          "none": 0.9,
+          "starting_point": 0.03,
+          "simpler_explanation": 0.01,
+          "next_step": 0.01,
+          "unclear": 0.05
+        }
+      },
+      "status": "completed",
+      "durationMs": 110.65619999999944,
+      "reason": null,
+      "usage": {
+        "input_tokens": 787,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 787
+      }
+    },
+    {
+      "fixtureId": "es-interrupted-request",
+      "language": "es",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0,
+          "simpler_explanation": 0,
+          "next_step": 0.02,
+          "unclear": 0.97
+        }
+      },
+      "status": "completed",
+      "durationMs": 300.27610000000004,
+      "reason": null,
+      "usage": {
+        "input_tokens": 709,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 709
+      }
+    },
+    {
+      "fixtureId": "es-changed-question",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.96,
+        "confidence": 0.95,
+        "probabilities": {
+          "none": 0.96,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0.01,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 170.88850000000002,
+      "reason": null,
+      "usage": {
+        "input_tokens": 769,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 769
+      }
+    },
+    {
+      "fixtureId": "es-quoted-request",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.99,
+        "confidence": 0.99,
+        "probabilities": {
+          "none": 0.99,
+          "starting_point": 0,
+          "simpler_explanation": 0,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 119.25740000000042,
+      "reason": null,
+      "usage": {
+        "input_tokens": 755,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 755
+      }
+    },
+    {
+      "fixtureId": "es-declined-help",
+      "language": "es",
+      "role": "family",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.94,
+        "confidence": 0.93,
+        "probabilities": {
+          "none": 0.94,
+          "starting_point": 0.03,
+          "simpler_explanation": 0.01,
+          "next_step": 0.01,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 130.86430000000018,
+      "reason": null,
+      "usage": {
+        "input_tokens": 762,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 762
+      }
+    },
+    {
+      "fixtureId": "es-start-already-addressed",
+      "language": "es",
+      "role": "family",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": true
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": true,
+        "addressedProbability": 1,
+        "selectedProbability": 0.92,
+        "confidence": 0.9,
+        "probabilities": {
+          "none": 0.04,
+          "starting_point": 0.92,
+          "simpler_explanation": 0.03,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 137.77149999999983,
+      "reason": null,
+      "usage": {
+        "input_tokens": 776,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 776
+      }
+    },
+    {
+      "fixtureId": "es-incomplete-next",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.87,
+        "confidence": 0.84,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0.1,
+          "unclear": 0.87
+        }
+      },
+      "status": "completed",
+      "durationMs": 127.99290000000019,
+      "reason": null,
+      "usage": {
+        "input_tokens": 711,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 711
+      }
+    },
+    {
+      "fixtureId": "es-research-mid-explanation",
+      "language": "es",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.86,
+        "confidence": 0.82,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.13,
+          "simpler_explanation": 0.86,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 123.02059999999983,
+      "reason": null,
+      "usage": {
+        "input_tokens": 909,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 909
+      }
+    },
+    {
+      "fixtureId": "es-adult-learner-start",
+      "language": "es",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "starting_point",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.96,
+        "confidence": 0.95,
+        "probabilities": {
+          "none": 0.02,
+          "starting_point": 0.96,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 132.7497999999996,
+      "reason": null,
+      "usage": {
+        "input_tokens": 745,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 745
+      }
+    },
+    {
+      "fixtureId": "es-campus-support-next",
+      "language": "es",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.91,
+        "confidence": 0.89,
+        "probabilities": {
+          "none": 0.02,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.05,
+          "next_step": 0.91,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 149.34009999999944,
+      "reason": null,
+      "usage": {
+        "input_tokens": 800,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 800
+      }
+    },
+    {
+      "fixtureId": "mixed-paying-simplify",
+      "language": "mixed",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.96,
+        "confidence": 0.95,
+        "probabilities": {
+          "none": 0,
+          "starting_point": 0.04,
+          "simpler_explanation": 0.96,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 122.22199999999975,
+      "reason": null,
+      "usage": {
+        "input_tokens": 731,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 731
+      }
+    },
+    {
+      "fixtureId": "mixed-demographics-not-request",
+      "language": "mixed",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.97,
+          "starting_point": 0.01,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 136.4966000000004,
+      "reason": null,
+      "usage": {
+        "input_tokens": 731,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 731
+      }
+    },
+    {
+      "fixtureId": "mixed-family-next",
+      "language": "mixed",
+      "role": "family",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "next_step",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.58,
+        "confidence": 0.47,
+        "probabilities": {
+          "none": 0.04,
+          "starting_point": 0.12,
+          "simpler_explanation": 0.23,
+          "next_step": 0.58,
+          "unclear": 0.03
+        }
+      },
+      "status": "completed",
+      "durationMs": 160.35810000000038,
+      "reason": null,
+      "usage": {
+        "input_tokens": 793,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 793
+      }
+    },
+    {
+      "fixtureId": "mixed-brief-ack",
+      "language": "mixed",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.99,
+        "confidence": 0.99,
+        "probabilities": {
+          "none": 0.99,
+          "starting_point": 0.01,
+          "simpler_explanation": 0,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 207.46479999999974,
+      "reason": null,
+      "usage": {
+        "input_tokens": 748,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 748
+      }
+    },
+    {
+      "fixtureId": "mixed-declined-after-request",
+      "language": "mixed",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.95,
+        "confidence": 0.94,
+        "probabilities": {
+          "none": 0.95,
+          "starting_point": 0.03,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 203.3135999999995,
+      "reason": null,
+      "usage": {
+        "input_tokens": 757,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 757
+      }
+    },
+    {
+      "fixtureId": "mixed-explanation-already-addressed",
+      "language": "mixed",
+      "role": "student",
+      "split": "calibration",
+      "expected": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": true
+      },
+      "result": {
+        "supportNeed": "simpler_explanation",
+        "alreadyAddressed": true,
+        "addressedProbability": 0.99,
+        "selectedProbability": 0.97,
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.02,
+          "simpler_explanation": 0.97,
+          "next_step": 0,
+          "unclear": 0
+        }
+      },
+      "status": "completed",
+      "durationMs": 227.23970000000008,
+      "reason": null,
+      "usage": {
+        "input_tokens": 774,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 774
+      }
+    },
+    {
+      "fixtureId": "mixed-interrupted-question",
+      "language": "mixed",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "unclear",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.95,
+        "confidence": 0.94,
+        "probabilities": {
+          "none": 0.01,
+          "starting_point": 0.01,
+          "simpler_explanation": 0,
+          "next_step": 0.03,
+          "unclear": 0.95
+        }
+      },
+      "status": "completed",
+      "durationMs": 169.85210000000006,
+      "reason": null,
+      "usage": {
+        "input_tokens": 709,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 709
+      }
+    },
+    {
+      "fixtureId": "mixed-earlier-help-new-fact",
+      "language": "mixed",
+      "role": "student",
+      "split": "holdout",
+      "expected": {
+        "supportNeed": "none",
+        "alreadyAddressed": false
+      },
+      "result": {
+        "supportNeed": "none",
+        "alreadyAddressed": false,
+        "addressedProbability": 0,
+        "selectedProbability": 0.96,
+        "confidence": 0.95,
+        "probabilities": {
+          "none": 0.96,
+          "starting_point": 0.02,
+          "simpler_explanation": 0.01,
+          "next_step": 0,
+          "unclear": 0.01
+        }
+      },
+      "status": "completed",
+      "durationMs": 481.72209999999995,
+      "reason": null,
+      "usage": {
+        "input_tokens": 749,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 749
+      }
+    }
+  ],
+  "limitations": [
+    "Authored fictional fixtures; related scenario templates cross splits.",
+    "No live integration, playback, voice-quality or production evaluation.",
+    "Three earlier transport failures retain $0.15 reservations."
+  ]
+}

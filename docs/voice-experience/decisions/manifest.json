@@ -1,0 +1,291 @@
+{
+  "scope": "All Decisions pages discovered in official indexes and Decisions-page links; selected supporting Live, Responses and operational contracts.",
+  "refreshed_at": "2026-11-08T02:01:12.959729+00:00",
+  "discovery": [
+    {
+      "source": "https://developers.openai.com/api/reference/llms.txt",
+      "retrieved_at": "2026-11-08T02:01:09.189682+00:00",
+      "sha256": "011c60869f95f7156165e63e08e249853dd73c99c2b19c3ac57846d087480626",
+      "decisions_urls": []
+    },
+    {
+      "source": "https://developers.openai.com/llms.txt",
+      "retrieved_at": "2026-11-08T02:01:09.321653+00:00",
+      "sha256": "b40e651d5d657741912bbbe1696644c295190d46e6f74c089b93f8c98de53e28",
+      "decisions_urls": []
+    }
+  ],
+  "pages": [
+    {
+      "source": "https://developers.openai.com/api/docs/guides/decisions",
+      "download_url": "https://developers.openai.com/api/docs/guides/decisions.md",
+      "file": "pages/api/docs/guides/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:09.449104+00:00",
+      "sha256": "ec2c5d873c9499ea9d5bb9e9bc4c6cdb0cb2c324be16f94154b9af7a606dbf12",
+      "bytes": 37788
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/decisions-voice",
+      "download_url": "https://developers.openai.com/api/docs/guides/decisions-voice.md",
+      "file": "pages/api/docs/guides/decisions-voice.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:09.426940+00:00",
+      "sha256": "1898af78aa4b82c0fc4307e1d5753f438f20b11b1282b82bcdda584518777123",
+      "bytes": 13529
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/function-calling",
+      "download_url": "https://developers.openai.com/api/docs/guides/function-calling.md",
+      "file": "pages/api/docs/guides/function-calling.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.524237+00:00",
+      "sha256": "48e808dac090d4b4b1de25bc207c667eee38d3471e98679146887a7ad5c15056",
+      "bytes": 77188
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/latency-optimization",
+      "download_url": "https://developers.openai.com/api/docs/guides/latency-optimization.md",
+      "file": "pages/api/docs/guides/latency-optimization.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.477563+00:00",
+      "sha256": "1a57f7b85e4d6c43dc7f621a0a8e387cb7b452636cda2087f6e1f12a87c196e8",
+      "bytes": 24037
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/live",
+      "download_url": "https://developers.openai.com/api/docs/guides/live.md",
+      "file": "pages/api/docs/guides/live.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:12.959295+00:00",
+      "sha256": "9f553eb5f3fdf2013519a868886132284ac3166c50dce180d07225f6fe678420",
+      "bytes": 6299
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/live-conversations",
+      "download_url": "https://developers.openai.com/api/docs/guides/live-conversations.md",
+      "file": "pages/api/docs/guides/live-conversations.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.558913+00:00",
+      "sha256": "d9f153e0c84bbe5aceb5593bbab98a62b1f8a589aaadeb34e144a03294d9ec89",
+      "bytes": 52846
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/live-delegation",
+      "download_url": "https://developers.openai.com/api/docs/guides/live-delegation.md",
+      "file": "pages/api/docs/guides/live-delegation.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.567296+00:00",
+      "sha256": "fbf98b070ce283b1ffbc91ebe86accb277c02f4afac84dafe89c1680263d0383",
+      "bytes": 56010
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/live-prompting",
+      "download_url": "https://developers.openai.com/api/docs/guides/live-prompting.md",
+      "file": "pages/api/docs/guides/live-prompting.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.648323+00:00",
+      "sha256": "6b3d4207d3d2a47f3b819e8244b43f744499e81c4f7e34b77bddc55af7df2c57",
+      "bytes": 43806
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/private-link",
+      "download_url": "https://developers.openai.com/api/docs/guides/private-link.md",
+      "file": "pages/api/docs/guides/private-link.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:12.902746+00:00",
+      "sha256": "17d8c77b67499a3f44fde7bd9907f859e9db9310c5b9c2aeebdcabb5f3950dd7",
+      "bytes": 14309
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/prompt-caching",
+      "download_url": "https://developers.openai.com/api/docs/guides/prompt-caching.md",
+      "file": "pages/api/docs/guides/prompt-caching.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.688252+00:00",
+      "sha256": "8c672dafd6a332d4b9ad7464aefa3ca4f6b0fffa8bf66bb5ee087e1b39152711",
+      "bytes": 56584
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/safety-best-practices",
+      "download_url": "https://developers.openai.com/api/docs/guides/safety-best-practices.md",
+      "file": "pages/api/docs/guides/safety-best-practices.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.667900+00:00",
+      "sha256": "2f79db6c7fca2f032cf379b96e004518cad88ca040a4561b20b8c17a00c5bb1f",
+      "bytes": 10235
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/structured-outputs",
+      "download_url": "https://developers.openai.com/api/docs/guides/structured-outputs.md",
+      "file": "pages/api/docs/guides/structured-outputs.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.732508+00:00",
+      "sha256": "dcd211d602a85c8573033559384424d6ebc86af73a844e752822ed868d82032b",
+      "bytes": 144810
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/voice-agents",
+      "download_url": "https://developers.openai.com/api/docs/guides/voice-agents.md",
+      "file": "pages/api/docs/guides/voice-agents.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.797294+00:00",
+      "sha256": "514995ddc6f775e382127a5db29bdef06b4f5002386406f5cf82cbbd269dd2d2",
+      "bytes": 10080
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/voice-server-controls",
+      "download_url": "https://developers.openai.com/api/docs/guides/voice-server-controls.md",
+      "file": "pages/api/docs/guides/voice-server-controls.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.811874+00:00",
+      "sha256": "5d5674791b0c7f2d6acc6890c5241b5d5c98efc8a818b06aff60c687d096778d",
+      "bytes": 22736
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/voice-webrtc",
+      "download_url": "https://developers.openai.com/api/docs/guides/voice-webrtc.md",
+      "file": "pages/api/docs/guides/voice-webrtc.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:12.907569+00:00",
+      "sha256": "868c18a56c0cc60d2d01626e18308aaad1cf2f89febd9e850198ab0c4e30fe1c",
+      "bytes": 41424
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/guides/your-data",
+      "download_url": "https://developers.openai.com/api/docs/guides/your-data.md",
+      "file": "pages/api/docs/guides/your-data.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:09.910888+00:00",
+      "sha256": "16e953514150dd5cbf2c599868ca14253c3b8d78cd7268e950a6f665418565ed",
+      "bytes": 85798
+    },
+    {
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "download_url": "https://developers.openai.com/api/docs/pricing.md",
+      "file": "pages/api/docs/pricing.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:12.956444+00:00",
+      "sha256": "f1ade44afc62fd8a12dd6e199bcecaa989a94c9b691aa620a34e1504ff62ff57",
+      "bytes": 22062
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/cli/resources/decisions",
+      "download_url": "https://developers.openai.com/api/reference/cli/resources/decisions.md",
+      "file": "pages/api/reference/cli/resources/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:10.063957+00:00",
+      "sha256": "ff746ca7b07db014fa55591c4244fbea3214a2308e65036f0c646cdd7a19705b",
+      "bytes": 17890
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/cli/resources/decisions/methods/create",
+      "download_url": "https://developers.openai.com/api/reference/cli/resources/decisions/methods/create.md",
+      "file": "pages/api/reference/cli/resources/decisions/methods/create.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:11.807222+00:00",
+      "sha256": "57589e9637a10300767fa4bc656f02b3351c0051039b992df795c5acac40d367",
+      "bytes": 5804
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/python/resources/decisions",
+      "download_url": "https://developers.openai.com/api/reference/python/resources/decisions.md",
+      "file": "pages/api/reference/python/resources/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:12.150530+00:00",
+      "sha256": "7b8ac9cc6ac58736db036fca8de82190ca053ec068695162ed6ae72e6b8ec797",
+      "bytes": 30915
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/python/resources/decisions/methods/create",
+      "download_url": "https://developers.openai.com/api/reference/python/resources/decisions/methods/create.md",
+      "file": "pages/api/reference/python/resources/decisions/methods/create.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:10.218089+00:00",
+      "sha256": "7f29346cd7e803da52e10e1896a3c76c4e6f202964ff120560ac6e94e529994f",
+      "bytes": 18978
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/decisions",
+      "download_url": "https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/decisions.md",
+      "file": "pages/api/reference/resources/admin/subresources/organization/subresources/usage/methods/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:10.181358+00:00",
+      "sha256": "d30ace68b17e620f5c6fd06a4470117ce5889a82070f7cb621ce48857a48006e",
+      "bytes": 8947
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/decisions",
+      "download_url": "https://developers.openai.com/api/reference/resources/decisions.md",
+      "file": "pages/api/reference/resources/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:10.328889+00:00",
+      "sha256": "02ba35060641fb10a7b962fe52e8aaeff57ab7372386f90f9ec2cd1890974cd9",
+      "bytes": 36337
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/decisions/methods/create",
+      "download_url": "https://developers.openai.com/api/reference/resources/decisions/methods/create.md",
+      "file": "pages/api/reference/resources/decisions/methods/create.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:10.410545+00:00",
+      "sha256": "81ed3d5acafa86851393852652fbaa33b1f44b2a85ac1a7ca14b273d4a9d06cd",
+      "bytes": 22781
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/live/methods/create",
+      "download_url": "https://developers.openai.com/api/reference/resources/live/methods/create.md",
+      "file": "pages/api/reference/resources/live/methods/create.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:10.479267+00:00",
+      "sha256": "5c7289656e05f2b7b8c31c9f5ea99dc04ac51e8b07e4591860940f0cb29dbbfc",
+      "bytes": 42259
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/live/primary-websocket",
+      "download_url": "https://developers.openai.com/api/reference/resources/live/primary-websocket.md",
+      "file": "pages/api/reference/resources/live/primary-websocket.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:10.659123+00:00",
+      "sha256": "d1d7071a9034840834d21fa9992070b10f64cce80960e774ed79277b0b3167a8",
+      "bytes": 384993
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/resources/live/sideband-websocket",
+      "download_url": "https://developers.openai.com/api/reference/resources/live/sideband-websocket.md",
+      "file": "pages/api/reference/resources/live/sideband-websocket.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:10.858221+00:00",
+      "sha256": "efcb6e9a56cc17a88ac9a61bcfb1c5414cda60f12c6db1b34cd71b957593448f",
+      "bytes": 346844
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/responses/overview",
+      "download_url": "https://developers.openai.com/api/reference/responses/overview.md",
+      "file": "pages/api/reference/responses/overview.md",
+      "category": "supporting-guidance",
+      "retrieved_at": "2026-11-08T02:01:10.743060+00:00",
+      "sha256": "ccfeff16e3ca6ae0f1d84c70282f78e805fb2961b878cf0b79557f16a3fae76c",
+      "bytes": 1336
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/typescript/resources/decisions",
+      "download_url": "https://developers.openai.com/api/reference/typescript/resources/decisions.md",
+      "file": "pages/api/reference/typescript/resources/decisions.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:12.786376+00:00",
+      "sha256": "e75b79c39871068b5e9a13d5d362a30ef220a0155ef56cd9b7632ae5fa95d0cc",
+      "bytes": 30046
+    },
+    {
+      "source": "https://developers.openai.com/api/reference/typescript/resources/decisions/methods/create",
+      "download_url": "https://developers.openai.com/api/reference/typescript/resources/decisions/methods/create.md",
+      "file": "pages/api/reference/typescript/resources/decisions/methods/create.md",
+      "category": "decisions",
+      "retrieved_at": "2026-11-08T02:01:12.813470+00:00",
+      "sha256": "5cf5caabaa817cd03f115f400621f97f55ed3458712c0b352f0eff2aaa3a9f62",
+      "bytes": 18520
+    }
+  ],
+  "failures": []
+}

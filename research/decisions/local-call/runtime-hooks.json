@@ -1,0 +1,17 @@
+{
+  "purpose": "Two local-only dependency-injection hooks; production rejects custom factories. All other runtime files must match the original baseline.",
+  "files": [
+    {
+      "path": "server/index.mjs",
+      "baselineSha256": "e6e1a5259268a676f481bafa473d4a0eb015addd8ee11bce7399f7ec1818133b",
+      "baselineNewlines": "crlf",
+      "reviewedSha256": "ecab2712c29b5eaf985c4976e83ba01b080b89483ca6b9b7f2a7af1bdb6acf1d"
+    },
+    {
+      "path": "server/voice-control.mjs",
+      "baselineSha256": "2336d769eb7d5a19a85e2c6081ac087db0b23dfb8acdb5de6f4e0b2fea7ddab1",
+      "baselineNewlines": "crlf",
+      "reviewedSha256": "0dbac8a1abc9f49dd27891435e34ff73b02752df45851535c5c758fb088a1009"
+    }
+  ]
+}

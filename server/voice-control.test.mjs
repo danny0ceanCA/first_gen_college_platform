@@ -260,7 +260,7 @@ class Provider extends EventEmitter{
 }
 async function transportFixture(options={}){
  let revision=1;const providers=[],urls=[],logs=[];
- const control=createVoiceControl({resumeGraceMs:options.resumeGraceMs,heartbeatIntervalMs:options.heartbeatIntervalMs,env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
+ const control=createVoiceControl({productionSessionFactory:options.productionSessionFactory,resumeGraceMs:options.resumeGraceMs,heartbeatIntervalMs:options.heartbeatIntervalMs,env:{ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',ALLOWED_ORIGINS:'http://allowed.test',...options.env},authenticate:async token=>{if(!['owner','other'].includes(token))throw Error('invalid');return {sub:token};},authorize:async()=>revision,request:options.request|| (async()=>({})),log:event=>logs.push(event),connect:url=>{urls.push(url);const socket=new Provider();providers.push(socket);return socket;}});
  const server=createServer();control.attach(server);await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const receipt=(providerId='live_session_prefixed')=>control.register({subject:'owner',permissionRevision:1,providerId,sessionId:'call',scope:{sessionId:'call',studentId:'aiden',confirmed:true},config:{...config,...options.config}});
  const connect=async(origin='http://allowed.test',socketOptions={})=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}/api/voice-control`,{...socketOptions,origin});ws.on('error',()=>{});const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');return {ws,messages};};
@@ -602,4 +602,13 @@ for(const [language,{answer,spoken}] of Object.entries(discussionExamples))test(
   assert.equal(primaryWrites.length,0,'no browser provider writes during research or speech');
   assert.ok(!provider.sent.some(e=>['response.cancel','session.input_audio.mute','session.instructions.append'].includes(e.type)));
  }finally{channel.close();await f.close();}
+});
+
+for(const enabled of [false,true])test('authenticated socket selects production Decisions factory only when enabled: '+enabled,async()=>{
+ const received=[];const f=await transportFixture({env:{NODE_ENV:'production',ORIGEN_DECISIONS_SUPPORT:String(enabled)},productionSessionFactory:options=>{received.push(options);return voiceControlSession(options);}});
+ try{const receipt=f.receipt(),{ws,messages}=await f.connect();ws.send(JSON.stringify({type:'authenticate',token:'owner',id:receipt.id}));
+ await until(()=>messages.some(row=>row.type==='ready'));assert.equal(received.length,enabled?1:0);
+ if(enabled){assert.equal(received[0].subject,'owner');assert.equal(received[0].scope.studentId,'aiden');assert.equal(received[0].config.instructions,config.instructions);}
+ assert.equal(f.providers[0].sent.filter(row=>['session.instructions.append','session.commentary.append'].includes(row.type)).length,0);
+ }finally{await f.close();}
 });

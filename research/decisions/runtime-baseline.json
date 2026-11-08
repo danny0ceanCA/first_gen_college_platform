@@ -1,0 +1,6 @@
+{
+  "commit": "f4073c02e561cfd4dbb997cedc535427e7bd1083",
+  "files": 3163,
+  "sha256": "0b40a73eaaaf42c288915f9fcfa60857228751d97719555b57e0187c975d834b",
+  "scope": "All tracked files at implementation start, excluding docs and AGENTS.md. New isolated research/decisions files are excluded from subsequent checks. Hash = SHA256 of sorted UTF-8 path + NUL + SHA256(file bytes)."
+}

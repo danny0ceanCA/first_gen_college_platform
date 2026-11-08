@@ -1,0 +1,258 @@
+{
+  "mode": "real-fictional-only",
+  "runId": "broad-en-es-20261108-c",
+  "rubricVersion": "conversation-observation-3",
+  "requested": 48,
+  "evaluated": 48,
+  "evaluation": {
+    "overall": {
+      "cases": 48,
+      "completed": 48,
+      "supportCorrect": 48,
+      "alreadyAddressedCorrect": 48,
+      "exactCases": 44,
+      "p50Ms": 204.2219,
+      "p95Ms": 460.8047999999999,
+      "predicates": {
+        "changed_question": {
+          "assessed": 48,
+          "correctStatus": 48,
+          "expectedUnavailable": 0,
+          "expectedProvisional": 2,
+          "binaryCases": 46,
+          "truePositive": 6,
+          "falsePositive": 0,
+          "missedPositive": 0
+        },
+        "research_relevant_now": {
+          "assessed": 48,
+          "correctStatus": 46,
+          "expectedUnavailable": 28,
+          "expectedProvisional": 2,
+          "binaryCases": 18,
+          "truePositive": 14,
+          "falsePositive": 2,
+          "missedPositive": 0
+        },
+        "comparison_mismatch": {
+          "assessed": 48,
+          "correctStatus": 46,
+          "expectedUnavailable": 36,
+          "expectedProvisional": 2,
+          "binaryCases": 10,
+          "truePositive": 4,
+          "falsePositive": 0,
+          "missedPositive": 2
+        },
+        "repeated_answer": {
+          "assessed": 48,
+          "correctStatus": 48,
+          "expectedUnavailable": 0,
+          "expectedProvisional": 2,
+          "binaryCases": 46,
+          "truePositive": 2,
+          "falsePositive": 0,
+          "missedPositive": 0
+        },
+        "direction_needed": {
+          "assessed": 48,
+          "correctStatus": 48,
+          "expectedUnavailable": 0,
+          "expectedProvisional": 2,
+          "binaryCases": 46,
+          "truePositive": 4,
+          "falsePositive": 0,
+          "missedPositive": 0
+        }
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "cases": 24,
+        "completed": 24,
+        "supportCorrect": 24,
+        "alreadyAddressedCorrect": 24,
+        "exactCases": 22,
+        "p50Ms": 216.22980000000007,
+        "p95Ms": 460.8047999999999,
+        "predicates": {
+          "changed_question": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 3,
+            "falsePositive": 0,
+            "missedPositive": 0
+          },
+          "research_relevant_now": {
+            "assessed": 24,
+            "correctStatus": 23,
+            "expectedUnavailable": 14,
+            "expectedProvisional": 1,
+            "binaryCases": 9,
+            "truePositive": 7,
+            "falsePositive": 1,
+            "missedPositive": 0
+          },
+          "comparison_mismatch": {
+            "assessed": 24,
+            "correctStatus": 23,
+            "expectedUnavailable": 18,
+            "expectedProvisional": 1,
+            "binaryCases": 5,
+            "truePositive": 2,
+            "falsePositive": 0,
+            "missedPositive": 1
+          },
+          "repeated_answer": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 1,
+            "falsePositive": 0,
+            "missedPositive": 0
+          },
+          "direction_needed": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 2,
+            "falsePositive": 0,
+            "missedPositive": 0
+          }
+        }
+      },
+      "es": {
+        "cases": 24,
+        "completed": 24,
+        "supportCorrect": 24,
+        "alreadyAddressedCorrect": 24,
+        "exactCases": 22,
+        "p50Ms": 191.06179999999995,
+        "p95Ms": 346.27050000000054,
+        "predicates": {
+          "changed_question": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 3,
+            "falsePositive": 0,
+            "missedPositive": 0
+          },
+          "research_relevant_now": {
+            "assessed": 24,
+            "correctStatus": 23,
+            "expectedUnavailable": 14,
+            "expectedProvisional": 1,
+            "binaryCases": 9,
+            "truePositive": 7,
+            "falsePositive": 1,
+            "missedPositive": 0
+          },
+          "comparison_mismatch": {
+            "assessed": 24,
+            "correctStatus": 23,
+            "expectedUnavailable": 18,
+            "expectedProvisional": 1,
+            "binaryCases": 5,
+            "truePositive": 2,
+            "falsePositive": 0,
+            "missedPositive": 1
+          },
+          "repeated_answer": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 1,
+            "falsePositive": 0,
+            "missedPositive": 0
+          },
+          "direction_needed": {
+            "assessed": 24,
+            "correctStatus": 24,
+            "expectedUnavailable": 0,
+            "expectedProvisional": 1,
+            "binaryCases": 23,
+            "truePositive": 2,
+            "falsePositive": 0,
+            "missedPositive": 0
+          }
+        }
+      }
+    },
+    "failures": [
+      {
+        "fixtureId": "en-broad-coexisting",
+        "status": "completed",
+        "mismatches": [
+          {
+            "field": "comparison_mismatch",
+            "expected": "observed",
+            "actual": "unavailable"
+          }
+        ],
+        "reason": null
+      },
+      {
+        "fixtureId": "es-broad-coexisting",
+        "status": "completed",
+        "mismatches": [
+          {
+            "field": "comparison_mismatch",
+            "expected": "observed",
+            "actual": "unavailable"
+          }
+        ],
+        "reason": null
+      },
+      {
+        "fixtureId": "en-broad-comparison-missing-scope",
+        "status": "completed",
+        "mismatches": [
+          {
+            "field": "research_relevant_now",
+            "expected": "not_observed",
+            "actual": "observed"
+          }
+        ],
+        "reason": null
+      },
+      {
+        "fixtureId": "es-broad-comparison-missing-scope",
+        "status": "completed",
+        "mismatches": [
+          {
+            "field": "research_relevant_now",
+            "expected": "not_observed",
+            "actual": "observed"
+          }
+        ],
+        "reason": null
+      }
+    ]
+  },
+  "budget": {
+    "capUsd": 2,
+    "reservationUsd": 0.05,
+    "maxRequests": 120,
+    "requestCount": 99,
+    "spentUsd": 0.0307234,
+    "reservedUsd": 0.15,
+    "availableUsd": 1.8192766,
+    "overspentUsd": 0,
+    "unknownCount": 3
+  },
+  "liveConnections": 0,
+  "intervention": false,
+  "limitation": "Authored paired text cases evaluate observation only. No production, live audio, independent holdout, factual research verification or conversation improvement is established."
+}

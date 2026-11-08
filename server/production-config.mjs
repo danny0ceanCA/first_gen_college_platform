@@ -9,6 +9,8 @@ import {activationConfiguration} from './coordinator-activation.mjs';
 // Return field names/reasons only. Never include configuration values or secrets.
 export function productionConfigIssues(env){
  const issues=[...coordinatorConfigurationIssues(env),...organizationConfigurationIssues(env)];
+ if(env.ORIGEN_DECISIONS_SUPPORT&&!['true','false'].includes(env.ORIGEN_DECISIONS_SUPPORT))issues.push('ORIGEN_DECISIONS_SUPPORT: use true or false');
+ if(env.ORIGEN_DECISIONS_SUPPORT==='true'&&(env.ORIGEN_LIVE_SERVER_CONTROL!=='true'||env.ORIGEN_BACKGROUND_RESEARCH!=='true'))issues.push('ORIGEN_DECISIONS_SUPPORT: server control and background research required');
  if((env.AUTH0_COORDINATOR_EVENTS_SECRET||env.AUTH0_COORDINATOR_CLIENT_IDS)&&!activationConfiguration(env).enabled)issues.push('AUTH0_COORDINATOR_EVENTS: a strong secret and an application client allowlist are required');
  try{registrationMailConfig(env);}catch{issues.push('REGISTRATION_EMAIL: valid transport, HTTPS public URL, sender and provider key required');}
  for(const key of ['ORIGEN_VOICE_PREPARATION','ORIGEN_BINDER_JOBS','ORIGEN_BINDER_CORRECTIONS','ORIGEN_GUIDED_CONVERSATION','ORIGEN_CONVERSATION_CONTINUITY','ORIGEN_CONVERSATION_RECOVERY'])if(env[key]&&!['true','false'].includes(env[key]))issues.push(`${key}: use true or false`);

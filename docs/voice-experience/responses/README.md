@@ -1,5 +1,9 @@
 # Responses documentation library
 
+For Decisions classifications and their Live integration, see the separate [Decisions documentation library](../decisions/README.md).
+
+For state, response continuation, Conversations endpoints and compaction, see the [conversation-state library](../conversation-state/README.md).
+
 See [Live Measurement Plan](LIVE_MEASUREMENT_PLAN.md) for implemented telemetry, report commands, limitations, and review templates.
 
 ## Living audit

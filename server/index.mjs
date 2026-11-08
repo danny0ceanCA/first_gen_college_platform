@@ -1,5 +1,6 @@
 import {createVoiceResearchJobsHandler,assertBackgroundResearchReady} from './voice-research-jobs.mjs';
 import {createVoiceControl} from './voice-control.mjs';
+import {createProductionDecisionsFactory,assertDecisionsReady} from './voice-decisions.mjs';
 import {createResearchCallObserver} from './research-trace.mjs';
 import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
 import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
@@ -104,7 +105,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
  let voiceServer;
- const voiceControl=createVoiceControl({env,authenticate,log,observeFactory:options=>createResearchCallObserver(database,{...options,env,log}),authorize:identity=>runAsAccount(identity,async()=>{
+ const voiceControl=createVoiceControl({env,authenticate,log,sessionFactory:reviewOptions.localObserverFactory,productionSessionFactory:createProductionDecisionsFactory({env,database}),observeFactory:options=>createResearchCallObserver(database,{...options,env,log}),authorize:identity=>runAsAccount(identity,async()=>{
   if(!database||await accountClosed(database,identity.sub))throw Error('account_closed');
   const eligibility=await permission.repository.read(identity.sub);if(!eligibilityAllowed(eligibility))throw Error('permission_required');return eligibility.revision;
  }),request:async(token,method,path,body,sessionId)=>{
@@ -248,6 +249,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const coordinatorTimer=setInterval(()=>{void coordinatorSweep();},30000);coordinatorTimer.unref();
   const application=createApp(process.env,undefined,database),server=createServer(application);application.attachServer(server);
   await assertBackgroundResearchReady(database,process.env);
+  await assertDecisionsReady(database,process.env);
   if(binderJobsEnabled(process.env)&&(!database||!maintenancePool||!await binderJobsReady(database)))throw new Error('binder_jobs_configuration_required');
    await assertOrganizationReady(database,process.env);
    await assertCorrectionsReady(database,process.env);

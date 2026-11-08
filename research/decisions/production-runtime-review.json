@@ -1,0 +1,59 @@
+{
+  "purpose": "Reviewed production Decisions connection; original runtime is intentionally changed, intro/prompt/UI files unchanged.",
+  "baselineCommit": "f4073c02e561cfd4dbb997cedc535427e7bd1083",
+  "reviewedAt": "2026-11-08T18:12:39.517Z",
+  "files": [
+    {
+      "path": "scripts/migrate-decisions.mjs",
+      "sha256": "3dfd6198b42da7b92e67d208f83eb4efa508a985279590a77fa66a00b4920527"
+    },
+    {
+      "path": "server/decisions-call-budget.mjs",
+      "sha256": "55d9fddcb9962fd5e505871c4928d129fee6927d844600b34362b3f323f236ab"
+    },
+    {
+      "path": "server/decisions-diagnostics-db.test.mjs",
+      "sha256": "2b86ab199955bc74b98ece8fa6eb7c982d3241e2ec76cba090f2eb2470667f33"
+    },
+    {
+      "path": "server/decisions-diagnostics.mjs",
+      "sha256": "81981477065374b3424157fa4c02f5e8573beebe6199e62a7abf55763c56a424"
+    },
+    {
+      "path": "server/fixtures/decisions-worker-test.mjs",
+      "sha256": "740096acbdf5b536a88f60d47b4bbb64301f40877273c363b19f0e56082fd941"
+    },
+    {
+      "path": "server/index.mjs",
+      "sha256": "ce829f0449783e179aeef8b5c24c6cf0a1cc130954d6de77e7ffaee11fe45fa0"
+    },
+    {
+      "path": "server/migrations/125_decisions_events.sql",
+      "sha256": "dbe4f446cab1be2c9a3083f40c4d4c79637f5c759bedaa0a7be58961063a2318"
+    },
+    {
+      "path": "server/production-config.mjs",
+      "sha256": "af035fd46fe50b106840c6dee7ca3664a397f73790f00cc842dcc0a6a4d1c829"
+    },
+    {
+      "path": "server/runtime-grants.mjs",
+      "sha256": "ca6fc1937be65bd0073f636eb79f5feeab5498b5864ad715d9b921781f517ef2"
+    },
+    {
+      "path": "server/voice-control.mjs",
+      "sha256": "742b83d7e7f1c32896f6ca8e3cf8d85a1aee2af0c14b92645ddd3b5d27ec9298"
+    },
+    {
+      "path": "server/voice-control.test.mjs",
+      "sha256": "718c86b8238ab9b3701e9f2fe855d7ab3a6dec2ae3fe52c18bf5301d304652ae"
+    },
+    {
+      "path": "server/voice-decisions.mjs",
+      "sha256": "e7f6a6c8cbc146416feb6d1a89b700a935c34805bf66f15fd677fa378c5964c4"
+    },
+    {
+      "path": "server/voice-decisions.test.mjs",
+      "sha256": "4561d0fd11e503f6ca3b273622fecb8b0fe2e5ea0e7f60c509adbe062c15af99"
+    }
+  ]
+}

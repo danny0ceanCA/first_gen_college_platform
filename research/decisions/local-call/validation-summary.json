@@ -1,0 +1,119 @@
+{
+  "mode": "fictional-controller-replay-with-real-decisions",
+  "voiceApiCalls": 0,
+  "observations": [
+    {
+      "callId": "fictional-3a-d99d94a7-f0a1-43aa-a134-42a293bf222e",
+      "status": "completed",
+      "durationMs": 578.8961000000002,
+      "supportNeed": "starting_point",
+      "alreadyAddressed": false,
+      "usage": {
+        "input_tokens": 708,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 708
+      },
+      "intervention": false
+    },
+    {
+      "callId": "fictional-3a-e4d32462-4497-47ce-b06d-42d538fe0bc4",
+      "status": "completed",
+      "durationMs": 294.78740000000016,
+      "supportNeed": "starting_point",
+      "alreadyAddressed": false,
+      "usage": {
+        "input_tokens": 708,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 708
+      },
+      "intervention": false
+    },
+    {
+      "callId": "fictional-3a-e4d32462-4497-47ce-b06d-42d538fe0bc4",
+      "status": "completed",
+      "durationMs": 261.9922999999999,
+      "supportNeed": "starting_point",
+      "alreadyAddressed": true,
+      "usage": {
+        "input_tokens": 765,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 765
+      },
+      "intervention": false
+    },
+    {
+      "callId": "fictional-3a-f4087575-6cfc-4e05-868e-6d306a578b2d",
+      "status": "completed",
+      "durationMs": 649.9783,
+      "supportNeed": "starting_point",
+      "alreadyAddressed": false,
+      "usage": {
+        "input_tokens": 708,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 708
+      },
+      "intervention": false
+    },
+    {
+      "callId": "fictional-3a-f4087575-6cfc-4e05-868e-6d306a578b2d",
+      "status": "completed",
+      "durationMs": 224.5088999999998,
+      "supportNeed": "starting_point",
+      "alreadyAddressed": true,
+      "usage": {
+        "input_tokens": 762,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 762
+      },
+      "intervention": false
+    }
+  ],
+  "phase3AEstimatedCostUsd": 0.0003651,
+  "sharedBudget": {
+    "capUsd": 5,
+    "reservationUsd": 0.05,
+    "maxRequests": 60,
+    "requestCount": 44,
+    "spentUsd": 0.0031018,
+    "reservedUsd": 0.15,
+    "availableUsd": 4.8468982,
+    "overspentUsd": 0,
+    "unknownCount": 3
+  },
+  "limitation": "No microphone audio or normal-app activation. One initial replay boundary timeout was fixed. Remaining tests are controlled controller replays."
+}

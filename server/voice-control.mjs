@@ -124,7 +124,8 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  };
 }
 
-export function createVoiceControl({env,authenticate,authorize,request,observeFactory,log=()=>{},resumeGraceMs=12000,heartbeatIntervalMs=3000,connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
+export function createVoiceControl({env,authenticate,authorize,request,observeFactory,sessionFactory=voiceControlSession,productionSessionFactory,log=()=>{},resumeGraceMs=12000,heartbeatIntervalMs=3000,connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
+ if(env.NODE_ENV==='production'&&sessionFactory!==voiceControlSession)throw Error('local_session_factory_not_allowed_in_production');
  const sessions=new Map(),clients=new Set();let wss,serverRef,upgrade;
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
@@ -223,7 +224,7 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
         const attachTimer=setTimeout(()=>dispose(run,'attach_timeout'),8000);run.attachTimer=attachTimer;attachTimer.unref();
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
-         run.engine=voiceControlSession({provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
+         run.engine=(sessionFactory===voiceControlSession&&env.ORIGEN_DECISIONS_SUPPORT==='true'&&productionSessionFactory?productionSessionFactory:sessionFactory)({subject:run.subject,provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
           observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
