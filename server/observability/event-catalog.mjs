@@ -6,7 +6,7 @@ const http=['httpStatus','durationMs','code'];
 const errors=['code'];
 const spec=(fields,level='info')=>Object.freeze({fields:Object.freeze(fields),level});
 export const serverEvents=Object.freeze({
- 'voice.live.measurement':spec(['measurementRun','configurationHash','measurementStage','turnIndex','recoveryStage','recoveryReason','speechOutcome','completedPortions','unfinishedPortion','playbackObserved','overlapCount','closeReason','failureKind','language','routingPolicy','deliveryStage','deliveryReason','durationMs','offsetMs','responseIndex','researchIndex','requestRevision','toolCount','contextAvailable','contextIncluded','packetCount','contextBytes','inputTokens','outputTokens','reasoningTokens','cachedTokens','voiceSeconds','httpStatus']),
+ 'voice.live.measurement':spec(['researchCallKey','researchJobKey','measurementRun','configurationHash','measurementStage','turnIndex','recoveryStage','recoveryReason','speechOutcome','completedPortions','unfinishedPortion','playbackObserved','overlapCount','closeReason','failureKind','language','routingPolicy','deliveryStage','deliveryReason','durationMs','offsetMs','responseIndex','researchIndex','requestRevision','toolCount','contextAvailable','contextIncluded','packetCount','contextBytes','inputTokens','outputTokens','reasoningTokens','cachedTokens','voiceSeconds','httpStatus']),
  'voice.context_timing':spec(['contextStage','durationMs','outcome']),
  'voice.control.ready':spec(['durationMs']),
  'voice.control.closed':spec(['reason']),
@@ -14,9 +14,13 @@ export const serverEvents=Object.freeze({
  'voice.control.resumed':spec([]),
  'voice.control.callback_timeout':spec(['sourceCount'],'warn'),
  'voice.control.close_failed':spec([],'error'),
- 'voice.research.finished':spec(['outcome','durationMs','sourceCount','model','inputTokens','outputTokens']),
- 'voice.research.initial_ready':spec(['outcome','durationMs','sourceCount']),
- 'voice.research.delivery':spec(['deliveryStage','deliveryReason','durationMs','packetCount','contextBytes','evidenceFormat']),
+ 'voice.research.finished':spec(['researchCallKey','researchJobKey','outcome','durationMs','sourceCount','model','inputTokens','outputTokens']),
+ 'voice.research.initial_ready':spec(['researchCallKey','researchJobKey','outcome','durationMs','sourceCount']),
+ 'voice.research.delivery':spec(['researchCallKey','researchJobKey','deliveryStage','deliveryReason','durationMs','packetCount','contextBytes','evidenceFormat']),
+ 'voice.research.lifecycle':spec(['researchCallKey','researchJobKey','researchStage','outcome','durationMs','queueMs','pass','failureKind','failureStage','recoveryStatus','httpStatus','inputTokens','outputTokens','reasoningTokens','cachedTokens','sourceCount','retainedFindingCount','evidenceVersion','verifiedCount','partialCount','unverifiedCount','reusedCount','lookupCount']),
+ 'voice.research.trace_gap':spec(['researchCallKey','researchJobKey','reason'],'warn'),
+ 'voice.research.worker_ready':spec([]),
+ 'voice.research.worker_error':spec(['workerPhase','failureStage'],'error'),
  api_request:spec(http),api_aborted:spec(http,'warn'),api_error:spec(errors,'error'),
  database_error:spec(errors,'error'),upstream_error:spec(errors,'error'),
  upstream_response:spec(['httpStatus','operation']),
@@ -50,6 +54,11 @@ export const serverEvents=Object.freeze({
  'runtime.health.observed':spec(['rssBytes','heapBytes','eventLoopDelayMs','poolTotal','poolIdle','poolWaiting','queueDepth','queueDropped','exportDropped','exportPending']),
 });
 export const enumFields=Object.freeze({
+ workerPhase:Object.freeze(['startup','poll','shutdown']),
+ pass:Object.freeze(['initial','recovery']),
+ researchStage:Object.freeze(['claimed','attempt_started','attempt_finished','reuse_selected','recovery_decided','initial_published','completed','failed','cancelled','publish_rejected','poll','delivery','speech_observation','playback_observation','trace_gap']),
+ recoveryStatus:Object.freeze(['not_needed','running','unresolved','partial','recovered','aborted','failed','deadline']),
+ failureStage:Object.freeze(['request','body','http','validation','persistence','aborted','unknown']),
  speechOutcome:Object.freeze(['complete','acknowledgment_overlap','substantive_interruption','uncertain_overlap','forced_flush']),
  unfinishedPortion:Object.freeze([true,false]),playbackObserved:Object.freeze([true,false]),
  closeReason:Object.freeze(['close_requested','expired','content','remote_hangup','connection_lost','unknown']),
@@ -74,14 +83,14 @@ export const enumFields=Object.freeze({
  mode:Object.freeze(['profile','planning','finance','loans','admissions']),language:Object.freeze(['en','es']),
  connectionState:Object.freeze(['new','connecting','connected','disconnected','failed','closed']),status:Object.freeze(['completed','failed','cancelled','incomplete']),
  operation:Object.freeze(['admissions_lookup','finance_lookup','voice_session','conversation_summary','conversation_overview','chat','conversation.item.delete','memory.generate','memory.read','memory.retrieve','memory.save','summary.generate','summary.overview','summary.review','notes.generate','voice.negotiate','finance.lookup','admissions.lookup','chat.respond','history.read','history.save','history.delete','notes.list','notes.save','permission.read','permission.hangup']),
- failureStage:Object.freeze(['request','body']),dependency:Object.freeze(['provider','database']),usageState:Object.freeze(['unknown','reported']),rowBucket:Object.freeze(['zero','one','few','many']),coverage:Object.freeze(['sampled','terminal-only']),
+ dependency:Object.freeze(['provider','database']),usageState:Object.freeze(['unknown','reported']),rowBucket:Object.freeze(['zero','one','few','many']),coverage:Object.freeze(['sampled','terminal-only']),
  model:Object.freeze(['other','gpt-4.1-mini','gpt-4o-mini','gpt-realtime','gpt-realtime-2.1','gpt-live-1','gpt-realtime-2_1','gpt-6-luna','gpt-6.1','gpt-6.1-sol']),
  job:Object.freeze(['conversation-checkpoints','conversation-recovery','permission-data','diagnostic-maps','metrics','invites','private-summaries','privacy-events','inquiries','outreach','guidance','progress','report-snapshots','quality','onboarding','admin-reviews','privacy-alerts','permission-supervisor','binder-processing','coordinator-lifecycle','registration-email','recommendation-previews','recommendation-evaluation']),
  parameter:Object.freeze(['item_id']),method:Object.freeze(['GET','POST','OPTIONS','PUT','PATCH','DELETE','HEAD','OTHER']),
  outcome:Object.freeze(['completed','failed','cancelled','unknown','skipped-lock','deferred','existing','changed']),
  reason:Object.freeze(['expired','browser_disconnected','provider_disconnected','invalid_provider_event','permission_changed','attach_timeout','update_failed','control_failed','server_shutdown','authentication_required','rate_limited','invalid_message','control_unavailable','invalid_update','invalid_command','control_backpressure','resume_buffer_exceeded','resume_timeout','transport_lost','unknown_event','queue_full','sink_failed','sink_timeout','release_unknown','closed','shutdown_timeout','capacity','mapping_capacity','mapping_expired','mapping_unavailable','mapping_scope_unavailable','export_loss','volume_limit']),
 });
-export const numericFields=Object.freeze({completedPortions:10000,overlapCount:10000,responseIndex:100000,researchIndex:100000,requestRevision:100000,contextAvailable:100,contextIncluded:100,reasoningTokens:100000000,cachedTokens:100000000,voiceSeconds:3600000,packetCount:10000,contextBytes:10000000,observedDelegations:1000,turnIndex:10000,offsetMs:3600000,firstAudioMs:600000,answerCandidateMs:600000,candidateAudioMs:600000,boundaryOverlapMs:600000,occurrenceCount:100000000,exportDropped:100000000,exportPending:2000,durationMs:600000,sourceMs:600000,generationMs:600000,sourceCount:10000,sequence:100000,speechDurationMs:600000,toolCount:1000,httpStatus:599,requestMs:600000,bodyMs:600000,acquireMs:600000,executeMs:600000,commitMs:600000,inputTokens:100000000,outputTokens:100000000,totalTokens:100000000,samplingProbability:1,backlog:1000000,oldestMs:31536000000,rssBytes:1099511627776,heapBytes:1099511627776,eventLoopDelayMs:600000,poolTotal:100,poolIdle:100,poolWaiting:100000,queueDepth:10000,deletedCount:1000000,queryCount:1000000,lastSuccessAgeMs:31536000000,queueDropped:Number.MAX_SAFE_INTEGER});
+export const numericFields=Object.freeze({queueMs:3600000,evidenceVersion:1000,retainedFindingCount:8,verifiedCount:8,partialCount:8,unverifiedCount:8,reusedCount:8,lookupCount:8,completedPortions:10000,overlapCount:10000,responseIndex:100000,researchIndex:100000,requestRevision:100000,contextAvailable:100,contextIncluded:100,reasoningTokens:100000000,cachedTokens:100000000,voiceSeconds:3600000,packetCount:10000,contextBytes:10000000,observedDelegations:1000,turnIndex:10000,offsetMs:3600000,firstAudioMs:600000,answerCandidateMs:600000,candidateAudioMs:600000,boundaryOverlapMs:600000,occurrenceCount:100000000,exportDropped:100000000,exportPending:2000,durationMs:600000,sourceMs:600000,generationMs:600000,sourceCount:10000,sequence:100000,speechDurationMs:600000,toolCount:1000,httpStatus:599,requestMs:600000,bodyMs:600000,acquireMs:600000,executeMs:600000,commitMs:600000,inputTokens:100000000,outputTokens:100000000,totalTokens:100000000,samplingProbability:1,backlog:1000000,oldestMs:31536000000,rssBytes:1099511627776,heapBytes:1099511627776,eventLoopDelayMs:600000,poolTotal:100,poolIdle:100,poolWaiting:100000,queueDepth:10000,deletedCount:1000000,queryCount:1000000,lastSuccessAgeMs:31536000000,queueDropped:Number.MAX_SAFE_INTEGER});
 export const clientFields=Object.freeze(['routingPolicy','routingObservation','observedDelegations','timingStage','contextStage','boundary','timingOutcome','turnIndex','offsetMs','firstAudioMs','answerCandidateMs','candidateAudioMs','boundaryOverlapMs','code','mode','language','connectionState','status','durationMs','sourceCount','sequence','speechDurationMs','toolCount']);
 const clientWarnings=new Set('connection_failure guide_update_failed transcription_timeout voice_usage_save_failed malformed_event welcome_save_failed api_error response_failed spoken_language_update_failed lookup_failure'.split(' '));
 export const clientSchemas=Object.freeze(Object.fromEntries(clientEvents.map(event=>[event,spec(clientFields,clientWarnings.has(event)?'warn':'info')])));

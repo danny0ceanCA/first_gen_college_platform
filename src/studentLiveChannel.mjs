@@ -165,7 +165,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
   if(observation){
    const {completedText,interrupted,...diagnostic}=observation;
-   await emit({type:'origen.research.speech_observed',response_id,...diagnostic});
+   await emit({type:'origen.research.speech_observed',response_id,...deliveryTracker.traceContext(),...diagnostic});
    deliveryTracker.reply(text,{audible,forced:force,interrupted,completedText});
   }
  }

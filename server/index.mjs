@@ -1,5 +1,6 @@
 import {createVoiceResearchJobsHandler,assertBackgroundResearchReady} from './voice-research-jobs.mjs';
 import {createVoiceControl} from './voice-control.mjs';
+import {createResearchCallObserver} from './research-trace.mjs';
 import {createPrivateVoiceCaptureHandler,purgePrivateVoiceCapture} from './private-voice-capture.mjs';
 import {createRecommendationEvaluationHandler,purgeRecommendationEvaluation} from './recommendation-evaluation.mjs';
 import {assertRecommendationContractReady} from './recommendation-contract.mjs';
@@ -103,7 +104,7 @@ export function createApp(env=process.env,verify,database=null,writeLog,reviewOp
  const permission=createPermissionHandler(database,env,reviewOptions.permission);
  const providerRequest=permissionFetch(database,env);
  let voiceServer;
- const voiceControl=createVoiceControl({env,authenticate,log,authorize:identity=>runAsAccount(identity,async()=>{
+ const voiceControl=createVoiceControl({env,authenticate,log,observeFactory:options=>createResearchCallObserver(database,{...options,env,log}),authorize:identity=>runAsAccount(identity,async()=>{
   if(!database||await accountClosed(database,identity.sub))throw Error('account_closed');
   const eligibility=await permission.repository.read(identity.sub);if(!eligibilityAllowed(eligibility))throw Error('permission_required');return eligibility.revision;
  }),request:async(token,method,path,body,sessionId)=>{

@@ -103,6 +103,8 @@ test('queue ownership, idempotency, cancellation and restricted worker RLS', {sk
   if(!exists){await f.owner.query('CREATE ROLE origen_research_worker NOLOGIN NOSUPERUSER NOBYPASSRLS');created=true;}
   await f.owner.query(`GRANT USAGE ON SCHEMA ${f.schema} TO origen_research_worker`);
   await f.owner.query('GRANT SELECT,UPDATE,DELETE ON origen_voice_research_jobs TO origen_research_worker');
+  await f.owner.query('GRANT SELECT,INSERT,UPDATE ON origen_voice_research_traces TO origen_research_worker');
+  await f.owner.query('GRANT SELECT,INSERT ON origen_voice_research_trace_events TO origen_research_worker');
  await f.owner.query('GRANT EXECUTE ON FUNCTION origen_current_account_id() TO origen_research_worker');
   worker=await f.owner.connect();await worker.query('SET ROLE origen_research_worker');
   await assert.rejects(worker.query('SELECT * FROM origen_students'),/permission denied/);

@@ -1,5 +1,6 @@
 import {createHash,randomBytes} from 'node:crypto';
 import {enumFields} from './observability/event-catalog.mjs';
+import {researchTraceKeys} from './research-trace.mjs';
 // Only fixed categories, counts and a random per-connection key cross this boundary.
 // Native IDs stay in bounded, connection-local maps; content never enters a record.
 export function responseMeasurement(data={},httpStatus){
@@ -10,7 +11,7 @@ export function responseMeasurement(data={},httpStatus){
  return {failureKind,inputTokens:data.usage?.input_tokens,outputTokens:data.usage?.output_tokens,
   reasoningTokens:data.usage?.output_tokens_details?.reasoning_tokens,cachedTokens:data.usage?.input_tokens_details?.cached_tokens,...(httpStatus?{httpStatus}:{})};
 }
-export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,now=()=>performance.now()}={}){
+export function liveMeasurements({log=()=>{},config={},sessionId,researchDeliveryV2=false,now=()=>performance.now()}={}){
  const measurementRun=randomBytes(16).toString('hex'),start=now();let sequence=0,turnIndex=0,closed=false;
  const responses=new Map(),research=new Map();let researchSequence=0;
  // Deliberately exclude instructions, input, credentials and person-specific values.
@@ -18,7 +19,7 @@ export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,
   language:value.language,routingPolicy:value.routingPolicy,researchDeliveryV2,maxOutputTokens:value.max_output_tokens,
   tools:(value.tools||[]).map(t=>({name:t.name,parameters:t.parameters,strict:false}))})).digest('hex');
  let configurationHash=fingerprint(config);
- const write=(measurementStage,fields={})=>{try{log({event:'voice.live.measurement',measurementRun,configurationHash,measurementStage,turnIndex,offsetMs:Math.max(0,now()-start),...fields});}catch{/* Measurement never changes the call. */}};
+ const write=(measurementStage,fields={})=>{const {jobId,...safe}=fields;try{log({event:'voice.live.measurement',measurementRun,configurationHash,measurementStage,turnIndex,offsetMs:Math.max(0,now()-start),...safe,...researchTraceKeys(sessionId,jobId)});}catch{/* Measurement never changes the call. */}};
  const usage=data=>responseMeasurement(data);
  return {
   start(){write('configuration',{language:config.language,routingPolicy:config.routingPolicy});},
@@ -59,6 +60,7 @@ export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,
     durationMs:Number.isFinite(e.durationMs)&&e.durationMs>=0?Math.min(e.durationMs,600000):undefined,
    });
    if(e.type==='origen.research.speech_observed')write('speech_observation',{
+    jobId:e.jobId,requestRevision:e.revision,
     speechOutcome:e.speechOutcome,completedPortions:e.completedPortions,
     unfinishedPortion:e.unfinishedPortion,playbackObserved:e.playbackObserved,overlapCount:e.overlapCount,
    });
@@ -66,7 +68,7 @@ export function liveMeasurements({log=()=>{},config={},researchDeliveryV2=false,
    if(e.type==='origen.research.delivery'||stages[e.type]){
     const key=e.requestId||e.jobId;
     if(key&&!research.has(key)){while(research.size>=128)research.delete(research.keys().next().value);research.set(key,++researchSequence);}
-    write('research_delivery',{researchIndex:research.get(key),requestRevision:e.revision,deliveryStage:stages[e.type]||e.deliveryStage,deliveryReason:e.deliveryReason,durationMs:e.durationMs,packetCount:e.packetCount,contextBytes:e.contextBytes});}
+    write('research_delivery',{jobId:e.jobId,researchIndex:research.get(key),requestRevision:e.revision,deliveryStage:stages[e.type]||e.deliveryStage,deliveryReason:e.deliveryReason,durationMs:e.durationMs,packetCount:e.packetCount,contextBytes:e.contextBytes});}
   },
   close(){if(closed)return;write('control_closed');closed=true;responses.clear();research.clear();},
  };

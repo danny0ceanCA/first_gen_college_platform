@@ -25,11 +25,11 @@ The research worker independently emits one `research_attempt` record for each a
 | `control_closed` | Application control shutdown, independent of provider finalization | LC-003 |
 | `research_attempt` | Pass duration, HTTP status, incomplete/refusal/provider/rate-limit/invalid-output categories and token details | RS-001/002 |
 
-`measurementRun` is a random connection- or worker-job key, not a user/student/provider ID. `responseIndex`, `researchIndex`, and `turnIndex` are local sequence numbers; turn indices use the existing estimated boundaries, not semantic ground truth. Native IDs are held only in bounded in-memory maps. They are never emitted by this instrumentation.
+`measurementRun` is a random connection- or worker-job key, not a user/student/provider ID. `responseIndex`, `researchIndex`, and `turnIndex` are local sequence numbers; turn indices use the existing estimated boundaries, not semantic ground truth. Native IDs remain absent from operational measurements. The November 7 durable research archive separately retains bounded provider request/response IDs and application call/job IDs under account access controls.
 
 Selection recovery records use `recoveryStage` and `recoveryReason`. A requested recovery is not a successful selection; a completed selection is not proof of a spoken recap or playback. The existing authorized private archive separately stores `origen.selection.recovery` with its opaque recovery, input, response, and request-event IDs for exact correlation, without adding conversation text to that event. Operational reports count lifecycle stages and reasons; those counts must not be interpreted as a success rate or unique attempts.
 
-`configurationHash` covers structural settings (models, tool schemas, language, routing policy, output limit, delivery-policy variant). It excludes instructions, student input, credentials, and private context. Existing log `release` identifies the deployment commit. This is not a hash of the entire prompt: a prompt-only change must be compared by release. Worker attempts have independent run keys and no configuration fingerprint; there is no cross-worker-to-call join yet.
+`configurationHash` covers structural settings (models, tool schemas, language, routing policy, output limit, delivery-policy variant). It excludes instructions, student input, credentials, and private context. Existing log `release` identifies the deployment commit. This is not a hash of the entire prompt: a prompt-only change must be compared by release. Worker attempts have independent run keys and a structural configuration fingerprint covering model, reasoning settings, output/tool limits, tools and result schema; it excludes instructions and request input. Purpose-separated `researchCallKey` and `researchJobKey` now join worker, delivery and measurement records. Raw call/job IDs are retained only in the account-scoped durable research archive.
 
 The event catalog drops unknown attributes and accepts only bounded numeric values, fixed enums, and validated opaque hex keys. Operational measurement records contain no transcripts, audio, prompts, function arguments/results, names, source-page content, or raw provider error text. Any audio-based review must use the existing authorized private capture workflow, not operational logs or repository recordings.
 
@@ -60,5 +60,9 @@ Existing `createVoiceTiming` observations distinguish first sound from a substan
 
 - Semantic judgments of unnecessary delegation, repeated questions, and first useful answers require reviewed audio or a separately validated evaluation system.
 - Exact microphone-to-playback alignment and hard-stop latency need client/media instrumentation; server-side transcript events alone cannot measure them.
-- Worker-to-voice-call correlation and explicit prompt-template revision tracking are not implemented.
+- Worker-to-call correlation is implemented by the November 7 durable research trace. Explicit prompt-template revision tracking remains separate from deployment release metadata.
 - Operational volume limits can drop events; inspect existing telemetry gap/drop reports before drawing conclusions from absent events.
+
+## Durable research tracing — November 7, 2026
+
+See [Durable research diagnostics](DURABLE_RESEARCH_DIAGNOSTICS.md) for migration 124, grants, retention, owner-authorized exports, failure coverage, and local tests. The durable archive is independent of sampled operational telemetry and the expiring research queue. Its retention is until account deletion, with no scheduled TTL. It does not change the retention of existing transcripts, recordings, or private voice capture.

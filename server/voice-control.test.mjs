@@ -23,6 +23,19 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
+for(const language of ['en','es'])test(`${language}: unavailable diagnostics cannot delay the intro or add provider speech instructions`,async()=>{
+ const calls=[],observer={observe:e=>calls.push(e),playback:()=>{throw Error('diagnostic sink failed');},close:()=>new Promise(()=>{}),reset:()=>{}};
+ const f=fixture({observer,researchDeliveryV2:true,config:{language}});
+ try{
+  const greeting=language==='es'?'Hola, qué gusto escucharte.':'Hi, it is good to hear from you.';
+  f.engine.receive({type:'session.output_transcript.delta',delta:greeting,start_ms:0,end_ms:1000});
+  await until(()=>f.events.some(e=>e.type==='response.output_audio_transcript.delta'));
+  f.engine.playback({idle:true,version:1});await f.engine.flush();
+  assert.equal(f.events.find(e=>e.type==='response.output_audio_transcript.done').transcript,greeting);
+  assert.equal(f.sent.filter(e=>['session.commentary.append','session.instructions.append'].includes(e.type)).length,0);
+  assert.ok(calls.length);f.engine.close();
+ }finally{f.engine.close();}
+});
 for(const language of ['en','es'])for(const callerAsks of [false,true])for(const invitedEarly of [false,true])test(`${language}: selection ${invitedEarly?'with an early invitation':'acknowledgment only'} and ${callerAsks?'an arriving caller question':'a name-only selection'} keep one native continuation through later refresh`,async()=>{
  const input={mode:'planning',role:'parent',language,studentId:'aiden',targetConfirmed:true,routeConversations:true,profile:{id:'aiden',name:'Aiden',school:'Synthetic Community College'}};
  input.openingBrief=buildOpeningBrief(input);

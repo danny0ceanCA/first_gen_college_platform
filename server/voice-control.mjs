@@ -12,8 +12,8 @@ import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
- const measurements=liveMeasurements({log,config,researchDeliveryV2});
+export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
+ const measurements=liveMeasurements({log,config,sessionId:scope.sessionId,researchDeliveryV2});
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
@@ -24,7 +24,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
  const research=backgroundResearch({requireReplacementChange:researchDeliveryV2,progressive:researchDeliveryV2,post:async query=>{if(!budget.take(query))throw Error('research_limit');return jobRequest('POST',undefined,query);},
-  read:id=>jobRequest('GET',id),remove:id=>jobRequest('DELETE',id),now,
+  read:async id=>{const started=now();try{const value=await jobRequest('GET',id);try{observer?.poll({jobId:id,status:value.status,outcome:'completed',durationMs:now()-started});}catch{}return value;}catch(error){try{observer?.poll({jobId:id,outcome:'failed',httpStatus:error?.status,durationMs:now()-started});}catch{}throw error;}},remove:id=>jobRequest('DELETE',id),now,
   isCurrent:query=>!closed&&query.studentId===scope.studentId&&query.sessionId===scope.sessionId,isQuiet:()=>true,
   onRequest:request=>{if(request.state==='requesting')reportRecord=undefined;send({type:'origen.research.state',request});},onState:active=>emit({type:'origen.research.active',active}),
   deliver:job=>{if(closed)return;const hasEvidence=job.result&&(job.status==='completed'||researchDeliveryV2&&job.result.evidenceVersion>0&&job.result.sources?.length);
@@ -55,6 +55,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  channel.onmessage=async message=>{
   const event=JSON.parse(message.data);if(closed)return;
   measurements.application(event);
+  try{observer?.observe(event);}catch{/* Observability never controls a call. */}
   const deliveryStages={'origen.research.supplied':'supplied','origen.research.context_acknowledged':'context_acknowledged','origen.research.context_failed':'context_failed','origen.research.announced':'commentary_requested','origen.research.native_reply_observed':'native_reply_observed'};
   if(deliveryStages[event.type]&&!(researchDeliveryV2&&event.type==='origen.research.announced'))log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
   if(event.type==='origen.research.delivery')log({event:'voice.research.delivery',deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs});
@@ -114,16 +115,16 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    }
    return false;
   },
-  playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version)playback={idle:value.idle,version:value.version,at:now()};},
+  playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version){if(value.idle!==playback.idle||value.version!==playback.version)try{observer?.playback(value);}catch{}playback={idle:value.idle,version:value.version,at:now()};}},
   suspend(){playback={...playback,idle:false,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
-  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
+  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){observer?.reset();reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();},
+  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();void observer?.close();},
  };
 }
 
-export function createVoiceControl({env,authenticate,authorize,request,log=()=>{},resumeGraceMs=12000,heartbeatIntervalMs=3000,connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
+export function createVoiceControl({env,authenticate,authorize,request,observeFactory,log=()=>{},resumeGraceMs=12000,heartbeatIntervalMs=3000,connect=url=>new WebSocket(url,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},maxPayload:4*1024*1024})}){
  const sessions=new Map(),clients=new Set();let wss,serverRef,upgrade;
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
@@ -223,7 +224,7 @@ export function createVoiceControl({env,authenticate,authorize,request,log=()=>{
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
          run.engine=voiceControlSession({provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
-          jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
+          observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
         run.provider.on('message',data=>{try{run.engine?.receive(JSON.parse(data));}catch{dispose(run,'invalid_provider_event');}});

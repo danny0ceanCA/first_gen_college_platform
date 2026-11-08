@@ -15,5 +15,7 @@ try{
  await c.query('GRANT USAGE ON SCHEMA public TO origen_research_worker');
  await c.query('GRANT EXECUTE ON FUNCTION origen_current_account_id() TO origen_research_worker');
  await c.query('GRANT SELECT,UPDATE,DELETE ON origen_voice_research_jobs TO origen_research_worker');
+ await c.query('GRANT SELECT,INSERT,UPDATE ON origen_voice_research_traces TO origen_research_worker');
+ await c.query('GRANT SELECT,INSERT ON origen_voice_research_trace_events TO origen_research_worker');
  await c.query('COMMIT');console.log('Research queue grants installed. No student-table access was granted.');
 }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();await pool.end();}

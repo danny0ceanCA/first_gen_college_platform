@@ -249,6 +249,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    if(substantive)job.deferred=undefined;
    wake();
   },
+  traceContext(){return current?{jobId:current.jobId,requestId:current.requestId,revision:current.revision}:{};},
   supersede(reason='new_request',question='') {
    if(current)retire(current,'superseded',reason);
    // A new task may concern an entirely different aspect. Preserve focus only
