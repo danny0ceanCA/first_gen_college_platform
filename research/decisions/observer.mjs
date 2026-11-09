@@ -49,7 +49,7 @@ export function createObserver({ state, client, budget, mode = 'off', threshold 
       if (!state.matches(snapshot) || stopped) { record(snapshot, { status: 'discarded', reason: 'stale_before_request' }); return; }
       const limit = limitReason(trigger);
       if (limit) { record(snapshot, { status: 'skipped', reason: limit, trigger }); return; }
-      const request = policy.buildRequest(snapshot, { operationId });
+      const request = policy.buildRequest(snapshot);
       reservation = budget.reserve({ operationId, metadata: { callId: snapshot.callId, snapshotHash: snapshot.fingerprint } });
       count++;
       if (!trigger.researchChanged) ordinaryCount++;

@@ -9,58 +9,6 @@ import {selectionRecoveryDelayMs,selectionRecoveryStartDeadlineMs} from './liveS
 import {decodedResearchContext} from './researchContext.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-for(const [prompt,reply] of [
- ['Do you want to talk through those housing costs?','Sure.'],
- ['¿Quieres que te explique los gastos de vivienda?','Sí.'],
-])test('a missed acceptance resumes an explanation once',async()=>{
- const clock=fakeClock(),f=fixture({...clock,canRecoverReply:()=>true});
- try{
-  f.receive({type:'session.output_transcript.delta',delta:prompt,end_ms:2000});await pause(0);
-  clock.advance(1800);await pause(0);
-  await selectionQuiet(f,clock,reply);clock.advance(950);await pause(0);
-  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
-  assert.equal(f.events.find(e=>e.type==='origen.reply.recovery')?.source,'rules');
-  await selectionQuiet(f,clock,reply);clock.advance(4000);await pause(0);
-  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
- }finally{f.channel.close();}
-});
-
-for(const [reply,action] of [['Sure','clarify'],['Actually, could you explain the difference for students living with family?','continue']])
-test('Decisions can recover a stalled short or longer reply after the native response window',async()=>{
- const clock=fakeClock(),f=fixture({...clock,canRecoverReply:()=>true,classifyReply:async()=>action});
- try{
-  f.receive({type:'session.output_transcript.delta',delta:'Berkeley or Davis?',end_ms:2000});await pause(0);
-  clock.advance(1800);await pause(0);
-  await selectionQuiet(f,clock,reply);assert.equal(f.sent.length,0);
-  clock.advance(950);await pause(0);
-  assert.equal(f.events.find(e=>e.type==='origen.reply.recovery')?.action,action);
- }finally{f.channel.close();}
-});
-
-test('a native reply suppresses recovery while Decisions is outstanding',async()=>{
- const clock=fakeClock();let complete;
- const f=fixture({...clock,canRecoverReply:()=>true,classifyReply:()=>new Promise(resolve=>{complete=resolve;})});
- try{
-  f.receive({type:'session.output_transcript.delta',delta:'Berkeley or Davis?'});await pause(0);
-  clock.advance(1800);await pause(0);
-  await selectionQuiet(f,clock,'Sure');clock.advance(950);await pause(0);
-  assert.equal(typeof complete,'function');
-  f.receive({type:'session.output_transcript.delta',delta:'Which campus should we start with?'});await pause(0);
-  complete('clarify');await pause(0);
-  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
- }finally{f.channel.close();}
-});
-
-test('a short acknowledgment overlapping an offer never starts recovery',async()=>{
- const clock=fakeClock(),f=fixture({...clock,canRecoverReply:()=>true,classifyReply:async()=>assert.fail('overlap must not reach Decisions')});
- try{
-  f.receive({type:'session.output_transcript.delta',delta:'Want me to explain the housing costs?',end_ms:2100});await pause(0);
-  f.receive({type:'session.input_transcript.delta',delta:'Sure',start_ms:1900});await pause(0);
-  clock.advance(1100);await pause(0);clock.advance(4000);await pause(0);
-  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
- }finally{f.channel.close();}
-});
-
 function pendingSelection(f,language='en',liveContext){
  f.channel.configure({voiceProvider:'live',voiceSession:{language,instructions:'Scope pending',selectionRecovery:{pending:true,names:['Aiden','Elodie']},tools:[{name:'request_conversation_target'}],...(liveContext?{liveContext}:{})}});
 }

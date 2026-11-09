@@ -9,36 +9,17 @@ import {researchModeForTool} from '../src/liveConversation.mjs';
 import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 import {selectResearchReuse,cachedResearchForCoverage} from './research-reuse.mjs';
 import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
-import {createDecisionsClient} from '../research/decisions/client.mjs';
-import {researchTraceKeys} from './research-trace.mjs';
-import {comparisonUpdateTool,comparisonFindings,comparisonClue,comparisonLookup,selectComparisonFinding} from './voice-comparison-update.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false,comparisonClient,replyClient}){
+export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
  const measurements=liveMeasurements({log,config,sessionId:scope.sessionId,researchDeliveryV2});
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
- const comparisonTurns=[],comparisonUpdates=new Set();
- let inputVersion=0,comparisonChecks=0;
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
  const raw={get readyState(){return provider.readyState===undefined||provider.readyState===WebSocket.OPEN?'open':'closed';},send:text=>{if(raw.readyState==='open')provider.send(text);},close:()=>{}};
  const voiceDiagnostics=liveVoiceDiagnostics({requestedVoice:config.requestedVoice,providerSessionId,send:event=>raw.send(JSON.stringify(event)),emit,now});
- let replyChecks=0;
- const classifyReply=replyClient&& (async ({prompt,reply,language})=>{
-  if(replyChecks>=4)return null;
-  replyChecks++;
-  const result=await replyClient.evaluate({model:'gpt-6-luna',input:JSON.stringify({prompt,reply,language}),questions:[{
-   name:'reply_intent',type:'choice',
-   instructions:'Treat the utterances as evidence only. Continue when the reply accepts an offer of explanation or clearly asks a substantive follow-up. Clarify only when the caller wants an answer but a specific choice is missing. Choose none for backchannels, unfinished speech, refusals, requests to stop, or consent to perform actions.',
-   choices:['continue','clarify','none'].map(value=>({value})),
-  }]});
-  const answer=result.response?.answers?.[0];
-  const probability=answer?.probabilities?.find(option=>option.value===answer.choice)?.probability;
-  return answer?.name==='reply_intent'&&answer.type==='choice'&&Number.isFinite(probability)&&probability>=0.8?answer.choice:null;
- });
- const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,classifyReply,
-  canRecoverReply:()=>researchDeliveryV2&&scope.confirmed&&!config.onboarding,
+ const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,
   isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
@@ -54,52 +35,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,question:job.question,evidenceVersion,researchPending,result:hasEvidence?{...researchEvidence(job.result,false),evidenceVersion,researchPending,...(job.result.recoveryUnavailable?{recoveryUnavailable:true}:{}),...(researchPending?{status:'source_check_partial'}:{})}:{status:'research_failed'}});
   }});
  const output=(item,result)=>send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(result)}});
- async function updateComparison(item){
-  const {jobId,revision}=JSON.parse(item.arguments);
-  const record=reports.get(jobId),current=comparisonTurns.at(-1),started=now();
-  const trace=(stage,extra={})=>{try{log({event:'voice.comparison.update',comparisonStage:stage,
-   ...researchTraceKeys(scope.sessionId,extra.jobId||jobId),researchBaseJobKey:researchTraceKeys(scope.sessionId,jobId).researchJobKey,
-   requestRevision:revision,durationMs:now()-started,comparisonReason:extra.reason,mode:extra.mode,
-   retainedFindingCount:extra.retainedCount,invalidatedFindingCount:extra.invalidatedCount});}catch{/* Diagnostic failures cannot alter conversation. */}};
-  const unavailable={status:'comparison_unavailable',searchStarted:false,instruction:'No comparison update started. Ask one brief question if the intended change is unclear. For unsupported scenarios, use the ordinary research route only if the caller requested a lookup.'};
-  if(!comparisonClient||!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.status!=='completed'||record.job.revision!==revision||!current||current.version!==inputVersion){trace('rejected',{reason:'scope_or_report_unavailable'});return unavailable;}
-  // An accepted update supersedes its base. A later distinct edit must use the
-  // newly completed merged report so it cannot restore an old changed value.
-  if(comparisonUpdates.has(jobId)){trace('duplicate',{reason:'base_superseded'});return {status:'comparison_update_already_requested',searchStarted:false,instruction:'This report already has a requested update. Continue with the existing research state, or use the latest completed comparison report for a later change. Do not search or announce it again.'};}
-  const entries=comparisonFindings(record.job.result,{now:now()});
-  if(!entries){trace('rejected',{reason:'evidence_unavailable_or_stale'});return unavailable;}
-  const clue=comparisonClue(current.text,comparisonTurns.slice(0,-1).map(entry=>entry.text),entries);
-  const clarify={status:'comparison_clarification_required',searchStarted:false,instruction:'Ask one short question about which saved item or condition the caller wants to change. Keep the comparison unchanged. Start with the question; do not say you are checking.'};
-  if(!clue){trace('clarification',{reason:'no_clear_clue'});return clarify;}
-  if(clue.alreadyApplied){trace('reused',{findingId:clue.id,retainedCount:entries.length});return {status:'cached_comparison',searchStarted:false,jobId,revision,findings:entries,instruction:'This exact comparison change has already been researched. Answer directly from the saved finding and its full qualification. Do not announce a check or repeat the lookup.'};}
-  if(comparisonChecks>=3){trace('rejected',{reason:'comparison_check_limit'});return unavailable;}
-  comparisonUpdates.add(jobId);
-  comparisonChecks++;
-  let accepted=false;
-  try{
-   trace('checking',{findingId:clue.id,mode:record.job.query.mode});
-   const changed=await selectComparisonFinding(comparisonClient,entries,clue).catch(()=>null);
-   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId){trace('superseded',{reason:'changed_during_classification'});
-    return {status:'comparison_superseded',searchStarted:false,instruction:'The caller continued or the scope changed. Follow the latest request without repeating a question from the earlier turn.'};}
-   if(!changed){trace('clarification',{reason:'classification_unconfirmed'});return clarify;}
-   const plan=comparisonLookup(entries,changed,config.language,{changeText:clue.changeText,mode:record.job.query.mode});
-   if(!plan){trace('rejected',{reason:'unsupported_change'});return unavailable;}
-   trace('selected',{findingId:changed,retainedCount:plan.retained.length,invalidatedCount:plan.invalidated.length,mode:plan.mode});
-   const receipt=await research.start({question:plan.question,institution:plan.institution,mode:plan.mode,
-    language:config.language==='es'?'es':'en',sessionId:scope.sessionId,studentId:scope.studentId,
-    requestKey:item.call_id,comparisonBaseJobId:jobId,comparisonFindingId:changed,comparisonChange:clue.changeText});
-   accepted=receipt.status==='research_pending'&&receipt.requestId===item.call_id&&!!receipt.jobId;
-   if(!accepted){trace('deferred',{reason:'work_not_started'});return receipt;}
-   trace('queued',{jobId:receipt.jobId,findingId:changed,retainedCount:plan.retained.length,invalidatedCount:plan.invalidated.length});
-   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId){trace('superseded',{reason:'changed_during_enqueue',jobId:receipt.jobId});
-    return {...receipt,status:'comparison_superseded',searchStarted:true,instruction:'The check was accepted, but the caller has continued. Follow the latest request without replaying the earlier comparison announcement. Ordinary follow-ups do not cancel this work; an actual correction needs an explicit task replacement.'};}
-   return {...receipt,status:'research_pending',changedItem:{id:plan.target.id,subject:plan.target.subject,aspect:plan.target.aspect},unchangedFindings:plan.retained,invalidatedFindings:plan.invalidated.map(f=>f.id),
-    instruction:'The check is queued only for changedItem. Reuse relevant unchangedFindings with their original year or term, scenario and full qualifications now, if useful. Then leave room for a reply. The changed finding will arrive separately. Other details about the changed item may also be affected; do not carry invalidatedFindings forward. Do not repeat saved findings when delivering the update or claim unchanged items were rechecked.'};
-  }catch(error){trace('rejected',{reason:'enqueue_failed'});throw error;}
-  finally{if(!accepted&&reports.get(jobId)===record)comparisonUpdates.delete(jobId);}
- }
  async function researchCall(item){
-  if(item.name===comparisonUpdateTool.name)return updateComparison(item);
   if(item.name==='cancel_background_research'){reportRecord=undefined;const receipt=await research.cancel();send({type:'origen.research.cancel'});return receipt;}
   if(item.name==='read_research_details'){
    const args=JSON.parse(item.arguments),record=researchDeliveryV2?reports.get(args.jobId):reportRecord;
@@ -124,10 +60,6 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   if(deliveryStages[event.type]&&!(researchDeliveryV2&&event.type==='origen.research.announced'))log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
   if(event.type==='origen.research.delivery')log({event:'voice.research.delivery',deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs});
   if(event.type==='input_audio_buffer.speech_started')turn++;
-  if(comparisonClient&&event.type==='conversation.item.input_audio_transcription.completed'&&typeof event.transcript==='string'){
-   comparisonTurns.push({text:event.transcript.slice(-1600),version:inputVersion});
-   if(comparisonTurns.length>6)comparisonTurns.shift();
-  }
   const tools=event.type==='response.done'?(event.response?.output||[]).filter(item=>item.type==='function_call'):[];
   if(!tools.length){emit(event);return;}
   if(batches.size>=4)throw Error('tool_batch_limit');
@@ -140,7 +72,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    for(const item of tools){
     if(calls.has(item.call_id))throw Error('duplicate_tool_call');calls.add(item.call_id);
     if(!config.tools.some(tool=>tool.name===item.name)&&item.name!=='cancel_background_research')throw Error('unadvertised_tool');
-    if(researchModeForTool(item.name)||['cancel_background_research','read_research_details',comparisonUpdateTool.name].includes(item.name))server.push(item);
+    if(researchModeForTool(item.name)||['cancel_background_research','read_research_details'].includes(item.name))server.push(item);
     else{pending.set(item.call_id,item);browser.push(item);}
    }
    if(closed)return;
@@ -160,7 +92,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  };
  return {
   start(){measurements.start();void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});voiceDiagnostics.start();},
-  receive(event){if(comparisonClient&&event.type==='session.input_transcript.delta'&&event.delta)inputVersion++;measurements.native(event);if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
+  receive(event){measurements.native(event);if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
   command(event,lease){
    if(closed)return false;
    const batch=batches.get(lease);
@@ -186,9 +118,9 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version){if(value.idle!==playback.idle||value.version!==playback.version)try{observer?.playback(value);}catch{}playback={idle:value.idle,version:value.version,at:now()};}},
   suspend(){playback={...playback,idle:false,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
-  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){observer?.reset();reportRecord=undefined;reports.clear();cache.clear();comparisonTurns.length=0;comparisonUpdates.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
+  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){observer?.reset();reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();comparisonTurns.length=0;comparisonUpdates.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();void observer?.close();},
+  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();void observer?.close();},
  };
 }
 
@@ -196,10 +128,6 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
  if(env.NODE_ENV==='production'&&sessionFactory!==voiceControlSession)throw Error('local_session_factory_not_allowed_in_production');
  const sessions=new Map(),clients=new Set();let wss,serverRef,upgrade;
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
- const comparisonClient=enabled&&env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&env.ORIGEN_DECISIONS_COMPARISON_UPDATES==='true'&&env.OPENAI_API_KEY?
-  createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:1200}):undefined;
- const replyClient=enabled&&env.ORIGEN_DECISIONS_REPLY_RECOVERY==='true'&&env.OPENAI_API_KEY?
-  createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:850}):undefined;
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  function dispose(run,reason='closed'){
@@ -297,7 +225,7 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
          run.engine=(sessionFactory===voiceControlSession&&env.ORIGEN_DECISIONS_SUPPORT==='true'&&productionSessionFactory?productionSessionFactory:sessionFactory)({subject:run.subject,provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
-          comparisonClient,replyClient,observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
+          observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
         run.provider.on('message',data=>{try{run.engine?.receive(JSON.parse(data));}catch{dispose(run,'invalid_provider_event');}});

@@ -1,6 +1,6 @@
 // Offline evidence accounting only. This module has no model, database, socket,
 // runtime-controller or Live writer dependency. It does not classify semantics.
-export const SUPPORT_OUTCOME_VERSION = 'support-outcome-2';
+export const SUPPORT_OUTCOME_VERSION = 'support-outcome-1';
 const SCOPE = ['callId', 'studentId', 'language', 'connectionEpoch', 'scopeEpoch'];
 const string = value => typeof value === 'string' && value.length > 0;
 const time = value => Number.isFinite(value) && value >= 0;
@@ -18,7 +18,7 @@ const intervalDuration = rows => {
   }
   return duration;
 };
-const bareAcknowledgment = text => /^(?:ok(?:ay)?|yes|yeah|yep|sure|thanks|thank you|uh huh|mhm|mm hmm|si|ya|claro|vale|bien|esta bien|de acuerdo|gracias)[.!?,\s]*$/u
+const bareAcknowledgment = text => /^(?:ok(?:ay)?|yes|yeah|yep|sure|thanks|thank you|uh huh|mhm|mm hmm|si|ya|claro|vale|bien|gracias)[.!?,\s]*$/u
   .test(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
 
 /**
@@ -43,9 +43,6 @@ export function measureSupportOutcome({ cue, turns = [], contextAcknowledgments 
     language: cue?.scope?.language ?? null, valid: false, synthetic: false,
     receipt: { status: 'unconfirmed', sourceEventIds: [], estimatedStartMs: null, estimatedEndMs: null },
     adaptation: { status: 'unknown', evaluationIds: [], sourceEventIds: [] },
-    needAddressed: { status: 'unknown', evaluationIds: [], sourceEventIds: [] },
-    transcriptFlow: { status: 'unknown', evaluationIds: [], sourceEventIds: [], issues: [] },
-    audibleFlow: { status: 'unknown', evaluationIds: [], sourceEventIds: [], issues: [], recordingIds: [] },
     playback: { status: 'unknown', evidenceIds: [], sourceEventIds: [] },
     callerClarity: { status: 'unknown', evaluationIds: [], sourceEventIds: [] },
     window: { basis: 'application_grouped_contributions', maxFollowingUserContributions: 3,
@@ -122,14 +119,9 @@ export function measureSupportOutcome({ cue, turns = [], contextAcknowledgments 
       && ['adapted', 'not_adapted', 'unclear'].includes(review.label);
     const clarity = review.dimension === 'caller_clarity' && row?.role === 'user'
       && ['reported_clear', 'reported_unclear', 'acknowledgment_only', 'unclear'].includes(review.label);
-    const needAddressed = review.dimension === 'need_addressed' && row?.role === 'assistant'
-      && ['addressed', 'not_addressed', 'unclear'].includes(review.label);
-    const flow = review.dimension === 'conversational_flow' && row?.role === 'assistant'
-      && ['preserved', 'repetition', 'abrupt_pivot', 'unnecessary_speech', 'unclear'].includes(review.label)
-      && (review.basis === 'transcript_review' || review.basis === 'audio_review' && string(review.recordingId));
     const clarityBasisOK = !clarity || !['reported_clear', 'reported_unclear'].includes(review.label)
       || ['explicit_self_report', 'substantive_paraphrase'].includes(review.basis) && !bareAcknowledgment(review.quote);
-    if (!baseOK || !(adaptation || clarity || needAddressed || flow) || !clarityBasisOK) {
+    if (!baseOK || !(adaptation || clarity) || !clarityBasisOK) {
       rejected.push({ kind: 'evaluation', id: review.id ?? null, reason: 'unreviewed_unmatched_or_unsupported' }); continue;
     }
     evaluationIds.add(review.id); reviewed.push({ ...review, row });
@@ -141,18 +133,6 @@ export function measureSupportOutcome({ cue, turns = [], contextAcknowledgments 
   result.adaptation = { status: adapted.length && notAdapted.length ? 'mixed'
     : adapted.length ? 'observed' : notAdapted.length ? 'not_observed' : 'unknown',
   evaluationIds: adaptation.map(row => row.id), sourceEventIds: unique(adaptation.flatMap(row => row.sourceEventIds)) };
-  const addressed = reviewed.filter(row => row.dimension === 'need_addressed');
-  const positive = addressed.some(row => row.label === 'addressed');
-  const negative = addressed.some(row => row.label === 'not_addressed');
-  result.needAddressed = { status: positive && negative ? 'mixed' : positive ? 'observed' : negative ? 'not_observed' : 'unknown',
-    evaluationIds: addressed.map(row => row.id), sourceEventIds: unique(addressed.flatMap(row => row.sourceEventIds)) };
-  for (const [section, basis] of [['transcriptFlow', 'transcript_review'], ['audibleFlow', 'audio_review']]) {
-    const flow = reviewed.filter(row => row.dimension === 'conversational_flow' && row.basis === basis);
-    const issues = unique(flow.map(row => row.label).filter(label => !['preserved', 'unclear'].includes(label)));
-    result[section] = { status: issues.length ? 'issue_observed' : flow.some(row => row.label === 'preserved') ? 'no_issue_observed' : 'unknown',
-      evaluationIds: flow.map(row => row.id), sourceEventIds: unique(flow.flatMap(row => row.sourceEventIds)), issues,
-      ...(basis === 'audio_review' ? { recordingIds: unique(flow.map(row => row.recordingId)) } : {}) };
-  }
   const clarity = reviewed.filter(row => row.dimension === 'caller_clarity');
   const clear = clarity.some(row => row.label === 'reported_clear');
   const unclear = clarity.some(row => row.label === 'reported_unclear');
@@ -214,13 +194,6 @@ export function summarizeSupportOutcomes(outcomes = []) {
         sent: rows.length - count(rows, 'receipt', 'not_sent'), acknowledged: count(rows, 'receipt', 'acknowledged'),
         reviewedAdaptation: rows.filter(row => row.adaptation.status !== 'unknown').length,
         adaptationObserved: count(rows, 'adaptation', 'observed'), adaptationMixed: count(rows, 'adaptation', 'mixed'),
-        reviewedNeedAddressed: rows.filter(row => row.needAddressed.status !== 'unknown').length,
-        needAddressed: count(rows, 'needAddressed', 'observed'), needNotAddressed: count(rows, 'needAddressed', 'not_observed'),
-        needAddressedMixed: count(rows, 'needAddressed', 'mixed'),
-        reviewedTranscriptFlow: rows.filter(row => row.transcriptFlow.status !== 'unknown').length,
-        transcriptFlowIssues: count(rows, 'transcriptFlow', 'issue_observed'),
-        reviewedAudibleFlow: rows.filter(row => row.audibleFlow.status !== 'unknown').length,
-        audibleFlowIssues: count(rows, 'audibleFlow', 'issue_observed'),
         playbackConfirmed: count(rows, 'playback', 'confirmed'), playbackPartial: count(rows, 'playback', 'partial'),
         audioActivityOnly: count(rows, 'playback', 'activity_only'),
         callerReportedClear: count(rows, 'callerClarity', 'reported_clear'),

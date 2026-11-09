@@ -1,5 +1,4 @@
 import { broadPolicy } from './broad-rubric.mjs';
-import { fitDecisionRequestBudget } from './local-call/explanation-history.mjs';
 
 // Local in-call experiment. These classifications are proposals to the local
 // delivery gate, not profile writes, research actions, or generated Live prompts.
@@ -22,7 +21,7 @@ export function buildPreferenceDecisionRequest(snapshot) {
   evidence.rubricVersion = PREFERENCE_RUBRIC_VERSION;
   // This is an evidence anchor, not an expected label or a new inferred memory.
   evidence.preferenceContribution = latestUser ? {
-    span: latestUser.span, text: latestUser.text, complete: latestUser.complete === true,
+    span: latestUserIndex + 1, text: latestUser.text, complete: latestUser.complete === true,
   } : null;
   request.input = JSON.stringify(evidence);
   request.questions.push(...PREFERENCES.map(preference => ({
@@ -33,7 +32,8 @@ export function buildPreferenceDecisionRequest(snapshot) {
       { value: 'disable', description: 'The caller explicitly retracts this ongoing conversational preference.' },
     ],
   })));
-  return fitDecisionRequestBudget(request);
+  if (Buffer.byteLength(JSON.stringify(request)) > 32768) throw Error('request_too_large');
+  return request;
 }
 
 export function parsePreferenceDecisionResponse(response) {

@@ -6,9 +6,9 @@ import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
 import {researchSpeechObservation} from './researchSpeechObservation.mjs';
 import {liveSelectionRecovery} from './liveSelectionRecovery.mjs';
-export const liveChannelRevision='bounded-reply-recovery-2026-11-09';
+export const liveChannelRevision='bounded-student-selection-recovery-2026-11-07';
 export const liveBackendDeadlineMs=25000;
-export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false,canRecoverReply=()=>false,classifyReply}={}){
+export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',turnItemId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0,recentInput=null,repliedSinceInput=false;
@@ -24,18 +24,16 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  // wakes the same guarded backend once; it never schedules speech or research.
  let researchState=null;
  let continuationRequested=false,emptyRecoveryEpoch=-1;
- let replyTimer,replyPrompt=null,lastAssistantEnd,lastAssistantConfiguration=-1,replyRequestedAt=-Infinity;
- const clearReply=()=>{if(replyTimer!==undefined)cancel(replyTimer);replyTimer=undefined;};
  const speechObservation=researchSpeechObservation();
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
- const transmit=event=>{if(closed)return;if(event.type==='session.commentary.append'){clearReply();replyPrompt=null;}if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
+ const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
  const selectionRecovery=liveSelectionRecovery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel,
   getState:()=>({started,closed,ending,session,epoch,lastDelegatedEpoch,inputPending:!!inputId,
    busy:!!(responses.size||pendingDelegations.size||toolHandlers||updates.size||continuation||continuationRequested)})});
  const selectionDelivery=liveSelectionDelivery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel});
  const deliveryTracker=researchDelivery({send:transmit,emit:event=>void emit(event),now,schedule,cancel,id,
-  canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&now()-replyRequestedAt>4000&&
+  canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&
    (!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))&&quietBoundary(/[?？]["”’')]*\s*$/u.test(lastOutputText)?6000:600)});
  function clearBackendTimers(){for(const response of responses.values())cancel(response.timer);responses.clear();}
  async function expireBackend(responseId){
@@ -135,36 +133,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    };check();
   });
  }
- function stopBoundaries(){clearReply();replyPrompt=null;researchVersion++;researchState=null;clearResearch('call_ended');selectionRecovery.close();pendingDelegations.clear();selectionDelivery.clear();for(const finish of [...boundaryWaiters])finish(false);}
- function recoverReply(transcript,inputEpoch){
-  const prompt=replyPrompt;
-  if(!prompt||!canRecoverReply()||session.onboarding||repliedSinceInput)return;
-  const reply=transcript.trim().slice(0,600);
-  const offer=/(?:want me to|would you like (?:me to|to)|shall we|do you want to)\s+(?:explain|walk through|talk through|go over)\b[^?？]*[?？]\s*$|(?:quieres|te gustar[ií]a|le gustar[ií]a)\s+(?:que (?:te |le )?)?(?:expli(?:c|qu)\p{L}+|repas\p{L}+|habl\p{L}+|revis\p{L}+)\b[^?？]*[?？]\s*$/iu.test(prompt);
-  const accept= /^(?:yes(?: please)?|sure(?: please)?|go ahead|please do|s[ií](?: por favor)?|claro|adelante)[.!¡!\s]*$/iu.test(reply);
-  const direct=offer&&accept;
-  if(!direct&&(!classifyReply||reply.length<2||/^(?:no|stop|wait|espera|para|bye|adiós)\b/iu.test(reply)))return;
-  const version=configurationVersion, research=researchVersion;
-  const deadline=now()+3200;
-  const current=()=>!closed&&!ending&&canRecoverReply()&&epoch===inputEpoch&&version===configurationVersion&&
-   research===researchVersion&&replyPrompt===prompt&&!repliedSinceInput&&lastDelegatedEpoch!==inputEpoch;
-  const quiet=()=>!responses.size&&!pendingDelegations.size&&!toolHandlers&&!updates.size&&!continuation&&!continuationRequested&&quietBoundary(250);
-  const check=async()=>{
-   if(!current()||now()>deadline){clearReply();return;}
-   if(!quiet()){replyTimer=schedule(()=>void check(),200);return;}
-   const action=direct?'continue':await classifyReply({prompt,reply,language:session.language}).catch(()=>null);
-   if(!current()||!quiet()||now()>deadline||!['continue','clarify'].includes(action))return;
-   replyPrompt=null;
-   replyRequestedAt=now();
-   const content=action==='clarify'
-    ? 'The caller has replied to the previous question. Briefly ask for the specific missing choice in the current language, then listen.'
-    : 'Continue naturally from the caller’s latest reply in the current language. Pick up the offered explanation or address the latest question directly. Keep it brief and use facts already available.';
-   transmit({type:'session.commentary.append',event_id:id(),delegation_id:null,content:content+' Do not initiate a tool action, treat the reply as consent to change records, or repeat a greeting.'});
-   void emit({type:'origen.reply.recovery',action,source:direct?'rules':'decisions'});
-  };
-  clearReply();
-  replyTimer=schedule(()=>void check(),950);
- }
+ function stopBoundaries(){researchVersion++;researchState=null;clearResearch('call_ended');selectionRecovery.close();pendingDelegations.clear();selectionDelivery.clear();for(const finish of [...boundaryWaiters])finish(false);}
  async function flushInput(){
   if(inputTimer)cancel(inputTimer);inputTimer=null;if(!inputId||!input)return;
   const item_id=inputId,transcript=input,inputEpoch=epoch;input='';inputId='';
@@ -173,7 +142,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
   if(researchDeliveryV2){speechObservation.callerStopped();deliveryTracker.callerStopped(transcript);}
   selectionRecovery.settled({transcript,itemId:item_id,epoch:inputEpoch});
-  recoverReply(transcript,inputEpoch);
   // Live can acknowledge a profile answer without delegating it. Give natural
   // delegation a brief head start, then ask the same guarded backend to process
   // this complete answer. This never parses or saves a profile in the adapter.
@@ -239,11 +207,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    // under a NEW turn, so any work on the earlier fragment is still fenced.
    // Never carry words across an assistant reply or a longer silence.
    if(!inputId){
-    clearReply();
-    const afterSpeech=Number.isFinite(e.start_ms)&&Number.isFinite(lastAssistantEnd)?e.start_ms>=lastAssistantEnd:!outputId&&isPlaybackIdle();
-    const recentQuestion=lastAssistantConfiguration===configurationVersion&&lastOutputAt>replyRequestedAt&&
-     now()-lastOutputAt<15000&&/[?？]\s*$/u.test(lastOutputText);
-    replyPrompt=afterSpeech&&recentQuestion?lastOutputText.slice(-600):null;
     const continued=recentInput&&now()-recentInput.lastInput<2500;
     input=continued?recentInput.transcript:'';recentInput=null;
     epoch++;inputId=id();turnItemId=inputId;await emit({type:'input_audio_buffer.speech_started',item_id:inputId,liveBoundary:continued?'transcript_continuation':'transcript_observed'});
@@ -252,7 +215,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    input+=e.delta;if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
   }
   if(e.type==='session.output_transcript.delta'&&typeof e.delta==='string'){
-   clearReply();replyPrompt=null;lastAssistantEnd=e.end_ms;lastAssistantConfiguration=configurationVersion;
    selectionRecovery.assistant(e.delta);
    selectionDelivery.assistant(e.delta);
    for(const response of responses.values())response.selectionSpeech=(response.selectionSpeech+e.delta).slice(-800);
@@ -390,7 +352,6 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   }
   if(event.type==='origen.research.cancel'){
    const previous=researchState,scopeChanged=event.reason==='scope_changed';
-   if(scopeChanged){clearReply();replyPrompt=null;lastAssistantConfiguration=-1;}
    researchVersion++;researchState=null;clearResearch(scopeChanged?'scope_changed':'cancelled');
    // Scope cleanup also runs on the first student selection, with no research.
    // Keep the stale-work barrier without inventing a cancelled lookup for Live.

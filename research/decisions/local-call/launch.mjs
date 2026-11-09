@@ -39,8 +39,6 @@ export function localConfiguration(source = {}) {
     ORIGEN_LIVE_FOLLOWUPS: 'true', ORIGEN_VOICE_PREPARATION: 'true',
     ORIGEN_BACKGROUND_RESEARCH: 'true', ORIGEN_LIVE_SERVER_CONTROL: 'true',
     ORIGEN_RESEARCH_DELIVERY_V2: 'true', OBSERVABILITY_EXPORT: 'false',
-    ORIGEN_DECISIONS_COMPARISON_UPDATES: 'true',
-    ORIGEN_DECISIONS_REPLY_RECOVERY: source.ORIGEN_DECISIONS_REPLY_RECOVERY === 'true' ? 'true' : 'false',
     GUARDIAN_EMAIL_TRANSPORT: 'disabled', REGISTRATION_EMAIL_TRANSPORT: 'disabled',
     ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT: LOCAL_COPY.subject,
   });
@@ -69,14 +67,12 @@ export async function launchLocalCall({ processEnv = process.env } = {}) {
   const conversationEnabled = processEnv.ORIGEN_LOCAL_CONTINUATION_SUPPORT === 'true';
   const earlyEnabled = processEnv.ORIGEN_LOCAL_EARLY_DECISIONS === 'true';
   const lateEnabled = processEnv.ORIGEN_LOCAL_LATE_DELIVERY_EXPERIMENT === 'true';
-  const betweenThoughtsEnabled = processEnv.ORIGEN_LOCAL_BETWEEN_THOUGHTS === 'true';
   const microphoneBudgetApproved = processEnv.ORIGEN_LOCAL_MICROPHONE_BUDGET === 'true';
   if (supportEnabled && !paid) throw Error('support_requires_approved_classification');
   if (preferencesEnabled && !supportEnabled) throw Error('preferences_require_local_support');
   if (conversationEnabled && !supportEnabled) throw Error('conversation_support_requires_local_support');
   if (earlyEnabled && !conversationEnabled) throw Error('early_support_requires_conversation_support');
   if (lateEnabled && !earlyEnabled) throw Error('late_experiment_requires_early_support');
-  if (betweenThoughtsEnabled && !earlyEnabled) throw Error('between_thoughts_requires_early_support');
   let app, api, ui, pool, worker, workerReady = false, stopPromise, constructionFailures = 0, allowedStudentIds = [];
   const observations = new Set(), recentObservers = [];
   const observerFactory = options => {
@@ -86,7 +82,7 @@ export async function launchLocalCall({ processEnv = process.env } = {}) {
         localOnly: true, dataKind: 'isolated-copy', fictional: false,
         seed: { fictional: false, isolatedLocal: true, dataKind: 'isolated-copy', accountId: 'isolated-account-copy', callId: options.scope.sessionId,
           studentId: options.scope.studentId ?? 'unselected', language: options.config.language === 'es' ? 'es' : 'en', role: 'family' },
-        allowedCallIds: [options.scope.sessionId], allowedStudentIds, paid, supportEnabled, preferencesEnabled, conversationEnabled, earlyEnabled, lateEnabled, betweenThoughtsEnabled, microphoneBudgetApproved, apiKey: paid ? env.OPENAI_API_KEY : undefined,
+        allowedCallIds: [options.scope.sessionId], allowedStudentIds, paid, supportEnabled, preferencesEnabled, conversationEnabled, earlyEnabled, lateEnabled, microphoneBudgetApproved, apiKey: paid ? env.OPENAI_API_KEY : undefined,
         onStatus: status => console.log(JSON.stringify({ event: 'local_observer_status', sessionId: options.scope.sessionId, ...status })),
       });
       observations.add(engine.observation);
@@ -104,7 +100,7 @@ export async function launchLocalCall({ processEnv = process.env } = {}) {
   };
   const status = () => ({ local: true, branch: 'v1.3-decisions-integration', dataKind: 'isolated-copy',
     database: LOCAL_COPY.database, productionWrites: false, observeOnly: !supportEnabled, cuesEnabled: supportEnabled,
-    supportEnabled, preferencesEnabled, conversationEnabled, earlyEnabled, lateEnabled, betweenThoughtsEnabled, microphoneBudgetApproved, researchObserveOnly: true,
+    supportEnabled, preferencesEnabled, conversationEnabled, earlyEnabled, lateEnabled, microphoneBudgetApproved, researchObserveOnly: true,
     classificationEnabled: paid, workerReady, observerCount: observations.size, constructionFailures,
     observers: [...observations].map(observation => observation.status()), recentObservers,
   });

@@ -57,21 +57,6 @@ test('disabled diagnostics do no polling or registration',async()=>{
  await monitor.sample();monitor.stop();assert.equal(touched,0);
 });
 
-test('sustained audio degradation is reported locally even without capture, then clears',async()=>{
- const changes=[];
- const h=harness({enabled:false,onQuality:value=>changes.push(value)});
- let received=100,lost=0;
- h.pc.getStats=async()=>report(audioRow({packetsReceived:received,packetsLost:lost}));
- try{
-  await h.monitor.sample();
-  for(let i=0;i<2;i++){received+=80;lost+=20;await h.monitor.sample();}
-  assert.deepEqual(changes,[true]);
-  for(let i=0;i<3;i++){received+=100;await h.monitor.sample();}
-  assert.deepEqual(changes,[true,false]);
-  assert.deepEqual(h.events,[]);
- }finally{h.monitor.stop();}
-});
-
 test('samples serialize one pending getStats, time out diagnostically, and ignore completion after cleanup',async()=>{
  let resolve,calls=0;const h=harness();h.pc.getStats=()=>{calls++;return new Promise(done=>{resolve=done;});};
  await h.advance(2000);void h.monitor.sample();assert.equal(calls,1);

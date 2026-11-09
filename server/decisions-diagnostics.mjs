@@ -1,8 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { createBoundedWriter } from './observability/logger.mjs';
 import { runAsAccount } from './account-isolation.mjs';
-import { decisionsDiagnosticData } from './decisions-diagnostic-data.mjs';
-export { decisionsDiagnosticData } from './decisions-diagnostic-data.mjs';
+
+const idKeys = new Set(['operationId','requestId','reservationId','eventId','contributionId','questionId','workerRunId','rubricVersion','supportKind','supportNeed','reason','status','action','triggerBasis','deliveryMode','inputBoundaryEvidence','callerAudioEnded','kind','source','eventType']);
+const numberKeys = new Set(['durationMs','totalMs','clientAwaitMs','transportAndJsonMs','requestBytes','questionCount','revision','supportRevision','assistantOutputRevision','workerSequence','workerElapsedMs','sourceToWorkerMs','classificationToSendMs','inputEvidenceToSendMs','evaluationCount','requestCount','costUsd']);
+const booleanKeys = new Set(['contextSent','playbackClaim','inputOpen','sourceComplete','freshAtWorker','reservationRetained','providerRequestCompleted']);
+export function decisionsDiagnosticData(event) {
+  const data = {};
+  for (const [key, value] of Object.entries(event ?? {})) {
+    if (idKeys.has(key) && typeof value === 'string' && /^[a-zA-Z0-9_.: -]{1,200}$/.test(value)) data[key] = value;
+    if (numberKeys.has(key) && Number.isFinite(value) && value >= 0) data[key] = value;
+    if (booleanKeys.has(key) && typeof value === 'boolean') data[key] = value;
+  }
+  for (const key of ['sourceEventIds','sourceTranscriptIds','sourceOutputEventIds'])
+    if (Array.isArray(event?.[key])) data[key] = event[key].filter(id => typeof id === 'string' && /^[a-zA-Z0-9_.:-]{1,160}$/.test(id)).slice(0,128);
+  const facts = event?.result?.facts;
+  if (facts && typeof facts === 'object') data.probabilities = Object.fromEntries(Object.entries(facts)
+    .filter(([key,value]) => /^[a-z_]{1,60}$/.test(key) && Number.isFinite(value) && value >= 0 && value <= 1));
+  for (const key of ['budget','explanationHistorySummary']) if (event?.[key] && typeof event[key] === 'object')
+    data[key] = Object.fromEntries(Object.entries(event[key]).filter(([name,value]) => /^[a-zA-Z]{1,50}$/.test(name)
+      && (typeof value === 'boolean' || Number.isFinite(value) && value >= 0)));
+  return data;
+}
 export function createDecisionsDiagnosticWriter(database, { subject, sessionId, release = null, onGap = () => {} }) {
   let sequence = 0, failed = false;
   const runId = randomUUID();

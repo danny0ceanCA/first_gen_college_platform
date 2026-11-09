@@ -1,5 +1,4 @@
 import { buildDecisionRequest, parseDecisionResponse, shadowDisposition } from './rubric.mjs';
-import { fitDecisionRequestBudget } from './local-call/explanation-history.mjs';
 
 // Observation only. These labels do not select tools, publish facts, or send Live cues.
 export const BROAD_RUBRIC_VERSION = 'conversation-observation-3';
@@ -77,7 +76,8 @@ export function buildBroadDecisionRequest(snapshot) {
   request.questions.push(...[...BROAD_PREDICATES, ...BROAD_EVIDENCE_CHECKS].map(name => ({
     name, type: 'predicate', instructions: `${common}\n${definitions[name]}`,
   })));
-  return fitDecisionRequestBudget(request);
+  if (Buffer.byteLength(JSON.stringify(request)) > 32768) throw new Error('request_too_large');
+  return request;
 }
 
 export function parseBroadDecisionResponse(response) {

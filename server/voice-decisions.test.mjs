@@ -42,14 +42,13 @@ test('readiness requires the diagnostic table and runtime insert/read privileges
   await assertDecisionsReady({query:async()=>({rows:[{present:true,permitted:true}]})},{ORIGEN_DECISIONS_SUPPORT:'true'});
 });
 
-for(const language of ['en','es'])for(const betweenThoughts of [false,true])test(`${language}: production wrapper preserves intro with between-thought support ${betweenThoughts ? 'enabled' : 'disabled'}`,async()=>{
+for(const language of ['en','es'])test(`${language}: production wrapper preserves intro and holds a real-shape cue until matching input closure`,async()=>{
   const messages=[],sent=[],writes=[],worker=new EventEmitter();let settings,mirror;
   worker.postMessage=packet=>{messages.push(structuredClone(packet));if(packet.source)mirror.receive(packet);
     queueMicrotask(()=>worker.emit('message',{type:'ack'}));
     if(packet.type==='close')queueMicrotask(()=>worker.emit('message',{type:'closed'}));};
   worker.terminate=async()=>{};
   const env={ORIGEN_DECISIONS_SUPPORT:'true',ORIGEN_LIVE_SERVER_CONTROL:'true',ORIGEN_BACKGROUND_RESEARCH:'true',OPENAI_API_KEY:'fake-not-used'};
-  if(betweenThoughts)env.ORIGEN_DECISIONS_BETWEEN_THOUGHTS='true';
   const database={query:async(sql,args)=>{writes.push({sql,args});return {rowCount:1};}};
   const factory=createProductionDecisionsFactory({env,database,dependencies:{createWorker:(_url,s)=>{
     settings=s.workerData;mirror=createEarlyEvidenceTracker(settings.seed,{allowedStudentIds:settings.allowedStudentIds});return worker;}}});
@@ -58,7 +57,6 @@ for(const language of ['en','es'])for(const betweenThoughts of [false,true])test
     provider:{readyState:1,send:text=>sent.push(JSON.parse(text))},emit(){},jobRequest(){throw Error('unexpected_research');}});
   try{
     assert.equal(settings.production,true);assert.equal(settings.lateEnabled,false);assert.equal(settings.seed.dataKind,'production');
-    assert.equal(settings.betweenThoughtsEnabled,betweenThoughts);assert.equal(settings.meaningfulScheduling,true);
     assert.equal(settings.seed.fictional,false);worker.emit('message',{type:'ready'});engine.start();
     engine.receive({type:'session.output_transcript.delta',event_id:'intro',delta:language==='en'?'Hello. How can I help?':'Hola. ¿Cómo te puedo ayudar?',start_ms:0,end_ms:500});
     await new Promise(r=>setImmediate(r));await engine.flush();engine.playback({idle:true,version:1});assert.equal(engine.observation.status().support.introReady,true);

@@ -1,8 +1,6 @@
 # Isolated Decisions observer — phases 1–2
 
-> Production release update: the authenticated production entry point is documented in [Decisions production release](../../docs/voice-experience/DECISIONS_PRODUCTION_RELEASE.md). Local trial descriptions below remain historical. The isolated launcher still rejects production mode, and the research observer remains observe-only.
-
-The application also has a separate, **default-off comparison experiment**. It now uses saved subjects and findings across topics—costs, deadlines, eligibility, programs, orientation, and family guidance—rather than a Berkeley/Davis housing template. A clear request identifies one changed item; the existing worker checks only that item, while unchanged source-backed findings retain their scope and caveats. Ambiguous requests require clarification. See [generalized comparison updates and validation](../../docs/voice-experience/COMPARISON_UPDATES_V1_3.md) for boundaries and results. For an isolated API, explicitly set `ORIGEN_DECISIONS_COMPARISON_UPDATES=true` alongside `ORIGEN_BACKGROUND_RESEARCH=true`, `ORIGEN_LIVE_SERVER_CONTROL=true`, and `ORIGEN_RESEARCH_DELIVERY_V2=true`, then start a new authenticated Live call. The isolated local call launcher enables these flags. The worker needs no new flag, service, or migration.
+> Production release update: the authenticated production entry point is documented in [Decisions production release](../../docs/voice-experience/DECISIONS_PRODUCTION_RELEASE.md). Local trial descriptions below remain historical; the isolated launcher still rejects production mode. Research Decisions remain observe-only and late delivery remains off.
 
 For the current optional local conversational-support experiment, see
 [meaningful support on v1.3](MEANINGFUL_SUPPORT_V1_3.md) and the

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { fixtures } from './fixtures.mjs';
 import { stateForFixture, main } from './cli.mjs';
 import { buildDecisionRequest } from './rubric.mjs';
@@ -39,24 +40,11 @@ test('CLI rejects arbitrary inputs and approval increases before requests', asyn
   await assert.rejects(main(['--real', '--cap-usd', '6']), /cap_exceeds_approval/);
   await assert.rejects(main(['--fixture-ids', 'real-student']), /unknown_fixture/);
 });
-test('runtime uses only the explicit shared Decisions boundaries; experiments remain isolated', () => {
+test('app runtime has no imports of the isolated observer; local factory wiring is dependency-injected', () => {
   const root = resolve(folder, '../..');
-  // Decisions was intentionally integrated in production after the original
-  // isolation test was written. Name the three reviewed boundaries explicitly,
-  // and inspect new files too; do not exempt arbitrary server or script imports.
-  const boundaries = new Map([
-    ['server/voice-decisions.mjs', '../research/decisions/local-call/session.mjs'],
-    ['server/decisions-diagnostic-data.mjs', '../research/decisions/diagnostic-classifications.mjs'],
-    ['scripts/decisions-diagnostic-report.mjs', '../research/decisions/local-call/diagnostic-report.mjs'],
-  ]);
-  const files = ['src', 'server', 'scripts'].flatMap(dir => readdirSync(resolve(root, dir), { recursive: true })
-    .map(name => `${dir}/${name.replaceAll('\\', '/')}`))
-    .filter(file => /\.[cm]?[jt]sx?$/.test(file) && !/\.test\.[cm]?[jt]sx?$/.test(file) && !file.includes('/fixtures/'));
-  for (const file of files) {
+  const output = execFileSync('git', ['-c', `safe.directory=${root.replaceAll('\\', '/')}`, 'ls-files', '-z', 'src', 'server', 'scripts'], {cwd:root,encoding:'utf8'});
+  for (const file of output.split('\0').filter(f => /\.[cm]?[jt]sx?$/.test(f))) {
     const source=readFileSync(resolve(root,file),'utf8');
-    assert.equal(/createObserverState|ORIGEN_DECISIONS_TEST_KEY/.test(source), false, file);
-    const references = [...source.matchAll(/['"]([^'"\n]*research[\\/]decisions[^'"\n]*)['"]/g)].map(match => match[1]);
-    assert.deepEqual(references, boundaries.has(file) ? [boundaries.get(file)] : [], file);
-    assert.equal(/native-trigger-evaluation|validate-early-live|early-refinement-budget/.test(source), false, file);
+    assert.equal(/research[\\/]decisions|createObserverState|ORIGEN_DECISIONS_TEST_KEY/.test(source), false, file);
   }
 });

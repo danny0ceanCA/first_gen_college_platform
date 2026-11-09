@@ -27,13 +27,13 @@ export function createEarlyEvidenceTracker(seed, { now = () => performance.now()
   if (!allowed.has(seed.studentId)) throw new Error('early_evidence_student_not_allowed');
   let studentId = seed.studentId, language = seed.language, connectionEpoch = 0, scopeEpoch = 0;
   let current = null, assistant = null, history = [], assistantEvidence = [], stopped = false, suspended = false;
-  let confirmed = studentId !== 'unselected', assistantOutputRevision = 0, assistantBoundaryRevision = -1, reason = null;
+  let confirmed = studentId !== 'unselected', assistantOutputRevision = 0, reason = null;
   const seen = new Map(), boundaries = new Map();
   const explanations = createExplanationHistory({ log });
   const stamp = () => ({ callId: seed.callId, studentId, language, connectionEpoch, scopeEpoch,
     contributionId: current?.id ?? null, revision: current?.revision ?? 0 });
   function record(type, extra = {}) { log({ type, ...stamp(), ...extra, intervention: false }); }
-  function clear() { current = null; assistant = null; assistantBoundaryRevision = -1; history = []; assistantEvidence = []; explanations.clear(); seen.clear(); boundaries.clear(); }
+  function clear() { current = null; assistant = null; history = []; assistantEvidence = []; explanations.clear(); seen.clear(); boundaries.clear(); }
   function reset(resetReason = 'explicit_reset') {
     scopeEpoch++; clear(); reason = resetReason;
     record('early_evidence_reset', { reason: resetReason });
@@ -68,8 +68,7 @@ export function createEarlyEvidenceTracker(seed, { now = () => performance.now()
       sourceTextEnds: [...(current?.sourceTextEnds ?? [])],
       startMs: current?.startMs ?? null, endMs: current?.endMs ?? null,
       firstObservedAtMs: current?.firstObservedAtMs ?? null, lastObservedAtMs: current?.lastObservedAtMs ?? null,
-      assistantOutputRevision, assistantBoundaryRevision, outputOpen: assistant !== null,
-      assistantOutputStartedForContribution: current?.assistantStarted === true,
+      assistantOutputRevision, assistantOutputStartedForContribution: current?.assistantStarted === true,
       contributionOutputOriginRevision: current?.outputOriginRevision ?? assistantOutputRevision,
       assistantEvidence: assistantEvidence.map(row => ({ ...row })),
       explanationHistory: explanations.snapshot({ currentText: current?.text ?? '', recentDialogue }),
@@ -176,8 +175,7 @@ export function createEarlyEvidenceTracker(seed, { now = () => performance.now()
     appendHistory({ role, text: event.transcript, complete: true, source: 'application_estimate',
       sourceEventIds: [...span.sourceEventIds],
       id: key, contributionId: role === 'user' ? current.id : null, startMs: span.startMs, endMs: span.endMs });
-    if (role === 'user') current.open = false;
-    else { assistant = null; assistantBoundaryRevision = assistantOutputRevision; }
+    if (role === 'user') current.open = false; else assistant = null;
     record('early_evidence_application_boundary', { role, boundary: 'application_estimate', playbackComplete: 'unknown' });
     return { changed: true, callerChanged: false };
   }
@@ -186,21 +184,9 @@ export function createEarlyEvidenceTracker(seed, { now = () => performance.now()
 
 export function meaningfulEarlyEvidence(text) {
   const words = text.match(/[\p{L}\p{N}]+(?:['’][\p{L}]+)?/gu) ?? [];
-  if (requestMoment(text)) return true;
   if (words.length >= 6) return true;
   if (words.length >= 3 && /[.!?…]\s*$/u.test(text)) return true;
   return words.length >= 2 && /\b(?:i(?:['’]m| am) confused|i (?:do not|don['’]t) understand|still (?:do not|don['’]t) understand|no (?:lo )?entiendo|no me queda claro|estoy confundid[oa])\b/iu.test(text);
-}
-
-// Scheduling hints, never classifications or permission to send context. The
-// classifier still sees the full accumulated text (including negation/quotes).
-export function requestMoment(text) {
-  if (typeof text !== 'string') return null;
-  if (/\b(?:example|analogy|ejemplo|analogía)\b/iu.test(text)
-    && /\b(?:give|show|use|another|different|could|can|please|dame|dar|puedes|podrías|otro|otra|muéstrame)\b/iu.test(text)) return 'example_request';
-  if (/\b(?:where (?:do i|should (?:i|we)|to) (?:start|begin)|(?:don['’]t|do not) know where to (?:start|begin)|por d[oó]nde (?:empezar|comenzar|empiezo)|no s[eé] (?:c[oó]mo|por d[oó]nde) empezar)\b/iu.test(text)) return 'starting_point_request';
-  if (/\b(?:i(?:['’]m| am) (?:lost|confused)|(?:don['’]t|do not|still don['’]t|still do not) understand|simpler|more simply|no (?:lo )?entiendo|no me queda claro|estoy (?:perdid[oa]|confundid[oa])|m[aá]s (?:sencillo|sencilla|simple))\b/iu.test(text)) return 'explanation_request';
-  return null;
 }
 
 // One timer and one in-flight observation. The first two accumulation windows
@@ -210,10 +196,9 @@ export function createEarlyProjector(seed, observe, log = () => {}, options = {}
   const { now = () => performance.now(), schedule = setTimeout, cancel = clearTimeout, debounceMs = 160,
     reservedQuietMs = 350, maxPerContribution = 3, maxPerCall = 8, minGrowthBytes = 16, enabled = () => true,
     needsRevalidation = () => false, supportRevision = () => 0,
-    distributed = false, meaningfulScheduling = false, lateAllowed = () => false,
-    betweenThoughtsAllowed = () => false, hasSupport = () => false, burst = 3, refillMs = 25000 } = options;
+    distributed = false, lateAllowed = () => false, burst = 3, refillMs = 25000 } = options;
   const tracker = createEarlyEvidenceTracker(seed, { ...options, now, log });
-  let timer = null, timerDue = Infinity, inFlight = false, closed = false, evaluated = 0, contribution = null, contributionKey = null, attempts = 0, previousBytes = 0;
+  let timer = null, inFlight = false, closed = false, evaluated = 0, contribution = null, contributionKey = null, attempts = 0, previousBytes = 0;
   let previousSupportRevision = -1;
   let previousOutputRevision = -1, tokens = burst, refillAt = now(), lastSkip = null;
   function available() {
@@ -224,10 +209,10 @@ export function createEarlyProjector(seed, observe, log = () => {}, options = {}
   function skip(reason, snapshot) {
     const key = `${snapshot.contributionId}:${snapshot.revision}:${reason}`;
     if (key !== lastSkip) log({ type: 'early_observation_deferred', ...snapshot.stamp,
-      reason, tokensAvailable: Math.floor(tokens), budgetConstraint: 'check_frequency', voiceNeverWaits: true, intervention: false });
+      reason, tokensAvailable: Math.floor(tokens), voiceNeverWaits: true, intervention: false });
     lastSkip = key;
   }
-  function clearTimer() { if (timer !== null) cancel(timer); timer = null; timerDue = Infinity; }
+  function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
   const reservedSlot = () => attempts === maxPerContribution - 1;
   function eligible() {
     const snapshot = tracker.snapshot();
@@ -235,68 +220,50 @@ export function createEarlyProjector(seed, observe, log = () => {}, options = {}
     if (key !== contributionKey) {
       contributionKey = key; contribution = snapshot.stamp.contributionId; attempts = 0; previousBytes = 0; previousSupportRevision = -1; previousOutputRevision = -1;
     }
-    const postOutput = distributed && snapshot.assistantOutputStartedForContribution;
-    const between = postOutput && betweenThoughtsAllowed()
-      && (hasSupport() || requestMoment(snapshot.text) !== null);
-    const late = postOutput && !between && lateAllowed();
+    const late = distributed && snapshot.assistantOutputStartedForContribution;
     if (closed || !snapshot.usable || (!distributed && !snapshot.inputOpen) || !enabled(snapshot) || evaluated >= maxPerCall
       || attempts >= maxPerContribution || !meaningfulEarlyEvidence(snapshot.text)
       || distributed && danglingConnector(snapshot.text)
       || bytes(snapshot.text) > EARLY_EVIDENCE_LIMITS.classificationBytes
-      || postOutput && (!between && !late || now() - snapshot.lastObservedAtMs > (between ? 45000 : 15000))
-      // Keep a bounded post-output check available; never spend all three
-      // attempts on the beginning of a long caller contribution.
-      || meaningfulScheduling && distributed && maxPerContribution >= 3 && attempts >= maxPerContribution - 1 && !postOutput
+      || late && (!lateAllowed() || now() - snapshot.lastObservedAtMs > 15000)
       || attempts > 0 && !(needsRevalidation() && supportRevision() !== previousSupportRevision)
-        && !(postOutput && snapshot.assistantOutputRevision > previousOutputRevision)
+        && !(late && snapshot.assistantOutputRevision > previousOutputRevision)
         && bytes(snapshot.text) - previousBytes < (distributed ? minGrowthBytes
           : reservedSlot() || needsRevalidation() ? 1 : minGrowthBytes)) return null;
     if (distributed && !available()) { skip('distributed_budget_reserved_for_later', snapshot); return null; }
-    return { ...snapshot, lateExperiment: late, betweenThoughts: between,
-      requestMoment: requestMoment(snapshot.text), revalidationRequested: needsRevalidation() };
+    return { ...snapshot, lateExperiment: late };
   }
   function queue({ callerChanged = false } = {}) {
     const snapshot = eligible();
     if (!snapshot || inFlight) return;
     const reserved = reservedSlot();
-    const fastRequest = meaningfulScheduling && distributed && attempts === 0 && snapshot.requestMoment
-      && !snapshot.assistantOutputStartedForContribution;
     if (timer !== null) {
       // Preserve the first two finite accumulation windows. Only the last slot
       // waits for a short pause, so small but decisive additions remain eligible
       // without spending every request on the beginning of a long utterance.
-      // A recognizable request emerging after generic context may bring the
-      // first check forward. Subsequent fragments never push that deadline back.
-      if (!(fastRequest && now() + debounceMs < timerDue) && (!reserved || !callerChanged)) return;
+      if (!reserved || !callerChanged) return;
       clearTimer();
     }
-    const quiet = !fastRequest && (distributed || reserved);
+    const quiet = distributed || reserved;
     const delay = quiet ? Math.max(0, reservedQuietMs - (now() - snapshot.lastObservedAtMs)) : debounceMs;
-    timerDue = now() + delay;
-    timer = schedule(() => run(snapshot.betweenThoughts ? 'between_thoughts_revalidation'
-      : snapshot.lateExperiment ? 'settled_late_experiment'
-      : fastRequest ? 'recognizable_request' : quiet ? 'reserved_quiet_gap' : 'bounded_accumulation'), delay);
+    timer = schedule(() => run(snapshot.lateExperiment ? 'settled_late_experiment' : quiet ? 'reserved_quiet_gap' : 'bounded_accumulation'), delay);
     timer?.unref?.();
   }
   function run(triggerBasis) {
-    timer = null; timerDue = Infinity;
+    timer = null;
     const snapshot = eligible();
     if (!snapshot) return;
-    if (distributed) triggerBasis = snapshot.betweenThoughts ? 'between_thoughts_revalidation'
-      : snapshot.lateExperiment ? 'settled_late_experiment'
-      : meaningfulScheduling && attempts === 0 && snapshot.requestMoment ? 'recognizable_request' : 'reserved_quiet_gap';
+    if (distributed) triggerBasis = snapshot.lateExperiment ? 'settled_late_experiment' : 'reserved_quiet_gap';
     const quietAgeMs = Math.max(0, now() - snapshot.lastObservedAtMs);
     if (triggerBasis === 'reserved_quiet_gap' && quietAgeMs < reservedQuietMs) { queue(); return; }
     attempts++; evaluated++; previousBytes = bytes(snapshot.text); previousSupportRevision = supportRevision(); inFlight = true;
     previousOutputRevision = snapshot.assistantOutputRevision;
     if (distributed) tokens -= 1;
     const capture = { ...snapshot, observedAtMs: now(), evaluationOrdinal: evaluated,
-      contributionEvaluationOrdinal: attempts, triggerBasis, quietAgeMs,
-      revalidationCount: Math.max(0, attempts - 1) };
+      contributionEvaluationOrdinal: attempts, triggerBasis, quietAgeMs };
     log({ type: 'early_observation_started', ...snapshot.stamp, sourceEventIds: snapshot.sourceEventIds,
       textBytes: previousBytes, provisional: true, complete: false, evaluationOrdinal: evaluated,
-      contributionEvaluationOrdinal: attempts, triggerBasis, quietAgeMs, requestMoment: snapshot.requestMoment,
-      revalidationRequested: snapshot.revalidationRequested, revalidationCount: Math.max(0, attempts - 1),
+      contributionEvaluationOrdinal: attempts, triggerBasis, quietAgeMs,
       evidenceAgeMs: Math.max(0, now() - snapshot.lastObservedAtMs), intervention: false });
     Promise.resolve().then(() => observe(capture)).catch(error => {
       log({ type: 'early_observation_failed', ...snapshot.stamp, reason: error?.name ?? 'Error', intervention: false });

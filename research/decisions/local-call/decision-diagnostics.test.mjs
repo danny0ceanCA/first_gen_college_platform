@@ -116,22 +116,3 @@ test('a failed diagnostic sink is distinct from a provider transport failure', a
   await assert.rejects(c.evaluate(input), error => error.code === 'diagnostic_write_failed');
   assert.equal(events.some(event => event.type === 'decisions_api_failed'), false);
 });
-
-test('completed-path logs retain every typed answer instead of summarizing only the legacy support category', () => {
-  const rows = [], diagnostics = createDecisionDiagnostics({ log: row => rows.push(row), rubricVersion: 'classification-review' });
-  const state = { ...snapshot(), language: 'es' };
-  diagnostics.offer(state);
-  const policy = diagnostics.wrapPolicy({ buildRequest: request, parseResponse: () => ({ status: 'completed', result: { supportNeed: 'none' } }) });
-  policy.buildRequest(state);
-  policy.parseResponse({ model: 'gpt-6-luna', answers: [
-    { name: 'already_addressed', type: 'predicate', probability: .1 },
-    { name: 'confusion_state', type: 'refusal', refusal: 'PRIVATE_PROVIDER_PROSE' },
-    { name: 'PRIVATE_UNKNOWN', type: 'predicate', probability: .8 },
-  ] });
-  const row = rows.at(-1);
-  assert.equal(row.classificationPath, 'completed'); assert.equal(row.classificationValidated, true);
-  assert.equal(row.classificationAnswers.length, 2); assert.equal(row.omittedClassificationAnswers, 1);
-  assert.equal(row.language, 'es'); assert.equal(row.supportNeed, 'none');
-  assert.equal(row.classificationAnswers[1].type, 'refusal');
-  assert.ok(!JSON.stringify(row).includes('PRIVATE_PROVIDER_PROSE'));
-});

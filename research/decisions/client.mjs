@@ -2,10 +2,7 @@
 import { performance } from 'node:perf_hooks';
 
 export const DECISIONS_ENDPOINT = 'https://api.openai.com/v1/decisions';
-export const MAX_DECISIONS_REQUEST_BYTES = 32 * 1024;
-export const serializeDecisionRequest = request => JSON.stringify({
-  ...request, prompt_cache_options: { mode: 'explicit', ttl: '30m' },
-});
+const MAX_REQUEST_BYTES = 32 * 1024;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const REQUEST_KEYS = new Set(['model', 'input', 'questions', 'prompt_cache_options']);
 const plainObject = (value) => value !== null && typeof value === 'object'
@@ -58,11 +55,11 @@ function requestBody(request) {
   check(request);
   let body;
   try {
-    body = serializeDecisionRequest(request);
+    body = JSON.stringify({ ...request, prompt_cache_options: { mode: 'explicit', ttl: '30m' } });
   } catch {
     invalid('Request must be serializable JSON.');
   }
-  if (Buffer.byteLength(body, 'utf8') > MAX_DECISIONS_REQUEST_BYTES) invalid('Request exceeds the 32 KiB laboratory limit.');
+  if (Buffer.byteLength(body, 'utf8') > MAX_REQUEST_BYTES) invalid('Request exceeds the 32 KiB laboratory limit.');
   return body;
 }
 

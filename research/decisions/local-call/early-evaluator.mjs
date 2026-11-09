@@ -3,17 +3,6 @@ import { createHash } from 'node:crypto';
 import { buildEarlyRequest, parseEarlyResponse, EARLY_RUBRIC_VERSION } from './early-rubric.mjs';
 import { sameEarlyEvidenceStamp } from './early-projector.mjs';
 
-export function earlyFreshnessMismatch(snapshot, latest, closed = false) {
-  const fields = ['callId', 'studentId', 'language', 'connectionEpoch', 'scopeEpoch', 'contributionId', 'revision'];
-  return [
-    ...(closed ? ['observer_closed'] : []),
-    ...(!latest?.usable ? ['evidence_unusable'] : []),
-    ...fields.filter(field => !snapshot?.stamp || !latest?.stamp || snapshot.stamp[field] !== latest.stamp[field]),
-    ...((latest?.supportRevision ?? 0) !== (snapshot?.supportRevision ?? 0) ? ['supportRevision'] : []),
-    ...((latest?.assistantOutputRevision ?? 0) !== (snapshot?.assistantOutputRevision ?? 0) ? ['assistantOutputRevision'] : []),
-  ];
-}
-
 // The projector serializes calls and coalesces newer fragments. This evaluator
 // only returns a typed candidate to the parent; it has no Live writer.
 export function createEarlyEvaluator({ client, budget, current, onResult, log = () => {},
@@ -32,10 +21,6 @@ export function createEarlyEvaluator({ client, budget, current, onResult, log = 
       rubricVersion: EARLY_RUBRIC_VERSION, supportRevision: snapshot.supportRevision ?? 0,
       assistantOutputRevision: snapshot.assistantOutputRevision ?? 0, provisional: true, complete: false,
       triggerBasis: snapshot.triggerBasis ?? null,
-      requestMoment: snapshot.requestMoment ?? null,
-      revalidationRequested: snapshot.revalidationRequested === true,
-      revalidationCount: snapshot.revalidationCount ?? 0,
-      quietAgeMs: snapshot.quietAgeMs ?? null,
       explanationHistorySummary: snapshot.explanationHistory ? {
         retainedRows: snapshot.explanationHistory.retainedRows,
         selectedRows: snapshot.explanationHistory.rows.length,
@@ -45,8 +30,7 @@ export function createEarlyEvaluator({ client, budget, current, onResult, log = 
       contextSent: false, playbackClaim: false };
     const emit = (stage, values = {}) => log({ type: 'early_decisions_' + stage, ...meta, ...values });
     if (!matches(snapshot) || count >= maxEvaluations) {
-      emit('skipped', { reason: closed ? 'closed' : count >= maxEvaluations ? 'call_limit' : 'stale_before_request',
-        freshnessMismatch: earlyFreshnessMismatch(snapshot, current(), closed) }); return;
+      emit('skipped', { reason: closed ? 'closed' : count >= maxEvaluations ? 'call_limit' : 'stale_before_request' }); return;
     }
     let reservation, settled = false, outcome;
     const controller = new AbortController(); active = controller;
@@ -64,8 +48,7 @@ export function createEarlyEvaluator({ client, budget, current, onResult, log = 
       const fresh = matches(snapshot);
       emit('completed', { reservationId: reservation.id, requestId: outcome.requestId,
         status: parsed.status, reason: parsed.reason ?? null, result: parsed.result, policyDecision: parsed.decision ?? null,
-        freshAtWorker: fresh, freshnessMismatch: earlyFreshnessMismatch(snapshot, current(), closed),
-        durationMs: outcome.durationMs, totalMs: now() - startedAt,
+        freshAtWorker: fresh, durationMs: outcome.durationMs, totalMs: now() - startedAt,
         usage: outcome.response?.usage, costUsd: cost.costUsd, budget: budget.summary() });
       if (!closed && parsed.status === 'completed') {
         // The parent independently validates source IDs, current scope, input,
@@ -80,8 +63,6 @@ export function createEarlyEvaluator({ client, budget, current, onResult, log = 
           assistantEvidenceComplete: snapshot.assistantSinceNeed?.evidenceComplete === true,
           sourceOutputEventIds: snapshot.assistantSinceNeed?.sourceEventIds ?? [],
           triggerBasis: snapshot.triggerBasis ?? null, classifiedAtMs: now(),
-          freshnessMismatch: earlyFreshnessMismatch(snapshot, current(), closed),
-          revalidationCount: snapshot.revalidationCount ?? 0,
         } });
       }
     } catch (error) {

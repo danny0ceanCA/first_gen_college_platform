@@ -12,8 +12,8 @@ const nativeTypes = new Set(['session.input_transcript.delta', 'session.output_t
 const applicationTypes = new Set(['conversation.item.input_audio_transcription.completed', 'response.output_audio_transcript.done', 'session.closed']);
 const studentId = scope => scope?.studentId ?? 'unselected';
 
-// The isolated launcher uses this guarded entry point. The authenticated server
-// factory uses the shared core below. Dependencies are never browser input.
+// Only the isolated launcher imports this module. The optional dependencies are
+// a local test seam; they are never accepted from a browser or Live event.
 export function createObservedLocalSession(options, lab, dependencies = {}) {
   const fictional = lab?.fictional === true && lab.seed?.fictional === true;
   const isolatedCopy = lab?.dataKind === 'isolated-copy' && lab.seed?.dataKind === 'isolated-copy'
@@ -30,7 +30,6 @@ export function createObservedLocalSession(options, lab, dependencies = {}) {
   if (lab.conversationEnabled && !lab.supportEnabled) throw new Error('conversation_support_requires_local_support');
   if (lab.earlyEnabled && !lab.conversationEnabled) throw new Error('early_support_requires_conversation_support');
   if (lab.lateEnabled && !lab.earlyEnabled) throw new Error('late_experiment_requires_early_support');
-  if (lab.betweenThoughtsEnabled && !lab.earlyEnabled) throw new Error('between_thoughts_requires_early_support');
   return createObservedSessionCore(options, lab, dependencies);
 }
 
@@ -43,7 +42,7 @@ export function createObservedSessionCore(options, lab, dependencies = {}) {
   let worker, pending = 0, dropped = 0, failed = false, closing = false, failureReason = null, timer, bootTimer;
   let currentScope = { ...options.scope }, currentLanguage = options.config.language;
   let earlyConfiguring = false;
-  let playback = { idle: false, version: 0, lateAllowed: false, betweenThoughtsAllowed: false };
+  let playback = { idle: false, version: 0, lateAllowed: false };
   let readyResolve, closeResolve;
   const ready = new Promise(resolve => { readyResolve = resolve; });
   const closed = new Promise(resolve => { closeResolve = resolve; });
@@ -51,8 +50,7 @@ export function createObservedSessionCore(options, lab, dependencies = {}) {
   const status = () => ({ pending, dropped, failed, closing, reason: failureReason,
     intervention: support.status().sent > 0 || support.status().preferences.attempts > 0 || support.status().conversation.attempts > 0 || support.status().early.attempts > 0, support: support.status() });
   const support = createSupportGate({ enabled: lab.supportEnabled === true, preferencesEnabled: lab.preferencesEnabled === true, conversationEnabled: lab.conversationEnabled === true,
-    earlyEnabled: lab.earlyEnabled === true, earlyObserveOnly: lab.earlyObserveOnly === true, lateEnabled: lab.lateEnabled === true,
-    betweenThoughtsEnabled: lab.betweenThoughtsEnabled === true, getEarlyEvidence: () => {
+    earlyEnabled: lab.earlyEnabled === true, earlyObserveOnly: lab.earlyObserveOnly === true, lateEnabled: lab.lateEnabled === true, getEarlyEvidence: () => {
       const snapshot = earlyTracker?.snapshot();
       return snapshot && earlyConfiguring ? { ...snapshot, usable: false } : snapshot;
     }, scope: options.scope, language: options.config.language,
@@ -111,8 +109,7 @@ export function createObservedSessionCore(options, lab, dependencies = {}) {
         ...(lab.preferencesEnabled ? { preferenceStamp: support.preferenceStamp() } : {}),
         ...(lab.conversationEnabled ? { conversationStamp: support.conversationStamp() } : {}),
         ...(lab.earlyEnabled ? { earlySupport: support.earlySupport(), earlySupportRevision: support.earlySupportRevision(),
-          earlyAllowed: !earlyConfiguring && support.earlyAllowed(), lateAllowed: !earlyConfiguring && support.lateAllowed(),
-          betweenThoughtsAllowed: !earlyConfiguring && support.betweenThoughtsAllowed() } : {}) }); pending++;
+          earlyAllowed: !earlyConfiguring && support.earlyAllowed(), lateAllowed: !earlyConfiguring && support.lateAllowed() } : {}) }); pending++;
     } catch { fail('observer_post_failed'); }
   }
   // Construct the unmodified voice engine first. Filesystem work belongs to the
@@ -150,8 +147,6 @@ export function createObservedSessionCore(options, lab, dependencies = {}) {
       conversationEnabled: lab.conversationEnabled === true,
       earlyEnabled: lab.earlyEnabled === true,
       lateEnabled: lab.lateEnabled === true,
-      betweenThoughtsEnabled: lab.betweenThoughtsEnabled === true,
-      meaningfulScheduling: lab.meaningfulScheduling !== false,
       microphoneBudgetApproved: lab.microphoneBudgetApproved === true,
       continuationRefinement: lab.continuationRefinement === true,
       allowedStudentIds: [...allowedStudents], logPath: resolve(root, lab.seed.callId + '.jsonl'),
@@ -195,13 +190,11 @@ export function createObservedSessionCore(options, lab, dependencies = {}) {
       support.playback(value);
       if (value && typeof value.idle === 'boolean' && Number.isSafeInteger(value.version) && value.version >= playback.version) {
         const lateAllowed = lab.lateEnabled === true && support.lateAllowed();
-        const betweenThoughtsAllowed = lab.betweenThoughtsEnabled === true && support.betweenThoughtsAllowed();
         // A 500ms browser idle transition can precede the stricter 900ms gate.
         // Forward that later readiness change once, not every meter sample.
-        if (value.idle !== playback.idle || value.version !== playback.version || lateAllowed !== playback.lateAllowed
-          || betweenThoughtsAllowed !== playback.betweenThoughtsAllowed)
+        if (value.idle !== playback.idle || value.version !== playback.version || lateAllowed !== playback.lateAllowed)
           copy('playback', { ...value, type: 'browser_playback' });
-        playback = { idle: value.idle, version: value.version, lateAllowed, betweenThoughtsAllowed };
+        playback = { idle: value.idle, version: value.version, lateAllowed };
       }
       return engine.playback(value);
     },
