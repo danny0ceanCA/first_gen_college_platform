@@ -205,6 +205,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [audioBlocked,setAudioBlocked]=useState(false);
+  const [audioDegraded,setAudioDegraded]=useState(false);
   const invalidateMemoryPlayback=useRef<()=>void>(()=>{});
   const [wakeStatus,setWakeStatus]=useState<VoiceWakeLockStatus>('hidden');
   const [draftRecovery]=useState(()=>recoveryKey?privateRecovery(recoveryKey):null);
@@ -496,7 +497,10 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       // Use this call's immutable archive scope. Samples go through the existing
       // opt-in batch queue, never through one operational HTTP upload per sample.
       const audioDiagnosticScope={subject:user?.sub,sessionId,attemptId:logAttempt.current,studentId:logTarget.current};
-      const audioDiagnostics=startLiveAudioDiagnostics({pc,audio:audio.current,enabled:captureRequested,getAudioContextState:()=>livePlayback.contextState(),onEvent:(event,details)=>{
+      setAudioDegraded(false);
+      const audioDiagnostics=startLiveAudioDiagnostics({pc,audio:audio.current,enabled:captureRequested,onQuality:onboarding?undefined:degraded=>{
+        if(generation.current===version&&privacyLease.valid())setAudioDegraded(degraded);
+      },getAudioContextState:()=>livePlayback.contextState(),onEvent:(event,details)=>{
         if(generation.current!==version||!privacyLease.valid())return;
         privateCapture.current.event({type:'diagnostic',event,details},audioDiagnosticScope);
       }});resources.current.stopAudioDiagnostics=()=>audioDiagnostics.stop();
@@ -1066,6 +1070,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         <button type="button" className="button outline voice-end" aria-label={finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')} onClick={()=>{onboardingEndReason.current='user_end';if(closing.current?.active())closing.current.force();else if(farewellPending.current)end();else closeWithFarewell();}}><PhoneOff size={18}/><span className="voice-control-label">{finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')}</span></button>
       </>}
       {state==='live'&&audioBlocked&&<button type="button" className="button outline voice-audio-recovery" onClick={resumeAudio}>{t('Play Origen audio','Reproducir audio de Origen')}</button>}
+      {state==='live'&&audioDegraded&&!audioBlocked&&!finishing&&<p className="voice-notice" role="status">{t('Audio may be choppy. If you missed something, ask Origen to repeat it.','El audio puede entrecortarse. Si no escuchaste algo, pídele a Origen que lo repita.')}</p>}
       {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
     <p className="voice-progress-status" role="status">{summarySaveState.failed?t('Summary not saved · retry below','Resumen sin guardar · reintenta abajo'):summarySaveState.saving?t('Saving your conversation…','Guardando tu conversación…'):recoveryState==='pending'?t('Preparing your summary…','Preparando tu resumen…'):summarySaved||recoveryState==='complete'?t('Summary saved · binder notes are organized separately','Resumen guardado · las notas se organizan por separado'):' '}</p>

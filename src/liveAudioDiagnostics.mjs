@@ -35,12 +35,25 @@ export function summarizeLiveAudioStats(report,previous=new Map()){
  return {summary:{streamCount:inbound.length,inbound},previous:next};
 }
 
-export function startLiveAudioDiagnostics({pc,audio,enabled=false,onEvent=()=>{},getAudioContextState=()=>undefined,document:page=globalThis.document,clock=()=>globalThis.performance?.now?.()??Date.now(),schedule=setTimeout,cancel=clearTimeout,intervalMs=2000,maxSamples=450,maxEvents=150}={}){
- if(!enabled)return {stop(){},sample:async()=>{}};
+export function startLiveAudioDiagnostics({pc,audio,enabled=false,onEvent=()=>{},onQuality,getAudioContextState=()=>undefined,document:page=globalThis.document,clock=()=>globalThis.performance?.now?.()??Date.now(),schedule=setTimeout,cancel=clearTimeout,intervalMs=2000,maxSamples=450,maxEvents=150}={}){
+ if(!enabled&&!onQuality)return {stop(){},sample:async()=>{}};
  const started=clock(),listeners=[],tracks=new Set();
  let stopped=false,busy=false,timer,timeoutTimer,nextSampleAt,previous=new Map(),samples=0,events=0,lastContext;
+ let badSamples=0,goodSamples=0,degraded=false;
+ function observeQuality(inbound){
+  const measured=inbound.filter(stream=>!stream.baseline&&Number.isFinite(stream.packetLossPercent));
+  if(!measured.length){badSamples=0;goodSamples=0;return;}
+  const bad=measured.some(stream=>stream.packetLossPercent>=10||stream.concealedPercent>=20);
+  badSamples=bad?badSamples+1:0;
+  goodSamples=bad?0:goodSamples+1;
+  if((!degraded&&badSamples>=2)||(degraded&&goodSamples>=3)){
+   degraded=!degraded;
+   try{onQuality?.(degraded);}catch{}
+   emit('audio_quality_changed',{degraded});
+  }
+ }
  function emit(event,details={},sample=false){
-  if(stopped)return;
+  if(stopped||!enabled)return;
   if(!sample&&events++>=maxEvents)return;
   try{onEvent(event,{elapsedMs:Math.max(0,Math.round(clock()-started)),...details});}catch{}
  }
@@ -69,6 +82,7 @@ export function startLiveAudioDiagnostics({pc,audio,enabled=false,onEvent=()=>{}
   try{
    const report=await pc.getStats();if(stopped)return;
    const collected=summarizeLiveAudioStats(report,previous);previous=collected.previous;samples++;
+   observeQuality(collected.summary.inbound);
    const current=state();
    if(current.audioContextState!==lastContext){lastContext=current.audioContextState;emit('audio_browser_state',{operation:'audio_context_state',...current});}
    emit('audio_transport_sample',{sample:samples,schedulerDelayMs,statsCollectionMs:Math.max(0,Math.round(clock()-requestedAt)),...current,...collected.summary},true);

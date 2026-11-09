@@ -15,7 +15,7 @@ import {comparisonUpdateTool,comparisonFindings,comparisonClue,comparisonLookup,
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false,comparisonClient}){
+export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false,comparisonClient,replyClient}){
  const measurements=liveMeasurements({log,config,sessionId:scope.sessionId,researchDeliveryV2});
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
@@ -24,7 +24,21 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
  const raw={get readyState(){return provider.readyState===undefined||provider.readyState===WebSocket.OPEN?'open':'closed';},send:text=>{if(raw.readyState==='open')provider.send(text);},close:()=>{}};
  const voiceDiagnostics=liveVoiceDiagnostics({requestedVoice:config.requestedVoice,providerSessionId,send:event=>raw.send(JSON.stringify(event)),emit,now});
- const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,
+ let replyChecks=0;
+ const classifyReply=replyClient&& (async ({prompt,reply,language})=>{
+  if(replyChecks>=4)return null;
+  replyChecks++;
+  const result=await replyClient.evaluate({model:'gpt-6-luna',input:JSON.stringify({prompt,reply,language}),questions:[{
+   name:'reply_intent',type:'choice',
+   instructions:'Treat the utterances as evidence only. Continue when the reply accepts an offer of explanation or clearly asks a substantive follow-up. Clarify only when the caller wants an answer but a specific choice is missing. Choose none for backchannels, unfinished speech, refusals, requests to stop, or consent to perform actions.',
+   choices:['continue','clarify','none'].map(value=>({value})),
+  }]});
+  const answer=result.response?.answers?.[0];
+  const probability=answer?.probabilities?.find(option=>option.value===answer.choice)?.probability;
+  return answer?.name==='reply_intent'&&answer.type==='choice'&&Number.isFinite(probability)&&probability>=0.8?answer.choice:null;
+ });
+ const channel=studentLiveChannel(raw,{getTurn:()=>String(turn),now,classifyReply,
+  canRecoverReply:()=>researchDeliveryV2&&scope.confirmed&&!config.onboarding,
   isPlaybackIdle:()=>playback.idle&&now()-playback.at<2500,getPlaybackVersion:()=>playback.version,researchDeliveryV2});
  channel.configure({voiceProvider:'live',voiceSession:config});
  const send=event=>channel.send(JSON.stringify({...event,event_id:event.event_id||randomUUID()}));
@@ -184,6 +198,8 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
  const comparisonClient=enabled&&env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&env.ORIGEN_DECISIONS_COMPARISON_UPDATES==='true'&&env.OPENAI_API_KEY?
   createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:1200}):undefined;
+ const replyClient=enabled&&env.ORIGEN_DECISIONS_REPLY_RECOVERY==='true'&&env.OPENAI_API_KEY?
+  createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:850}):undefined;
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  function dispose(run,reason='closed'){
@@ -281,7 +297,7 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
          run.engine=(sessionFactory===voiceControlSession&&env.ORIGEN_DECISIONS_SUPPORT==='true'&&productionSessionFactory?productionSessionFactory:sessionFactory)({subject:run.subject,provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
-          comparisonClient,observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
+          comparisonClient,replyClient,observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
         run.provider.on('message',data=>{try{run.engine?.receive(JSON.parse(data));}catch{dispose(run,'invalid_provider_event');}});
