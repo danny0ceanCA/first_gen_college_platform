@@ -20,6 +20,39 @@ test('a temporary database outage remains retryable; malformed polling IDs do no
  assert.equal(connections,1);
 });
 
+test('scoped housing updates require a fresh same-student report and derive the worker source server-side',{skip:!process.env.DATABASE_TEST_URL},async()=>{
+ const target=new URL(process.env.DATABASE_TEST_URL);assert.ok(['localhost','127.0.0.1'].includes(target.hostname));
+ const f=await retrievalFixture(),sessionId=randomUUID(),baseId=randomUUID();
+ const handler=createVoiceResearchJobsHandler(f.db,{ORIGEN_BACKGROUND_RESEARCH:'true',ORIGEN_RESEARCH_DELIVERY_V2:'true',ORIGEN_DECISIONS_COMPARISON_UPDATES:'true'});
+ const official='https://financialaid.ucdavis.edu/undergraduate/cost/2627-entering';
+ const sources=[{url:'https://financialaid.berkeley.edu/how-aid-works/student-budgets-cost-of-attendance/'},{url:official}];
+ const findings=['UC Berkeley','UC Davis'].map((name,i)=>({subject:name,aspect:'total_budget',status:'verified',
+  answer:name+' 2026–27 residence hall annual estimate $'+['54,674','49,009'][i]+' ['+(i+1)+'].',
+  qualification:'For new California-resident undergraduates, before aid and not a bill ['+(i+1)+'].'}));
+ const result={sources,voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
+ async function post(extra={}){
+  const input={sessionId,studentId:'alex',requestKey:randomUUID(),mode:'finance',language:'en',question:'Untrusted question mentioning Berkeley',
+   institution:'UC Davis',comparisonBaseJobId:baseId,comparisonOfficialUrl:'https://example.edu/forged',...extra};
+  const req=Object.assign(Readable.from([JSON.stringify(input)]),{url:'/api/voice-research-jobs',method:'POST',headers:{},origenAuthorized:true,origenIdentity:{sub:'reader'}});
+  let status,body;
+  await f.as('reader',()=>handler(req,{writeHead:n=>status=n,end:s=>body=JSON.parse(s)},()=>assert.fail()));
+  return {status,body};
+ }
+ try{
+  const account=(await f.owner.query("SELECT id FROM origen_accounts WHERE auth0_subject='reader'")).rows[0].id;
+  await f.owner.query("INSERT INTO origen_voice_research_jobs(id,account_id,student_id,session_id,request_key,input,status,result,finished_at) VALUES($1,$2,'alex',$3,$4,$5,'completed',$6,now())",
+   [baseId,account,sessionId,randomUUID(),{mode:'finance',language:'en',institution:'UC Berkeley and UC Davis',question:'Compare residence halls'},result]);
+  assert.equal((await post({studentId:'sam'})).status,409);
+  assert.equal((await post({sessionId:randomUUID()})).status,409);
+  assert.equal((await post({institution:'UC Irvine'})).status,409);
+  const {status,body}=await post();assert.equal(status,200);
+  const saved=(await f.owner.query('SELECT input FROM origen_voice_research_jobs WHERE id=$1',[body.id])).rows[0].input;
+  assert.equal(saved.comparisonOfficialUrl,official);
+  assert.match(saved.question,/UC Davis.*live with family/);
+  assert.doesNotMatch(JSON.stringify(saved),/Berkeley|forged|Untrusted/);
+ }finally{await f.close();}
+});
+
 test('queued comparison reuses only server-owned same-account/session/student evidence',{skip:!process.env.DATABASE_TEST_URL},async()=>{
  const target=new URL(process.env.DATABASE_TEST_URL);assert.ok(['localhost','127.0.0.1'].includes(target.hostname));
  const f=await retrievalFixture(),sessionId=randomUUID();

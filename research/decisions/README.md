@@ -1,6 +1,8 @@
 # Isolated Decisions observer — phases 1–2
 
-> Production release update: the authenticated production entry point is documented in [Decisions production release](../../docs/voice-experience/DECISIONS_PRODUCTION_RELEASE.md). Local trial descriptions below remain historical; the isolated launcher still rejects production mode. Research Decisions remain observe-only and late delivery remains off.
+> Production release update: the authenticated production entry point is documented in [Decisions production release](../../docs/voice-experience/DECISIONS_PRODUCTION_RELEASE.md). Local trial descriptions below remain historical. The isolated launcher still rejects production mode, and the research observer remains observe-only.
+
+The application also has a separate, default-off comparison pilot. For an isolated API, set `ORIGEN_DECISIONS_COMPARISON_UPDATES=true` alongside `ORIGEN_BACKGROUND_RESEARCH=true`, `ORIGEN_LIVE_SERVER_CONTROL=true`, and `ORIGEN_RESEARCH_DELIVERY_V2=true`, and use a new authenticated Live call. It supports changing one 2026–27 California-resident entering undergraduate budget from a residence hall to living with family in a completed Berkeley/Davis comparison. Start with a report containing both verified budgets and their caveats. Ask for one campus by name, or establish which campus is closer to family before referring to it indirectly. An unsupported or unclear request cannot start a comparison lookup. The receipt supplies the unchanged estimate for immediate conversation while the existing worker checks the one changed scenario. This flag is separate from the observer, and the worker needs no new flag or migration.
 
 For the current optional local conversational-support experiment, see
 [meaningful support on v1.3](MEANINGFUL_SUPPORT_V1_3.md) and the

@@ -19,3 +19,22 @@ test('shutdown signal propagates to the provider; completed writes guard cancell
  await processResearchJob(db,{}, {signal:controller.signal,request:async(url,options)=>{controller.abort();assert.equal(options.signal.aborted,true);throw Error('aborted');}});
  assert.ok(db.writes.at(-1).sql.includes("AND status='running'"));
 });
+for(const mismatch of [false,true])test('scoped comparison '+(mismatch?'rejects a wrong housing scenario':'checks only the changed campus and retains its caveat'),async()=>{
+ const source='https://financialaid.ucdavis.edu/undergraduate/cost/2627-entering';
+ const db=fixture({question:'Verify the 2026–27 UC Davis living-with-family budget.',institution:'UC Davis',language:'en',mode:'finance',comparisonOfficialUrl:source});
+ const text=JSON.stringify({budget:38231,scope:mismatch?'unknown':'2026-27-entering-ca-resident-living-with-family'});
+ let count=0;
+ await processResearchJob(db,{}, {log:()=>{},request:async(url,options)=>{
+  count++;
+  const request=JSON.parse(options.body);
+  assert.deepEqual(request.tools[0].filters.allowed_domains,['financialaid.ucdavis.edu']);
+  assert.equal(request.max_tool_calls,1);
+  assert.doesNotMatch(options.body,/UC Berkeley/);
+  return new Response(JSON.stringify({status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'open_page',url:source}},
+   {type:'message',content:[{type:'output_text',text}]}]}));
+ }});
+ assert.equal(count,1);
+ const completed=db.writes.find(w=>w.sql.includes("status='completed'"));
+ if(mismatch)assert.ok(!completed);
+ else assert.match(completed?.args[1].voiceBrief.findings[0].qualification,/not a bill/);
+});

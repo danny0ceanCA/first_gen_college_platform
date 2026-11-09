@@ -9,13 +9,17 @@ import {researchModeForTool} from '../src/liveConversation.mjs';
 import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 import {selectResearchReuse,cachedResearchForCoverage} from './research-reuse.mjs';
 import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
+import {createDecisionsClient} from '../research/decisions/client.mjs';
+import {comparisonUpdateTool,comparisonFindings,comparisonClue,comparisonLookup,selectComparisonCampus} from './voice-comparison-update.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
-export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false}){
+export function voiceControlSession({provider,providerSessionId,config,scope,jobRequest,emit,log=()=>{},observer,now=Date.now,callbackTimeoutMs=35000,researchDeliveryV2=false,comparisonClient}){
  const measurements=liveMeasurements({log,config,sessionId:scope.sessionId,researchDeliveryV2});
  let closed=false,turn=0,playback={idle:false,version:0,at:0},reportRecord;
  const reports=new Map();
+ const comparisonTurns=[],comparisonUpdates=new Set();
+ let inputVersion=0,comparisonChecks=0;
  const batches=new Map(),finishedLeases=new Set(),calls=new Set(),cache=voiceResearchCache(now),budget=voiceResearchBudget();
  const raw={get readyState(){return provider.readyState===undefined||provider.readyState===WebSocket.OPEN?'open':'closed';},send:text=>{if(raw.readyState==='open')provider.send(text);},close:()=>{}};
  const voiceDiagnostics=liveVoiceDiagnostics({requestedVoice:config.requestedVoice,providerSessionId,send:event=>raw.send(JSON.stringify(event)),emit,now});
@@ -35,7 +39,38 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    send({type:'origen.research.ready',jobId:job.id,requestId:job.requestId,revision:job.revision,question:job.question,evidenceVersion,researchPending,result:hasEvidence?{...researchEvidence(job.result,false),evidenceVersion,researchPending,...(job.result.recoveryUnavailable?{recoveryUnavailable:true}:{}),...(researchPending?{status:'source_check_partial'}:{})}:{status:'research_failed'}});
   }});
  const output=(item,result)=>send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(result)}});
+ async function updateComparison(item){
+  const {jobId,revision}=JSON.parse(item.arguments);
+  const record=reports.get(jobId),current=comparisonTurns.at(-1);
+  const unavailable={status:'comparison_unavailable',searchStarted:false,instruction:'No comparison update started. Ask one brief question if the intended change is unclear. For unsupported scenarios, use the ordinary research route only if the caller requested a lookup.'};
+  if(!comparisonClient||!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.status!=='completed'||record.job.revision!==revision||!current||current.version!==inputVersion||comparisonChecks>=3)return unavailable;
+  const entries=comparisonFindings(record.job.result);
+  if(!entries)return unavailable;
+  const clue=comparisonClue(current.text,comparisonTurns.slice(0,-1).map(entry=>entry.text));
+  const clarify={status:'comparison_clarification_required',searchStarted:false,instruction:'Ask which campus should change to living with family. Keep the comparison unchanged. Start with the question; do not say you are checking.'};
+  if(!clue)return clarify;
+  if(comparisonUpdates.has(jobId))return {status:'comparison_update_already_requested',searchStarted:false,instruction:'This report already has a requested update. Continue with the existing research state. Do not search or announce it again.'};
+  comparisonUpdates.add(jobId);
+  comparisonChecks++;
+  let accepted=false;
+  try{
+   const changed=await selectComparisonCampus(comparisonClient,entries,clue).catch(()=>null);
+   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId)
+    return {status:'comparison_superseded',searchStarted:false,instruction:'The caller continued or the scope changed. Follow the latest request without repeating a question from the earlier turn.'};
+   if(!changed)return clarify;
+   const plan=changed&&comparisonLookup(entries,changed,config.language);
+   if(!plan)return unavailable;
+   const receipt=await research.start({question:plan.question,institution:plan.institution,mode:'finance',
+    language:config.language==='es'?'es':'en',sessionId:scope.sessionId,studentId:scope.studentId,
+    requestKey:item.call_id,comparisonBaseJobId:jobId});
+   accepted=receipt.status==='research_pending'&&receipt.requestId===item.call_id&&!!receipt.jobId;
+   if(!accepted)return receipt;
+   return {...receipt,status:'research_pending',changedCampus:plan.institution,unchangedFinding:plan.retained,
+    instruction:'The check is queued only for changedCampus. Share the saved unchangedFinding with its year, residence-hall scope and full caveat now, if useful. Then leave room for a reply. The changed figure will arrive separately. Do not repeat the saved estimate when delivering the new figure or claim the unchanged campus was rechecked.'};
+  }finally{if(!accepted&&reports.get(jobId)===record)comparisonUpdates.delete(jobId);}
+ }
  async function researchCall(item){
+  if(item.name===comparisonUpdateTool.name)return updateComparison(item);
   if(item.name==='cancel_background_research'){reportRecord=undefined;const receipt=await research.cancel();send({type:'origen.research.cancel'});return receipt;}
   if(item.name==='read_research_details'){
    const args=JSON.parse(item.arguments),record=researchDeliveryV2?reports.get(args.jobId):reportRecord;
@@ -60,6 +95,10 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   if(deliveryStages[event.type]&&!(researchDeliveryV2&&event.type==='origen.research.announced'))log({event:'voice.research.delivery',deliveryStage:deliveryStages[event.type],durationMs:event.durationMs,packetCount:event.packetCount,contextBytes:event.contextBytes,evidenceFormat:event.evidenceFormat});
   if(event.type==='origen.research.delivery')log({event:'voice.research.delivery',deliveryStage:event.deliveryStage,deliveryReason:event.deliveryReason,durationMs:event.durationMs});
   if(event.type==='input_audio_buffer.speech_started')turn++;
+  if(comparisonClient&&event.type==='conversation.item.input_audio_transcription.completed'&&typeof event.transcript==='string'){
+   comparisonTurns.push({text:event.transcript.slice(-1600),version:inputVersion});
+   if(comparisonTurns.length>6)comparisonTurns.shift();
+  }
   const tools=event.type==='response.done'?(event.response?.output||[]).filter(item=>item.type==='function_call'):[];
   if(!tools.length){emit(event);return;}
   if(batches.size>=4)throw Error('tool_batch_limit');
@@ -72,7 +111,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
    for(const item of tools){
     if(calls.has(item.call_id))throw Error('duplicate_tool_call');calls.add(item.call_id);
     if(!config.tools.some(tool=>tool.name===item.name)&&item.name!=='cancel_background_research')throw Error('unadvertised_tool');
-    if(researchModeForTool(item.name)||['cancel_background_research','read_research_details'].includes(item.name))server.push(item);
+    if(researchModeForTool(item.name)||['cancel_background_research','read_research_details',comparisonUpdateTool.name].includes(item.name))server.push(item);
     else{pending.set(item.call_id,item);browser.push(item);}
    }
    if(closed)return;
@@ -92,7 +131,7 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  };
  return {
   start(){measurements.start();void raw.onmessage?.({data:JSON.stringify({type:'session.started'})});voiceDiagnostics.start();},
-  receive(event){measurements.native(event);if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
+  receive(event){if(comparisonClient&&event.type==='session.input_transcript.delta'&&event.delta)inputVersion++;measurements.native(event);if(!closed&&!voiceDiagnostics.receive(event))raw.onmessage?.({data:JSON.stringify(event)});},
   command(event,lease){
    if(closed)return false;
    const batch=batches.get(lease);
@@ -118,9 +157,9 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
   playback(value){if(typeof value.idle==='boolean'&&Number.isSafeInteger(value.version)&&value.version>=playback.version){if(value.idle!==playback.idle||value.version!==playback.version)try{observer?.playback(value);}catch{}playback={idle:value.idle,version:value.version,at:now()};}},
   suspend(){playback={...playback,idle:false,at:now()};},
   async cancel(){reportRecord=undefined;const result=await research.cancel();send({type:'origen.research.cancel'});return result;},
-  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){observer?.reset();reportRecord=undefined;reports.clear();cache.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
+  async configure(next,nextScope,eventId){if(nextScope.studentId!==scope.studentId||nextScope.confirmed!==scope.confirmed){observer?.reset();reportRecord=undefined;reports.clear();cache.clear();comparisonTurns.length=0;comparisonUpdates.clear();await research.cancel();send({type:'origen.research.cancel',reason:'scope_changed'});}scope=nextScope;config=next;send({type:'session.update',event_id:eventId,session:next});},
   settle:options=>channel.settle(options),prepareClose:()=>channel.prepareClose(),flush:()=>channel.flush(),
-  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();void observer?.close();},
+  close(){if(closed)return;measurements.close();voiceDiagnostics.close();closed=true;reports.clear();cache.clear();comparisonTurns.length=0;comparisonUpdates.clear();for(const batch of batches.values())batch.finish(false);research.close();channel.close();void observer?.close();},
  };
 }
 
@@ -128,6 +167,8 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
  if(env.NODE_ENV==='production'&&sessionFactory!==voiceControlSession)throw Error('local_session_factory_not_allowed_in_production');
  const sessions=new Map(),clients=new Set();let wss,serverRef,upgrade;
  const enabled=env.ORIGEN_LIVE_SERVER_CONTROL==='true';
+ const comparisonClient=enabled&&env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&env.ORIGEN_DECISIONS_COMPARISON_UPDATES==='true'&&env.OPENAI_API_KEY?
+  createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:1200}):undefined;
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  function dispose(run,reason='closed'){
@@ -225,7 +266,7 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
         run.provider.once('open',()=>{
          clearTimeout(attachTimer);if(run.closed)return;
          run.engine=(sessionFactory===voiceControlSession&&env.ORIGEN_DECISIONS_SUPPORT==='true'&&productionSessionFactory?productionSessionFactory:sessionFactory)({subject:run.subject,provider:run.provider,providerSessionId:run.providerId,config:run.config,scope:run.scope,researchDeliveryV2:env.ORIGEN_RESEARCH_DELIVERY_V2==='true',emit:event=>{send({type:'event',event});if(event.type==='error'&&['live_adapter_failed','live_event_invalid'].includes(event.error?.code))dispose(run,'control_failed');},log,
-          observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
+          comparisonClient,observer:observeFactory?.({subject:run.subject,sessionId:run.sessionId}),jobRequest:(method,id,body)=>request(run.token,method,'/api/voice-research-jobs'+(id?'?id='+encodeURIComponent(id):''),body,run.sessionId)});
          const durationMs=Date.now()-attachStarted;send({type:'ready'});send({type:'event',event:{type:'origen.control.ready',durationMs}});run.engine.start();log({event:'voice.control.ready',sessionId:run.sessionId,durationMs});
         });
         run.provider.on('message',data=>{try{run.engine?.receive(JSON.parse(data));}catch{dispose(run,'invalid_provider_event');}});

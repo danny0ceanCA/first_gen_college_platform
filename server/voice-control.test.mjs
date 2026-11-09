@@ -10,6 +10,7 @@ import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 import {voiceTargetResult} from '../src/voiceTargetResult.mjs';
 import {capturePayload} from '../src/voiceCapture.mjs';
+import {comparisonUpdateTool} from './voice-comparison-update.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -23,6 +24,62 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
+for(const language of ['en','es'])test(language+': comparison keeps the saved figure in the receipt while only the changed campus is queued',async()=>{
+ const es=language==='es',changed=es?'UC Berkeley':'UC Davis',unchanged=es?'UC Davis':'UC Berkeley';
+ const sources=[
+  {url:'https://financialaid.berkeley.edu/how-aid-works/student-budgets-cost-of-attendance/',title:'Berkeley'},
+  {url:'https://financialaid.ucdavis.edu/undergraduate/cost/2627-entering',title:'Davis'},
+ ];
+ const findings=['UC Berkeley','UC Davis'].map((name,i)=>({subject:name+' — residence hall',aspect:'total_budget',status:'verified',
+  answer:name+' 2026–27 residence hall annual total: $'+['54,674','49,009'][i]+' ['+(i+1)+'].',
+  qualification:'Estimate for new California-resident undergraduates before aid, not a bill ['+(i+1)+'].'}));
+ const result={sources,checkedAt:new Date().toISOString(),text:findings.map(f=>f.answer+' '+f.qualification).join(' '),
+  voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
+ const posts=[];let decisions=0;
+ const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,comparisonUpdateTool]},
+  comparisonClient:{evaluate:async request=>{
+   decisions++;
+   assert.doesNotMatch(request.input,/my family|nuestra familia|50,000/);
+   const choice=changed.toLowerCase();
+   return {response:{answers:[{type:'choice',name:'comparison_update',choice,probabilities:[{value:choice,probability:1}]}]}};
+  }},
+  jobRequest:async(method,id,body)=>{
+   if(method==='POST'){posts.push(body);return {id:'job-'+posts.length,status:'queued'};}
+   if(method==='DELETE')return {id,status:'cancelled'};
+   return id==='job-1'?{id,status:'completed',result}:{id,status:'running'};
+  }});
+ const reply=id=>f.sent.find(e=>e.item?.call_id===id)?.item?.output;
+ const speak=async text=>{f.engine.receive({type:'session.input_transcript.delta',delta:text});await pause(0);await f.engine.flush();};
+ const assistantTurn=async()=>{f.engine.receive({type:'session.output_transcript.delta',delta:es?'Entendido.':'Got it.'});await pause(0);await f.engine.flush();};
+ try{
+  f.call([tool('lookup_financial_aid','initial',{institution:'UC Berkeley and UC Davis',question:'Compare 2026–27 residence hall budgets'})],'original');
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.jobId==='job-1'),2000);
+  await speak(es?'¿Y si vive con su familia en ese campus?':'What if he lived at home at that campus?');
+  f.call([tool(comparisonUpdateTool.name,'ambiguous',{jobId:'job-1',revision:1})],'unclear');
+  await until(()=>reply('ambiguous'));
+  assert.equal(JSON.parse(reply('ambiguous')).status,'comparison_clarification_required');
+  assert.equal(decisions,0);assert.equal(posts.length,1);
+  await assistantTurn();
+  await speak(es?'UC Davis está más cerca de nuestra familia.':'UC Davis is closer to our family.');
+  await assistantTurn();
+  await speak(es?'¿Y si vive con su familia en el campus más lejos de nosotros?':'What if he lived at home at the campus closer to our family?');
+  f.call([tool(comparisonUpdateTool.name,'update',{jobId:'job-1',revision:1})],'update');
+  await until(()=>reply('update'));
+  const receipt=JSON.parse(reply('update'));
+  assert.equal(receipt.status,'research_pending');
+  assert.equal(receipt.changedCampus,changed);
+  assert.equal(receipt.unchangedFinding.name,unchanged);
+  assert.match(receipt.unchangedFinding.qualification,/before aid, not a bill/);
+  assert.equal(posts.length,2);assert.equal(decisions,1);
+  assert.equal(posts[1].institution,changed);
+  assert.equal(posts[1].comparisonBaseJobId,'job-1');
+  assert.ok(!posts[1].question.includes(unchanged));
+  f.call([tool(comparisonUpdateTool.name,'duplicate',{jobId:'job-1',revision:1})],'duplicate');
+  await until(()=>reply('duplicate'));
+  assert.equal(JSON.parse(reply('duplicate')).status,'comparison_update_already_requested');
+  assert.equal(posts.length,2);assert.equal(decisions,1);
+ }finally{f.engine.close();}
+});
 for(const language of ['en','es'])test(`${language}: unavailable diagnostics cannot delay the intro or add provider speech instructions`,async()=>{
  const calls=[],observer={observe:e=>calls.push(e),playback:()=>{throw Error('diagnostic sink failed');},close:()=>new Promise(()=>{}),reset:()=>{}};
  const f=fixture({observer,researchDeliveryV2:true,config:{language}});

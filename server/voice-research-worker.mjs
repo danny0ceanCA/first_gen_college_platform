@@ -8,6 +8,7 @@ import {researchRecoveryPlan,recoveryResearchRequest,researchAttemptDiagnostics,
 import {mergeReusedResearchSources,reuseResearchRequest,parseReusedOnlyResearch,cachedResearchForCoverage,retainVerifiedResearch} from './research-reuse.mjs';
 import {researchBriefSelection} from '../src/researchBrief.mjs';
 import {createResearchTraceWriter,researchTraceKeys} from './research-trace.mjs';
+import {comparisonResearchSource,parseComparisonResearch} from './voice-comparison-update.mjs';
 export async function processResearchJob(database,env,{request=fetch,signal,now=Date.now,log=runtimeLog}={}){
  // Atomic claim; a crashed job is failed, never retried automatically at extra cost.
  await database.query("UPDATE origen_voice_research_jobs SET status='failed',finished_at=now() WHERE status='running' AND started_at<now()-interval '3 minutes'");
@@ -28,9 +29,17 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
  const watch=setInterval(()=>{if(checking)return;checking=true;void database.query('SELECT status FROM origen_voice_research_jobs WHERE id=$1',[job.id]).then(r=>{if(r.rows[0]?.status!=='running')controller.abort();}).catch(()=>controller.abort()).finally(()=>{checking=false;});},1000);
  try{
   const finance=['finance','loans'].includes(job.input.mode);
+  const comparison=job.input.comparisonOfficialUrl?comparisonResearchSource(job.input):null;
+  if(job.input.comparisonOfficialUrl&&!comparison)throw Error('comparison_source_unavailable');
   const base=reuseResearchRequest(finance?financeResearchRequest(env,job.input):admissionsResearchRequest(env,job.input),job.input);
-  const body=env.ORIGEN_RESEARCH_BRIEFS==='false'?base:researchBriefRequest(base);
-  body.max_tool_calls=2;
+  const body=comparison?{
+   model:base.model,store:false,reasoning:{effort:'low'},max_output_tokens:1200,max_tool_calls:1,tool_choice:'required',
+   tools:[{type:'web_search',search_context_size:'low',filters:{allowed_domains:[new URL(comparison.url).hostname]}}],
+   include:['web_search_call.action.sources'],
+   input:'Open this exact official URL: '+comparison.url+' . Verify only '+comparison.name+' 2026–27 annual total cost of attendance for new California-resident undergraduates living with family. Read the published total for that housing column. Set budget to null and scope to unknown if the exact scope and amount cannot be verified.',
+   text:{format:{type:'json_schema',name:'comparison_budget',strict:true,schema:{type:'object',properties:{budget:{type:['integer','null']},scope:{type:'string',enum:['2026-27-entering-ca-resident-living-with-family','unknown']}},required:['budget','scope'],additionalProperties:false}}},
+  }:env.ORIGEN_RESEARCH_BRIEFS==='false'?base:researchBriefRequest(base);
+  if(!comparison)body.max_tool_calls=2;
   let latestData;const usage={inputTokens:0,outputTokens:0};
   async function run(requestBody,pass){
    const passStarted=now(),attemptId=randomUUID();let data,httpStatus,passOutcome,providerRequestId,networkFailure,failureStage='request';
@@ -44,8 +53,8 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
     failureStage='body';
     data=await response.json();latestData=data;usage.inputTokens+=data.usage?.input_tokens||0;usage.outputTokens+=data.usage?.output_tokens||0;
     failureStage='validation';
-    const parsed=mergeReusedResearchSources((finance?parseFinanceResearch:parseAdmissionsResearch)(data,job.input.institution)||parseReusedOnlyResearch(data,job.input)||parseUnverifiedResearch(data),job.input);
-    const parsedBrief=env.ORIGEN_RESEARCH_BRIEFS==='false'?parsed:parseResearchBrief(parsed);
+    const parsed=comparison?parseComparisonResearch(data,job.input,now):mergeReusedResearchSources((finance?parseFinanceResearch:parseAdmissionsResearch)(data,job.input.institution)||parseReusedOnlyResearch(data,job.input)||parseUnverifiedResearch(data),job.input);
+    const parsedBrief=comparison||env.ORIGEN_RESEARCH_BRIEFS==='false'?parsed:parseResearchBrief(parsed);
     const result=parsedBrief?retainVerifiedResearch(parsedBrief,job.input):null;
     if(!result)throw new Error('sources_unverified');
     attempts.push(researchAttemptDiagnostics(data,{pass,outcome:'completed',durationMs:now()-passStarted,httpStatus}));
@@ -62,7 +71,7 @@ export async function processResearchJob(database,env,{request=fetch,signal,now=
   // Reuse it without forcing a web call merely because this job was queued.
   let result=cachedResearchForCoverage(job.input)||await run(body,'initial');
   record('reuse_selected',{reusedCount:job.input.reusedEvidence?.length||0,lookupCount:job.input.lookupInstitutions?.length||0,retainedFindingCount:result.retainedFindingCount||0});
-  const plan=env.ORIGEN_RESEARCH_BRIEFS==='false'?null:researchRecoveryPlan(result,job.input);
+  const plan=env.ORIGEN_RESEARCH_BRIEFS==='false'||comparison?null:researchRecoveryPlan(result,job.input);
   record('recovery_decided',{recoveryStatus:plan?'unresolved':'not_needed',unverifiedCount:plan?.gaps.length||0});
   let recoveryStatus='not_needed';
   // Leave a useful first result intact if time is almost exhausted. Recovery

@@ -15,6 +15,7 @@ import {loadRelevantCoordinatorGuidance} from './coordinator-voice-context.mjs';
 import {coordinatorFeedbackEnabled} from './coordinator-feedback.mjs';
 import {negotiateStudentLive,studentLiveUpdate,studentVoiceModel,studentSelectionRecovery} from './student-live-session.mjs';
 import {studentLiveRouting} from './live-delegation-policy.mjs';
+import {comparisonUpdateTool} from './voice-comparison-update.mjs';
 import {prepareTeachingAccess,teachingSituationQuery} from './teaching-library.mjs';
 import {voiceMemoryPrompt,conversationVoicePrompt,profileVoicePrompt,voiceFlowPrompt,voiceToolPrompt} from './voice-prompts.mjs';
 import {voiceOrientationInstructions} from './voice-orientation.mjs';
@@ -326,6 +327,8 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       await verifyFocusedResponse();
       const backgroundResearch=env.ORIGEN_BACKGROUND_RESEARCH==='true'&&config.model==='gpt-live-1'&&input.onboarding!==true&&!!database&&req.origenAuthorized===true;
       if(backgroundResearch){
+        if(input.voiceControlProtocol==='server-v1'&&env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&env.ORIGEN_DECISIONS_COMPARISON_UPDATES==='true')
+          config.tools.push(comparisonUpdateTool);
         config.tools=config.tools.map(tool=>['lookup_financial_aid','lookup_college_applications','lookup_education_planning'].includes(tool.name)?{...tool,parameters:{...tool.parameters,properties:{...tool.parameters.properties,
           replaceRequestId:{type:'string',description:'Only for a material caller-requested change to the latest accepted research, including a completed check. Copy its current requestId/revision. Omit for rephrasing, support, repeats or ordinary follow-ups.'},
           replaceRevision:{type:'integer',minimum:1,description:'Current receipt revision paired with replaceRequestId. A stale revision cannot replace newer research.'},
