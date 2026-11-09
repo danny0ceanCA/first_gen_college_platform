@@ -1,5 +1,6 @@
 // Local worker telemetry only. Keep request/transcript text, provider response
 // text, credentials and private reasoning out of these structured lifecycle rows.
+import { diagnosticClassifications } from '../diagnostic-classifications.mjs';
 const safeCode = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,200}$/.test(value) ? value : null;
 const elapsed = (now, started) => Number.isFinite(started) ? Math.max(0, now() - started) : null;
 const tokens = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -20,7 +21,7 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
     questionId: context?.questionId ?? null, sourceTranscriptIds: context?.sourceTranscriptIds ?? [],
     scopeEpoch: context?.scopeEpoch ?? null, connectionEpoch: context?.connectionEpoch ?? null,
     questionRevision: context?.questionRevision ?? null, inputRevision: context?.inputRevision ?? null,
-    rubricVersion });
+    language: context?.language ?? null, rubricVersion });
   const emit = (stage, context, details = {}) => {
     try { log({ type: `decisions_${stage}`, schemaVersion: 1,
       sequence: ++sequence, ...meta(context), ...details, contextSent: false, playbackClaim: false,
@@ -31,7 +32,7 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
     return { callId: snapshot.callId, studentId: snapshot.studentId, fingerprint: snapshot.fingerprint,
       questionId: snapshot.currentQuestion?.id ?? null, sourceTranscriptIds: (snapshot.recentTranscripts ?? []).map(turn => turn.id),
       scopeEpoch: snapshot.scopeEpoch, connectionEpoch: snapshot.connectionEpoch,
-      questionRevision: snapshot.questionRevision, inputRevision: snapshot.inputRevision,
+      questionRevision: snapshot.questionRevision, inputRevision: snapshot.inputRevision, language: snapshot.language,
       offeredAt: now() };
   }
   function offer(snapshot) {
@@ -60,11 +61,13 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
           try { request = policy.buildRequest(snapshot); }
           catch (error) { emit('request_preparation_failed', context, { reason: safeCode(error.code || error.message) ?? 'preparation_failed', buildMs: elapsed(now, started) }); throw error; }
           requests.set(request, context); context.preparedAt = now();
+          context.queueWaitMs = Math.max(0, started - context.offeredAt);
+          context.buildMs = elapsed(now, started);
           emit('request_prepared', context, { model: request.model, questionCount: request.questions.length,
               questionNames: request.questions.map(question => question.name),
               configuredRequestBytes: Buffer.byteLength(JSON.stringify(request)),
               inputBytes: Buffer.byteLength(typeof request.input === 'string' ? request.input : JSON.stringify(request.input)),
-              queueWaitMs: Math.max(0, started - context.offeredAt), buildMs: elapsed(now, started),
+              queueWaitMs: context.queueWaitMs, buildMs: context.buildMs,
               cacheMode: request.prompt_cache_options?.mode ?? 'default', requestContentsLogged: false });
           return request;
         },
@@ -74,8 +77,11 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
           try { parsed = policy.parseResponse(response); }
           catch (error) { emit('response_parse_failed', context, { parseMs: elapsed(now, started), reason: safeCode(error.code || error.message) ?? 'parse_failed' }); throw error; }
             if (context) context.parseMs = elapsed(now, started);
+            const classifications = diagnosticClassifications(response?.answers);
             emit('response_parsed', context, { status: parsed.status, reason: safeCode(parsed.reason),
               parseMs: elapsed(now, started), model: safeCode(response?.model), answerCount: Array.isArray(response?.answers) ? response.answers.length : null,
+              classificationPath: 'completed', classificationValidated: parsed.status === 'completed',
+              classificationAnswers: classifications.answers, omittedClassificationAnswers: classifications.omittedAnswers,
               // These are allowlisted classification labels, never generated prose.
               supportNeed: parsed.result?.supportNeed ?? null,
               preferenceChanges: parsed.result?.preferenceChanges ?? null,
@@ -90,6 +96,7 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
         const context = requests.get(request) ?? active, started = now();
         if (context) context.apiStartedAt = started;
         emit('api_started', context, { model: request.model, preparedToApiMs: context ? Math.max(0, started - context.preparedAt) : null,
+          queueWaitMs: context?.queueWaitMs ?? null, buildMs: context?.buildMs ?? null,
           timeoutPolicy: 'bounded_existing_client', attempt: 1, automaticRetries: 0 });
         let outcome;
         try { outcome = await client.evaluate(request, options); }

@@ -1,9 +1,10 @@
 import { preferencePolicy } from './preference-rubric.mjs';
 import { affirmativeAcknowledgment } from './conversation-evidence.mjs';
+import { fitExplanationHistoryBudget } from './local-call/explanation-history.mjs';
 
 // Local experimental classifications only. Neither label authorizes a tool,
 // a student-record write, or speech. The application owns scope and delivery.
-export const CONVERSATION_RUBRIC_VERSION = 'conversation-support-3';
+export const CONVERSATION_RUBRIC_VERSION = 'conversation-support-4';
 export const CONFUSION_ACTIONS = Object.freeze(['needs_simpler_explanation', 'resolved', 'topic_changed', 'none', 'unclear']);
 export const CONTINUATION_ACTIONS = Object.freeze(['accepted_conversational_offer', 'declined', 'none', 'unclear']);
 const probability = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
@@ -67,8 +68,7 @@ export function buildConversationDecisionRequest(snapshot) {
       none: 'There is no qualifying conversational offer and acceptance/decline in the latest contribution.',
       unclear: 'The latest contribution or immediate offer is incomplete or genuinely ambiguous.',
     })[value] })) });
-  if (Buffer.byteLength(JSON.stringify(request)) > 32768) throw Error('request_too_large');
-  return request;
+  return fitExplanationHistoryBudget(request);
 }
 
 export function parseConversationDecisionResponse(response) {

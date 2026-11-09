@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { loadEnv } from 'vite';
 import WebSocket from 'ws';
 import { voiceSession } from '../../../server/profile-voice.mjs';
@@ -20,17 +21,21 @@ import { nextTestTurnMayStart } from './validation-quiet-window.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const LOCAL = resolve(ROOT, 'research/decisions/.local');
-const budgetPath = resolve(LOCAL, EARLY_VOICE_BUDGET_FILE);
+const args = process.argv.slice(2);
+const betweenTrial = args.includes('--between-thoughts-validation');
+const budgetPath = resolve(LOCAL, betweenTrial ? 'between-thoughts-20261108-voice-budget.json' : EARLY_VOICE_BUDGET_FILE);
 const reportPath = resolve(LOCAL, 'need-continuity-live-' + Date.now() + '.json');
 const artifactRoot = resolve(ROOT, 'output/playwright/early-decisions');
-const args = process.argv.slice(2);
-if (args.some(arg => !['--execute', '--early-smoke', '--spanish-only'].includes(arg)) || new Set(args).size !== args.length
+if (args.some(arg => !['--execute', '--early-smoke', '--spanish-only', '--between-thoughts-validation'].includes(arg)) || new Set(args).size !== args.length
+  || betweenTrial && (args.includes('--early-smoke') || args.includes('--spanish-only'))
   || args.includes('--spanish-only') && !args.includes('--early-smoke')) throw Error('unsupported_argument');
 const smoke = args.includes('--early-smoke');
-const cap = EARLY_VOICE_CAP_USD, maxSeconds = smoke ? 90 : 180, reserveUsd = .25;
-const modes = smoke ? ['early'] : ['shadow', 'early'];
+const cap = betweenTrial ? 2.5 : EARLY_VOICE_CAP_USD, maxSeconds = smoke ? 90 : 180, reserveUsd = betweenTrial ? .50 : .25;
+const modes = betweenTrial ? ['early', 'between'] : smoke ? ['early'] : ['shadow', 'early'];
 const languages = args.includes('--spanish-only') ? ['es'] : ['en', 'es'];
-const allocation = () => inspectEarlyRefinementAllocation({ budgetPath: resolve(LOCAL, EARLY_REFINEMENT_BUDGET_FILE),
+const allocation = () => betweenTrial ? { combinedApprovedUsd: 5, voiceCapUsd: cap,
+  decisionsMaximumReservedUsd: languages.length * modes.length * .16, oneBatchOnly: true }
+  : inspectEarlyRefinementAllocation({ budgetPath: resolve(LOCAL, EARLY_REFINEMENT_BUDGET_FILE),
   conversationEnabled: true, earlyEnabled: true });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -48,19 +53,23 @@ const audioText = {
     ordinary: 'A él le gusta ayudar a la gente y también escribir. ¿Qué cosa pequeña podría probar primero?',
   },
 };
+if (betweenTrial) {
+  audioText.en.followup = 'Could you give me a concrete example of a grant and a loan? I still cannot picture the difference.';
+  audioText.es.followup = '¿Me puedes dar un ejemplo concreto de una beca y de un préstamo? Todavía no me queda clara la diferencia.';
+}
 const steps = smoke ? ['confusion'] : Object.keys(audioText.en);
 const audioPath = (language, step) => resolve(artifactRoot, language + '-' + step + '-' + hash(audioText[language][step]).slice(0, 12) + '.wav');
-const classifierLedger = createEarlyRefinementBudget({ budgetPath: resolve(LOCAL, EARLY_REFINEMENT_BUDGET_FILE),
+const classifierLedger = betweenTrial ? null : createEarlyRefinementBudget({ budgetPath: resolve(LOCAL, EARLY_REFINEMENT_BUDGET_FILE),
   conversationEnabled: true, earlyEnabled: true });
-const classifierBudget = classifierLedger.summary(); classifierLedger.close();
+const classifierBudget = classifierLedger?.summary(); classifierLedger?.close();
 const maximumClassifierRequests = languages.length * modes.length * 32;
-const classifierReady = classifierBudget.maxRequests - classifierBudget.requestCount >= maximumClassifierRequests
+const classifierReady = betweenTrial || classifierBudget.maxRequests - classifierBudget.requestCount >= maximumClassifierRequests
   && classifierBudget.availableUsd >= classifierBudget.reservationUsd;
 if (!process.argv.includes('--execute')) {
   console.log(JSON.stringify({ preflight: true, allocation: allocation(), voiceBudgetUsd: cap, maxSeconds, runs: languages.length * modes.length,
     classifierReady, classifierBudget, maximumClassifierRequests,
     noDatabase: true, maxNewTtsCalls: languages.length * steps.length, ttsReserveUsd: .10, fictionalOnly: true,
-    command: 'node research/decisions/local-call/validate-early-live.mjs --execute' + (smoke ? ' --early-smoke' : '') + (args.includes('--spanish-only') ? ' --spanish-only' : '') }));
+    command: 'node research/decisions/local-call/validate-early-live.mjs --execute' + (betweenTrial ? ' --between-thoughts-validation' : '') + (smoke ? ' --early-smoke' : '') + (args.includes('--spanish-only') ? ' --spanish-only' : '') }));
   process.exit(0);
 }
 if (!classifierReady) throw Error('insufficient_decisions_request_allowance');
@@ -71,7 +80,11 @@ const { chromium } = createRequire(packagePath)('playwright');
 await mkdir(LOCAL, { recursive: true });
 await mkdir(artifactRoot, { recursive: true });
 let budget;
-try { budget = JSON.parse(await readFile(budgetPath, 'utf8')); }
+if (betweenTrial) {
+  budget = { capUsd: cap, authorization: 'Fictional bilingual validation, separately approved up to $5 on November 8, 2026',
+    classifierMaximumReservedUsd: .64, reservations: [] };
+  await writeFile(budgetPath, JSON.stringify(budget, null, 2), { flag: 'wx' });
+} else try { budget = JSON.parse(await readFile(budgetPath, 'utf8')); }
 catch (error) { if (error.code !== 'ENOENT') throw error; budget = { capUsd: cap, authorization: 'Increased $5 combined approval, prior full voice cap and exhausted Decisions retained; new voice $2.10 and Decisions $0.30.', reservations: [] }; }
 if (budget.capUsd !== cap) throw Error('voice_budget_mismatch');
 const saveBudget = () => writeFile(budgetPath, JSON.stringify(budget, null, 2));
@@ -86,7 +99,10 @@ const report = { startedAt: new Date().toISOString(), fictionalOnly: true, noDat
   allocation: allocation(), answerTimeoutMs: 45000, steps, scenario: smoke ? 'focused-bilingual-confusion' : 'four-turn-bilingual-need-continuity-comparison',
   pricingSource: 'https://developers.openai.com/api/docs/models/gpt-live-1', voiceCapUsd: cap,
   sourceHashes: Object.fromEntries(['validate-early-live.mjs', 'validation-quiet-window.mjs', 'support.mjs', 'early-support-delivery.mjs', 'early-projector.mjs', 'early-need-context.mjs', 'early-evaluator.mjs', 'early-rubric.mjs', 'early-refinement-budget.mjs', 'conversation-delivery.mjs', 'session.mjs', 'worker.mjs', 'projector.mjs', '../observer.mjs'].map(name => [name, hash(readFileSync(new URL(name, import.meta.url), 'utf8'))])),
-  evidenceLimits: 'Small synthetic A/B comparison, not statistical causal evidence or a human warmth assessment. Same application startup and local support configuration; only early context delivery is shadow-only versus enabled. Language order counterbalances conditions. Fictional confirmed student, no database or research. Browser RMS is playback activity, not intelligibility. Native transcript intervals remain separate. No manual cues or mocked classifier results. The model directly hears confusion too. Optional support never holds native audio.', runs: [] };
+  evidenceLimits: 'Small synthetic comparison. Same application startup. ' + (betweenTrial
+    ? 'Only between-thought delivery differs. The helper uses the production per-call accounting branch with fictional seed data and an in-memory diagnostic sink. '
+    : 'Only early context delivery differs (shadow versus enabled). ')
+    + 'Language order counterbalances conditions. Fictional confirmed student, no database or research. Browser RMS is playback activity, not intelligibility. Native transcript intervals remain separate. No manual cues or mocked classifier results.', runs: [] };
 const missingAudio = languages.flatMap(language => steps.map(step => ({ language, step }))).filter(({ language, step }) => !existsSync(audioPath(language, step)));
 if (missingAudio.length) {
   const ttsReservation = await reserve('continuation-fictional-tts', .10);
@@ -176,7 +192,14 @@ try {
           }
         }, jobRequest() { run.researchAttempts++; throw Error('research_disabled_for_support_validation'); } },
       { localOnly: true, fictional: true, seed, allowedCallIds: [run.callId], supportEnabled: true, preferencesEnabled: true, conversationEnabled: true,
-        earlyEnabled: true, earlyObserveOnly: run.mode === 'shadow', paid: true, apiKey: key });
+        earlyEnabled: true, earlyObserveOnly: run.mode === 'shadow', betweenThoughtsEnabled: run.mode === 'between', paid: true, apiKey: key },
+      betweenTrial ? { createWorker(url, settings) {
+        const worker = new Worker(url, { ...settings, workerData: { ...settings.workerData, production: true } });
+        worker.on('message', message => {
+          if (message?.type === 'diagnostic') run.observerRecords.push(message.event);
+        });
+        return worker;
+      } } : {});
       if (!await run.engine.observation.ready) throw Error('observer_not_ready');
       run.socket.on('message', rawEvent => { const event = JSON.parse(rawEvent);
         const recorded = { at: Date.now(), ...event };
@@ -201,7 +224,7 @@ try {
   browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', args: ['--autoplay-policy=no-user-gesture-required'] });
   for (const language of languages) for (const mode of (language === 'es' ? [...modes].reverse() : modes)) {
     const reservation = await reserve(`${language}-${mode}`);
-    const run = { language, mode, callId: 'early-voice-' + randomUUID(), startedAt: Date.now(), events: [], sent: [], application: [], errors: [], turns: [], researchAttempts: 0, delegations: 0 };
+    const run = { language, mode, callId: 'early-voice-' + randomUUID(), startedAt: Date.now(), events: [], sent: [], application: [], observerRecords: [], errors: [], turns: [], researchAttempts: 0, delegations: 0 };
     active = run;
     const page = await browser.newPage();
     const guard = setTimeout(() => void closeRun(run), maxSeconds * 1000);
@@ -273,11 +296,14 @@ try {
       if (run.cost.complete) { reservation.settledUsd = run.cost.total; reservation.usageComplete = true; }
       else reservation.usageComplete = false;
       await saveBudget();
-      try { run.observerRecords = readFileSync(resolve(LOCAL, run.callId + '.jsonl'), 'utf8').trim().split('\n').map(JSON.parse); } catch { run.observerRecords = []; }
+      if (!betweenTrial) try { run.observerRecords = readFileSync(resolve(LOCAL, run.callId + '.jsonl'), 'utf8').trim().split('\n').map(JSON.parse); } catch { run.observerRecords = []; }
       delete run.engine; delete run.socket;
       report.runs.push(run); await writeFile(reportPath, JSON.stringify(report, null, 2));
       console.log(JSON.stringify({ language, mode, introMs: run.intro?.firstAudioMs, turns: run.turns.map(turn => ({ step: turn.step, firstAudioMs: turn.firstAudioMs })), errors: run.errors,
         reportPath, quietAppends: run.sent.filter(event => event.type === 'session.thinking.append').length, costUsd: run.cost.total, completeUsage: run.cost.complete }));
+    }
+    if (betweenTrial && run.providerSessionId && !run.events.some(event => event.type === 'session.closed')) {
+      throw Error('paid_batch_stopped_after_unconfirmed_session_close');
     }
   }
 } finally {

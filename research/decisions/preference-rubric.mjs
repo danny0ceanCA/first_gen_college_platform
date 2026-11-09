@@ -1,4 +1,5 @@
 import { broadPolicy } from './broad-rubric.mjs';
+import { fitExplanationHistoryBudget } from './local-call/explanation-history.mjs';
 
 // Local in-call experiment. These classifications are proposals to the local
 // delivery gate, not profile writes, research actions, or generated Live prompts.
@@ -32,8 +33,7 @@ export function buildPreferenceDecisionRequest(snapshot) {
       { value: 'disable', description: 'The caller explicitly retracts this ongoing conversational preference.' },
     ],
   })));
-  if (Buffer.byteLength(JSON.stringify(request)) > 32768) throw Error('request_too_large');
-  return request;
+  return fitExplanationHistoryBudget(request);
 }
 
 export function parsePreferenceDecisionResponse(response) {

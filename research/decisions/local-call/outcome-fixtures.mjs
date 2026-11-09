@@ -53,9 +53,19 @@ export function makeOutcomeFixture(language = 'en', scenario = 'ack_only') {
     expected.callerClarity = scenario === 'caller_unclear' ? 'reported_unclear'
       : scenario === 'caller_acknowledgment' ? 'unknown' : 'reported_clear';
   }
+  if (['need_addressed_flow_preserved', 'adapted_but_need_unanswered', 'audio_review_with_repetition'].includes(scenario)) {
+    input.evaluations.push(review('need_addressed', scenario === 'adapted_but_need_unanswered' ? 'not_addressed' : 'addressed', answer));
+    expected.needAddressed = scenario === 'adapted_but_need_unanswered' ? 'not_observed' : 'observed';
+    input.evaluations.push({ ...review('conversational_flow', scenario === 'audio_review_with_repetition' ? 'repetition' : 'preserved', answer),
+      basis: scenario === 'audio_review_with_repetition' ? 'audio_review' : 'transcript_review',
+      ...(scenario === 'audio_review_with_repetition' ? { recordingId: 'fictional-recording' } : {}) });
+    expected[scenario === 'audio_review_with_repetition' ? 'audibleFlow' : 'transcriptFlow'] =
+      scenario === 'audio_review_with_repetition' ? 'issue_observed' : 'no_issue_observed';
+  }
   return { id, language, scenario, input, expected };
 }
 
 export const outcomeFixtures = freeze(['en', 'es'].flatMap(language => [
   'ack_only', 'transcript_only', 'activity_only', 'played_and_reported_clear', 'caller_unclear', 'caller_acknowledgment',
+  'need_addressed_flow_preserved', 'adapted_but_need_unanswered', 'audio_review_with_repetition',
 ].map(scenario => makeOutcomeFixture(language, scenario))));

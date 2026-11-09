@@ -29,7 +29,8 @@ function fixture(language = 'en', earlyEnabled = true, options = {}) {
     jobRequest() { researchCalls++; throw Error('unexpected_research'); } },
   { localOnly: true, fictional: true, seed, allowedCallIds: [scope.sessionId], allowedStudentIds,
     paid: true, supportEnabled: true, preferencesEnabled: true, conversationEnabled: true,
-    ...(earlyEnabled ? { earlyEnabled: true } : {}), ...(options.lateEnabled ? { lateEnabled: true } : {}) },
+    ...(earlyEnabled ? { earlyEnabled: true } : {}), ...(options.lateEnabled ? { lateEnabled: true } : {}),
+    ...(options.betweenThoughtsEnabled ? { betweenThoughtsEnabled: true } : {}) },
   { ...(options.fakeClock ? { now: () => clock } : {}),
     createWorker: (_url, settings) => { workerSettings = settings; return worker; } });
   function native(role, text) {
@@ -75,8 +76,10 @@ function fixture(language = 'en', earlyEnabled = true, options = {}) {
     async close() { engine.close(); await engine.observation.closed; mirror.close(); } };
 }
 
-for (const language of ['en', 'es']) test(`${language}: settled same-version playback wakes the late experiment once without changing intro or speech`, async () => {
-  const f = fixture(language, true, { lateEnabled: true, fakeClock: true });
+for (const language of ['en', 'es']) for (const mode of ['late_experiment', 'between_thoughts']) test(`${language}: settled same-version playback wakes ${mode} once without changing intro or speech`, async () => {
+  const between = mode === 'between_thoughts';
+  const f = fixture(language, true, { lateEnabled: !between, betweenThoughtsEnabled: between, fakeClock: true });
+  const flag = between ? 'betweenThoughtsAllowed' : 'lateAllowed';
   try {
     await f.readyIntro();
     const introCommands = structuredClone(f.sent);
@@ -86,11 +89,11 @@ for (const language of ['en', 'es']) test(`${language}: settled same-version pla
     f.engine.receive({ type: 'session.output_audio.delta', delta: Buffer.from([1, 0]).toString('base64') });
     await f.words('output', language === 'en' ? 'Of course.' : 'Claro.');
     f.advance(100); f.idle();
-    assert.equal(f.messages.findLast(row => row.source === 'playback').lateAllowed, false);
+    assert.equal(f.messages.findLast(row => row.source === 'playback')[flag], false);
     const before = f.messages.filter(row => row.source === 'playback').length;
     f.advance(900); f.idle(true);
     const wake = f.messages.findLast(row => row.source === 'playback');
-    assert.equal(wake.lateAllowed, true);
+    assert.equal(wake[flag], true);
     assert.equal(f.messages.filter(row => row.source === 'playback').length, before + 1);
     f.idle(true);
     assert.equal(f.messages.filter(row => row.source === 'playback').length, before + 1, 'unchanged idle does not poll classifications');
@@ -99,7 +102,7 @@ for (const language of ['en', 'es']) test(`${language}: settled same-version pla
     const snapshot = f.mirror.snapshot();
     const rows = snapshot.assistantEvidence.filter(row => row.revision > snapshot.contributionOutputOriginRevision);
     const value = f.candidate();
-    Object.assign(value.record, { triggerBasis: 'settled_late_experiment', classifiedAtMs: f.now(),
+    Object.assign(value.record, { triggerBasis: between ? 'between_thoughts_revalidation' : 'settled_late_experiment', classifiedAtMs: f.now(),
       assistantOutputOriginRevision: snapshot.contributionOutputOriginRevision,
       assistantEvidenceComplete: true, sourceOutputEventIds: rows.map(row => row.sourceEventId),
       result: earlyResultFixture({ need: 'simplify' }, { ...snapshot, assistantSinceNeed: {
@@ -111,7 +114,7 @@ for (const language of ['en', 'es']) test(`${language}: settled same-version pla
     assert.deepEqual(f.sent.slice(0, introCommands.length), introCommands);
     assert.equal(f.researchCalls(), 0);
     assert.ok(f.messages.some(row => row.event?.type === 'support_early_sent'
-      && row.event.deliveryMode === 'late_experiment' && row.event.playbackClaim === false));
+      && row.event.deliveryMode === mode && row.event.playbackClaim === false));
   } finally { await f.close(); }
 });
 

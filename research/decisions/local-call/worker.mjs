@@ -14,6 +14,7 @@ import { createConversationCandidateBridge } from './conversation-candidates.mjs
 import { conversationOwnsSupport } from './support-routing.mjs';
 import { createDecisionDiagnostics } from './decision-diagnostics.mjs';
 import { createEarlyProjector } from './early-projector.mjs';
+import { createCompletedHistoryEvidence } from './completed-history.mjs';
 import { createEarlyEvaluator } from './early-evaluator.mjs';
 import { createEarlyRefinementBudget } from './early-refinement-budget.mjs';
 import { createMicrophoneBudget } from './microphone-budget.mjs';
@@ -25,6 +26,7 @@ let observer, budget, failed = false, closing = false, currentSupportStamp = nul
 let earlyProjector, earlyEvaluator, currentEarlySupport = null, currentEarlyAllowed = false;
 let currentEarlySupportRevision = 0;
 let currentLateAllowed = false;
+let currentBetweenThoughtsAllowed = false;
 const supportStamps = new Map();
 const basePolicy = workerData.conversationEnabled === true ? conversationPolicy : workerData.preferencesEnabled === true ? preferencePolicy : broadPolicy;
 if (!workerData.production) mkdirSync(dirname(workerData.logPath), { recursive: true });
@@ -43,7 +45,9 @@ const log = event => {
   else appendFileSync(workerData.logPath, JSON.stringify(record) + '\n');
 };
 const diagnostics = createDecisionDiagnostics({ log, rubricVersion: basePolicy.version });
-const policy = diagnostics.wrapPolicy(basePolicy);
+const completedHistory = createCompletedHistoryEvidence();
+const policy = diagnostics.wrapPolicy({ ...basePolicy,
+  buildRequest: snapshot => basePolicy.buildRequest(completedHistory.enrich(snapshot)) });
 const preferenceCandidates = createPreferenceCandidateBridge({ enabled: workerData.preferencesEnabled === true, log });
 const conversationCandidates = createConversationCandidateBridge({ enabled: workerData.conversationEnabled === true, log });
 function fail(reason) {
@@ -52,6 +56,7 @@ function fail(reason) {
   try { log({ type: 'decisions_worker_failed', reason, contextSent: false, playbackClaim: false }); } catch {}
   preferenceCandidates.clear();
   conversationCandidates.clear();
+  completedHistory.clear();
   // Invalidate before cancelling inference, including failure to write the log.
   try { projector.stop(reason); } catch {}
   observer?.close();
@@ -70,6 +75,7 @@ const projector = createCallProjector(workerData.seed, (state, eligibility) => {
       questionRevision: snapshot.questionRevision, eligibility, paidRequestStarted: false, contextSent: false, playbackClaim: false });
     return;
   }
+  const historyCaptured = completedHistory.capture(snapshot, earlyProjector?.snapshot());
   diagnostics.offer(snapshot);
   if (workerData.supportEnabled && currentSupportStamp) {
     supportStamps.set(snapshot.fingerprint, currentSupportStamp);
@@ -80,6 +86,7 @@ const projector = createCallProjector(workerData.seed, (state, eligibility) => {
   observer ??= createObserver({ state, client: diagnostics.wrapClient(createDecisionsClient({ apiKey: workerData.apiKey })), budget,
     mode: 'observe', policy, maxEvaluations: workerData.earlyEnabled ? 16 : workerData.supportEnabled ? 32 : 12,
     researchReserve: workerData.supportEnabled ? 4 : 0, onRecord: row => {
+      completedHistory.release(row.fingerprint);
       try {
         diagnostics.finish(row);
         log({ type: 'decision_observation', ...row });
@@ -107,6 +114,7 @@ const projector = createCallProjector(workerData.seed, (state, eligibility) => {
       } catch { fail('observer_log_failed'); }
     } });
   const receipt = observer.observe(snapshot, { researchChanged: eligibility.researchChanged });
+  if (!receipt.queued && (receipt.reason !== 'duplicate' || historyCaptured)) completedHistory.release(snapshot.fingerprint);
   diagnostics.receipt(snapshot, receipt);
   if (!receipt.queued) log({ type: 'decision_observation_skipped', reason: receipt.reason, fingerprint: snapshot.fingerprint, eligibility });
 }, log, { allowedStudentIds: workerData.allowedStudentIds });
@@ -122,8 +130,12 @@ if (workerData.paid) {
       onResult: candidate => { if (!failed && !closing) send(candidate); }, maxEvaluations: 16 });
     earlyProjector = createEarlyProjector(workerData.seed, snapshot => earlyEvaluator.evaluate(
       withEarlyNeedContext(snapshot, currentEarlySupport, currentEarlySupportRevision)), log, { allowedStudentIds: workerData.allowedStudentIds,
-      enabled: () => currentEarlyAllowed && !failed && !closing, maxPerCall: 16, maxPerContribution: 2,
+      enabled: () => currentEarlyAllowed && !failed && !closing, maxPerCall: 16,
+      maxPerContribution: workerData.meaningfulScheduling ? 3 : 2,
       distributed: true, lateAllowed: () => workerData.lateEnabled === true && currentLateAllowed,
+      meaningfulScheduling: workerData.meaningfulScheduling === true,
+      betweenThoughtsAllowed: () => workerData.betweenThoughtsEnabled === true && currentBetweenThoughtsAllowed,
+      hasSupport: () => !!currentEarlySupport && !currentEarlySupport.sent,
       needsRevalidation: () => currentEarlySupport?.status === 'provisional' && !currentEarlySupport.blockedReason,
       supportRevision: () => currentEarlySupportRevision });
   }
@@ -134,8 +146,9 @@ log({ type: 'decisions_worker_started', studentId: workerData.seed.studentId,
   conversationEnabled: workerData.conversationEnabled === true,
   earlyEnabled: workerData.earlyEnabled === true,
   lateExperimentEnabled: workerData.lateEnabled === true,
+  betweenThoughtsEnabled: workerData.betweenThoughtsEnabled === true,
   earlyEvaluationPolicy: workerData.earlyEnabled ? { earlyMaximum: 16, completedMaximum: 16,
-    burst: 3, refillMs: 25000, maximumPerContribution: 2, scheduledPolling: false,
+    burst: 3, refillMs: 25000, maximumPerContribution: workerData.meaningfulScheduling ? 3 : 2, scheduledPolling: false,
     combinedMaximum: 32, completedResearchReserve: 4, earlyQuestions: EARLY_QUESTION_COUNT, earlyRubricVersion: EARLY_RUBRIC_VERSION, voiceNeverWaits: true } : null,
   evaluationPolicy: { maximumPerCall: workerData.supportEnabled ? 32 : 12, reservedForResearch: workerData.supportEnabled ? 4 : 0,
     assistantBoundaries: 'capture_only', callerContributions: 'complete_meaningful_change', research: 'changed_evidence_or_terminal_status' },
@@ -155,6 +168,7 @@ parentPort.on('message', async message => {
       log({ type: 'decisions_worker_closing', reason: message.reason ?? 'call_closed', contextSent: false, playbackClaim: false });
       preferenceCandidates.clear();
       conversationCandidates.clear();
+      completedHistory.clear();
       if (message.reason) { try { projector.stop(message.reason); } catch {} }
       projector.close(); observer?.close(); await observer?.idle();
       earlyProjector?.close(); earlyEvaluator?.close(); await earlyEvaluator?.idle();
@@ -164,6 +178,7 @@ parentPort.on('message', async message => {
     }
     if (!failed) {
       if (message.type === 'support_diagnostic') { log(message.event); return; }
+      if (message.source === 'scope' || message.source === 'connection') completedHistory.clear();
       currentSupportStamp = message.supportStamp ?? null;
       currentPreferenceStamp = message.preferenceStamp ?? null;
       currentConversationStamp = message.conversationStamp ?? null;
@@ -171,6 +186,7 @@ parentPort.on('message', async message => {
       currentEarlySupportRevision = message.earlySupportRevision ?? 0;
       currentEarlyAllowed = message.earlyAllowed === true;
       currentLateAllowed = message.lateAllowed === true;
+      currentBetweenThoughtsAllowed = message.betweenThoughtsAllowed === true;
       earlyProjector?.receive(message);
       if (message.source === 'early-state') earlyProjector?.refresh();
       else projector.receive(message);
