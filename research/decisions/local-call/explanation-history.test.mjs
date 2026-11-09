@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createExplanationHistory, explanationHistoryInput, fitExplanationHistoryBudget, EXPLANATION_HISTORY_LIMITS } from './explanation-history.mjs';
+import { createExplanationHistory, explanationHistoryInput, fitDecisionRequestBudget, EXPLANATION_HISTORY_LIMITS } from './explanation-history.mjs';
 
 const row = (id, role, text) => ({ id, role, text, complete: true, source: 'application_estimate',
   sourceEventIds: [`native-${id}`], startMs: 10, endMs: 20 });
@@ -160,7 +160,7 @@ test('composed request fitting omits whole optional evidence and preserves lates
   const evidence = { currentContribution: { text: 'Actually, explain the school counselor instead.' },
     explanationHistory: explanationHistoryInput(history.snapshot()) };
   const request = { model: 'gpt-6-luna', input: JSON.stringify(evidence), questions: [] };
-  fitExplanationHistoryBudget(request, 1500);
+  fitDecisionRequestBudget(request, 1500);
   const fitted = JSON.parse(request.input), retained = new Set(fitted.explanationHistory.rows.map(value => value.id));
   assert.equal(fitted.currentContribution.text, evidence.currentContribution.text);
   assert.equal(fitted.explanationHistory.selectionTruncated, true);
@@ -168,5 +168,5 @@ test('composed request fitting omits whole optional evidence and preserves lates
   assert.ok(fitted.explanationHistory.exchanges.every(exchange => retained.has(exchange.assistantRowId)
     && (!exchange.callerBeforeRowId || retained.has(exchange.callerBeforeRowId))
     && (!exchange.callerAfterRowId || retained.has(exchange.callerAfterRowId))));
-  assert.throws(() => fitExplanationHistoryBudget({ model: 'gpt-6-luna', input: JSON.stringify({ currentContribution: { text: 'x'.repeat(2000) } }), questions: [] }, 1500), /request_too_large/);
+  assert.throws(() => fitDecisionRequestBudget({ model: 'gpt-6-luna', input: JSON.stringify({ currentContribution: { text: 'x'.repeat(2000) } }), questions: [] }, 1500), /request_too_large/);
 });

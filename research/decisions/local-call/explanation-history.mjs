@@ -1,5 +1,7 @@
 // Local Decisions evidence only. These are raw transcript observations, not
 // learned student facts, a provider Conversation, or context sent to Live.
+import { MAX_DECISIONS_REQUEST_BYTES, serializeDecisionRequest } from '../client.mjs';
+
 export const EXPLANATION_HISTORY_VERSION = 'explanation-evidence-1';
 export const EXPLANATION_HISTORY_LIMITS = Object.freeze({ rows: 40, bytes: 32768, rowBytes: 8192,
   selectedRows: 10, selectedBytes: 16384, recentRows: 6, sourceEvents: 128 });
@@ -132,12 +134,13 @@ export function explanationHistoryInput(value) {
     interpretation: 'Earlier words show attempts and caller reactions, not confirmed comprehension. An assistant explanation, silence, or a bare okay/sí is not proof of understanding. Exchange references establish adjacency only: inspect the original words to distinguish a definition, example, action step, reassurance, explicit reported clarity or renewed confusion. Do not label all assistant speech as teaching. Latest caller corrections take precedence; a repeated question may need a different explanation, not research. A caller report of clarity is self-report about that idea, not independently measured understanding.' };
 }
 
-// Composed rubrics add questions after the base request. Fit only the optional
-// history at the final boundary; never truncate a current correction or answer.
-export function fitExplanationHistoryBudget(request, maximumBytes = 32768) {
-  if (bytes(request) <= maximumBytes) return request;
+// Rubrics add questions in layers. Count the same UTF-8 bytes the client sends,
+// including JSON escaping and transport-added cache settings.
+export function fitDecisionRequestBudget(request, maximumBytes = MAX_DECISIONS_REQUEST_BYTES) {
+  const fits = () => Buffer.byteLength(serializeDecisionRequest(request), 'utf8') <= maximumBytes;
+  if (fits()) return request;
   const input = JSON.parse(request.input);
-  while (bytes(request) > maximumBytes && input.explanationHistory?.rows?.length) {
+  while (!fits() && input.explanationHistory?.rows?.length) {
     const removed = input.explanationHistory.rows.shift();
     input.explanationHistory.omittedRows = (input.explanationHistory.omittedRows ?? 0) + 1;
     input.explanationHistory.selectionTruncated = true;
@@ -148,6 +151,24 @@ export function fitExplanationHistoryBudget(request, maximumBytes = 32768) {
         callerAfterRowId: exchange.callerAfterRowId === removed.id ? null : exchange.callerAfterRowId }));
     request.input = JSON.stringify(input);
   }
-  if (bytes(request) > maximumBytes) throw Error('request_too_large');
+
+  // The immediate exchange can include an offer and two acknowledgments.
+  // Keep it, the latest caller contribution, and all subsequent replies intact.
+  const callerIndex = input.transcripts?.findLastIndex(row => row.role === 'user') ?? -1;
+  let olderTranscriptCount = Math.max(0, callerIndex - 3);
+  while (!fits() && (olderTranscriptCount || input.researchFindings?.length || input.researchTasks?.length > 1)) {
+    if (input.researchFindings?.length) input.researchFindings.shift();
+    else if (olderTranscriptCount) {
+      input.transcripts.shift();
+      olderTranscriptCount--;
+    } else input.researchTasks.shift();
+    // Drop whole records to keep amounts, qualifications and source counts together.
+    input.olderEvidenceOmitted = true;
+    request.input = JSON.stringify(input);
+  }
+  if (!fits()) throw Object.assign(Error('request_too_large'), {
+    requestBytes: Buffer.byteLength(serializeDecisionRequest(request), 'utf8'),
+    requestLimitBytes: maximumBytes,
+  });
   return request;
 }

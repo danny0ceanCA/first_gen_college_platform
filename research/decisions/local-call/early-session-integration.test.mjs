@@ -191,13 +191,19 @@ for (const language of ['en', 'es']) {
     const f = fixture(language);
     try {
       await f.readyIntro();
-      f.native('input', confusion); f.worker.emit('message', f.candidate());
+      f.native('input', confusion);
+      const candidate = f.candidate();
+      f.worker.emit('message', candidate);
       assert.equal(f.engine.observation.status().support.early.pending, true);
       f.native('input', language === 'en' ? ' Actually, I understand now.' : ' En realidad, ya entiendo.');
       assert.equal(f.engine.observation.status().support.early.pending, false);
       await drain(); await f.engine.flush(); f.idle();
       assert.equal(f.notes().length, 0, 'a later boundary cannot revive a cue based on an earlier prefix');
-      assert.ok(f.messages.some(row => row.event?.reason === 'new_input_requires_reclassification'));
+      const discarded = f.messages.find(row => row.event?.type === 'support_early_discarded')?.event;
+      assert.equal(discarded?.reason, 'new_input_requires_reclassification');
+      assert.equal(discarded.operationId, candidate.record.operationId);
+      assert.equal(discarded.deliveryMode, 'preanswer');
+      assert.equal(discarded.readiness.inputOpen, true);
       assert.equal(f.researchCalls(), 0);
     } finally { await f.close(); }
   });

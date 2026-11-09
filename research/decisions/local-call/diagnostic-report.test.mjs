@@ -47,6 +47,28 @@ test('paths and languages are explicit, early evidence is distinct from complete
   assert.equal(report.timings.completedTransport.samples, 0);
 });
 
+test('early cue outcomes distinguish a discarded cue, an acknowledged append, and missing parent evidence', () => {
+  let sequence = 0;
+  const row = (stage, operationId, details = {}) => ({ stage, sequence: ++sequence, session_id: 'call', run_id: 'run',
+    data: decisionsDiagnosticData({ type: stage, operationId, ...details }) });
+  const result = buildDecisionsDiagnosticReport([
+    row('early_decisions_completed', 'discarded', { policyDecision: { eligible: true, reason: 'support_eligible' } }),
+    row('support_early_validated', 'discarded'),
+    row('support_early_deferred', 'discarded', { reason: 'caller_speech_in_progress' }),
+    row('support_early_discarded', 'discarded', { reason: 'new_input_requires_reclassification' }),
+    row('early_decisions_completed', 'acknowledged'),
+    row('support_early_sent', 'acknowledged', { contextSent: true, eventId: 'append' }),
+    row('support_early_context_acknowledged', 'acknowledged', { eventId: 'append' }),
+    row('early_decisions_completed', 'missing'),
+    row('early_decisions_failed', 'timeout', { reason: 'timeout' }),
+  ].reverse());
+  assert.deepEqual({ ...result.earlyCueOutcomes }, {
+    'discarded:new_input_requires_reclassification': 1, context_acknowledged: 1,
+    no_parent_outcome_observed: 1, 'failed:timeout': 1,
+  });
+  assert.equal(result.earlyWorkerPolicyReasons.support_eligible, 1);
+});
+
 test('queue timing is attributed from API start after the budget operation exists', () => {
   const report = buildDecisionsDiagnosticReport([{ type: 'decisions_request_prepared', callId: 'call', workerRunId: 'run', queueWaitMs: 42 },
     { type: 'decisions_api_started', callId: 'call', workerRunId: 'run', operationId: 'request', queueWaitMs: 42 }]);

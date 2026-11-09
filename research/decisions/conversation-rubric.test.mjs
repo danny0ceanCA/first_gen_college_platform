@@ -6,6 +6,7 @@ import { PREFERENCES, PREFERENCE_ACTIONS, preferencePolicy } from './preference-
 import { conversationPolicy, CONFUSION_ACTIONS, CONTINUATION_ACTIONS } from './conversation-rubric.mjs';
 import { continuationFixtures, continuationContextFixtures, continuationFixtureSnapshot } from './continuation-fixtures.mjs';
 import { affirmativeAcknowledgment } from './conversation-evidence.mjs';
+import { createDecisionsClient, MAX_DECISIONS_REQUEST_BYTES } from './client.mjs';
 
 const fixture = id => continuationFixtures.find(value => value.id === `en-conversation-${id}`);
 const snapshot = id => continuationFixtureSnapshot(fixture(id));
@@ -89,6 +90,53 @@ test('local authorization and bounded input still apply', () => {
     assert.throws(() => conversationPolicy.buildRequest({ ...snapshot('confused'), ...patch }), /ineligible_snapshot/);
   const state = snapshot('confused'); state.recentTranscripts.at(-1).text = 'words '.repeat(10000);
   assert.throws(() => conversationPolicy.buildRequest(state), /request_too_large/);
+});
+
+test('a long bilingual call sends a bounded request with the latest exchange and qualified research intact', async () => {
+  for (const language of ['en', 'es']) {
+    const state = snapshot('accept-example');
+    const oldText = language === 'en' ? 'An older topic with "quoted" words. ' : 'Un tema anterior con palabras «entre comillas» y "citas". ';
+    const offer = language === 'en' ? 'Would you like a concrete example?' : '¿Quieres un ejemplo concreto?';
+    const yes = language === 'en' ? 'Yes.' : 'Sí.';
+    const answer = language === 'en' ? 'Here is a concrete example.' : 'Aquí tienes un ejemplo concreto.';
+    const newest = [offer, yes, yes, yes, answer];
+    state.language = language;
+    state.recentTranscripts = [
+      ...Array.from({ length: 11 }, (_, index) => ({
+        role: index % 2 === 0 ? 'user' : 'assistant', text: oldText.repeat(30),
+      })),
+      ...newest.map((text, index) => ({ role: index === 0 || index === 4 ? 'assistant' : 'user', text })),
+    ].map((row, index) => ({ ...row, id: 'turn-' + index, complete: true, connectionEpoch: 0,
+      startMs: index * 800, endMs: index * 800 + 300 }));
+    state.currentQuestion = { text: yes };
+    const finding = { fact: 'Tuition and fees, before aid.', year: '2026–27', scenario: 'Resident',
+      limitation: 'Housing and health insurance are separate.', status: 'verified',
+      subject: 'Fictional campus', aspect: 'tuition', sourceIds: ['official-fixture'] };
+    state.researchTasks = [{ jobId: 'newest-job', revision: 1, status: 'completed',
+      question: 'What does the campus bill?', evidenceAvailability: 'available', findings: [finding] }];
+    const before = structuredClone(state);
+    const request = conversationPolicy.buildRequest(state);
+    const client = createDecisionsClient({ apiKey: 'fixture-key', fetchImpl: async (_url, options) => {
+      assert.ok(Buffer.byteLength(options.body, 'utf8') <= MAX_DECISIONS_REQUEST_BYTES);
+      const wire = JSON.parse(options.body);
+      const evidence = JSON.parse(wire.input);
+      assert.equal(wire.questions.length, 12);
+      assert.equal(evidence.olderEvidenceOmitted, true);
+      assert.equal(evidence.currentQuestion.text, yes);
+      assert.equal(evidence.currentContribution.span, 15);
+      assert.equal(evidence.preferenceContribution.span, 15);
+      assert.equal(evidence.conversationContribution.previousAssistant.text, offer);
+      assert.deepEqual(evidence.conversationContribution.repeatedAcknowledgments.map(row => row.span), [13, 14]);
+      assert.equal(evidence.conversationContribution.assistantAfterCaller[0].text, answer);
+      const [retained] = evidence.researchTasks[0].findings;
+      assert.equal(retained.fact, finding.fact);
+      assert.equal(retained.limitation, finding.limitation);
+      assert.equal(retained.sourceCount, 1);
+      return new Response(JSON.stringify(response()), { status: 200 });
+    } });
+    await client.evaluate(request);
+    assert.deepEqual(state, before);
+  }
 });
 
 test('English and Spanish repeated affirmative spans retain the same offer with a fresh latest caller anchor', () => {

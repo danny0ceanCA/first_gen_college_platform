@@ -1,5 +1,5 @@
 // Independent Decisions classification. This module has no voice or tool writer.
-import { explanationHistoryInput, fitExplanationHistoryBudget } from './local-call/explanation-history.mjs';
+import { explanationHistoryInput, fitDecisionRequestBudget } from './local-call/explanation-history.mjs';
 
 export const RUBRIC_VERSION = 'support-opportunity-2';
 export const MODEL = 'gpt-6-luna';
@@ -55,7 +55,7 @@ export function buildDecisionRequest(snapshot) {
     // Explicit mode with no breakpoints disables caching for this small measured experiment.
     prompt_cache_options: { mode: 'explicit' },
   };
-  return fitExplanationHistoryBudget(request);
+  return fitDecisionRequestBudget(request);
 }
 
 const probability = n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;

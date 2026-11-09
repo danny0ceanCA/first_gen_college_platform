@@ -25,6 +25,8 @@ The input is an explicitly exported array of durable `origen_decisions_events` r
 
 Summaries retain English, Spanish, mixed-language, and unknown categories. Older logs may lack a classification path or distribution; the report preserves that limitation instead of filling it in. Repeated export rows and repeated summaries of one operation are deduplicated. Durable rows use their record ID or durable sequence; local rows use `workerSequence` scoped to their call and worker run. An inner lifecycle `sequence` is never treated as a global local-event identity. Conflicting duplicate rows, uncorrelated classifications, and gaps *between observed durable rows* are visible. A filtered export can produce apparent gaps; there is no claim that a gap proves lost data.
 
+Start with `earlyCueOutcomes` when a cue seems missing. It groups each correlated early check by the last observed delivery outcome, such as a provider timeout, a candidate skipped by the parent, a validated cue discarded after new speech, or an acknowledged append. `earlyWorkerPolicyReasons` separates the classifier's policy verdict from the parent's live readiness check. For individual cues, match `operationId` and inspect the gate's reason, input and output state, playback age, and pending delegation or context counts.
+
 ## Reviewed outcome cases
 
 Each case follows `measureSupportOutcome` in `outcome-evaluation.mjs`: a cue with exact call/student/language/connection scope, native source event IDs, session-relative timestamps, transcript rows, optional provider acknowledgments, optional client playback, and explicitly reviewed evaluations. The evaluation window covers at most three following application-grouped caller contributions. These groupings are not provider-completed semantic turns.

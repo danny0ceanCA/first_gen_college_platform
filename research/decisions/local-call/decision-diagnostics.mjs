@@ -1,6 +1,7 @@
 // Local worker telemetry only. Keep request/transcript text, provider response
 // text, credentials and private reasoning out of these structured lifecycle rows.
 import { diagnosticClassifications } from '../diagnostic-classifications.mjs';
+import { MAX_DECISIONS_REQUEST_BYTES, serializeDecisionRequest } from '../client.mjs';
 const safeCode = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,200}$/.test(value) ? value : null;
 const elapsed = (now, started) => Number.isFinite(started) ? Math.max(0, now() - started) : null;
 const tokens = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -54,18 +55,25 @@ export function createDecisionDiagnostics({ log, now = () => performance.now(), 
     },
     wrapPolicy(policy) {
       return { ...policy,
-        buildRequest(snapshot) {
+        buildRequest(snapshot, { operationId } = {}) {
           const context = contexts.get(snapshot.fingerprint) ?? contextFor(snapshot); active = context;
+          if (operationId) context.operationId = operationId;
           contexts.set(snapshot.fingerprint, context); const started = now();
           let request;
           try { request = policy.buildRequest(snapshot); }
-          catch (error) { emit('request_preparation_failed', context, { reason: safeCode(error.code || error.message) ?? 'preparation_failed', buildMs: elapsed(now, started) }); throw error; }
+          catch (error) {
+            emit('request_preparation_failed', context, { reason: safeCode(error.code || error.message) ?? 'preparation_failed',
+              buildMs: elapsed(now, started), requestBytes: tokens(error.requestBytes), requestLimitBytes: tokens(error.requestLimitBytes) });
+            throw error;
+          }
           requests.set(request, context); context.preparedAt = now();
           context.queueWaitMs = Math.max(0, started - context.offeredAt);
           context.buildMs = elapsed(now, started);
           emit('request_prepared', context, { model: request.model, questionCount: request.questions.length,
               questionNames: request.questions.map(question => question.name),
               configuredRequestBytes: Buffer.byteLength(JSON.stringify(request)),
+              requestBytes: Buffer.byteLength(serializeDecisionRequest(request), 'utf8'),
+              requestLimitBytes: MAX_DECISIONS_REQUEST_BYTES,
               inputBytes: Buffer.byteLength(typeof request.input === 'string' ? request.input : JSON.stringify(request.input)),
               queueWaitMs: context.queueWaitMs, buildMs: context.buildMs,
               cacheMode: request.prompt_cache_options?.mode ?? 'default', requestContentsLogged: false });

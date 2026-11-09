@@ -1,5 +1,5 @@
 import { buildDecisionRequest, parseDecisionResponse, shadowDisposition } from './rubric.mjs';
-import { fitExplanationHistoryBudget } from './local-call/explanation-history.mjs';
+import { fitDecisionRequestBudget } from './local-call/explanation-history.mjs';
 
 // Observation only. These labels do not select tools, publish facts, or send Live cues.
 export const BROAD_RUBRIC_VERSION = 'conversation-observation-3';
@@ -77,7 +77,7 @@ export function buildBroadDecisionRequest(snapshot) {
   request.questions.push(...[...BROAD_PREDICATES, ...BROAD_EVIDENCE_CHECKS].map(name => ({
     name, type: 'predicate', instructions: `${common}\n${definitions[name]}`,
   })));
-  return fitExplanationHistoryBudget(request);
+  return fitDecisionRequestBudget(request);
 }
 
 export function parseBroadDecisionResponse(response) {

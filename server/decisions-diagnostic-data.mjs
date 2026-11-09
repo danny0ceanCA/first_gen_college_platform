@@ -7,6 +7,10 @@ const numberKeys = new Set(['durationMs','totalMs','clientAwaitMs','transportAnd
   'scopeEpoch','connectionEpoch','questionRevision','inputRevision','generation','scopeGeneration','queueWaitMs','buildMs','parseMs','preparedToApiMs','totalWorkerMs','configuredRequestBytes','inputBytes','inputAgeMs','evidenceAgeMs','quietAgeMs','tokensAvailable','revalidationCount','maxEvaluations','ordinaryEvaluationCount','researchReserve','pendingMs','validationToSendMs','thoughtAgeMs','idleMs','quietMs','startMs','endMs','answerCount','attempt','automaticRetries','providerStatus','reservedUsd','classificationAgeMs','sourceRevision','currentRevision']);
 const booleanKeys = new Set(['contextSent','playbackClaim','inputOpen','sourceComplete','freshAtWorker','reservationRetained','providerRequestCompleted','revalidationRequested','revalidated','parsedClassificationAvailable','classificationValidated','stale','queued','provisional','complete','eligible','retained','requestContentsLogged','usageKnown','duplicateOffer','latestUserComplete','authorized']);
 const mismatchKeys = new Set(['callId','studentId','language','connectionEpoch','scopeEpoch','contributionId','revision','supportRevision','assistantOutputRevision','sourceEventIds','sourceOutputEventIds','usable','closed','observer_closed','evidence_unusable']);
+const workerFlagKeys = ['supportEnabled', 'preferencesEnabled', 'conversationEnabled', 'earlyEnabled', 'lateExperimentEnabled', 'betweenThoughtsEnabled'];
+numberKeys.add('currentAssistantOutputRevision');
+numberKeys.add('assistantBoundaryRevision');
+numberKeys.add('requestLimitBytes');
 const numeric = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
 const opaque = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,160}$/.test(value);
 const scalarObject = (value, booleans, numbers) => Object.fromEntries(Object.entries(value ?? {}).filter(([key, v]) =>
@@ -21,6 +25,16 @@ export function decisionsDiagnosticData(event) {
   }
   // A write with uncertain completion must not disappear or become false.
   if (event?.contextSent === 'unknown') data.contextSent = 'unknown';
+  if (event?.type === 'decisions_worker_started') Object.assign(data, scalarObject(event, workerFlagKeys, []));
+  if (event?.type === 'early_decisions_completed' && event.policyDecision) {
+    const { eligible, reason } = event.policyDecision;
+    if (typeof eligible === 'boolean') data.policyEligible = eligible;
+    if (opaque(reason)) data.policyReason = reason;
+  }
+  if (event?.type === 'early_decisions_completed') {
+    if (typeof event.policyEligible === 'boolean') data.policyEligible = event.policyEligible;
+    if (opaque(event.policyReason)) data.policyReason = event.policyReason;
+  }
   if (['en','es','mixed','unknown'].includes(event?.language)) data.language = event.language;
   for (const key of ['sourceEventIds','sourceTranscriptIds','sourceOutputEventIds'])
     if (Array.isArray(event?.[key])) data[key] = [...new Set(event[key].filter(opaque))].slice(0,128);

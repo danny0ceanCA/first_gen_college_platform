@@ -3,7 +3,7 @@
 import { decisionsDiagnosticData } from '../../../server/decisions-diagnostic-data.mjs';
 import { measureSupportOutcome, summarizeSupportOutcomes } from './outcome-evaluation.mjs';
 
-export const DECISIONS_REPORT_VERSION = 'decisions-evidence-report-1';
+export const DECISIONS_REPORT_VERSION = 'decisions-evidence-report-2';
 const code = value => typeof value === 'string' && /^[a-zA-Z0-9_.: -]{1,200}$/.test(value) ? value : null;
 const count = (map, key) => { if (key) map[key] = (map[key] ?? 0) + 1; };
 const counters = () => Object.create(null);
@@ -36,6 +36,7 @@ export function buildDecisionsDiagnosticReport(events = [], { reviewedCases = []
     observedSequenceGaps: 0, sequenceCoverage: 'only_between_observed_durable_rows',
     stages: counters(), withholdingReasons: counters(), scheduling: { triggerBasis: counters(), requestMoment: counters(), budgetConstraint: counters() },
     freshnessMismatch: counters(), revalidationRequested: 0, revalidated: 0,
+    earlyCueOutcomes: counters(), earlyWorkerPolicyReasons: counters(),
     byLanguage: Object.fromEntries(['en', 'es', 'mixed', 'unknown'].map(language => [language, quality()])),
     timings: {}, outcomeReview: null,
     limitations: ['Provider receipt does not prove use, playback or comprehension.',
@@ -67,7 +68,7 @@ export function buildDecisionsDiagnosticReport(events = [], { reviewedCases = []
     if (!call || !run) report.uncorrelatedEvents++;
     if (classificationStage(stage) && (!call || !run || !data.operationId)) report.uncorrelatedClassifications++;
     const language = languageOf(data);
-    const row = { stage, data, call, run, language, index: rows.length }; rows.push(row);
+    const row = { stage, data, call, run, language, sequence, index: rows.length }; rows.push(row);
     count(report.stages, stage);
     if (durable && call && run && sequence !== null) {
       const key = JSON.stringify([call, run]);
@@ -97,6 +98,20 @@ export function buildDecisionsDiagnosticReport(events = [], { reviewedCases = []
   }
   const latest = (list, predicate) => list.filter(predicate).at(-1);
   for (const list of requests.values()) {
+    const classified = latest(list, row => row.stage === 'early_decisions_completed');
+    const earlyCheck = classified ?? latest(list, row => /^early_decisions_(failed|skipped)$/.test(row.stage))
+      ?? latest(list, row => row.stage === 'early_decisions_started');
+    if (earlyCheck) {
+      count(report.earlyWorkerPolicyReasons, classified?.data.policyReason);
+      const gate = list.filter(row => /^support_early_(validated|deferred|discarded|skipped|resolved|need_retained)$/.test(row.stage))
+        .sort((a, b) => (a.sequence ?? a.index) - (b.sequence ?? b.index)).at(-1);
+      const provider = latest(list, row => /^support_early_(context_acknowledged|provider_rejected)$/.test(row.stage));
+      const send = latest(list, row => /^support_early_(sent|send_unconfirmed)$/.test(row.stage));
+      const decisive = provider ?? send ?? gate ?? earlyCheck;
+      const outcome = decisive.stage.replace(/^(support_early_|early_decisions_)/, '');
+      const stage = decisive === earlyCheck && outcome === 'completed' ? 'no_parent_outcome_observed' : outcome;
+      count(report.earlyCueOutcomes, decisive.data.reason ? `${stage}:${decisive.data.reason}` : stage);
+    }
     // Prefer the complete parsed response over repeated/legacy summary events.
     const parsed = latest(list, row => row.stage === 'decisions_response_parsed')
       ?? latest(list, row => classificationStage(row.stage));

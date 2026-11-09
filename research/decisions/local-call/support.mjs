@@ -56,8 +56,13 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
     // delegations and context still fence the append's acknowledgment effects.
     : delegation || backends.size || pendingDelegations.size || pendingContext.size ? 'background_or_context_pending'
     : !['en', 'es'].includes(currentLanguage) ? 'language_unsupported' : null;
+  const deliveryState = () => ({ started, closed, selected: Boolean(selected()), selectionPending, introReady,
+    inputOpen, outputOpen, recentAudio: now() - audioActivityAt < 900,
+    playbackIdle: playback.idle, playbackAgeMs: Number.isFinite(playback.at) ? Math.max(0, now() - playback.at) : null,
+    research, delegation, backendCount: backends.size, delegationCount: pendingDelegations.size,
+    pendingContextCount: pendingContext.size });
   const early = createEarlySupportDelivery({ enabled: enabled && earlyEnabled, observeOnly: earlyObserveOnly, lateEnabled, betweenThoughtsEnabled,
-    canDeliverLate: lateBlocked, canDeliverBetweenThoughts: betweenBlocked, getEvidence: getEarlyEvidence, now, log,
+    canDeliverLate: lateBlocked, canDeliverBetweenThoughts: betweenBlocked, getEvidence: getEarlyEvidence, now, log, deliveryState,
     canDeliver: () => closed || !started || !selected() ? 'session_or_scope_unready'
       : selectionPending || !introReady ? 'intro_unready'
       // Classification can run while the caller speaks, but optional context
@@ -98,11 +103,7 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
   });
   const preferences = createPreferenceDelivery({ enabled: enabled && preferencesEnabled, scope, language, now,
     log,
-    deliveryState: () => ({ started, closed, selected: Boolean(selected()), selectionPending, introReady,
-      inputOpen, outputOpen, recentAudio: now() - audioActivityAt < 900,
-      playbackIdle: playback.idle, playbackAgeMs: Number.isFinite(playback.at) ? Math.max(0, now() - playback.at) : null,
-      research, delegation, backendCount: backends.size, delegationCount: pendingDelegations.size,
-      pendingContextCount: pendingContext.size }),
+    deliveryState,
     canDeliver: () => closed || !started || !selected() ? 'session_or_scope_unready'
       : selectionPending || !introReady ? 'intro_unready'
       : inputOpen || outputOpen || now() - audioActivityAt < 900 ? 'speech_in_progress'

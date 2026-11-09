@@ -1,6 +1,6 @@
 import { preferencePolicy } from './preference-rubric.mjs';
 import { affirmativeAcknowledgment } from './conversation-evidence.mjs';
-import { fitExplanationHistoryBudget } from './local-call/explanation-history.mjs';
+import { fitDecisionRequestBudget } from './local-call/explanation-history.mjs';
 
 // Local experimental classifications only. Neither label authorizes a tool,
 // a student-record write, or speech. The application owns scope and delivery.
@@ -68,7 +68,7 @@ export function buildConversationDecisionRequest(snapshot) {
       none: 'There is no qualifying conversational offer and acceptance/decline in the latest contribution.',
       unclear: 'The latest contribution or immediate offer is incomplete or genuinely ambiguous.',
     })[value] })) });
-  return fitExplanationHistoryBudget(request);
+  return fitDecisionRequestBudget(request);
 }
 
 export function parseConversationDecisionResponse(response) {
