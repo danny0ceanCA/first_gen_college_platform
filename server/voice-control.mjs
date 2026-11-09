@@ -10,7 +10,8 @@ import {voiceLanguageInstructions} from '../src/voiceLanguage.mjs';
 import {selectResearchReuse,cachedResearchForCoverage} from './research-reuse.mjs';
 import {liveVoiceDiagnostics} from './live-voice-diagnostics.mjs';
 import {createDecisionsClient} from '../research/decisions/client.mjs';
-import {comparisonUpdateTool,comparisonFindings,comparisonClue,comparisonLookup,selectComparisonCampus} from './voice-comparison-update.mjs';
+import {researchTraceKeys} from './research-trace.mjs';
+import {comparisonUpdateTool,comparisonFindings,comparisonClue,comparisonLookup,selectComparisonFinding} from './voice-comparison-update.mjs';
 
 // One native provider writer per physical call. Browser callbacks are leases,
 // not a second provider connection. No retries of callbacks or durable writes.
@@ -41,33 +42,47 @@ export function voiceControlSession({provider,providerSessionId,config,scope,job
  const output=(item,result)=>send({type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:JSON.stringify(result)}});
  async function updateComparison(item){
   const {jobId,revision}=JSON.parse(item.arguments);
-  const record=reports.get(jobId),current=comparisonTurns.at(-1);
+  const record=reports.get(jobId),current=comparisonTurns.at(-1),started=now();
+  const trace=(stage,extra={})=>{try{log({event:'voice.comparison.update',comparisonStage:stage,
+   ...researchTraceKeys(scope.sessionId,extra.jobId||jobId),researchBaseJobKey:researchTraceKeys(scope.sessionId,jobId).researchJobKey,
+   requestRevision:revision,durationMs:now()-started,comparisonReason:extra.reason,mode:extra.mode,
+   retainedFindingCount:extra.retainedCount,invalidatedFindingCount:extra.invalidatedCount});}catch{/* Diagnostic failures cannot alter conversation. */}};
   const unavailable={status:'comparison_unavailable',searchStarted:false,instruction:'No comparison update started. Ask one brief question if the intended change is unclear. For unsupported scenarios, use the ordinary research route only if the caller requested a lookup.'};
-  if(!comparisonClient||!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.status!=='completed'||record.job.revision!==revision||!current||current.version!==inputVersion||comparisonChecks>=3)return unavailable;
-  const entries=comparisonFindings(record.job.result);
-  if(!entries)return unavailable;
-  const clue=comparisonClue(current.text,comparisonTurns.slice(0,-1).map(entry=>entry.text));
-  const clarify={status:'comparison_clarification_required',searchStarted:false,instruction:'Ask which campus should change to living with family. Keep the comparison unchanged. Start with the question; do not say you are checking.'};
-  if(!clue)return clarify;
-  if(comparisonUpdates.has(jobId))return {status:'comparison_update_already_requested',searchStarted:false,instruction:'This report already has a requested update. Continue with the existing research state. Do not search or announce it again.'};
+  if(!comparisonClient||!scope.confirmed||!record||record.studentId!==scope.studentId||record.job.status!=='completed'||record.job.revision!==revision||!current||current.version!==inputVersion){trace('rejected',{reason:'scope_or_report_unavailable'});return unavailable;}
+  // An accepted update supersedes its base. A later distinct edit must use the
+  // newly completed merged report so it cannot restore an old changed value.
+  if(comparisonUpdates.has(jobId)){trace('duplicate',{reason:'base_superseded'});return {status:'comparison_update_already_requested',searchStarted:false,instruction:'This report already has a requested update. Continue with the existing research state, or use the latest completed comparison report for a later change. Do not search or announce it again.'};}
+  const entries=comparisonFindings(record.job.result,{now:now()});
+  if(!entries){trace('rejected',{reason:'evidence_unavailable_or_stale'});return unavailable;}
+  const clue=comparisonClue(current.text,comparisonTurns.slice(0,-1).map(entry=>entry.text),entries);
+  const clarify={status:'comparison_clarification_required',searchStarted:false,instruction:'Ask one short question about which saved item or condition the caller wants to change. Keep the comparison unchanged. Start with the question; do not say you are checking.'};
+  if(!clue){trace('clarification',{reason:'no_clear_clue'});return clarify;}
+  if(clue.alreadyApplied){trace('reused',{findingId:clue.id,retainedCount:entries.length});return {status:'cached_comparison',searchStarted:false,jobId,revision,findings:entries,instruction:'This exact comparison change has already been researched. Answer directly from the saved finding and its full qualification. Do not announce a check or repeat the lookup.'};}
+  if(comparisonChecks>=3){trace('rejected',{reason:'comparison_check_limit'});return unavailable;}
   comparisonUpdates.add(jobId);
   comparisonChecks++;
   let accepted=false;
   try{
-   const changed=await selectComparisonCampus(comparisonClient,entries,clue).catch(()=>null);
-   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId)
-    return {status:'comparison_superseded',searchStarted:false,instruction:'The caller continued or the scope changed. Follow the latest request without repeating a question from the earlier turn.'};
-   if(!changed)return clarify;
-   const plan=changed&&comparisonLookup(entries,changed,config.language);
-   if(!plan)return unavailable;
-   const receipt=await research.start({question:plan.question,institution:plan.institution,mode:'finance',
+   trace('checking',{findingId:clue.id,mode:record.job.query.mode});
+   const changed=await selectComparisonFinding(comparisonClient,entries,clue).catch(()=>null);
+   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId){trace('superseded',{reason:'changed_during_classification'});
+    return {status:'comparison_superseded',searchStarted:false,instruction:'The caller continued or the scope changed. Follow the latest request without repeating a question from the earlier turn.'};}
+   if(!changed){trace('clarification',{reason:'classification_unconfirmed'});return clarify;}
+   const plan=comparisonLookup(entries,changed,config.language,{changeText:clue.changeText,mode:record.job.query.mode});
+   if(!plan){trace('rejected',{reason:'unsupported_change'});return unavailable;}
+   trace('selected',{findingId:changed,retainedCount:plan.retained.length,invalidatedCount:plan.invalidated.length,mode:plan.mode});
+   const receipt=await research.start({question:plan.question,institution:plan.institution,mode:plan.mode,
     language:config.language==='es'?'es':'en',sessionId:scope.sessionId,studentId:scope.studentId,
-    requestKey:item.call_id,comparisonBaseJobId:jobId});
+    requestKey:item.call_id,comparisonBaseJobId:jobId,comparisonFindingId:changed,comparisonChange:clue.changeText});
    accepted=receipt.status==='research_pending'&&receipt.requestId===item.call_id&&!!receipt.jobId;
-   if(!accepted)return receipt;
-   return {...receipt,status:'research_pending',changedCampus:plan.institution,unchangedFinding:plan.retained,
-    instruction:'The check is queued only for changedCampus. Share the saved unchangedFinding with its year, residence-hall scope and full caveat now, if useful. Then leave room for a reply. The changed figure will arrive separately. Do not repeat the saved estimate when delivering the new figure or claim the unchanged campus was rechecked.'};
-  }finally{if(!accepted&&reports.get(jobId)===record)comparisonUpdates.delete(jobId);}
+   if(!accepted){trace('deferred',{reason:'work_not_started'});return receipt;}
+   trace('queued',{jobId:receipt.jobId,findingId:changed,retainedCount:plan.retained.length,invalidatedCount:plan.invalidated.length});
+   if(closed||inputVersion!==current.version||reports.get(jobId)!==record||scope.studentId!==record.studentId){trace('superseded',{reason:'changed_during_enqueue',jobId:receipt.jobId});
+    return {...receipt,status:'comparison_superseded',searchStarted:true,instruction:'The check was accepted, but the caller has continued. Follow the latest request without replaying the earlier comparison announcement. Ordinary follow-ups do not cancel this work; an actual correction needs an explicit task replacement.'};}
+   return {...receipt,status:'research_pending',changedItem:{id:plan.target.id,subject:plan.target.subject,aspect:plan.target.aspect},unchangedFindings:plan.retained,invalidatedFindings:plan.invalidated.map(f=>f.id),
+    instruction:'The check is queued only for changedItem. Reuse relevant unchangedFindings with their original year or term, scenario and full qualifications now, if useful. Then leave room for a reply. The changed finding will arrive separately. Other details about the changed item may also be affected; do not carry invalidatedFindings forward. Do not repeat saved findings when delivering the update or claim unchanged items were rechecked.'};
+  }catch(error){trace('rejected',{reason:'enqueue_failed'});throw error;}
+  finally{if(!accepted&&reports.get(jobId)===record)comparisonUpdates.delete(jobId);}
  }
  async function researchCall(item){
   if(item.name===comparisonUpdateTool.name)return updateComparison(item);

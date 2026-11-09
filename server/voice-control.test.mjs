@@ -10,7 +10,7 @@ import {studentVoiceChannel} from '../src/studentVoiceChannel.mjs';
 import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 import {voiceTargetResult} from '../src/voiceTargetResult.mjs';
 import {capturePayload} from '../src/voiceCapture.mjs';
-import {comparisonUpdateTool} from './voice-comparison-update.mjs';
+import {comparisonUpdateTool,comparisonFindings} from './voice-comparison-update.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -40,7 +40,7 @@ for(const language of ['en','es'])test(language+': comparison keeps the saved fi
   comparisonClient:{evaluate:async request=>{
    decisions++;
    assert.doesNotMatch(request.input,/my family|nuestra familia|50,000/);
-   const choice=changed.toLowerCase();
+   const choice=JSON.parse(request.input).options.find(option=>option.subject===changed).id;
    return {response:{answers:[{type:'choice',name:'comparison_update',choice,probabilities:[{value:choice,probability:1}]}]}};
   }},
   jobRequest:async(method,id,body)=>{
@@ -67,9 +67,9 @@ for(const language of ['en','es'])test(language+': comparison keeps the saved fi
   await until(()=>reply('update'));
   const receipt=JSON.parse(reply('update'));
   assert.equal(receipt.status,'research_pending');
-  assert.equal(receipt.changedCampus,changed);
-  assert.equal(receipt.unchangedFinding.name,unchanged);
-  assert.match(receipt.unchangedFinding.qualification,/before aid, not a bill/);
+  assert.equal(receipt.changedItem.subject,changed);
+  assert.equal(receipt.unchangedFindings[0].name,unchanged);
+  assert.match(receipt.unchangedFindings[0].qualification,/before aid, not a bill/);
   assert.equal(posts.length,2);assert.equal(decisions,1);
   assert.equal(posts[1].institution,changed);
   assert.equal(posts[1].comparisonBaseJobId,'job-1');
@@ -78,6 +78,110 @@ for(const language of ['en','es'])test(language+': comparison keeps the saved fi
   await until(()=>reply('duplicate'));
   assert.equal(JSON.parse(reply('duplicate')).status,'comparison_update_already_requested');
   assert.equal(posts.length,2);assert.equal(decisions,1);
+ }finally{f.engine.close();}
+});
+function comparisonReport(aspect='deadline'){
+ const checkedAt=new Date(Date.now()-1000).toISOString(),names=['Eastview College','Pine Valley College','Harbor College'];
+ const findings=names.map((subject,i)=>({subject,aspect,status:'verified',answer:subject+' published fall 2027 policy ['+(i+1)+'].',qualification:'First-year applicants only; program exceptions can apply ['+(i+1)+'].'}));
+ return {checkedAt,sources:names.map((name,i)=>({url:'https://campus'+i+'.edu/policy',title:name,checkedAt})),text:findings.map(f=>f.answer+' '+f.qualification).join(' '),
+  voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
+}
+async function comparisonFixture({language='en',aspect='deadline',result=comparisonReport(aspect),evaluate,post}={}){
+ const posts=[],logs=[],results={'job-1':result};let decisions=0;
+ const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,{name:'lookup_college_applications'},comparisonUpdateTool]},log:event=>logs.push(event),
+  comparisonClient:{evaluate:async request=>{decisions++;if(evaluate)return evaluate(request);const input=JSON.parse(request.input),choice=input.options.find(o=>o.subject===input.reference.subject&&o.aspect===input.reference.aspect).id;
+   return {response:{answers:[{type:'choice',name:'comparison_update',choice,probabilities:[{value:choice,probability:1}]}]}};}},
+  jobRequest:async(method,id,body)=>{if(method==='POST'){posts.push(body);return post?post(body,posts.length):{id:'job-'+posts.length,status:'queued'};}if(method==='DELETE')return {id,status:'cancelled'};return results[id]?{id,status:'completed',result:results[id]}:{id,status:'running'};}});
+ const speak=async text=>{f.engine.receive({type:'session.input_transcript.delta',delta:text});await pause(0);await f.engine.flush();};
+ const reply=id=>f.sent.find(e=>e.item?.call_id===id)?.item?.output;
+ f.call([tool('lookup_college_applications','original',{institution:'Eastview, Pine Valley and Harbor',question:'Compare published fall 2027 policies'})],'original');
+ await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.jobId==='job-1'),2000);
+ return {...f,posts,logs,results,speak,reply,decisions:()=>decisions,result};
+}
+for(const [aspect,en,es] of [
+ ['deadline','Change Eastview College to spring 2028.','Cambia Eastview College a primavera de 2028.'],
+ ['eligibility','What if Eastview College enrollment is part time?','¿Qué pasa si la matrícula de medio tiempo es en Eastview College?'],
+ ['other','Switch Eastview College orientation to online.','Cambia la orientación de Eastview College a en línea.'],
+])for(const language of ['en','es'])test(`${language}: controller preserves multiple ${aspect} findings and routes only the changed condition`,async()=>{
+ const f=await comparisonFixture({language,aspect});
+ try{
+  await f.speak(language==='es'?es:en);f.call([tool(comparisonUpdateTool.name,'change',{jobId:'job-1',revision:1})],'change');await until(()=>f.reply('change'));
+  const receipt=JSON.parse(f.reply('change'));
+  assert.equal(receipt.status,'research_pending');assert.equal(receipt.changedItem.subject,'Eastview College');assert.equal(receipt.changedItem.aspect,aspect);
+  assert.deepEqual(receipt.unchangedFindings.map(e=>e.subject),['Pine Valley College','Harbor College']);
+  assert.ok(receipt.unchangedFindings.every(e=>e.qualification.includes('program exceptions')&&e.answer.includes('2027')));
+  assert.equal(f.posts[1].mode,'admissions');assert.equal(f.posts[1].comparisonFindingId,receipt.changedItem.id);
+  assert.equal(f.posts[1].comparisonChange,language==='es'?es:en);
+  assert.doesNotMatch(f.posts[1].question,/Pine Valley|Harbor/);assert.equal(f.decisions(),1);
+  assert.ok(f.logs.some(e=>e.comparisonStage==='queued'&&e.retainedFindingCount===2));
+  assert.ok(f.logs.filter(e=>e.comparisonStage).every(e=>!Object.hasOwn(e,'transcript')&&!Object.hasOwn(e,'comparisonChange')));
+  assert.equal(f.sent.filter(e=>e.type==='session.instructions.append').length,0);
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: unclear comparison needs no Decisions check or lookup`,async()=>{
+ const f=await comparisonFixture({language});
+ try{
+  await f.speak(language==='es'?'¿Y si esa universidad es para primavera?':'What if that college is for spring?');
+  f.call([tool(comparisonUpdateTool.name,'unclear',{jobId:'job-1',revision:1})],'unclear');await until(()=>f.reply('unclear'));
+  const receipt=JSON.parse(f.reply('unclear'));assert.equal(receipt.status,'comparison_clarification_required');assert.equal(receipt.searchStarted,false);
+  assert.equal(f.posts.length,1);assert.equal(f.decisions(),0);assert.ok(f.logs.some(e=>e.comparisonStage==='clarification'));
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: exact completed change reuses its merged report without rechecking`,async()=>{
+ const change=language==='es'?'Cambia Eastview College a primavera de 2028.':'Change Eastview College to spring 2028.',result=comparisonReport();
+ result.comparisonUpdate={version:2,changedFindingId:comparisonFindings(result)[0].id,requestedChange:change};
+ const f=await comparisonFixture({language,result});
+ try{
+  await f.speak(change);f.call([tool(comparisonUpdateTool.name,'same',{jobId:'job-1',revision:1})],'same');await until(()=>f.reply('same'));
+  const receipt=JSON.parse(f.reply('same'));assert.equal(receipt.status,'cached_comparison');assert.equal(receipt.searchStarted,false);assert.equal(receipt.findings.length,3);
+  assert.equal(f.posts.length,1);assert.equal(f.decisions(),0);assert.ok(f.logs.some(e=>e.comparisonStage==='reused'));
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: a later change uses the newly merged report while the old report stays superseded`,async()=>{
+ const f=await comparisonFixture({language});
+ const first=language==='es'?'Cambia Eastview College a primavera de 2028.':'Change Eastview College to spring 2028.';
+ try{
+  const merged=structuredClone(f.result);merged.voiceBrief.findings[0].answer='Eastview College spring 2028 deadline: September 1 [1].';
+  merged.comparisonUpdate={version:2,changedFindingId:comparisonFindings(merged)[0].id,requestedChange:first};f.results['job-2']=merged;
+  await f.speak(first);f.call([tool(comparisonUpdateTool.name,'first',{jobId:'job-1',revision:1})],'first');await until(()=>f.reply('first'));
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.jobId==='job-2'),2000);
+  f.engine.receive({type:'session.output_transcript.delta',delta:language==='es'?'Eastview tiene una fecha para primavera.':'Eastview has a spring deadline.'});await pause(0);await f.engine.flush();
+  await f.speak(language==='es'?'Cambia Pine Valley College a solicitantes de transferencia.':'Change Pine Valley College to transfer applicants.');
+  f.call([tool(comparisonUpdateTool.name,'old-base',{jobId:'job-1',revision:1})],'old-base');await until(()=>f.reply('old-base'));
+  assert.equal(JSON.parse(f.reply('old-base')).status,'comparison_update_already_requested');assert.equal(f.decisions(),1);
+  f.call([tool(comparisonUpdateTool.name,'second',{jobId:'job-2',revision:1})],'second');await until(()=>f.reply('second'));
+  const receipt=JSON.parse(f.reply('second'));assert.equal(receipt.status,'research_pending');assert.equal(receipt.changedItem.subject,'Pine Valley College');
+  assert.match(receipt.unchangedFindings.find(e=>e.subject==='Eastview College').answer,/September 1/);assert.equal(f.posts[2].comparisonBaseJobId,'job-2');assert.equal(f.decisions(),2);
+ }finally{f.engine.close();}
+});
+for(const changed of ['caller','student'])test(`comparison rejects ${changed} change while classification is pending`,async()=>{
+ let finish,request;
+ const f=await comparisonFixture({evaluate:r=>{request=r;return new Promise(resolve=>{finish=resolve;});}});
+ try{
+  await f.speak('Change Eastview College to spring 2028.');f.call([tool(comparisonUpdateTool.name,'pending',{jobId:'job-1',revision:1})],'pending');await until(()=>finish);
+  if(changed==='caller')await f.speak('Actually, use fall 2029 instead.');
+  else await f.engine.configure({...config,tools:[...config.tools,comparisonUpdateTool]}, {sessionId:'physical-call',studentId:'elodie',confirmed:true},'changed-student');
+  const choice=JSON.parse(request.input).options[0].id;finish({response:{answers:[{type:'choice',name:'comparison_update',choice,probabilities:[{value:choice,probability:1}]}]}});
+  await until(()=>f.reply('pending'));assert.equal(JSON.parse(f.reply('pending')).status,'comparison_superseded');assert.equal(f.posts.length,1);
+  assert.ok(f.logs.some(e=>e.comparisonStage==='superseded'));
+ }finally{f.engine.close();}
+});
+test('caller continuation during enqueue retains background work without replaying the obsolete announcement',async()=>{
+ let finish;
+ const f=await comparisonFixture({post:async(body,n)=>n===1?{id:'job-1',status:'queued'}:new Promise(resolve=>{finish=resolve;})});
+ try{
+  await f.speak('Change Eastview College to spring 2028.');f.call([tool(comparisonUpdateTool.name,'pending',{jobId:'job-1',revision:1})],'pending');await until(()=>finish);
+  await f.speak('Can you explain what an entry term means?');finish({id:'job-2',status:'queued'});await until(()=>f.reply('pending'));
+  const receipt=JSON.parse(f.reply('pending'));assert.equal(receipt.status,'comparison_superseded');assert.equal(receipt.searchStarted,true);
+  assert.equal(receipt.unchangedFindings,undefined);assert.equal(f.posts.length,2);assert.ok(f.logs.some(e=>e.comparisonReason==='changed_during_enqueue'));
+ }finally{f.engine.close();}
+});
+test('stale comparison is rejected before invoking Decisions',async()=>{
+ const result=comparisonReport();result.sources[1].checkedAt=new Date(Date.now()-300001).toISOString();
+ const f=await comparisonFixture({result});
+ try{
+  await f.speak('Change Eastview College to spring 2028.');f.call([tool(comparisonUpdateTool.name,'old',{jobId:'job-1',revision:1})],'old');await until(()=>f.reply('old'));
+  assert.equal(JSON.parse(f.reply('old')).status,'comparison_unavailable');assert.equal(f.decisions(),0);assert.equal(f.posts.length,1);
  }finally{f.engine.close();}
 });
 for(const language of ['en','es'])test(`${language}: unavailable diagnostics cannot delay the intro or add provider speech instructions`,async()=>{

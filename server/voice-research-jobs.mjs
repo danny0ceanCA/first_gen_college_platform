@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {guardAccountTransaction} from './account-guard.mjs';
-import {publicResearchInput,researchPrivateNames} from './provider-privacy.mjs';
+import {publicResearchInput,publicSearchText,researchPrivateNames} from './provider-privacy.mjs';
 import {allowedRequest} from './origin.mjs';
 import {selectResearchReuse} from './research-reuse.mjs';
-import {comparisonFindings,comparisonLookup} from './voice-comparison-update.mjs';
+import {comparisonFindings,comparisonClue,comparisonLookup} from './voice-comparison-update.mjs';
 import {researchTraceKeys} from './research-trace.mjs';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function assertBackgroundResearchReady(database,env){
@@ -34,8 +34,10 @@ export function createVoiceResearchJobsHandler(database,env){
     let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>10000)return send(413,{error:'request_too_large'});}
     input=JSON.parse(raw);
     if(!uuid.test(input.sessionId)||typeof input.requestKey!=='string'||!input.requestKey||input.requestKey.length>100||!['finance','admissions','planning','loans'].includes(input.mode)||!['en','es'].includes(input.language)||typeof input.question!=='string'||!input.question.trim()||input.question.length>3000||typeof input.institution!=='string'||input.institution.length>300)return send(400,{error:'invalid_request'});
-    if(input.comparisonBaseJobId!==undefined&&(!uuid.test(input.comparisonBaseJobId)||input.mode!=='finance'||env.ORIGEN_DECISIONS_COMPARISON_UPDATES!=='true'||env.ORIGEN_RESEARCH_DELIVERY_V2!=='true'))return send(400,{error:'invalid_comparison'});
-    input={...input,...publicResearchInput(input,await researchPrivateNames(req,database))};
+    const comparisonRequested=['comparisonBaseJobId','comparisonFindingId','comparisonChange'].some(key=>input[key]!==undefined);
+    if(comparisonRequested&&(!uuid.test(input.comparisonBaseJobId||'')||typeof input.comparisonFindingId!=='string'||!input.comparisonFindingId||input.comparisonFindingId.length>100||typeof input.comparisonChange!=='string'||!input.comparisonChange.trim()||input.comparisonChange.length>1600||env.ORIGEN_DECISIONS_COMPARISON_UPDATES!=='true'||env.ORIGEN_RESEARCH_DELIVERY_V2!=='true'))return send(400,{error:'invalid_comparison'});
+    const privateNames=await researchPrivateNames(req,database);
+    input={...input,...publicResearchInput(input,privateNames),...(comparisonRequested?{comparisonChange:publicSearchText(input.comparisonChange,privateNames)}:{})};
    }
    const id=params.get('id'),sessionId=params.get('sessionId'),after=params.get('after'),afterId=params.get('afterId');
    if(diagnostics? !uuid.test(sessionId||'')||!!after!==!!afterId||after&&(!Number.isFinite(Date.parse(after))||!uuid.test(afterId||'')):req.method!=='POST'&&!uuid.test(id||''))return send(400,{error:'invalid_request'});
@@ -59,15 +61,19 @@ export function createVoiceResearchJobsHandler(database,env){
      // POST body. An explicit refresh bypasses both exact-cache and evidence reuse.
      let comparison;
      if(input.comparisonBaseJobId){
-      const base=(await c.query("SELECT result FROM origen_voice_research_jobs WHERE id=$1 AND account_id=$2 AND session_id=$3 AND student_id IS NOT DISTINCT FROM $4 AND status='completed' AND finished_at>now()-interval '5 minutes' AND expires_at>now()",[input.comparisonBaseJobId,account.id,input.sessionId,input.studentId??null])).rows[0];
-      const entries=base&&comparisonFindings(base.result),changed=entries?.find(entry=>entry.name===input.institution);
-      comparison=changed&&comparisonLookup(entries,changed.id,input.language);
+      const base=(await c.query("SELECT input,result,finished_at FROM origen_voice_research_jobs WHERE id=$1 AND account_id=$2 AND session_id=$3 AND student_id IS NOT DISTINCT FROM $4 AND status='completed' AND finished_at>now()-interval '5 minutes' AND expires_at>now()",[input.comparisonBaseJobId,account.id,input.sessionId,input.studentId??null])).rows[0];
+      const entries=base&&comparisonFindings({...base.result,checkedAt:base.result?.checkedAt||base.finished_at},{now:Date.now()});
+      // Reconstruct from authorized evidence and an explicit public subject.
+      // Relative references are resolved by the controller before this route;
+      // a supplied finding ID alone never authorizes an ambiguous change.
+      const clue=entries&&comparisonClue(input.comparisonChange,[],entries);
+      comparison=base?.input?.mode===input.mode&&clue?.id===input.comparisonFindingId&&!clue.alreadyApplied&&comparisonLookup(entries,clue.id,input.language,{changeText:input.comparisonChange,mode:base.input.mode});
       if(!comparison){await c.query('ROLLBACK');return send(409,{error:'comparison_report_unavailable'});}
      }
      const prior=!comparison&&env.ORIGEN_RESEARCH_DELIVERY_V2==='true'&&input.forceRefresh!==true?
       (await c.query("SELECT input,result,status,finished_at FROM origen_voice_research_jobs WHERE account_id=$1 AND session_id=$2 AND student_id IS NOT DISTINCT FROM $3 AND status='completed' AND finished_at>now()-interval '5 minutes' AND expires_at>now() ORDER BY finished_at DESC LIMIT 8",[account.id,input.sessionId,input.studentId??null])).rows:[];
      const payload={question:comparison?.question??input.question,institution:comparison?.institution??input.institution,language:input.language,mode:input.mode,purpose:input.mode==='planning'?'planning':undefined,
-      ...(comparison?{comparisonOfficialUrl:comparison.officialUrl}:selectResearchReuse(input,prior))};
+      ...(comparison?{comparisonPlan:{version:2,target:comparison.target,retained:comparison.retained,invalidated:comparison.invalidated,changeText:comparison.changeText}}:selectResearchReuse(input,prior))};
      row=(await c.query('INSERT INTO origen_voice_research_jobs(id,account_id,student_id,session_id,request_key,input) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,status',[randomUUID(),account.id,input.studentId??null,input.sessionId,input.requestKey,payload])).rows[0];
     }
    }else if(req.method==='DELETE')row=(await c.query("UPDATE origen_voice_research_jobs SET status='cancelled',result=NULL,finished_at=now() WHERE id=$1 AND account_id=$2 RETURNING id,status",[id,account.id])).rows[0];

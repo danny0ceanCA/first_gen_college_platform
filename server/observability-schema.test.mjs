@@ -5,6 +5,21 @@ import {diagnosticRecord,clientDiagnosticRecord,createMetadata,MAX_EVENT_BYTES} 
 import {serverEvents,clientEvents} from './observability/event-catalog.mjs';
 import {safeErrorCode} from './observability/error-codes.mjs';
 import {loggingPolicyIssues,checkLoggingPolicy} from '../scripts/check-logging-policy.mjs';
+import {researchTraceKeys} from './research-trace.mjs';
+
+test('comparison diagnostics retain bounded decisions and join worker events without exposing raw call data',()=>{
+ const sessionId=randomUUID(),baseId=randomUUID(),jobId=randomUUID();
+ const keys=researchTraceKeys(sessionId,jobId),researchBaseJobKey=researchTraceKeys(sessionId,baseId).researchJobKey;
+ const event=diagnosticRecord({event:'voice.comparison.update',...keys,researchBaseJobKey,comparisonStage:'queued',comparisonReason:'changed_during_enqueue',mode:'admissions',requestRevision:2,durationMs:150,retainedFindingCount:2,invalidatedFindingCount:99,
+  transcript:'Private family circumstances',question:'Private question',sessionId,jobId,baseJobId:baseId});
+ assert.equal(event.event,'voice.comparison.update');assert.equal(event.comparisonStage,'queued');assert.equal(event.comparisonReason,'changed_during_enqueue');
+ assert.equal(event.researchCallKey,keys.researchCallKey);assert.equal(event.researchJobKey,keys.researchJobKey);assert.equal(event.researchBaseJobKey,researchBaseJobKey);
+ assert.equal(event.retainedFindingCount,2);assert.equal(event.invalidatedFindingCount,8);assert.equal(event.requestRevision,2);
+ assert.ok(!JSON.stringify(event).includes(sessionId));assert.ok(!JSON.stringify(event).includes(jobId));assert.ok(!JSON.stringify(event).includes(baseId));assert.doesNotMatch(JSON.stringify(event),/Private/);
+ const invalid=diagnosticRecord({event:'voice.comparison.update',comparisonStage:'arbitrary text',comparisonReason:'private narrative',researchBaseJobKey:baseId});
+ assert.equal(invalid.comparisonStage,undefined);assert.equal(invalid.comparisonReason,undefined);assert.equal(invalid.researchBaseJobKey,undefined);
+ assert.equal(diagnosticRecord(clientDiagnosticRecord({event:'voice.comparison.update',...keys,researchBaseJobKey})).researchBaseJobKey,undefined);
+});
 
 test('all events construct bounded immutable envelopes and never copy caller identifiers or metadata',()=>{
  const canaries=['Private_Family_Story','sk-private-secret','eyJprivate.token.secret','private@example.com','SELECT private_value','unsafe\nvalue'];
