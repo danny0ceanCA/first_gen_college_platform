@@ -28,6 +28,8 @@ No intro, voice selection, audio playback, call indicator or ordinary-turn promp
 
 ## Boundaries
 
+For the production trial, deploy the API and the existing research worker from the same `main` revision before enabling `ORIGEN_DECISIONS_COMPARISON_UPDATES=true` on the API in Render. Start new calls for the English and Spanish checks. To end the trial, set the flag to `false` and deploy the API with that setting.
+
 - The experiment is enabled only by an explicit `ORIGEN_DECISIONS_COMPARISON_UPDATES=true` with existing background research, server control and research-delivery-V2 prerequisites. Unset/false remains disabled.
 - A starting report needs 2–8 verified entries with caveats and approved official sources checked less than five minutes ago. Reusing an entry does not refresh its age.
 - One clearly identified item changes at a time. At most three comparison classifications run per call. A later distinct change uses the latest completed merged report, not an already-superseded base.
