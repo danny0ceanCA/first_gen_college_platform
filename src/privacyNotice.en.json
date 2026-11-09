@@ -150,6 +150,14 @@
       ],
       [
         "h",
+        "Private call diagnostics"
+      ],
+      [
+        "p",
+        "When private call diagnostics are enabled, Origen keeps voice transcripts, relevant context updates and tool activity for up to 90 days to troubleshoot calls. These records can include names and other details spoken or used during a call. Access is restricted to authorized technical review. The archive contains text and technical events."
+      ],
+      [
+        "h",
         "Summaries normally save automatically"
       ],
       [

@@ -1,8 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
+import {readFile} from 'node:fs/promises';
+import pg from 'pg';
 import {captureIdentity,validateCapture,createPrivateVoiceCaptureHandler} from './private-voice-capture.mjs';
 import {capturePayload,createVoiceCapture} from '../src/voiceCapture.mjs';
+
+async function requestCapture(handler,subject,input){
+ const req=Readable.from([JSON.stringify(input)]);
+ Object.assign(req,{url:'/api/private-voice-capture',method:'POST',origenAuthorized:!!subject,origenIdentity:{sub:subject}});
+ let status,body;
+ await handler(req,{writeHead(value){status=value;},end(value){body=JSON.parse(value);}},()=>assert.fail('Unexpected route'));
+ return {status,body};
+}
+
+test('all-account capture is discoverable only by authenticated callers and requires the explicit flag',async()=>{
+ const database={connect(){assert.fail('Status must not connect to the database');}};
+ const enabled=createPrivateVoiceCaptureHandler(database,{ORIGEN_PRIVATE_VOICE_CAPTURE_ALL_ACCOUNTS:'true'});
+ const disabled=createPrivateVoiceCaptureHandler(database,{ORIGEN_PRIVATE_VOICE_CAPTURE_ALL_ACCOUNTS:'false'});
+ const input={action:'status'};
+ assert.deepEqual(await requestCapture(enabled,'fictional-user',input),{status:200,body:{enabled:true}});
+ assert.deepEqual(await requestCapture(disabled,'fictional-user',input),{status:200,body:{enabled:false}});
+ assert.equal((await requestCapture(enabled,null,input)).status,401);
+});
+
+test('all-account capture saves batches idempotently and reads only owned sessions',{skip:!process.env.ORIGEN_CAPTURE_TEST_DATABASE_URL},async()=>{
+ const url=new URL(process.env.ORIGEN_CAPTURE_TEST_DATABASE_URL);
+ assert.equal(url.hostname,'127.0.0.1','Use only an isolated loopback database');
+ const client=new pg.Client({connectionString:url.href});
+ await client.connect();
+ const schema='capture_test_'+crypto.randomUUID().replaceAll('-','');
+ try{
+  await client.query(`CREATE SCHEMA ${schema}; SET search_path TO ${schema}, public;
+   CREATE TABLE origen_accounts(id uuid PRIMARY KEY,auth0_subject text NOT NULL UNIQUE);
+   CREATE TABLE origen_students(account_id uuid,id text,PRIMARY KEY(account_id,id));
+   CREATE TABLE origen_subject_locks(subject_hash text PRIMARY KEY);
+   CREATE TABLE origen_closed_accounts(subject_hash text PRIMARY KEY);
+   CREATE FUNCTION origen_current_account_id() RETURNS uuid LANGUAGE sql AS 'SELECT NULL::uuid';`);
+  await client.query(await readFile(new URL('./migrations/122_private_voice_capture.sql',import.meta.url),'utf8'));
+  const first=crypto.randomUUID(),second=crypto.randomUUID(),sessionId=crypto.randomUUID();
+  await client.query("INSERT INTO origen_accounts VALUES($1,'first'),($2,'second')",[first,second]);
+  await client.query("INSERT INTO origen_students VALUES($1,'own-student'),($2,'other-student')",[first,second]);
+  const handler=createPrivateVoiceCaptureHandler({connect:async()=>({query:client.query.bind(client),release(){}})},
+   {ORIGEN_PRIVATE_VOICE_CAPTURE_ALL_ACCOUNTS:'true'},()=>assert.fail('All-account mode does not fetch UserInfo'));
+  const row=(sequence,studentId)=>({id:crypto.randomUUID(),sessionId,subject:'first',sequence,studentId,
+   clientAt:new Date().toISOString(),data:{type:'session.input_transcript.delta',text:'Hola, estudiante de prueba.'}});
+  const append={action:'append',events:[row(1,'own-student'),row(2,'other-student')]};
+  for(let attempt=0;attempt<2;attempt++)assert.equal((await requestCapture(handler,'first',append)).status,200);
+  assert.equal((await requestCapture(handler,'second',append)).status,403);
+  const own=(await requestCapture(handler,'first',{action:'read',sessionId})).body.events;
+  assert.equal(own.length,2);
+  assert.equal(own.find(event=>event.sequence===1).student_id,'own-student');
+  assert.equal(own.find(event=>event.sequence===2).student_id,null);
+  assert.equal(own[0].data.text,'Hola, estudiante de prueba.');
+  assert.deepEqual((await requestCapture(handler,'second',{action:'read',sessionId})).body.events,[]);
+ }finally{
+  try{await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);}finally{await client.end();}
+ }
+});
 test('capture requires the exact verified email; request attributes cannot enable another account',async()=>{
  assert.equal(captureIdentity({email:'danielgojeda.1@gmail.com',email_verified:true}),true);
  for(const value of [{email:'other@example.test',email_verified:true},{email:'danielgojeda.1@gmail.com',email_verified:false},{}])assert.equal(captureIdentity(value),false);
