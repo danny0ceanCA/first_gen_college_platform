@@ -4,12 +4,13 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-import {researchSpeechObservation} from './researchSpeechObservation.mjs';
+import {isResearchAcknowledgment,researchSpeechObservation} from './researchSpeechObservation.mjs';
 import {liveSelectionRecovery} from './liveSelectionRecovery.mjs';
-export const liveChannelRevision='bounded-reply-recovery-2026-11-09';
+export const liveChannelRevision='early-caller-yield-2026-11-10';
 export const liveBackendDeadlineMs=25000;
 const trailingClause=/(?:[,;:…—–-]|\.{2,}|\b(?:and|or|but|because|then|the|to|with|y|o|pero|porque|entonces|el|la|de|con))\s*$/iu;
 const openQuestion=/(?:[?？]["”’')]*|(?:^|[.!。]\s+|¿)(?:do you|would you|can you|what|which|how|quieres|te gustar[ií]a|qu[eé]|cu[aá]l|c[oó]mo)\b[^.!?。！？]*)\s*$/iu;
+const yieldRequest=/^[¿¡]?(?:wait|hold on|stop (?:there|for a moment)|no[ ,]+(?:i mean|i meant|actually)|actually[ ,]+(?:i meant|i mean|how|what|can we)|how (?:should|can|do) i|espera(?: un momento)?|un momento|no[ ,]+(?:quise decir|me refiero)|en realidad[ ,]+(?:quer[ií]a decir|c[oó]mo|qu[eé])|c[oó]mo (?:elijo|puedo|debo|hago))(?:$|[\s,.!?¿¡])/iu;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false,canRecoverReply=()=>false,classifyReply}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',turnItemId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
@@ -27,6 +28,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  let researchState=null;
  let continuationRequested=false,emptyRecoveryEpoch=-1;
  let replyTimer,replyPrompt=null,lastAssistantEnd,lastAssistantConfiguration=-1,replyRequestedAt=-Infinity;
+ let yieldedEpoch=-1,lastAssistantStart,yieldPrefixLength=0;
  const clearReply=()=>{if(replyTimer!==undefined)cancel(replyTimer);replyTimer=undefined;};
  const speechObservation=researchSpeechObservation();
  const id=()=>globalThis.crypto.randomUUID();
@@ -254,10 +256,21 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     replyPrompt=afterSpeech&&recentQuestion?lastOutputText.slice(-600):null;
     const continued=recentInput&&now()-recentInput.lastInput<2500;
     input=continued?recentInput.transcript:'';recentInput=null;
+    yieldPrefixLength=0;
     epoch++;inputId=id();turnItemId=inputId;await emit({type:'input_audio_buffer.speech_started',item_id:inputId,liveBoundary:continued?'transcript_continuation':'transcript_observed'});
    }
    if(closed)return;lastInput=now();
-   input+=e.delta;if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
+   if(researchDeliveryV2&&input&&isResearchAcknowledgment(input))yieldPrefixLength=input.length;
+   input+=e.delta;
+   // The latest transcript fragment can be slightly ahead of or behind the audio.
+   // Duck local playback only, leaving the provider's input and reply intact.
+   if(researchDeliveryV2&&outputId&&yieldedEpoch!==epoch&&!isPlaybackIdle()&&
+    Number.isFinite(e.start_ms)&&Number.isFinite(lastAssistantStart)&&Number.isFinite(lastAssistantEnd)&&
+    e.start_ms>=lastAssistantStart&&e.start_ms<=lastAssistantEnd+800&&yieldRequest.test(input.slice(yieldPrefixLength).trim())){
+    yieldedEpoch=epoch;
+    void emit({type:'origen.caller.yield',item_id:inputId,response_id:outputId});
+   }
+   if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
   }
   if(e.type==='session.output_transcript.delta'&&typeof e.delta==='string'){
    clearReply();replyPrompt=null;lastAssistantEnd=e.end_ms;lastAssistantConfiguration=configurationVersion;
@@ -279,6 +292,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     // New caller fragments are classified after their quiet boundary, rather
     // than treating every "yes" as a cutoff of the whole research answer.
     outputId=id();
+   lastAssistantStart=e.start_ms;
     await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});
     await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});
    }

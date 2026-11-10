@@ -10,6 +10,30 @@ import {decodedResearchContext} from './researchContext.fixture.mjs';
 import {correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
+for(const [language,ack,correction,rest] of [
+ ['en','Mm-hm.',' Wait,',' how do I choose a major?'],
+ ['es','Ajá.',' Espera,',' ¿cómo elijo mi carrera?'],
+])test(`${language}: a clear correction steers active speech once and a listening sound leaves it alone`,async()=>{
+ const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true,isPlaybackIdle:()=>false});
+ try{
+  f.receive({type:'session.output_transcript.delta',delta:'An answer in progress',start_ms:0,end_ms:1000});
+  await pause(0);
+  f.receive({type:'session.input_transcript.delta',delta:ack,start_ms:500,end_ms:700});
+  await pause(0);clock.advance(1100);await pause(0);
+  assert.equal(f.sent.length,0);
+  f.receive({type:'session.output_transcript.delta',delta:' with a caveat still to come',start_ms:1000,end_ms:1800});
+  await pause(0);
+  f.receive({type:'session.input_transcript.delta',delta:correction,start_ms:1700,end_ms:1900});
+  await pause(0);
+  assert.equal(f.events.filter(e=>e.type==='origen.caller.yield').length,1);
+  f.receive({type:'session.input_transcript.delta',delta:rest,start_ms:2000,end_ms:2400});
+  await pause(0);clock.advance(1100);await pause(0);
+  assert.equal(f.events.filter(e=>e.type==='origen.caller.yield').length,1);
+  assert.equal(f.sent.length,0);
+  assert.equal(f.events.filter(e=>e.type==='conversation.item.input_audio_transcription.completed').at(-1).transcript,correction+rest);
+ }finally{f.channel.close();}
+});
+
 for(const [language,example] of Object.entries(correctedBudgetExamples)){
  test(`${language}: a worker status update follows the caller's explicit topic change`,async()=>{
   const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});

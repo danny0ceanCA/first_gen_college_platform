@@ -1,7 +1,7 @@
 // Live transcripts are continuous fragments, not completed spoken turns. This
 // ledger only suppresses optional repeat announcements; it never certifies that
 // a person heard a fact or changes audio playback / the conversational floor.
-const acknowledgment=/^(?:(?:yes|yeah|yep|yup|okay|ok|right|sure|uh huh|mhm|mm hmm|mm|hmm|i see|got it|thanks|thank you|si|claro|vale|entiendo|entiendo gracias|ya veo|de acuerdo|gracias|aha|aja)(?:\s+|$)){1,4}$/u;
+const acknowledgment=/^(?:(?:yes|yeah|yep|yup|okay|ok|right|sure|uh huh|mhm|mm ?hmm?|mm|hmm|i see|got it|thanks|thank you|si|claro|vale|entiendo|entiendo gracias|ya veo|de acuerdo|gracias|aha|aja)(?:\s+|$)){1,4}$/u;
 const fold=text=>String(text||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const isResearchAcknowledgment=text=>!/[?¿？]/u.test(text)&&acknowledgment.test(fold(text));
 const timed=value=>Number.isFinite(value)&&value>=0;

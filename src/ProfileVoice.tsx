@@ -705,6 +705,8 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         if(e.type==='origen.research.active'){setResearching(e.active===true);return;}
         if(e.type==='origen.research.result'){sessionSources.current=mergeConversationSources(sessionSources.current,e.sources||[]);setSources(sessionSources.current);return;}
         if(closing.current?.active()){closing.current.event(e);return;}
+        if(e.type==='origen.caller.yield'){livePlayback.duck(audio.current);return;}
+        if(e.type==='input_audio_buffer.speech_stopped'||e.type==='output_audio_buffer.stopped')livePlayback.restoreVolume();
         onboardingVoice.current?.provider(e);
         turns.playback(e);
         saveCompletion.current?.event(e);
