@@ -534,7 +534,7 @@ for(const language of ['en','es'])test(`${language}: speech before a target prop
 for(const language of ['en','es'])test(`${language}: delivery v2 waits through an ordinary reply and then introduces completed research once`,async()=>{
  const clock=fakeClock();let audible=0;
  const f=fixture({...clock,researchDeliveryV2:true,getPlaybackVersion:()=>audible});
- f.receive({type:'session.input_transcript.delta',delta:language==='en'?'Can we discuss essays?':'¿Podemos hablar de los ensayos?'});await pause(0);
+ f.receive({type:'session.input_transcript.delta',delta:language==='en'?'While you check, can we discuss essays?':'Mientras investigas, ¿podemos hablar de los ensayos?'});await pause(0);
  f.channel.send(JSON.stringify({type:'origen.research.ready',jobId:'job',requestId:'request',revision:1,question:'Costs',result:{text:'The verified annual tuition is 12345 dollars.\nHousing is separate.'}}));
  clock.advance(1100);await pause(0);clock.advance(1000);await pause(0);
  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);

@@ -21,6 +21,39 @@ function fixture(){
  };
 }
 
+const topicRequests=[
+ ['en','What is the annual tuition?','Actually as for off, how do I transfer my course credits?',true],
+ ['en','When is the admissions application due?','How do I apply for financial aid?',true],
+ ['en','How much financial aid is available?','Can you help me choose a major?',true],
+ ['en','What are the transfer requirements?','How much is off-campus housing?',true],
+ ['en','What is the total budget?','How much is rent off campus?',false],
+ ['en','What scholarships are available?','While you check, how do I choose a major?',false],
+ ['en','What is tuition?','My daughter asked how do I start the application essay.',false],
+ ['en','How much is tuition?','How do scholarships affect tuition?',false],
+ ['es','¿Cuánto cuesta la matrícula?','Mejor cable, ¿cómo puedo convalidar mis créditos?',true],
+ ['es','¿Cuándo cierra la solicitud de admisión?','¿Cómo solicito ayuda financiera?',true],
+ ['es','¿Qué becas están disponibles?','¿Cómo elijo mi carrera?',true],
+ ['es','¿Cuáles son los requisitos de transferencia?','¿Cuánto cuesta la vivienda fuera del campus?',true],
+ ['es','¿Cuánto cuesta la vivienda?','¿Cuál es el alquiler fuera del campus?',false],
+ ['es','¿Cuándo cierra la solicitud de admisión?','Mientras investigas, ¿cómo elijo una carrera?',false],
+ ['es','¿Cuánto cuesta la matrícula?','Ella dijo cómo empiezo mi ensayo de admisión.',false],
+ ['es','¿Cuál es el costo de asistencia?','¿Cómo afectan las becas al costo total?',false],
+];
+for(const [language,previous,request,moved] of topicRequests){
+ test(`${language}: ${moved?'follows new request':'preserves pending research'} — ${request}`,()=>{
+  const f=fixture();
+  f.delivery.supersede('new_request',previous);
+  f.delivery.caller();
+  assert.equal(f.delivery.topicChanged(request),moved);
+  f.delivery.callerStopped(request);
+  assert.equal(f.delivery.topicChanged(),moved);
+  f.ready(language,{question:previous});
+  const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+  assert.equal(packets.some(p=>p.findingsWithheld===true),moved);
+  f.delivery.clear();
+ });
+}
+
 for(const [language,example]of Object.entries(correctedBudgetExamples)){
  const result={sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'partial',answer:example.finding.answer,qualification:example.finding.qualification,nextStep:'',findings:[example.finding]}};
  test(`${language}: a complete paraphrased total retires the optional announcement even with a rich subject`,()=>{

@@ -12,20 +12,34 @@ export {researchAnswerOverlap} from './researchDiscussion.mjs';
 // grader or proof the listener heard/understood the answer.
 const words=text=>String(text||'').replace(/\[\d+\]/gu,'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
 const evidenceText=text=>words(text).join(' ');
+const topicAreas=[
+ /\b(?:tuition|fees|budgets?|housing|rent|off campus|on campus|costs?|afford|net price|matricula|cuotas|presupuestos?|vivienda|alquiler|costos?|coste|precio neto)\b/u,
+ /\b(?:financial aid|fafsa|dream act|scholarships?|grants?|student loans?|ayuda financiera|becas?|subvenciones?|prestamos estudiantiles)\b/u,
+ /\b(?:essays?|personal statements?|personal insight questions?|piqs?|ensayos?|declaracion personal)\b/u,
+ /\b(?:admissions?|applications?|apply to|admision(?:es)?|solicitud(?:es)?|postular(?:me|se)?|inscripcion)\b/u,
+ /\b(?:credits?|course equivalenc\w*|articulation|transfer (?:courses?|classes?|requirements?)|creditos?|equivalencias?|convalid\w*|homolog\w*|requisitos de transferencia)\b/u,
+ /\b(?:majors?|career\w*|choose (?:a|my) college|college options|carreras?|especialidad(?:es)?|elegir (?:una|mi) universidad|opciones de universidades)\b/u,
+];
+const directRequest=/\b(?:how (?:do|does|can|could|should|would|much|many|long)|what (?:is|are|do|does|should|would|about)|which|when|where|why|(?:can|could|would) (?:you|we|i)|(?:help|tell|show) me|explain|i (?:want to|would like to|d like to|need help)|como|que (?:es|son|debo|puedo|necesito|opciones|requisitos)|cual(?:es)?|cuant[oa]s?|cuando|donde|por que|puedes|podrias|podemos|ayudame|dime|explicame|quisiera|quiero (?:saber|entender|hablar|empezar|escribir|solicitar))\b/u;
+const keepResearch=/\b(?:while you (?:check|look|search|research|investigate)|mientras (?:(?:lo |sigues )?(?:revisas|buscas|verificas|investigas)|se revisa))\b/u;
 function topicSwitch(text,previousQuestion){
  const request=evidenceText(text).replace(/^(?:(?:actually|okay|ok|well|bueno|bien|mejor|en realidad|ahora) )+/u,'');
+ if(keepResearch.test(request))return false;
  if(/^(?:different question|new topic|(?:(?:let s|can we|could we|i want to|i d like to) )?(?:switch|change) (?:topics?|the (?:topic|subject))|changing topics|otra pregunta|otro tema|cambiando de tema|(?:podemos |quiero |quisiera )?cambiar de tema|cambiemos de tema|pasemos a otro tema)\b/u.test(request))return true;
- // A complete request for writing help can survive a garbled transition cue.
- // Keep the inference narrow so a mention of an essay does not change topics.
- const writingRequest=/\b(?:(?:how (?:do|can|should) i|help me) (?:start|write|revise|edit) (?:my |an? |the )?(?:application |college |admissions )?essay|(?:como|ayudame a) (?:empiezo|comienzo|escribo|empezar|comenzar|escribir|revisar) (?:mi |un |el )?ensayo)\b/u;
- const oldRequest=evidenceText(previousQuestion);
- return writingRequest.test(request)&&!/\b(?:essay|essays|ensayo|ensayos)\b/u.test(oldRequest)&&
-  requestedResearchAspects(previousQuestion).some(aspect=>['total_budget','tuition_fees','housing'].includes(aspect))&&
-  !/\b(?:while you (?:check|look|search)|mientras (?:lo )?(?:revisas|buscas|verificas))\b/u.test(request);
+ const match=directRequest.exec(request);
+ if(!match)return false;
+ const lead=request.slice(0,match.index);
+ // Short transcription debris can precede a direct request. Reported speech
+ // and reflections can contain the same words without asking a new question.
+ if(words(lead).length>8||/\b(?:asked|said|told|wondered|mentioned|pregunto|pregunte|dijo|dije|menciono)\b/u.test(lead))return false;
+ const previous=evidenceText(primaryQuestion(previousQuestion));
+ const next=request.slice(match.index);
+ return topicAreas.some(area=>area.test(previous))&&topicAreas.some(area=>area.test(next))&&
+  !topicAreas.some(area=>area.test(previous)&&area.test(next));
 }
 function explanatoryFollowup(text){
  const request=evidenceText(text);
- return /\b(?:while you (?:check|look|search)|mientras (?:lo )?(?:revisas|buscas|verificas))\b/u.test(request)&&
+ return keepResearch.test(request)&&
   /\b(?:what|which|explain|que|cual|cuales|explicar|explicame)\b/u.test(request);
 }
 const sameFinding=(a,b)=>a.aspect===b.aspect&&(a.status==='unverified')===(b.status==='unverified')&&['subject','answer','qualification'].every(key=>evidenceText(a[key])===evidenceText(b[key]));
