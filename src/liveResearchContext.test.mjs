@@ -59,6 +59,15 @@ const cases={
  es:{subject:'UC Berkeley',aspect:'total_budget',status:'verified',answer:'Total fuera del campus en 2026–27: $44,000 [1].',qualification:'Estimación anual antes de ayuda; no es una factura [1].'},
 };
 for(const [language,finding] of Object.entries(cases)){
+ test(`${language}: a completed result can lead with the entire qualified finding before metadata`,()=>{
+  const packets=researchContextPackets(researchJob(finding),'test-ref',{leadWithFinding:true});
+  const [lead,state,provenance]=units(packets);
+  assert.equal(lead.unit,'finding');assert.equal(lead.taskState,'completed');
+  assert.equal(lead.answer,finding.answer);assert.equal(lead.qualification,finding.qualification);
+  assert.equal(state.unit,'state');assert.equal(provenance.unit,'source');
+  const pending=researchContextPackets(researchJob(finding,{researchPending:true}),'test-ref',{leadWithFinding:true});
+  assert.equal(units(pending)[0].unit,'state');
+ });
  test(`${language}: a fitting finding carries the full answer, year, scenario and qualification in one quiet unit`,()=>{
   const packets=researchContextPackets(researchJob(finding),'01234567-0123-0123-0123-012345678901');
   const direct=packets.map(p=>JSON.parse(p)).filter(p=>p.unit==='finding');

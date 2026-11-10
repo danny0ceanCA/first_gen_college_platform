@@ -35,7 +35,8 @@ for(const [language,example]of Object.entries(correctedBudgetExamples)){
   assert.equal(f.announcements().length,0);
   f.delivery.reply(language==='en'?'We can work through the costs together.':'Podemos entender los costos juntos.',{audible:true});
   f.quiet(true);f.advance(500);assert.equal(f.announcements().length,1);
-  const prompt=f.announcements()[0].content;assert.match(prompt,/Answer first with its year\/scenario, then the material caveat/);
+  const prompt=f.announcements()[0].content;assert.match(prompt,/Answer with all supplied conditions/);
+  assert.match(prompt,/State each caveat once or refer back to it/);
   assert.doesNotMatch(prompt,/unverified part first/);assert.ok(Buffer.byteLength(prompt)<=480);
   const evidence=decodedResearchContext(f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
   assert.ok(JSON.stringify(evidence).includes(example.finding.qualification));
@@ -60,6 +61,25 @@ for(const [language,example]of Object.entries(correctedBudgetExamples)){
 
 for(const language of ['en','es']){
  const x=examples[language];
+ test(`${language}: topic changes before or during completion send only state, with no announcement`,()=>{
+  const phrases=language==='en'?['Different question. Can we talk about essays?','Actually, let’s switch topics. Can we talk about the application essay?']:
+   ['Otra pregunta. ¿Podemos hablar de los ensayos?','Mejor cambiemos de tema. ¿Podemos hablar del ensayo de admisión?'];
+  for(const phrase of phrases)for(const stillSpeaking of [false,true]){
+   const f=fixture();f.delivery.supersede('new_request','Tuition');f.delivery.caller();
+   if(!stillSpeaking)f.delivery.callerStopped(phrase);
+   f.ready(language,{},stillSpeaking?{awaitingReply:true,pendingCallerText:phrase}:undefined);
+   f.ack();f.advance(10000);
+   const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+   assert.deepEqual(packets.map(p=>p.unit),['state']);
+   assert.equal(packets[0].taskState,'completed');
+   assert.equal(f.announcements().length,0);
+   assert.ok(f.events.some(e=>e.deliveryReason==='different_requested_portion'));
+   f.delivery.supersede('new_request','Tuition for a new school');f.ready(language,{jobId:'new-job',requestId:'new-request'});
+   f.delivery.reply(x.reply,{audible:true});f.ack();f.advance(500);
+   assert.equal(f.announcements().length,1);
+   f.delivery.clear();
+  }
+ });
  test(`${language}: caller speech and an unrelated reply postpone, then release one research contribution`,()=>{
   const f=fixture();f.ready(language);f.ack();f.delivery.caller();f.advance(5000);assert.equal(f.announcements().length,0);
   f.delivery.reply(x.ack,{audible:true});f.advance(1000);assert.equal(f.announcements().length,0);
@@ -138,6 +158,31 @@ test('overlap does not infer success from topic words, progress promises, or a d
  assert.equal(researchAnswerOverlap(answer,answer.replace('12345','99999')),false);
  assert.equal(researchAnswerOverlap(answer,answer),true);
  assert.equal(researchAnswerOverlap(answer,examples.en.qualification),false);
+});
+for(const [language,example] of Object.entries({
+ en:{
+  answer:'For Eastview College, the 2027–28 off-campus budget is $13,647 before financial aid. [1]',
+  caveat:'It is a planning estimate, not a bill. [1]',
+  spoken:'For Eastview College, the twenty twenty-seven to twenty twenty-eight off-campus budget is thirteen thousand six hundred forty seven dollars, before financial aid and that is a planning estimate, not a bill.',
+  differentYear:text=>text.replace('twenty twenty-eight','twenty twenty-nine'),
+  differentAmount:text=>text.replace('forty seven','forty nine'),
+ },
+ es:{
+  answer:'En Eastview College, el presupuesto de 2027–28 fuera del campus es de $13,647 antes de la ayuda financiera. [1]',
+  caveat:'Es una estimación para planificar, no una factura. [1]',
+  spoken:'En Eastview College, la estimación para vivir fuera del campus en 2027–28 es de 13 mil 647 dólares antes de la ayuda financiera, y es una guía para planificar, no una factura.',
+  differentYear:text=>text.replace('2027–28','2028–29'),
+  differentAmount:text=>text.replace('13 mil 647','13 mil 649'),
+ },
+}))test(`${language}: native number formatting and an attached caveat do not queue a duplicate announcement`,()=>{
+ const finding={subject:'Eastview College',aspect:'total_budget',status:'verified',answer:example.answer,qualification:example.caveat};
+ const result={sources:[{url:'https://example.edu/costs'}],voiceBrief:{...finding,nextStep:'',findings:[finding]}};
+ for(const [spoken,shouldAnnounce] of [[example.spoken,false],[example.differentYear(example.spoken),true],[example.differentAmount(example.spoken),true]]){
+  const f=fixture();f.ready(language,{question:example.answer,result},{awaitingReply:true});f.ack();
+  f.delivery.reply(spoken,{audible:true});f.advance(1000);
+  assert.equal(f.announcements().length,Number(shouldAnnounce));
+  f.delivery.clear();
+ }
 });
 test('private delivery diagnostics retain correlation and stage without copied content',()=>{
  const payload=capturePayload({type:'origen.research.delivery',jobId:'job',revision:1,deliveryStage:'deferred',deliveryReason:'caller_turn',durationMs:123,question:'PRIVATE',text:'PRIVATE'});

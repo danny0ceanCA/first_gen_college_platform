@@ -62,7 +62,11 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
   assert.match(speech,/State only qualifications supported by the findings/);
   assert.match(speech,/different amounts alone do not establish different inclusions or rules/);
   assert.match(speech,/A changed scenario outside its searched question is not researched, not searched-and-unverified/);
-  assert.match(speech,/Lead with the useful answer to the latest question, keeping its year and scenario/);
+  assert.match(speech,/lead with the useful fact and its year\/scenario/);
+  assert.match(speech,/finish a useful answer to the caller's question first/);
+  assert.match(speech,/Give any material caveat once, in the same thought as the result/);
+  assert.match(speech,/Keep all conditions that change its meaning/);
+  assert.match(speech,/If they explicitly changed topics, leave the old result/);
   assert.match(speech,/A rejected replacement or reading an old report performs no search/);
   assert.match(speech,/Answer the latest question first using relevant verified findings/);
   assert.match(speech,/simple comparison or calculation when their year and scenario support it/);

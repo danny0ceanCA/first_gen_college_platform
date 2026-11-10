@@ -11,6 +11,10 @@ export {researchAnswerOverlap} from './researchDiscussion.mjs';
 // grader or proof the listener heard/understood the answer.
 const words=text=>String(text||'').replace(/\[\d+\]/gu,'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
 const evidenceText=text=>words(text).join(' ');
+function topicSwitch(text){
+ const request=evidenceText(text).replace(/^(?:(?:actually|okay|ok|well|bueno|bien|mejor|en realidad|ahora) )+/u,'');
+ return /^(?:different question|new topic|(?:(?:let s|can we|could we|i want to|i d like to) )?(?:switch|change) (?:topics?|the (?:topic|subject))|changing topics|otra pregunta|otro tema|cambiando de tema|(?:podemos |quiero |quisiera )?cambiar de tema|cambiemos de tema|pasemos a otro tema)\b/u.test(request);
+}
 const sameFinding=(a,b)=>a.aspect===b.aspect&&(a.status==='unverified')===(b.status==='unverified')&&['subject','answer','qualification'].every(key=>evidenceText(a[key])===evidenceText(b[key]));
 // Speech dedup tolerates paraphrases and citation renumbering. Transport reuse
 // must also preserve exact status and provenance for later answers/citations.
@@ -46,7 +50,8 @@ const firstFinding=(job,remaining)=>[...remaining].sort((a,b)=>(job.researchPend
 function commentaryContent(job,remaining){
  const state=job.failed?'The source check failed. No verified findings are available.':job.researchPending?'Initial sourced findings; recovery is running.':'Completed research; this check has ended. Do not say still checking.';
  const limitations=!job.researchPending&&remaining.some(f=>f.status==='unverified');
- const direction=(limitations?' Explain the requested gap, then useful verified context.':' Answer first with its year/scenario, then the material caveat.')+' At a pause; be brief and yield to speech.';
+ const direction=limitations?' Explain the requested gap, then useful verified context. Yield to the caller.':
+  ' Answer with all supplied conditions. State each caveat once or refer back to it. Yield to the caller.';
  const first=firstFinding(job,remaining);
  // Prefer the complete focused finding, including its subject and qualification,
  // over an opaque report ID. Never cut off a caveat to meet the append limit.
@@ -61,7 +66,7 @@ function commentaryContent(job,remaining){
 }
 
 export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=setTimeout,cancel=clearTimeout,id=()=>globalThis.crypto.randomUUID()}){
- const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',focus=[],acceptedCallerTurns=[];const callerTurns=[];
+ const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',focus=[],acceptedCallerTurns=[],topicMoved=false;const callerTurns=[];
  const stage=(job,deliveryStage,deliveryReason)=>emit({type:'origen.research.delivery',jobId:job?.jobId,requestId:job?.requestId,revision:job?.revision,
   evidenceVersion:job?.evidenceVersion,researchPending:job?.researchPending,deliveryStage,deliveryReason,durationMs:job?now()-job.suppliedAt:0});
  const legacy=(job,type,extra={})=>emit({type,jobId:job.jobId,requestId:job.requestId,revision:job.revision,evidenceVersion:job.evidenceVersion,researchPending:job.researchPending,...extra});
@@ -97,6 +102,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
   if(!job.acknowledged&&now()-job.suppliedAt>=30000){
    legacy(job,'origen.research.context_failed',{reason:'acknowledgment_timeout'});retire(job,'delivery_unconfirmed','context_timeout');return;
   }
+  if(topicMoved&&job.acknowledged){retire(job,'deferred','different_requested_portion');return;}
   if(job.quietOnly&&job.acknowledged){retire(job,'deferred','recovery_context_only');return;}
   if(job.requestedAt!==undefined){
    if(now()-job.requestedAt>=30000){retire(job,'delivery_unconfirmed','speech_not_observed');return;}
@@ -129,7 +135,15 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
  }
  function wake(){stopTimer();if(current)timer=schedule(tick,250);}
  return {
-  ready(event,{awaitingReply=false}={}){
+  hasPendingAnswer(){
+   const job=current;
+   if(topicMoved||!job||job.terminal||!job.acknowledged||job.quietOnly||job.failed||job.researchPending||
+    job.requestedAt!==undefined||now()-job.suppliedAt>=120000)return false;
+   const finding=firstFinding(job,relevant(job).filter(item=>!job.discussed.has(item)));
+   return finding?.status==='verified'&&!!finding.findingId;
+  },
+  ready(event,{awaitingReply=false,pendingCallerText=''}={}){
+   if(topicSwitch(pendingCallerText))topicMoved=true;
    // Server-issued IDs are untrusted reference values, never prompt syntax.
    const key=event.jobId||event.requestId||id(),evidenceVersion=event.evidenceVersion||event.result?.evidenceVersion||1;
    const previous=[...records.values()].reverse().find(j=>j.key===key&&j.requestId===event.requestId&&j.revision===event.revision);
@@ -164,7 +178,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    if(records.size>64)records.delete(records.keys().next().value);
    // Only acknowledged evidence can be reused. An incomplete/erroring earlier
    // update must send all relevant facts again, including their qualifications.
-   const selected=selectedResearchContextFindings(relevant(job),job.researchPending).map(finding=>{
+   const selected=selectedResearchContextFindings(topicMoved?[]:relevant(job),job.researchPending).map(finding=>{
     const contextSources=job.selection.sources.filter((source,index)=>finding.sourceIds.includes(source.id??index+1));
     const prior=previous?.contextFindings?.find(old=>sameContextFinding(old,{...finding,contextSources}));
     // Stable opaque finding references let a bounded commentary point to one
@@ -177,8 +191,9 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    job.contextFindings=previous?.acknowledged
     ? [...(previous.contextFindings||[]).filter(old=>!selected.some(f=>f.subject===old.subject&&f.aspect===old.aspect)),...selected]
     : selected;
-   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,
-    priorityFindings:job.selection.findings?.length?changed:undefined,
+   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,leadWithFinding:!waitingForReply,
+    // Retain old facts in the report without feeding them into the new topic.
+    priorityFindings:topicMoved||job.selection.findings?.length?changed:undefined,
     unchangedEvidenceFrom:previous?.acknowledged&&previous.contextFindings?.length?previous.referenceId:undefined});
    if(changed.length<selected.length)stage(job,'repeat_suppressed','unchanged_context');
    for(const content of packets){const event_id=id();job.pending++;acks.set(event_id,{job,kind:'context'});send({type:'session.thinking.append',event_id,delegation_id:null,content});}
@@ -204,6 +219,10 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    defer(current,'caller_turn');wake();
   },
   callerStopped(text=''){
+   if(topicSwitch(text)){
+    topicMoved=true;
+    retire(current,'deferred','different_requested_portion');
+   }
    if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=requestedResearchAspects(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
    if(waitingForReply){replyDeadline=now()+3000;wake();}
   },
@@ -252,11 +271,12 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
   traceContext(){return current?{jobId:current.jobId,requestId:current.requestId,revision:current.revision}:{};},
   supersede(reason='new_request',question='') {
    if(current)retire(current,'superseded',reason);
+   topicMoved=false;
    // A new task may concern an entirely different aspect. Preserve focus only
    // within a request; tuition from a previous check must not hide course work.
    acceptedCallerTurns=reason==='new_request'?[...callerTurns]:[];
    focus=requestedResearchAspects(primaryQuestion(question));latestQuestion='';callerTurns.length=0;
   },
-  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';focus=[];acceptedCallerTurns=[];callerTurns.length=0;},
+  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';focus=[];acceptedCallerTurns=[];callerTurns.length=0;topicMoved=false;},
  };
 }

@@ -55,8 +55,12 @@ const stop=new Set(('a an the is are was were be been being for of at in on to a
 const stem=word=>word.length>6&&word.endsWith('ly')?word.slice(0,-2):word.length>8&&word.endsWith('mente')?word.slice(0,-5):word.length>4&&word.endsWith('s')?word.slice(0,-1):word;
 function tokens(text){
  let plain=fold(text).replace(/\[\d+\]/gu,'').toLowerCase();
- // Academic-year shorthand: 2026–27 and spoken/transcribed "2026 and '27".
- plain=plain.replace(/\b(20\d{2})\s*(?:[-–—/]|(?:and|y)\s*['’]?)\s*(\d{2})\b/gu,(_,year,end)=>`${year} ${year.slice(0,2)+end}`);
+ // Live may transcribe each half of an academic year in words, and combine
+ // digit groups with a spoken thousands separator (e.g. "13 mil 647").
+ plain=plain.replace(/\btwenty[ -]+(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[ -]+(one|two|three|four|five|six|seven|eight|nine))?\b/gu,
+  (_,ten,one)=>String(2000+tens[ten]+(units[one]??0)));
+ plain=plain.replace(/\b(20\d{2})\s*(?:[-–—/]|(?:and|y|to|through|a)\s+['’]?)\s*(\d{2})\b/gu,(_,year,end)=>`${year} ${year.slice(0,2)+end}`);
+ plain=plain.replace(/\b(\d{1,3})\s+(?:thousand|mil)\s+(\d{1,3})(?!\d)\b/gu,(_,thousands,remainder)=>String(Number(thousands)*1000+Number(remainder)));
  // Both 49,692 and 49.692 are grouped whole numbers. Decimal values remain
  // distinct tokens, so an unrecognized rendering cannot count as a match.
  plain=plain.replace(/\b\d{1,3}(?:[,.]\d{3})+(?!\d)/gu,n=>n.replace(/[,.]/gu,''));

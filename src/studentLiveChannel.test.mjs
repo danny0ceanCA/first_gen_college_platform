@@ -7,7 +7,61 @@ import {capturePayload} from './voiceCapture.mjs';
 import {voiceTargetResult} from './voiceTargetResult.mjs';
 import {selectionRecoveryDelayMs,selectionRecoveryStartDeadlineMs} from './liveSelectionRecovery.mjs';
 import {decodedResearchContext} from './researchContext.fixture.mjs';
+import {correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+for(const [language,example] of Object.entries(correctedBudgetExamples)){
+ const ready={type:'origen.research.ready',jobId:'quiet-job',question:example.question,result:{
+  sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'verified',answer:example.finding.answer,
+   qualification:example.finding.qualification,nextStep:'',findings:[{...example.finding,status:'verified'}]},
+ }};
+ test(`${language}: a verified result uses the confirmed playback pause without a second silence wait`,async()=>{
+  const clock=fakeClock();let idle=false,version=0;
+  const f=fixture({...clock,researchDeliveryV2:true,isPlaybackIdle:()=>idle,getPlaybackVersion:()=>version});
+  try{
+   f.receive({type:'session.input_transcript.delta',delta:language==='en'?'What does an off-campus budget cover?':'¿Qué incluye un presupuesto fuera del campus?'});
+   await pause(0);
+   version=1;
+   f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Housing and meals are usually included.':'Suele incluir vivienda y comida.'});
+   await pause(0);
+   f.channel.send(JSON.stringify(ready));await pause(0);
+   clock.advance(1100);await pause(0);clock.advance(500);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+   idle=true;clock.advance(200);await pause(0);clock.advance(250);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+  }finally{f.channel.close();}
+ });
+ test(`${language}: a playback boundary releases research after a complete thought without transcript punctuation`,async()=>{
+  const clock=fakeClock();let idle=false;
+  const f=fixture({...clock,researchDeliveryV2:true,isPlaybackIdle:()=>idle});
+  try{
+   f.receive({type:'session.output_transcript.delta',delta:language==='en'?'We can take this one step at a time':'Podemos entenderlo paso a paso'});await pause(0);
+   f.channel.send(JSON.stringify(ready));await pause(0);
+   clock.advance(5000);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+   idle=true;clock.advance(250);await pause(0);clock.advance(250);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+   clock.advance(5000);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,1);
+  }finally{f.channel.close();}
+ });
+ test(`${language}: a ready verified answer gets the turn ahead of reply recovery with Decisions off`,async()=>{
+  const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true,canRecoverReply:()=>true});
+  try{
+   f.receive({type:'session.output_transcript.delta',delta:language==='en'?'Do you want to talk through those housing costs?':'¿Quieres que te explique los gastos de vivienda?'});await pause(0);
+   clock.advance(1800);await pause(0);
+   await selectionQuiet(f,clock,language==='en'?'Sure.':'Sí.');
+   f.channel.send(JSON.stringify(ready));await pause(0);
+   clock.advance(950);await pause(0);
+   assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+   clock.advance(2050);await pause(0);
+   const appends=f.sent.filter(e=>e.type==='session.commentary.append');
+   assert.equal(appends.length,1);
+   assert.match(appends[0].content,/Completed research/);
+   assert.ok(!f.events.some(e=>e.type==='origen.reply.recovery'));
+  }finally{f.channel.close();}
+ });
+}
 
 for(const [prompt,reply] of [
  ['Do you want to talk through those housing costs?','Sure.'],

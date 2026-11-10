@@ -8,6 +8,8 @@ import {researchSpeechObservation} from './researchSpeechObservation.mjs';
 import {liveSelectionRecovery} from './liveSelectionRecovery.mjs';
 export const liveChannelRevision='bounded-reply-recovery-2026-11-09';
 export const liveBackendDeadlineMs=25000;
+const trailingClause=/(?:[,;:…—–-]|\.{2,}|\b(?:and|or|but|because|then|the|to|with|y|o|pero|porque|entonces|el|la|de|con))\s*$/iu;
+const openQuestion=/(?:[?？]["”’')]*|(?:^|[.!。]\s+|¿)(?:do you|would you|can you|what|which|how|quieres|te gustar[ií]a|qu[eé]|cu[aá]l|c[oó]mo)\b[^.!?。！？]*)\s*$/iu;
 export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false,canRecoverReply=()=>false,classifyReply}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',turnItemId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
@@ -35,8 +37,9 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    busy:!!(responses.size||pendingDelegations.size||toolHandlers||updates.size||continuation||continuationRequested)})});
  const selectionDelivery=liveSelectionDelivery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel});
  const deliveryTracker=researchDelivery({send:transmit,emit:event=>void emit(event),now,schedule,cancel,id,
-  canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&now()-replyRequestedAt>4000&&
-   (!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))&&quietBoundary(/[?？]["”’')]*\s*$/u.test(lastOutputText)?6000:600)});
+  canAnnounce:()=>!closed&&!ending&&!responses.size&&!pendingDelegations.size&&!toolHandlers&&!updates.size&&
+   !continuation&&now()-replyRequestedAt>4000&&!trailingClause.test(lastOutputText)&&
+   quietBoundary(lastOutputAt>lastInput&&openQuestion.test(lastOutputText.trim())?3000:600)});
  function clearBackendTimers(){for(const response of responses.values())cancel(response.timer);responses.clear();}
  async function expireBackend(responseId){
   const response=responses.get(responseId);if(closed||!response)return;
@@ -152,8 +155,10 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   const check=async()=>{
    if(!current()||now()>deadline){clearReply();return;}
    if(!quiet()){replyTimer=schedule(()=>void check(),200);return;}
+   if(researchDeliveryV2&&deliveryTracker.hasPendingAnswer()){clearReply();return;}
    const action=direct?'continue':await classifyReply({prompt,reply,language:session.language}).catch(()=>null);
-   if(!current()||!quiet()||now()>deadline||!['continue','clarify'].includes(action))return;
+   if(!current()||!quiet()||now()>deadline||!['continue','clarify'].includes(action)||
+    researchDeliveryV2&&deliveryTracker.hasPendingAnswer())return;
    replyPrompt=null;
    replyRequestedAt=now();
    const content=action==='clarify'
@@ -189,6 +194,9 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   if(!force&&!isPlaybackIdle()){outputTimer=schedule(()=>void finishSpeech(),250);return;}
   const response_id=outputId,text=output,metadata=outputMetadata;outputId='';output='';outputMetadata={};
   const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
+  // Playback already confirmed silence for this version. New audio still
+  // restarts the research boundary check through quietBoundary.
+  if(researchDeliveryV2&&audible&&!force)lastSoundVersion=lastAudibleVersion;
   const observation=researchDeliveryV2?speechObservation.finish({forced:force,playbackObserved:audible}):null;
   if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
@@ -371,7 +379,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    if(ending)return;
    if(researchState?.jobId&&event.jobId&&researchState.jobId!==event.jobId)return;
    if(event.revision!==undefined&&researchState?.revision!==undefined&&event.revision!==researchState.revision)return;
-   if(researchDeliveryV2){deliveryTracker.ready(event,{awaitingReply:!!inputId||!!recentInput&&!repliedSinceInput});return;}
+   if(researchDeliveryV2){deliveryTracker.ready(event,{awaitingReply:!!inputId||!!recentInput&&!repliedSinceInput,pendingCallerText:input});return;}
    const delivery=supplyResearch(event);if(delivery.announced||delivery.quietOnly)return;
    researchReady=delivery;cancel(researchTimer);researchTimer=schedule(checkResearch,250);return;
   }

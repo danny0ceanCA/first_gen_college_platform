@@ -58,7 +58,7 @@ export function selectedResearchContextFindings(findings,researchPending){
  return [...findings].sort((a,b)=>(researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified'))).slice(0,3);
 }
 
-export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings,unchangedEvidenceFrom}={}){
+export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings,unchangedEvidenceFrom,leadWithFinding=false}={}){
  const original=job.result||{},result=researchBriefSelection(original);
  const researchPending=job.researchPending??original.researchPending??false;
  const taskState=original.status==='research_failed'?'failed':researchPending?'running':'completed';
@@ -74,13 +74,20 @@ export function researchContextPackets(job,resultId,{completedState=false,focus=
    taskState,researchPending,evidenceVersion,...(original.recoveryUnavailable?{recoveryUnavailable:true}:{}),
    focus,...(unchangedEvidenceFrom?{unchangedEvidenceFrom}:{}),remainingFindings:Math.max(0,(result.findings?.length||0)-findings.length),
    verification:result.verification,detailAvailable:true,evidenceFormat:result.evidenceFormat};
+  const findingPackets=(finding,index,withState=false)=>researchUnitPackets(resultId,evidenceVersion,'finding',{
+   ...(finding.findingId?{findingId:finding.findingId}:{}),
+   ...(withState?{taskState}:{}),
+   subject:finding.subject,aspect:finding.aspect,status:finding.status,
+   answer:finding.answer,qualification:finding.qualification,sourceIds:finding.sourceIds,
+  },`finding-${index+1}`);
+  // Put the answer, qualification and completion together before ancillary
+  // metadata. Keep the original order if the lead finding needs multiple parts.
+  const lead=leadWithFinding&&taskState==='completed'&&findings[0]?.status==='verified'?findingPackets(findings[0],0,true):[];
+  const leadFits=lead.length===1;
   return [
+   ...(leadFits?lead:[]),
    ...researchUnitPackets(resultId,evidenceVersion,'state',state,'state'),
-   ...findings.flatMap((finding,index)=>researchUnitPackets(resultId,evidenceVersion,'finding',{
-    ...(finding.findingId?{findingId:finding.findingId}:{}),
-    subject:finding.subject,aspect:finding.aspect,status:finding.status,
-    answer:finding.answer,qualification:finding.qualification,sourceIds:finding.sourceIds,
-   },`finding-${index+1}`)),
+   ...findings.flatMap((finding,index)=>leadFits&&index===0?[]:findingPackets(finding,index)),
    ...result.sources.flatMap((source,index)=>ids.has(source.id??index+1)?researchUnitPackets(resultId,evidenceVersion,'source',{
     id:source.id??index+1,title:source.title,url:source.url,
    },`source-${source.id??index+1}`):[]),
