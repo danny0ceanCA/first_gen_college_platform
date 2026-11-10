@@ -64,6 +64,9 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
   assert.match(speech,/A changed scenario outside its searched question is not researched, not searched-and-unverified/);
   assert.match(speech,/lead with the useful fact and its year\/scenario/);
   assert.match(speech,/finish a useful answer to the caller's question first/);
+  assert.match(speech,/begin with a direct answer to the caller's newest question, even if an earlier result arrives before or during your reply/);
+  assert.match(speech,/Give the categories before sharing the campus result/);
+  assert.match(speech,/distinguish typical expenses from verified campus-specific inclusions/);
   assert.match(speech,/Give any material caveat once, in the same thought as the result/);
   assert.match(speech,/Keep all conditions that change its meaning/);
   assert.match(speech,/If they explicitly changed topics, leave the old result/);
