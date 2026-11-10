@@ -135,6 +135,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
  }
  function wake(){stopTimer();if(current)timer=schedule(tick,250);}
  return {
+  topicChanged(pendingCallerText){return topicMoved||topicSwitch(pendingCallerText);},
   hasPendingAnswer(){
    const job=current;
    if(topicMoved||!job||job.terminal||!job.acknowledged||job.quietOnly||job.failed||job.researchPending||
@@ -191,7 +192,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    job.contextFindings=previous?.acknowledged
     ? [...(previous.contextFindings||[]).filter(old=>!selected.some(f=>f.subject===old.subject&&f.aspect===old.aspect)),...selected]
     : selected;
-   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,leadWithFinding:!waitingForReply,
+   const packets=researchContextPackets(event,job.referenceId,{completedState:true,focus,leadWithFinding:!waitingForReply,topicChanged:topicMoved,
     // Retain old facts in the report without feeding them into the new topic.
     priorityFindings:topicMoved||job.selection.findings?.length?changed:undefined,
     unchangedEvidenceFrom:previous?.acknowledged&&previous.contextFindings?.length?previous.referenceId:undefined});

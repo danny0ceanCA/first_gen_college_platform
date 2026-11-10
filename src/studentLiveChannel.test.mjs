@@ -11,6 +11,22 @@ import {correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 for(const [language,example] of Object.entries(correctedBudgetExamples)){
+ test(`${language}: a worker status update follows the caller's explicit topic change`,async()=>{
+  const clock=fakeClock(),f=fixture({...clock,researchDeliveryV2:true});
+  try{
+   const request={requestId:'old-request',jobId:'old-job',revision:1,state:'running',question:example.question};
+   f.channel.send(JSON.stringify({type:'origen.research.state',request}));
+   f.receive({type:'session.input_transcript.delta',delta:language==='en'?"Actually, let's switch topics.":"Mejor cambiemos de tema."});
+   await pause(0);
+   f.sent.length=0;
+   f.channel.send(JSON.stringify({type:'origen.research.state',request:{...request,state:'completed'}}));
+   const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+   assert.equal(decodedResearchContext(packets).deliveryDisposition,'caller_changed_topic');
+   const backend=f.sent.find(e=>e.type==='response.item.create');
+   assert.match(backend.item.content[0].text,/caller_changed_topic/);
+   assert.equal(f.sent.some(e=>e.type==='session.commentary.append'),false);
+  }finally{f.channel.close();}
+ });
  const ready={type:'origen.research.ready',jobId:'quiet-job',question:example.question,result:{
   sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'verified',answer:example.finding.answer,
    qualification:example.finding.qualification,nextStep:'',findings:[{...example.finding,status:'verified'}]},

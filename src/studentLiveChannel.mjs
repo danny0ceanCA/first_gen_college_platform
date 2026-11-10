@@ -389,6 +389,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    researchState=event.request;
    if(changed){
     const snapshot=researchDeliveryV2?researchStateContext(researchState):{...researchState,elapsedMs:undefined};
+    if(researchDeliveryV2&&deliveryTracker.topicChanged(input))snapshot.deliveryDisposition='caller_changed_topic';
     quietContext('research-state',researchState?.requestId||'current',snapshot);
     // Live's quiet context and the managed Responses conversation are separate.
     // Retire its old pending tool receipt as well, without starting generation,

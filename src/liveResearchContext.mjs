@@ -58,7 +58,7 @@ export function selectedResearchContextFindings(findings,researchPending){
  return [...findings].sort((a,b)=>(researchPending?-1:1)*(Number(b.status==='unverified')-Number(a.status==='unverified'))).slice(0,3);
 }
 
-export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings,unchangedEvidenceFrom,leadWithFinding=false}={}){
+export function researchContextPackets(job,resultId,{completedState=false,focus=[],priorityFindings,unchangedEvidenceFrom,leadWithFinding=false,topicChanged=false}={}){
  const original=job.result||{},result=researchBriefSelection(original);
  const researchPending=job.researchPending??original.researchPending??false;
  const taskState=original.status==='research_failed'?'failed':researchPending?'running':'completed';
@@ -72,6 +72,7 @@ export function researchContextPackets(job,resultId,{completedState=false,focus=
   const ids=new Set(findings.flatMap(f=>f.sourceIds));
   const state={checkedAt:result.checkedAt,status:original.status,
    taskState,researchPending,evidenceVersion,...(original.recoveryUnavailable?{recoveryUnavailable:true}:{}),
+   ...(topicChanged?{deliveryDisposition:'caller_changed_topic',findingsWithheld:true}:{}),
    focus,...(unchangedEvidenceFrom?{unchangedEvidenceFrom}:{}),remainingFindings:Math.max(0,(result.findings?.length||0)-findings.length),
    verification:result.verification,detailAvailable:true,evidenceFormat:result.evidenceFormat};
   const findingPackets=(finding,index,withState=false)=>researchUnitPackets(resultId,evidenceVersion,'finding',{

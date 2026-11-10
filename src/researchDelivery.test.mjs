@@ -72,6 +72,8 @@ for(const language of ['en','es']){
    const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
    assert.deepEqual(packets.map(p=>p.unit),['state']);
    assert.equal(packets[0].taskState,'completed');
+   assert.equal(packets[0].deliveryDisposition,'caller_changed_topic');
+   assert.equal(packets[0].findingsWithheld,true);
    assert.equal(f.announcements().length,0);
    assert.ok(f.events.some(e=>e.deliveryReason==='different_requested_portion'));
    f.delivery.supersede('new_request','Tuition for a new school');f.ready(language,{jobId:'new-job',requestId:'new-request'});
