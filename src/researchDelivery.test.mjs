@@ -62,8 +62,8 @@ for(const [language,example]of Object.entries(correctedBudgetExamples)){
 for(const language of ['en','es']){
  const x=examples[language];
  test(`${language}: topic changes before or during completion send only state, with no announcement`,()=>{
-  const phrases=language==='en'?['Different question. Can we talk about essays?','Actually, let’s switch topics. Can we talk about the application essay?']:
-   ['Otra pregunta. ¿Podemos hablar de los ensayos?','Mejor cambiemos de tema. ¿Podemos hablar del ensayo de admisión?'];
+  const phrases=language==='en'?['Different question. Can we talk about essays?','Actually, let’s switch topics. Can we talk about the application essay?','actually as for off How do I start my application essay']:
+   ['Otra pregunta. ¿Podemos hablar de los ensayos?','Mejor cambiemos de tema. ¿Podemos hablar del ensayo de admisión?','mejor cable Cómo empiezo mi ensayo de admisión'];
   for(const phrase of phrases)for(const stillSpeaking of [false,true]){
    const f=fixture();f.delivery.supersede('new_request','Tuition');f.delivery.caller();
    if(!stillSpeaking)f.delivery.callerStopped(phrase);
@@ -81,6 +81,21 @@ for(const language of ['en','es']){
    assert.equal(f.announcements().length,1);
    f.delivery.clear();
   }
+ });
+ test(`${language}: background findings wait while the caller's explanatory answer finishes`,()=>{
+  const f=fixture(),question=language==='en'?'While you check, what does that budget usually include?':'Mientras lo revisas, ¿qué suele incluir ese presupuesto?';
+  f.delivery.caller();f.delivery.callerStopped(question);f.quiet(false);
+  f.ready(language);
+  f.advance(4000);
+  assert.equal(f.sent.length,0);
+  f.delivery.caller();f.delivery.callerStopped(x.ack);
+  f.advance(1000);
+  assert.equal(f.sent.length,0);
+  f.delivery.reply(x.reply,{audible:true});f.quiet(true);
+  f.advance(500);f.ack();f.advance(500);
+  assert.equal(f.announcements().length,1);
+  assert.ok(f.sent.some(e=>e.type==='session.thinking.append'));
+  f.delivery.clear();
  });
  test(`${language}: caller speech and an unrelated reply postpone, then release one research contribution`,()=>{
   const f=fixture();f.ready(language);f.ack();f.delivery.caller();f.advance(5000);assert.equal(f.announcements().length,0);

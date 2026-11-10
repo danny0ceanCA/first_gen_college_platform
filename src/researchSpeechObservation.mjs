@@ -3,6 +3,7 @@
 // a person heard a fact or changes audio playback / the conversational floor.
 const acknowledgment=/^(?:(?:yes|yeah|yep|yup|okay|ok|right|sure|uh huh|mhm|mm hmm|mm|hmm|i see|got it|thanks|thank you|si|claro|vale|entiendo|entiendo gracias|ya veo|de acuerdo|gracias|aha|aja)(?:\s+|$)){1,4}$/u;
 const fold=text=>String(text||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+export const isResearchAcknowledgment=text=>!/[?¿？]/u.test(text)&&acknowledgment.test(fold(text));
 const timed=value=>Number.isFinite(value)&&value>=0;
 function interval(event){return timed(event.start_ms)&&timed(event.end_ms)&&event.end_ms>=event.start_ms?{start:event.start_ms,end:event.end_ms}:null;}
 function portions(text){
@@ -37,7 +38,7 @@ export function researchSpeechObservation(){
  function callerStopped(){if(active){active.finished=true;active.resume=text.length;active=null;}}
  function finish({forced=false,playbackObserved=false}={}){
   const snapshot=text,groups=overlaps.map(group=>{
-   const ack=group.finished&&!/[?¿？]/u.test(group.text)&&acknowledgment.test(fold(group.text));
+   const ack=group.finished&&isResearchAcknowledgment(group.text);
    // The grouping timer can still be open after native speech actually ended.
    // Fully timed, disjoint turns are sequential, not evidence of an overlap.
    const sequential=group.time&&fragments.length&&fragments.every(fragment=>fragment.time)&&

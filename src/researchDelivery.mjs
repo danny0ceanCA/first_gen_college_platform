@@ -3,6 +3,7 @@ import {researchBriefSelection} from './researchBrief.mjs';
 import {researchAnswerOverlap,researchLimitationOverlap,researchPortionObserved,researchScopeCompatible} from './researchDiscussion.mjs';
 import {focusedResearchFindings,findingSubjectMentioned} from './researchFindings.mjs';
 import {requestedResearchAspects} from './researchQuestion.mjs';
+import {isResearchAcknowledgment} from './researchSpeechObservation.mjs';
 export {researchAnswerOverlap} from './researchDiscussion.mjs';
 
 // A delivery opportunity is separate from a completed job. This controller never
@@ -11,9 +12,21 @@ export {researchAnswerOverlap} from './researchDiscussion.mjs';
 // grader or proof the listener heard/understood the answer.
 const words=text=>String(text||'').replace(/\[\d+\]/gu,'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
 const evidenceText=text=>words(text).join(' ');
-function topicSwitch(text){
+function topicSwitch(text,previousQuestion){
  const request=evidenceText(text).replace(/^(?:(?:actually|okay|ok|well|bueno|bien|mejor|en realidad|ahora) )+/u,'');
- return /^(?:different question|new topic|(?:(?:let s|can we|could we|i want to|i d like to) )?(?:switch|change) (?:topics?|the (?:topic|subject))|changing topics|otra pregunta|otro tema|cambiando de tema|(?:podemos |quiero |quisiera )?cambiar de tema|cambiemos de tema|pasemos a otro tema)\b/u.test(request);
+ if(/^(?:different question|new topic|(?:(?:let s|can we|could we|i want to|i d like to) )?(?:switch|change) (?:topics?|the (?:topic|subject))|changing topics|otra pregunta|otro tema|cambiando de tema|(?:podemos |quiero |quisiera )?cambiar de tema|cambiemos de tema|pasemos a otro tema)\b/u.test(request))return true;
+ // A complete request for writing help can survive a garbled transition cue.
+ // Keep the inference narrow so a mention of an essay does not change topics.
+ const writingRequest=/\b(?:(?:how (?:do|can|should) i|help me) (?:start|write|revise|edit) (?:my |an? |the )?(?:application |college |admissions )?essay|(?:como|ayudame a) (?:empiezo|comienzo|escribo|empezar|comenzar|escribir|revisar) (?:mi |un |el )?ensayo)\b/u;
+ const oldRequest=evidenceText(previousQuestion);
+ return writingRequest.test(request)&&!/\b(?:essay|essays|ensayo|ensayos)\b/u.test(oldRequest)&&
+  requestedResearchAspects(previousQuestion).some(aspect=>['total_budget','tuition_fees','housing'].includes(aspect))&&
+  !/\b(?:while you (?:check|look|search)|mientras (?:lo )?(?:revisas|buscas|verificas))\b/u.test(request);
+}
+function explanatoryFollowup(text){
+ const request=evidenceText(text);
+ return /\b(?:while you (?:check|look|search)|mientras (?:lo )?(?:revisas|buscas|verificas))\b/u.test(request)&&
+  /\b(?:what|which|explain|que|cual|cuales|explicar|explicame)\b/u.test(request);
 }
 const sameFinding=(a,b)=>a.aspect===b.aspect&&(a.status==='unverified')===(b.status==='unverified')&&['subject','answer','qualification'].every(key=>evidenceText(a[key])===evidenceText(b[key]));
 // Speech dedup tolerates paraphrases and citation renumbering. Transport reuse
@@ -66,7 +79,7 @@ function commentaryContent(job,remaining){
 }
 
 export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=setTimeout,cancel=clearTimeout,id=()=>globalThis.crypto.randomUUID()}){
- const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',focus=[],acceptedCallerTurns=[],topicMoved=false;const callerTurns=[];
+ const records=new Map(),acks=new Map();let current,timer,waitingForReply=false,replyDeadline,latestQuestion='',researchQuestion='',focus=[],acceptedCallerTurns=[],topicMoved=false;const callerTurns=[];
  const stage=(job,deliveryStage,deliveryReason)=>emit({type:'origen.research.delivery',jobId:job?.jobId,requestId:job?.requestId,revision:job?.revision,
   evidenceVersion:job?.evidenceVersion,researchPending:job?.researchPending,deliveryStage,deliveryReason,durationMs:job?now()-job.suppliedAt:0});
  const legacy=(job,type,extra={})=>emit({type,jobId:job.jobId,requestId:job.requestId,revision:job.revision,evidenceVersion:job.evidenceVersion,researchPending:job.researchPending,...extra});
@@ -99,6 +112,11 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
   // backchannel must not strand completed research forever. This deadline only
   // releases this one result's opportunity; it never requests another backend.
   if(waitingForReply&&replyDeadline!==undefined&&now()>=replyDeadline)waitingForReply=false;
+  if(job.publish){
+   if(!waitingForReply&&canAnnounce()){const publish=job.publish;job.publish=null;publish();}
+   else if(now()-job.suppliedAt>=120000){retire(job,'deferred','opportunity_expired');return;}
+   else {timer=schedule(tick,250);return;}
+  }
   if(!job.acknowledged&&now()-job.suppliedAt>=30000){
    legacy(job,'origen.research.context_failed',{reason:'acknowledgment_timeout'});retire(job,'delivery_unconfirmed','context_timeout');return;
   }
@@ -135,7 +153,7 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
  }
  function wake(){stopTimer();if(current)timer=schedule(tick,250);}
  return {
-  topicChanged(pendingCallerText){return topicMoved||topicSwitch(pendingCallerText);},
+  topicChanged(pendingCallerText){return topicMoved||topicSwitch(pendingCallerText,researchQuestion);},
   hasPendingAnswer(){
    const job=current;
    if(topicMoved||!job||job.terminal||!job.acknowledged||job.quietOnly||job.failed||job.researchPending||
@@ -144,7 +162,9 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    return finding?.status==='verified'&&!!finding.findingId;
   },
   ready(event,{awaitingReply=false,pendingCallerText=''}={}){
-   if(topicSwitch(pendingCallerText))topicMoved=true;
+   const callerQuestion=!pendingCallerText||isResearchAcknowledgment(pendingCallerText)?latestQuestion:pendingCallerText;
+   researchQuestion||=event.question||'';
+   if(topicSwitch(callerQuestion,researchQuestion))topicMoved=true;
    // Server-issued IDs are untrusted reference values, never prompt syntax.
    const key=event.jobId||event.requestId||id(),evidenceVersion=event.evidenceVersion||event.result?.evidenceVersion||1;
    const previous=[...records.values()].reverse().find(j=>j.key===key&&j.requestId===event.requestId&&j.revision===event.revision);
@@ -197,8 +217,13 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
     priorityFindings:topicMoved||job.selection.findings?.length?changed:undefined,
     unchangedEvidenceFrom:previous?.acknowledged&&previous.contextFindings?.length?previous.referenceId:undefined});
    if(changed.length<selected.length)stage(job,'repeat_suppressed','unchanged_context');
-   for(const content of packets){const event_id=id();job.pending++;acks.set(event_id,{job,kind:'context'});send({type:'session.thinking.append',event_id,delegation_id:null,content});}
-   legacy(job,'origen.research.supplied',{packetCount:packets.length,contextBytes:packets.reduce((n,p)=>n+new TextEncoder().encode(p).length,0),evidenceFormat:job.selection.evidenceFormat});
+   const publish=()=>{
+    job.suppliedAt=now();
+    for(const content of packets){const event_id=id();job.pending++;acks.set(event_id,{job,kind:'context'});send({type:'session.thinking.append',event_id,delegation_id:null,content});}
+    legacy(job,'origen.research.supplied',{packetCount:packets.length,contextBytes:packets.reduce((n,p)=>n+new TextEncoder().encode(p).length,0),evidenceFormat:job.selection.evidenceFormat});
+   };
+   if(!topicMoved&&waitingForReply&&explanatoryFollowup(callerQuestion))job.publish=publish;
+   else publish();
    if(job.quietOnly){job.nativePortion=previous.nativePortion;wake();return;}
    if(waitingForReply)defer(job,'caller_turn');wake();
   },
@@ -220,11 +245,11 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    defer(current,'caller_turn');wake();
   },
   callerStopped(text=''){
-   if(topicSwitch(text)){
+   if(topicSwitch(text,researchQuestion)){
     topicMoved=true;
     retire(current,'deferred','different_requested_portion');
    }
-   if(text){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=requestedResearchAspects(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
+   if(text&&!isResearchAcknowledgment(text)){latestQuestion=String(text).slice(0,1200);callerTurns.push(latestQuestion);if(callerTurns.length>8)callerTurns.shift();const next=requestedResearchAspects(text);if(next.length&&(requestsSubject(text)||housingScenario(text)))focus=focus.includes('total_budget')&&next.length===1&&next[0]==='housing'&&housingScenario(text)?['total_budget','housing']:next;}
    if(waitingForReply){replyDeadline=now()+3000;wake();}
   },
   reply(text,{audible=false,forced=false,interrupted=false,completedText}={}){
@@ -276,8 +301,8 @@ export function researchDelivery({send,emit,canAnnounce,now=Date.now,schedule=se
    // A new task may concern an entirely different aspect. Preserve focus only
    // within a request; tuition from a previous check must not hide course work.
    acceptedCallerTurns=reason==='new_request'?[...callerTurns]:[];
-   focus=requestedResearchAspects(primaryQuestion(question));latestQuestion='';callerTurns.length=0;
+   researchQuestion=question;focus=requestedResearchAspects(primaryQuestion(question));latestQuestion='';callerTurns.length=0;
   },
-  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';focus=[];acceptedCallerTurns=[];callerTurns.length=0;topicMoved=false;},
+  clear(reason='scope_changed'){if(current)retire(current,'superseded',reason);stopTimer();acks.clear();records.clear();waitingForReply=false;replyDeadline=undefined;latestQuestion='';researchQuestion='';focus=[];acceptedCallerTurns=[];callerTurns.length=0;topicMoved=false;},
  };
 }
