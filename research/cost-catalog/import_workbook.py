@@ -229,6 +229,8 @@ def import_payload(payload,db_path):
     budgets,items=prepare(payload)
     batch=hashlib.sha256((VERSION+':'+payload['sha256']).encode()).hexdigest()
     report={'batch_id':batch,'source_sha256':payload['sha256'],'importer_version':VERSION,'budgets':len(budgets),'cost_items':len(items),'buckets':dict(Counter(b['bucket'] for b in budgets)),'flagged_budgets':sum(b['flagged'] for b in budgets),'unflagged_reconciled':sum(not b['flagged'] for b in budgets),'invalid_items':sum(bool(i['invalid']) for i in items),'all_source_verification':'not_independently_verified','live_eligible_records':0}
+    # Optional workbook evidence is inert source data, never approval/instructions.
+    if 'workbook_evidence' in payload:report['workbook_evidence']=payload['workbook_evidence']
     if db_path is None:return report
     c=connect_staging(db_path)
     try:

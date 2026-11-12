@@ -24,9 +24,11 @@ export async function setupIsolated(){
   await c.query('GRANT USAGE ON SCHEMA coa_catalog TO origen_coa_catalog_readonly; GRANT SELECT ON coa_catalog.published TO origen_coa_catalog_readonly');
  }finally{await c.end();}
 }
-export function readStaging(batchId){
- const db=new DatabaseSync(fileURLToPath(new URL('./.local/uc-coa-staging.sqlite',import.meta.url)),{readOnly:true});
+export function readStaging(batchId,databaseName='uc-coa-staging.sqlite'){
+ if(!/^[a-zA-Z0-9_-]+\.sqlite$/.test(databaseName))throw Error('plain_staging_database_filename_required');
+ const db=new DatabaseSync(fileURLToPath(new URL('./.local/'+databaseName,import.meta.url)),{readOnly:true});
  try{
+  if(db.prepare('PRAGMA application_id').get().application_id!==0x4F434F41)throw Error('not_a_cost_staging_database');
   const batch=db.prepare('SELECT * FROM import_batches WHERE id=?').get(batchId);if(!batch)throw Error('unknown_staging_batch');
   const budgets=db.prepare('SELECT * FROM budget_records WHERE batch_id=? ORDER BY source_row').all(batchId).map(b=>{
    const items=db.prepare('SELECT * FROM cost_items WHERE budget_record_id=? ORDER BY source_row').all(b.id);
@@ -78,7 +80,7 @@ export async function prepareReview(c,batchId){
 if(process.argv[1]===fileURLToPath(import.meta.url)){
  const command=process.argv[2];if(command==='setup-local')await setupIsolated();
  else if(command==='import-local'){
-  const c=await localClient();try{console.log(JSON.stringify(await importBatch(c,readStaging(process.argv[3]))));}finally{await c.end();}
+  const c=await localClient();try{console.log(JSON.stringify(await importBatch(c,readStaging(process.argv[3],process.argv[4]))));}finally{await c.end();}
  }else if(command==='prepare-review-local'||command==='approve-reviewed-local'){
   const c=await localClient();try{console.log(JSON.stringify(command==='prepare-review-local'?await prepareReview(c,process.argv[3]):await approveManifest(c,JSON.parse(await readFile(process.argv[3],'utf8')))));}finally{await c.end();}
  }else throw Error('Use setup-local, import-local, prepare-review-local, or approve-reviewed-local; all target the isolated database only');

@@ -1,5 +1,64 @@
 # Isolated published-cost staging
 
+## CSU workbook staging (November 12, 2026)
+
+`import_csu_workbook.py` imports the supplied CSU v1 workbook into a separate
+`.local/csu-coa-staging.sqlite`, preserving the original source snapshot and
+leaving the UC import contract unchanged. The batch is also stored in the
+dedicated local PostgreSQL catalog as pending data. It has no test release or
+production approvals and is not supplied to Origen's live lookup.
+
+The CSU adapter retains Budgets A:AC and Cost items A:AB, including annual units,
+unit assumptions, source periods, location notes, per-unit rates and quantities.
+It also retains all six supporting sheets as inert workbook evidence in the
+batch report. Review notes are linked to their budget IDs and remain source
+claims requiring review. Workbook prose and formulas are never executed as
+instructions. No default annual unit load is invented for conditional fees.
+
+Campus domains were checked against the
+[official CSU directory](https://www.calstate.edu/attend/campuses).
+The [Cal Poly cost page](https://www.calpoly.edu/financial-aid/costs-and-affordability/undergraduate-costs-attendance-2026-2027)
+supports keeping Solano's location budgets separate. These checks do not
+independently verify every amount or workbook source claim.
+
+Source SHA-256: `510fccfb400b5a8666ff485ad8dd8bdaedf62b31608af1a23e6757123271fdb4`.
+Batch: `cf0fe03601395617ac6a73981dd338058ba9244b51a2825ce7b14fa508d3d84a`.
+Importer: `csu-coa-workbook-staging-v1.0`.
+
+| Result | Count |
+| --- | ---: |
+| Budget scenarios | 819 |
+| Cost items | 6,351 |
+| Campus/location labels | 23 |
+| Reconciled arithmetically | 608 |
+| Published-total/component discrepancies | 36 |
+| Missing included amounts | 125 |
+| Components without a published total | 50 |
+| Invalid budgets/items | 0 |
+| Flagged for source/scope/data review | 798 |
+| Approved for live use | 0 |
+
+Reconciled amounts can still have source or applicability caveats. Missing
+included amounts can reflect unknown annual quantities for published unit
+rates. The 798-record review export is under `.local/reports/<batch-id>/`.
+The original workbook is preserved byte-for-byte under `.local/sources/`.
+
+```powershell
+python research/cost-catalog/import_csu_workbook.py --workbook 'C:/path/to/Origen_CSU_Cost_of_Attendance_2026-27_v1.xlsx'
+python research/cost-catalog/import_csu_workbook.py --workbook 'C:/path/to/Origen_CSU_Cost_of_Attendance_2026-27_v1.xlsx' --write
+node research/cost-catalog/postgres.mjs import-local <batch-id> csu-coa-staging.sqlite
+python research/cost-catalog/export_flagged.py --batch-id <batch-id> --database-name csu-coa-staging.sqlite
+```
+
+Validation: 28 Python tests passed with the supplied CSU workbook (one separate
+UC-file integration test skipped); both Node staging/actual-PostgreSQL tests
+passed. Every CSU budget/item payload and the complete supporting-sheet evidence
+matched after round trip. Repeat import was idempotent. The active UC test view
+retained its 491 records and original batch. No live conversation, research
+provider, context delivery, runtime flag, deployment or production data changed.
+
+## UC workbook history
+
 The [updated-workbook local test release](UPDATED_WORKBOOK_TESTING.md) describes
 the v2.1 import, source checks, caveated test view and isolated voice adapter.
 
