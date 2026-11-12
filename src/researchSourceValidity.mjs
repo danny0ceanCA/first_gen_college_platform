@@ -6,7 +6,7 @@ export function sourceIsCurrent(source,now=Date.now()){
  const checked=Date.parse(source?.checkedAt);
  if(source?.catalogValidity===undefined)return Number.isFinite(checked)&&now>=checked&&now-checked<300000;
  const c=source.catalogValidity;
- if(!c||c.version!==1||!['reviewed_catalog','local_testing_catalog'].includes(c.kind)||
+ if(!c||c.version!==1||!['reviewed_catalog','local_testing_catalog','published_catalog'].includes(c.kind)||
   !/^[a-f0-9]{64}$/u.test(c.batchId||'')||!/^[a-f0-9]{64}$/u.test(c.recordDigest||'')||
   !/^[a-zA-Z0-9_-]{1,100}$/u.test(c.recordId||'')||c.sourceUrl!==source.url||c.sourceCheckedAt!==source.checkedAt||
   !['independent_review','workbook_reported'].includes(c.reviewBasis))return false;

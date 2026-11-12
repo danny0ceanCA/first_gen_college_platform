@@ -15,7 +15,7 @@ export function scopeMatch(record,scope){
 }
 
 export function projectRecord(record,language='en',{allowTesting=false,now=Date.now()}={}){
- const {raw,normalized,items}=record.payload,es=language==='es',groups=new Map(),testing=allowTesting&&record.test_publication===true;
+ const {raw,normalized,items}=record.payload,es=language==='es',groups=new Map(),production=record.caveated_publication===true,testing=allowTesting&&(record.test_publication===true||production);
  if(!testing&&(record.bucket!=='reconciled'||record.flagged||record.published_cents===null||/source conflict/i.test(raw['Scope and exclusions']||'')))return null;
  if(record.bucket==='invalid')return null;
  const urls=[...new Set([raw['Official source URL'],...items.flatMap(i=>[i.raw['Source override URL'],i.raw['Verification URL']])].filter(Boolean))];
@@ -40,7 +40,7 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
   expectedCategories:values.filter(v=>v.role==='component').map(v=>v.key),components:values.map(v=>({key:v.key,role:v.missing?'missing':v.role,amount:v.missing?null:v.cents/100,sourceLabel:testing&&[...new Set(v.labels)].join('; ').length>120?v.key:[...new Set(v.labels)].join('; '),qualification:testing&&[...new Set(v.notes)].join(' ').length>300?(es?'Condiciones completas en los detalles de la fuente.':'Complete conditions in the source details.'):[...new Set(v.notes)].join(' ')}))};
  if(raw['Budget period']!=='Academic year'||!validatedBudget(budget,new Set(urls.map((_,i)=>i+1)))||!testing&&!budgetAudit(budget).complete)return null;
  const coverage=raw['Coverage months']?(es?`Cubre ${raw['Coverage months']} meses.`:`Covers ${raw['Coverage months']} months.`):'';
- const testConditions=[es?'Datos del archivo para pruebas locales; la revisión oficial no confirma todos los campos. No es una factura.':'Workbook data for local testing; official rechecking has not confirmed every field. Not a bill.',
+ const testConditions=[production?(es?'Datos del catálogo publicado; los campos con limitaciones conservan sus advertencias. No es una factura.':'Published catalog data; fields with limitations retain their qualifications. Not a bill.'):es?'Datos del archivo para pruebas locales; la revisión oficial no confirma todos los campos. No es una factura.':'Workbook data for local testing; official rechecking has not confirmed every field. Not a bill.',
   record.bucket==='derived'?(es?'No hay total publicado; no se presenta la suma calculada como total oficial.':'No published total; a calculated sum is not presented as an official total.'):'',
   record.bucket==='discrepancy'?(es?'El total publicado y sus componentes no coinciden.':'The published total and its components do not reconcile.'):'',
   unknownHousing?(es?'La modalidad de vivienda de la fuente no está resuelta.':'The source housing classification remains unresolved.'):'',
@@ -58,7 +58,7 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
   const item=items.find(i=>(i.raw['Verification URL']||i.raw['Source override URL'])===url);
   const sourceCheckedAt=testing&&item?sourceDate(item.raw['Verification checked']||item.raw['Item source checked']||raw['Source checked']):checkedAt;
   const catalogValidity=sourceCheckedAt&&/^[a-f0-9]{64}$/u.test(record.batch_id||'')&&/^[a-f0-9]{64}$/u.test(record.record_digest||'')&&validUntil?{
-   version:1,kind:testing?'local_testing_catalog':'reviewed_catalog',batchId:record.batch_id,recordId:record.budget_key,recordDigest:record.record_digest,
+   version:1,kind:production?'published_catalog':testing?'local_testing_catalog':'reviewed_catalog',batchId:record.batch_id,recordId:record.budget_key,recordDigest:record.record_digest,
    sourceUrl:url,sourceCheckedAt,reviewedAt,retrievedAt,validUntil,reviewBasis:testing?'workbook_reported':'independent_review',
   }:null;
   return {url,title:record.campus+' published cost source',checkedAt:sourceCheckedAt,...(catalogValidity?{catalogValidity}:{})};
@@ -68,7 +68,7 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
  if(testing&&parsed){
   const review=record.review_evidence?.reviewNotes?.find(note=>note.values?.['Budget ID']===record.budget_key)?.values;
   parsed.catalogAdditionalDetails=[raw['Scope and exclusions'],raw['Summer treatment'],review?JSON.stringify(review):'',...items.map(item=>`${item.raw['Original source label']}: ${item.amount===null?'Amount unavailable':'USD '+item.amount/100}. ${item.raw['Conditions / notes']||''}`)].filter(Boolean).join('\n');
-  parsed.text+='\nWorkbook source details (local testing only):\n'+parsed.catalogAdditionalDetails;
+  parsed.text+=(production?'\nPublished catalog source details:\n':'\nWorkbook source details (local testing only):\n')+parsed.catalogAdditionalDetails;
  }
  // The shared parser rebuilds its canonical budget report. Retain non-additive
  // alternatives separately for detailed readback without inventing a subtotal.

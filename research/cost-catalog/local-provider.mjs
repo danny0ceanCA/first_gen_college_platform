@@ -17,7 +17,9 @@ export function assertLocalCatalogEnvironment(env){
 // This adapter is loaded only by the explicitly enabled isolated launcher.
 // Unknown personal scope remains unknown. A general entering-cohort benchmark
 // is labelled as such; it is never claimed as a student's established cohort.
-export function createLocalCostLookup({query,emit=()=>{}}){
+export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
+ if(!['local','production'].includes(publication))throw Error('invalid_catalog_publication');
+ const view=publication==='production'?'production_published':'testing_published';
  return async (input,{observe=()=>{}}={})=>{
   const report=data=>{try{emit(data);observe(data);}catch{/* Logging never changes a lookup. */}};
   const defer=reason=>{report({outcome:'deferred',reason});return null;};
@@ -49,7 +51,7 @@ export function createLocalCostLookup({query,emit=()=>{}}){
   params.push(residentCategories(residency));conditions.push(`payload->'raw'->>'Residency'=ANY($${params.length}::text[])`);
   conditions.push("payload->'raw'->>'Student level'='Undergraduate'","payload->'raw'->>'Program / degree'='General undergraduate'","coalesce(payload->'raw'->>'Dependent children','') IN ('','0')");
   if(year.length){params.push(year[0]);conditions.push(`academic_year=$${params.length}`);}
-  const rows=(await query('SELECT * FROM coa_catalog.testing_published WHERE '+conditions.join(' AND '),params)).rows;
+  const rows=(await query('SELECT * FROM coa_catalog.'+view+' WHERE '+conditions.join(' AND '),params)).rows;
   const selected=[];
   for(const campus of [...new Set(campuses)])for(const scenario of scenarios){
    let choices=rows.filter(r=>r.campus===campus&&r.payload.raw['Student level']==='Undergraduate'&&r.payload.raw['Program / degree']==='General undergraduate'&&residentCategories(residency).includes(r.payload.raw.Residency)&&
@@ -95,7 +97,7 @@ export function createLocalCostLookup({query,emit=()=>{}}){
   if(uncertain){result.voiceBrief.nextStep=language==='es'?'¿Alquilaría o viviría con familiares?':'Would the student rent or live with family?';}
   result=input.comparisonAddition?mergeComparisonAddition(result,input):retainVerifiedResearch(result,input);
   report({outcome:'hit',reason:'matched',campuses:[...new Set(campuses)],findings:result.voiceBrief?.findings.length||0});
-  return {...result,catalogLocalTesting:true};
+  return {...result,...(publication==='production'?{catalogPublication:'production'}:{catalogLocalTesting:true})};
  };
 }
 

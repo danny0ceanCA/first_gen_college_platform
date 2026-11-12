@@ -11,7 +11,10 @@ try{
  if(identity?.name!=='origen_research_worker'||identity.student_access)throw Error('restricted_research_worker_role_required');
  const ready=(await pool.query("SELECT has_table_privilege(current_user,'origen_voice_research_traces','SELECT') AND has_table_privilege(current_user,'origen_voice_research_traces','INSERT') AND has_table_privilege(current_user,'origen_voice_research_traces','UPDATE') AND has_table_privilege(current_user,'origen_voice_research_trace_events','INSERT') AS ready")).rows[0]?.ready;
  if(!ready)throw Error('research_trace_migration_and_grants_required');
- if(process.env.ORIGEN_LOCAL_COST_CATALOG==='true'){
+ if(process.env.ORIGEN_COST_CATALOG==='true'){
+  const {createProductionCatalogProvider}=await import('../research/cost-catalog/production-provider.mjs');
+  catalog=await createProductionCatalogProvider(process.env);
+ }else if(process.env.ORIGEN_LOCAL_COST_CATALOG==='true'){
   const {createLocalCatalogProvider}=await import('../research/cost-catalog/local-provider.mjs');
   catalog=await createLocalCatalogProvider(process.env);
  }

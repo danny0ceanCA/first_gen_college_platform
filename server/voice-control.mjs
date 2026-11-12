@@ -1,3 +1,4 @@
+import {researchTablesEnabled} from './research-feature-flags.mjs';
 import WebSocket,{WebSocketServer} from 'ws';
 import {liveMeasurements} from './live-measurements.mjs';
 import {randomUUID} from 'node:crypto';
@@ -419,7 +420,7 @@ export function createVoiceControl({env,authenticate,authorize,request,observeFa
   createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:1200}):undefined;
  const replyClient=enabled&&env.ORIGEN_DECISIONS_REPLY_RECOVERY==='true'&&env.OPENAI_API_KEY?
   createDecisionsClient({apiKey:env.OPENAI_API_KEY,timeoutMs:850}):undefined;
- const visualCards=env.NODE_ENV==='development'&&['true','rules','decisions'].includes(env.ORIGEN_LOCAL_VISUAL_CARDS);
+ const visualCards=researchTablesEnabled(env);
  if(enabled&&env.ORIGEN_BACKGROUND_RESEARCH!=='true')throw Error('server_voice_control_requires_background_research');
  const origins=new Set((env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  function dispose(run,reason='closed'){
