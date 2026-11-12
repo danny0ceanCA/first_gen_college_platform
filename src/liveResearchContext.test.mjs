@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {liveContextPackets,researchContextPackets,researchStateContext} from './liveResearchContext.mjs';
+import {publicRecord,publicFact} from '../server/research-record.fixtures.mjs';
 
 for(const text of ['A quoted "figure" is not an individual award. '.repeat(70),'La cifra no confirma ayuda ni elegibilidad. '.repeat(80),'大学の費用は個別の請求書ではありません。'.repeat(80),'https://example.edu/'+('a'.repeat(1800))])test('bounded reference packets preserve the complete evidence: '+text.slice(0,25),()=>{
  const value={text,conditions:'Unverified means unknown, not absent.',sources:[{url:'https://example.edu/fees'}]};
@@ -59,6 +60,15 @@ const cases={
  es:{subject:'UC Berkeley',aspect:'total_budget',status:'verified',answer:'Total fuera del campus en 2026–27: $44,000 [1].',qualification:'Estimación anual antes de ayuda; no es una factura [1].'},
 };
 for(const [language,finding] of Object.entries(cases)){
+ test(`${language}: a completed result can lead with the entire qualified finding before metadata`,()=>{
+  const packets=researchContextPackets(researchJob(finding),'test-ref',{leadWithFinding:true});
+  const [lead,state,provenance]=units(packets);
+  assert.equal(lead.unit,'finding');assert.equal(lead.taskState,'completed');
+  assert.equal(lead.answer,finding.answer);assert.equal(lead.qualification,finding.qualification);
+  assert.equal(state.unit,'state');assert.equal(provenance.unit,'source');
+  const pending=researchContextPackets(researchJob(finding,{researchPending:true}),'test-ref',{leadWithFinding:true});
+  assert.equal(units(pending)[0].unit,'state');
+ });
  test(`${language}: a fitting finding carries the full answer, year, scenario and qualification in one quiet unit`,()=>{
   const packets=researchContextPackets(researchJob(finding),'01234567-0123-0123-0123-012345678901');
   const direct=packets.map(p=>JSON.parse(p)).filter(p=>p.unit==='finding');
@@ -128,4 +138,51 @@ test('a reused reference keeps partial units distinct across evidence versions',
  assert.ok(groups[0].size>=2);assert.ok([...groups[0]].every(group=>!groups[1].has(group)));
  assert.equal(decoded[0].find(u=>u.unit==='finding').answer,finding.answer);
  assert.equal(decoded[1].find(u=>u.unit==='finding').answer,second.result.voiceBrief.answer);
+});
+
+for(const language of ['en','es'])for(const [topic,questions,kind] of [
+ ['scholarships',['How much is the scholarship?','¿Cuánto es la beca?'],'amount'],
+ ['student_support',['Who can I contact?','¿Con quién puedo hablar?'],'text'],
+ ['process',['What are the steps?','¿Cuáles son los pasos?'],'step'],
+ ['admissions',['What is the application deadline?','¿Cuál es la fecha límite?'],'date'],
+])test(`${language}: the requested ${topic} fact reaches quiet context with scope, qualification and source`,()=>{
+ const evidence=publicRecord(topic,language),question=questions[language==='es'?1:0];
+ const finding={subject:'Eastview College',aspect:'other',status:'verified',answer:'A short overview is available. [1]',qualification:'The source conditions apply. [1]',evidence};
+ const job=researchJob(finding,{question,query:{language}});
+ const decoded=units(researchContextPackets(job,'focused-reference'));
+ const unit=decoded.find(value=>value.unit==='finding');
+ assert.match(unit.scope,/2027/);
+ assert.ok(unit.focusedFacts.length>0);
+ assert.ok(unit.focusedFacts.every(fact=>fact.kind===kind));
+ for(const fact of unit.focusedFacts){
+  const original=evidence.facts.find(item=>item.key===fact.key);
+  assert.equal(fact.qualification,original.qualification);
+  assert.equal(fact.sourceCitation,original.sourceCitation);
+  assert.equal(fact.status,original.status);
+ }
+ assert.ok(decoded.some(value=>value.unit==='source'));
+});
+
+for(const language of ['en','es'])test(`${language}: an application fee question does not promote the scholarship award instead`,()=>{
+ const evidence=publicRecord('scholarships',language);
+ evidence.facts.push(publicFact({key:'application_fee',label:language==='es'?'Costo de solicitud':'Application fee',kind:'amount',amount:25,bound:'exact',currency:'USD',unit:'per application',date:null,time:null,timeZone:null,qualification:'Not refundable.'}));
+ evidence.expectedFacts.push('application_fee');
+ const finding={subject:'Eastview College',aspect:'other',status:'verified',answer:'An overview is available. [1]',qualification:'The source conditions apply. [1]',evidence};
+ const job=researchJob(finding,{question:language==='es'?'¿Cuál es el costo de solicitud?':'What is the application fee?',query:{language}});
+ const unit=units(researchContextPackets(job,'fee-reference')).find(value=>value.unit==='finding');
+ assert.deepEqual(unit.focusedFacts.map(fact=>fact.key),['application_fee']);
+ assert.match(unit.focusedFacts[0].value,/25/);
+});
+
+test('supplemental evidence uses distinct atomic groups within the same result version',()=>{
+ const finding={...cases.es,qualification:'La cifra requiere confirmar todas las condiciones de la fuente. '.repeat(9)+'[1]'};
+ const job=researchJob(finding);job.result.sources[0].url='https://example.edu/'+('a'.repeat(700));
+ const first=researchContextPackets(job,'same-ref');
+ const supplemental=researchContextPackets(job,'same-ref',{includeState:false,packetGroupPrefix:'supplement-1-'});
+ const groups=new Set(first.map(JSON.parse).filter(packet=>packet.group).map(packet=>packet.group));
+ assert.ok(supplemental.map(JSON.parse).filter(packet=>packet.group).every(packet=>!groups.has(packet.group)));
+ const decoded=units([...first,...supplemental]);
+ assert.equal(decoded.filter(unit=>unit.unit==='finding').length,2);
+ assert.equal(decoded.filter(unit=>unit.unit==='source').length,2);
+ assert.equal(decoded.filter(unit=>unit.unit==='state').length,1);
 });

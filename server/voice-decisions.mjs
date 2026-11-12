@@ -34,6 +34,8 @@ export function createProductionDecisionsFactory({ env, database, dependencies =
           callId: options.scope.sessionId, studentId, language: options.config.language, role: 'unknown' },
         allowedStudentIds: [studentId], supportEnabled: true, preferencesEnabled: true,
         conversationEnabled: true, earlyEnabled: true, lateEnabled: false,
+        meaningfulScheduling: true,
+        betweenThoughtsEnabled: env.ORIGEN_DECISIONS_BETWEEN_THOUGHTS === 'true',
       }, { ...dependencies, onDiagnostic: diagnostics.record });
       active++;
       diagnostics.record({ type: 'production_decisions_enabled', contextSent: false, playbackClaim: false });

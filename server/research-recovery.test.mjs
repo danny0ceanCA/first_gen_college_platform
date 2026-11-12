@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {processResearchJob} from './voice-research-worker.mjs';
-import {researchRecoveryPlan,recoveryResearchRequest,researchAttemptDiagnostics,mergeRecoveryResearch,parseUnverifiedResearch} from './research-recovery.mjs';
-import {parseResearchBrief} from './research-brief.mjs';
+import {researchRecoveryPlan,researchRecoveryOutcome,recoveryResearchRequest,researchAttemptDiagnostics,mergeRecoveryResearch,parseUnverifiedResearch} from './research-recovery.mjs';
+import {parseResearchBrief,researchBriefRequest} from './research-brief.mjs';
 import {parseFinanceResearch} from './finance-research.mjs';
+import {hasCoaBreakdown,requestsCoa} from './coa-evidence.mjs';
 
 const berkeley='https://financialaid.berkeley.edu/costs',ucsc='https://registrar.ucsc.edu/fees';
 function output({language='en',recovered=false,allUnknown=false}={}){
@@ -26,6 +27,104 @@ function fixture(language='en',extra={}){
  }};
 }
 const saved=db=>db.writes.find(w=>w.sql.includes("status='completed'"))?.args[1];
+
+test('COA completeness distinguishes narrow tuition, cited breakdowns and unsupported totals',()=>{
+ for(const question of ['Full cost of attendance','Costo de asistencia completo','What are the costs?','¿Cuánto cuesta?'])assert.equal(requestsCoa(question),true);
+ for(const question of ['Annual tuition and fees only','Solo matrícula y cuotas anuales'])assert.equal(requestsCoa(question),false);
+ const finding={aspect:'total_budget',status:'verified',sourceIds:[1],answer:'Annual budget $40,000. Published breakdown: Tuition and fees: $10,000; Housing and food: $28,000; Books: $2,000.'};
+ assert.equal(hasCoaBreakdown(finding),true,'combined official categories need not be split');
+ for(const changes of [{sourceIds:[]},{status:'unverified'},{aspect:'tuition_fees'},{answer:'Annual total $40,000.'},{answer:'Annual tuition $10,000. Published breakdown: Tuition: $10,000; Fees: $2,000.'}]){
+  assert.equal(hasCoaBreakdown({...finding,...changes}),false);
+ }
+});
+
+test('a complete earlier-year COA avoids recovery for an unavailable future year but preserves its qualification',()=>{
+ const finding={subject:'UC Berkeley — 2026–27 renting off campus',aspect:'total_budget',status:'partial',
+  answer:'2026–27 rental budget $40,000. Published breakdown: Tuition and fees: $10,000; Housing and food: $28,000; Books: $2,000. [1]',
+  qualification:'A published benchmark; not a verified 2027–28 price. [1]'};
+ const initial={sources:[{url:berkeley}],voiceBrief:{status:'partial',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding,
+  {subject:'UC Berkeley — 2027–28',aspect:'total_budget',status:'unverified',answer:'The future-year price is unverified.',qualification:''}]}};
+ assert.equal(researchRecoveryPlan(initial,{question:'2027–28 cost of attendance renting off campus',institution:'UC Berkeley'}),null);
+ assert.match(initial.voiceBrief.findings[0].qualification,/not a verified 2027/);
+});
+
+test('COA recovery rejects the wrong campus or living arrangement and leads with the recovered budget',()=>{
+ const initial={sources:[{url:berkeley}],voiceBrief:{status:'partial',answer:'Tuition $10,000 [1].',qualification:'Total missing.',nextStep:'',findings:[
+  {subject:'UC Berkeley — 2027–28',aspect:'total_budget',status:'unverified',answer:'The total was not verified.',qualification:'The page could not be read.'},
+  {subject:'UC Berkeley',aspect:'tuition_fees',status:'verified',answer:'Annual tuition and fees $10,000 [1].',qualification:'Published fee schedule [1].'},
+  {subject:'UC Davis',aspect:'deadline',status:'unverified',answer:'The deadline is unverified.',qualification:''},
+ ]}};
+ const plan=researchRecoveryPlan(initial,{question:'Full cost of attendance renting off campus',institution:'UC Berkeley'});
+ const recovered={sources:[{url:berkeley}],text:'Official budget evidence [1].',voiceBrief:{status:'partial',nextStep:'',findings:[{
+  subject:'UC Berkeley — 2026–27 renting off campus',aspect:'total_budget',status:'partial',
+  answer:'2026–27 rental budget $40,000. Published breakdown: Tuition and fees: $10,000; Housing and food: $28,000; Books: $2,000. [1]',
+  qualification:'Earlier-year benchmark before aid. [1]',
+ }]}};
+ const merged=mergeRecoveryResearch(initial,recovered,'en',plan);
+ assert.match(merged.voiceBrief.answer,/40,000/);
+ assert.equal(merged.voiceBrief.findings.length,3);
+ assert.equal(merged.voiceBrief.findings[0].subject,'UC Berkeley — 2026–27 renting off campus');
+ assert.equal(merged.voiceBrief.findings[1].answer,initial.voiceBrief.findings[1].answer);
+ for(const subject of ['UC Davis — 2026–27 renting off campus','UC Berkeley — 2026–27 living with family']){
+  const wrong=structuredClone(recovered);wrong.voiceBrief.findings[0].subject=subject;
+  wrong.voiceBrief.findings[0].answer=wrong.voiceBrief.findings[0].answer.replace('rental budget',subject.includes('family')?'living with family budget':'rental budget');
+  assert.equal(mergeRecoveryResearch(initial,wrong,'en',plan),initial);
+  assert.notEqual(researchRecoveryOutcome(wrong,plan),'recovered');
+ }
+ const request=recoveryResearchRequest(researchBriefRequest({input:'{}',instructions:'Rules.'}),initial,plan);
+ assert.equal(request.text.format.schema.properties.brief.properties.findings.items.anyOf[0].properties.subject.enum,undefined);
+ assert.match(request.instructions,/For ordinary gaps without needsBreakdown/);
+ assert.match(request.instructions,/label the actual published year/);
+});
+
+for(const language of ['en','es'])test(`${language}: tuition-only COA output recovers the full most-recent published benchmark`,async()=>{
+ const db=fixture(language,{institution:'UC Berkeley',question:language==='es'?'Costo de asistencia completo 2027–28 fuera del campus':'Full 2027–28 cost of attendance off campus'});
+ let calls=0;
+ await processResearchJob(db,{}, {log:()=>{},request:async(_,options)=>{
+  const request=JSON.parse(options.body),input=JSON.parse(request.input);
+  if(++calls===2){
+   assert.equal(input.recovery.gaps[0].aspect,'total_budget');
+   assert.equal(input.recovery.gaps[0].needsBreakdown,true);
+   assert.match(request.instructions,/most recent available complete published budget/);
+  }
+  const finding=calls===1
+   ?{subject:'UC Berkeley — 2026–27',aspect:'tuition_fees',status:'partial',answer:'Annual tuition and fees: $10,000 CITE.',qualification:'The requested 2027–28 price is unverified.'}
+   :{subject:'UC Berkeley — 2026–27 renting off campus',aspect:'total_budget',status:'partial',
+    answer:language==='es'?'US$40,000 antes de la ayuda en 2026–27, alquiler fuera del campus. Desglose publicado: Matrícula y cuotas: $10,000; Vivienda: $20,000; Alimentación: $4,000; Libros: $1,000; Transporte: $1,000; Gastos personales: $1,000; Seguro médico: $3,000 CITE.':
+     'US$40,000 before aid in 2026–27, renting off campus. Published breakdown: Tuition and fees: $10,000; Housing: $20,000; Food: $4,000; Books: $1,000; Transportation: $1,000; Personal: $1,000; Insurance: $3,000 CITE.',
+    qualification:'Published 2026–27 benchmark, not a 2027–28 price. Assumed rental benchmark; housing choice unconfirmed. CITE.'};
+  const text=JSON.stringify({report:'Protocol fixture budget evidence CITE.',brief:{status:'partial',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}});
+  const annotations=[...text.matchAll(/CITE/gu)].map(match=>({type:'url_citation',url:berkeley,start_index:match.index,end_index:match.index+4}));
+  return new Response(JSON.stringify({status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'open_page',url:berkeley}},
+   {type:'message',content:[{type:'output_text',text,annotations}]}]}));
+ }});
+ assert.equal(calls,2);
+ const result=saved(db);assert.ok(result);
+ assert.equal(result.voiceBrief.findings.length,2,'the source-backed tuition remains beside the recovered budget');
+ const budget=result.voiceBrief.findings.find(finding=>finding.aspect==='total_budget');
+ assert.match(budget.subject,/2026–27/);assert.match(budget.answer,/40,000/);assert.match(budget.answer,/Transportation|Transporte/);
+ assert.equal(result.researchDiagnostics.recoveryStatus,'partial','benchmark retrieval does not verify a future-year price');
+});
+
+test('recovery logging requires the requested gap to become verified',async()=>{
+ const db=fixture();let calls=0;
+ await processResearchJob(db,{}, {request:async()=>{
+  const data=output({recovered:++calls===2});
+  if(calls===2){
+   const block=data.output.find(item=>item.type==='message').content[0];
+   const parsed=JSON.parse(block.text);
+   parsed.brief.status='partial';parsed.brief.findings[0].status='partial';
+   block.text=JSON.stringify(parsed);
+   // Citation offsets change when status text grows. Rebuild the CITE offsets.
+   block.annotations=[...block.text.matchAll(/CITE/gu)].map(match=>({type:'url_citation',url:ucsc,title:'Official fees',start_index:match.index,end_index:match.index+4}));
+  }
+  return new Response(JSON.stringify(data));
+ }});
+ assert.equal(calls,2);
+ assert.equal(saved(db).researchDiagnostics.recoveryStatus,'partial');
+ const initial={voiceBrief:{findings:[{subject:'UC Berkeley',aspect:'total_budget',status:'unverified',answer:'Unconfirmed.',qualification:''}]},sources:[]};
+ assert.equal(researchRecoveryOutcome(initial,{gaps:[{subject:'UC Berkeley',aspect:'total_budget'}]}),'unresolved');
+});
 
 for(const language of ['en','es'])test(`${language}: one gap-only recovery merges citations, retains Berkeley and shares the original deadline`,async()=>{
  const db=fixture(language),requests=[];
@@ -57,14 +156,14 @@ test('a completed but unresolved second pass keeps the honest limitation without
 });
 
 test('a verified result needs no additional request',async()=>{
- const db=fixture();let calls=0;
+ const db=fixture('en',{institution:'UC Santa Cruz',question:'Current undergraduate tuition at UC Santa Cruz'});let calls=0;
  await processResearchJob(db,{}, {request:async()=>{calls++;return new Response(JSON.stringify(output({recovered:true})));}});
  assert.equal(calls,1);assert.equal(saved(db).researchDiagnostics.recoveryStatus,'not_needed');
 });
 
 for(const language of ['en','es'])test(`${language}: a tuition-only contrast does not spend another call recovering an unsolicited budget`,async()=>{
  const question=language==='en'?'Compare current 2026–27 undergraduate tuition at UC Berkeley and UC Santa Cruz. Separate tuition from total cost of attendance.':'Compara matrícula de pregrado 2026–27 de UC Berkeley y UC Santa Cruz. Separa la matrícula del costo total.';
- const db=fixture(language,{question});let calls=0;
+  const db=fixture(language,{question,institution:'UC Berkeley'});let calls=0;
  const response=output({language}),value=JSON.parse(response.output[1].content[0].text);
  value.brief.findings[1]={...value.brief.findings[1],aspect:'total_budget'};
  const text=JSON.stringify(value);response.output[1].content[0].text=text;
@@ -123,6 +222,25 @@ test('recovery cannot overwrite verified evidence or resolve another campus by m
 test('the common UCSC abbreviation resolves only its matching missing campus',()=>{
  const initial=parse(output()),recovered=parse(output({recovered:true}));recovered.voiceBrief.findings[0].subject='UCSC';
  const merged=mergeRecoveryResearch(initial,recovered);assert.notEqual(merged,initial);assert.equal(merged.voiceBrief.findings[1].status,'verified');
+});
+
+test('structured recovery keeps exact gap identity while leaving factual limitations explicit',()=>{
+ const initial=parse(output()),subject='UC Santa Cruz — 2026–27 California-resident undergraduate off-campus apartment';
+ initial.voiceBrief.findings[1].subject=subject;
+ const plan=researchRecoveryPlan(initial),base=researchBriefRequest({input:'{"question":"Annual tuition 2026–27"}',instructions:'Rules.'});
+ const snapshot=JSON.stringify(base),body=recoveryResearchRequest(base,initial,plan);
+ const items=body.text.format.schema.properties.brief.properties.findings;
+ assert.equal(items.maxItems,1);assert.equal(items.items.anyOf.length,1);
+ assert.deepEqual(items.items.anyOf[0].properties.subject.enum,[subject]);
+ assert.deepEqual(items.items.anyOf[0].properties.aspect.enum,[plan.gaps[0].aspect]);
+ assert.match(body.instructions,/Copy the attempted gap's subject and aspect exactly/);
+ assert.match(body.instructions,/scope mismatch or limitation in the answer and qualification/);
+ assert.equal(JSON.stringify(base),snapshot,'recovery schema does not mutate the initial request');
+ const recovered=parse(output({recovered:true}));
+ recovered.voiceBrief.findings[0].subject='UC Santa Cruz — 2027–28 living with family';
+ assert.equal(mergeRecoveryResearch(initial,recovered),initial,'a different scenario label is never silently treated as the requested gap');
+ recovered.voiceBrief.findings[0].subject=subject;
+ assert.equal(mergeRecoveryResearch(initial,recovered).voiceBrief.findings[1].status,'verified');
 });
 
 const retained={institution:'UC Berkeley',question:'2026–27 undergraduate tuition',checkedAt:'2026-11-05',coverage:'verified',

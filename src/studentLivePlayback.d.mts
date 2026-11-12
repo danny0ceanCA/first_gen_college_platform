@@ -1,1 +1,1 @@
-export function studentLivePlayback(options?:Record<string,unknown>):{prime:()=>Promise<void>;attach:(stream:MediaStream)=>Promise<void>;idle:()=>boolean;audibleVersion:()=>number;contextState:()=>string|undefined;stop:()=>void};
+export function studentLivePlayback(options?:Record<string,unknown>):{prime:()=>Promise<void>;attach:(stream:MediaStream)=>Promise<void>;idle:()=>boolean;audibleVersion:()=>number;contextState:()=>string|undefined;duck:(audio:HTMLAudioElement|null)=>void;restoreVolume:()=>void;stop:()=>void};

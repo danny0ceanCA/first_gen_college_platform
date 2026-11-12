@@ -1,8 +1,8 @@
 // Offline measurements only. This module never invokes a provider or takes an
 // action from a classification. Unavailable classifications are not negatives.
-const SUPPORT_NEEDS = ['none', 'starting_point', 'simpler_explanation', 'next_step', 'unclear'];
+import { SUPPORT_NEEDS } from './rubric.mjs';
 const SUCCESS_STATUSES = new Set(['completed', 'ok', 'success']);
-const HELP_NEEDS = new Set(['starting_point', 'simpler_explanation', 'next_step']);
+const HELP_NEEDS = new Set(SUPPORT_NEEDS.filter(need => !['none', 'unclear'].includes(need)));
 const LANGUAGES = ['en', 'es', 'mixed'];
 const SPLITS = ['calibration', 'holdout'];
 const ROLES = ['family', 'student', 'unknown'];

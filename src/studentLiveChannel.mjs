@@ -4,18 +4,22 @@ import {liveContextPackets,researchContextPackets,researchStateContext} from './
 import {researchBriefSelection} from './researchBrief.mjs';
 import {researchDelivery} from './researchDelivery.mjs';
 import {liveSelectionDelivery} from './liveSelectionDelivery.mjs';
-import {researchSpeechObservation} from './researchSpeechObservation.mjs';
+import {isResearchAcknowledgment,researchSpeechObservation} from './researchSpeechObservation.mjs';
 import {liveSelectionRecovery} from './liveSelectionRecovery.mjs';
-export const liveChannelRevision='bounded-student-selection-recovery-2026-11-07';
+export const liveChannelRevision='early-caller-yield-2026-11-10';
 export const liveBackendDeadlineMs=25000;
-export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false}={}){
+const trailingClause=/(?:[,;:…—–-]|\.{2,}|\b(?:and|or|but|because|then|the|to|with|y|o|pero|porque|entonces|el|la|de|con))\s*$/iu;
+const openQuestion=/(?:[?？]["”’')]*|(?:^|[.!。]\s+|¿)(?:do you|would you|can you|what|which|how|quieres|te gustar[ií]a|qu[eé]|cu[aá]l|c[oó]mo)\b[^.!?。！？]*)\s*$/iu;
+const yieldRequest=/^[¿¡]?(?:wait|hold on|stop (?:there|for a moment)|no[ ,]+(?:i mean|i meant|actually)|actually[ ,]+(?:i meant|i mean|how|what|can we)|how (?:should|can|do) i|espera(?: un momento)?|un momento|no[ ,]+(?:quise decir|me refiero)|en realidad[ ,]+(?:quer[ií]a decir|c[oó]mo|qu[eé])|c[oó]mo (?:elijo|puedo|debo|hago))(?:$|[\s,.!?¿¡])/iu;
+export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cancel=clearTimeout,now=Date.now,isPlaybackIdle=()=>false,getPlaybackVersion=()=>0,researchDeliveryV2=false,canRecoverReply=()=>false,classifyReply}={}){
  let live=false,started=false,closed=false,session={},opening=false,continuation=false;
  let input='',inputId='',turnItemId='',inputTimer,output='',outputId='',outputTimer,epoch=0,outputMetadata={};
  let queue=[],handlers={},updates=new Map(),responses=new Map(),seenResponses=new Set(),lastInput=0,recentInput=null,repliedSinceInput=false;
  let draftTimer,lastDelegatedEpoch=-1,lastAudibleVersion=0,backendBlockedEpoch=-1,ending=false;
- let researchReady=null,researchTimer,lastOutputAt=0,lastOutputText='',lastSoundVersion=0,lastSoundAt=0,toolHandlers=0;
+ let researchReady=null,researchTimer,lastOutputAt=0,lastOutputText='',lastSoundVersion=0,lastSoundAt=0,toolHandlers=0,finishingOutput=0;
  let researchVersion=0,configurationVersion=0;
  const researchDeliveries=new Map(),researchAcknowledgments=new Map();
+ const comparisonAcknowledgments=new Map();
  const configurationAcknowledgments=new Map();
  const researchTools=new Set(['lookup_financial_aid','lookup_college_applications','lookup_education_planning']);
  const boundaryWaiters=new Set();
@@ -24,17 +28,21 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  // wakes the same guarded backend once; it never schedules speech or research.
  let researchState=null;
  let continuationRequested=false,emptyRecoveryEpoch=-1;
+ let replyTimer,replyPrompt=null,lastAssistantEnd,lastAssistantConfiguration=-1,replyRequestedAt=-Infinity;
+ let yieldedEpoch=-1,lastAssistantStart,yieldPrefixLength=0;
+ const clearReply=()=>{if(replyTimer!==undefined)cancel(replyTimer);replyTimer=undefined;};
  const speechObservation=researchSpeechObservation();
  const id=()=>globalThis.crypto.randomUUID();
  const emit=event=>{if(!closed)return Promise.resolve(handlers.onmessage?.({data:JSON.stringify(event)}));};
- const transmit=event=>{if(closed)return;if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
+ const transmit=event=>{if(closed)return;if(event.type==='session.commentary.append'){clearReply();replyPrompt=null;}if(!started){queue.push(event);return;}raw.send(JSON.stringify(event));};
  const selectionRecovery=liveSelectionRecovery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel,
   getState:()=>({started,closed,ending,session,epoch,lastDelegatedEpoch,inputPending:!!inputId,
    busy:!!(responses.size||pendingDelegations.size||toolHandlers||updates.size||continuation||continuationRequested)})});
  const selectionDelivery=liveSelectionDelivery({send:transmit,emit:event=>void emit(event),id,now,schedule,cancel});
  const deliveryTracker=researchDelivery({send:transmit,emit:event=>void emit(event),now,schedule,cancel,id,
-  canAnnounce:()=>!closed&&!ending&&!responses.size&&!toolHandlers&&!updates.size&&
-   (!lastOutputText||/[.!?。！？]["”’')]*\s*$/u.test(lastOutputText))&&quietBoundary(/[?？]["”’')]*\s*$/u.test(lastOutputText)?6000:600)});
+  canAnnounce:()=>!closed&&!ending&&!responses.size&&!pendingDelegations.size&&!toolHandlers&&!updates.size&&!finishingOutput&&
+   !continuation&&now()-replyRequestedAt>4000&&!trailingClause.test(lastOutputText)&&
+   quietBoundary(lastOutputAt>lastInput&&openQuestion.test(lastOutputText.trim())?3000:600)});
  function clearBackendTimers(){for(const response of responses.values())cancel(response.timer);responses.clear();}
  async function expireBackend(responseId){
   const response=responses.get(responseId);if(closed||!response)return;
@@ -133,7 +141,38 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    };check();
   });
  }
- function stopBoundaries(){researchVersion++;researchState=null;clearResearch('call_ended');selectionRecovery.close();pendingDelegations.clear();selectionDelivery.clear();for(const finish of [...boundaryWaiters])finish(false);}
+ function stopBoundaries(){clearReply();replyPrompt=null;researchVersion++;researchState=null;clearResearch('call_ended');selectionRecovery.close();pendingDelegations.clear();comparisonAcknowledgments.clear();selectionDelivery.clear();for(const finish of [...boundaryWaiters])finish(false);}
+ function recoverReply(transcript,inputEpoch){
+  const prompt=replyPrompt;
+  if(!prompt||!canRecoverReply()||session.onboarding||repliedSinceInput)return;
+  const reply=transcript.trim().slice(0,600);
+  const offer=/(?:want me to|would you like (?:me to|to)|shall we|do you want to)\s+(?:explain|walk through|talk through|go over)\b[^?？]*[?？]\s*$|(?:quieres|te gustar[ií]a|le gustar[ií]a)\s+(?:que (?:te |le )?)?(?:expli(?:c|qu)\p{L}+|repas\p{L}+|habl\p{L}+|revis\p{L}+)\b[^?？]*[?？]\s*$/iu.test(prompt);
+  const accept= /^(?:yes(?: please)?|sure(?: please)?|go ahead|please do|s[ií](?: por favor)?|claro|adelante)[.!¡!\s]*$/iu.test(reply);
+  const direct=offer&&accept;
+  if(!direct&&(!classifyReply||reply.length<2||/^(?:no|stop|wait|espera|para|bye|adiós)\b/iu.test(reply)))return;
+  const version=configurationVersion, research=researchVersion;
+  const deadline=now()+3200;
+  const current=()=>!closed&&!ending&&canRecoverReply()&&epoch===inputEpoch&&version===configurationVersion&&
+   research===researchVersion&&replyPrompt===prompt&&!repliedSinceInput&&lastDelegatedEpoch!==inputEpoch;
+  const quiet=()=>!responses.size&&!pendingDelegations.size&&!toolHandlers&&!updates.size&&!continuation&&!continuationRequested&&quietBoundary(250);
+  const check=async()=>{
+   if(!current()||now()>deadline){clearReply();return;}
+   if(!quiet()){replyTimer=schedule(()=>void check(),200);return;}
+   if(researchDeliveryV2&&deliveryTracker.hasPendingAnswer()){clearReply();return;}
+   const action=direct?'continue':await classifyReply({prompt,reply,language:session.language}).catch(()=>null);
+   if(!current()||!quiet()||now()>deadline||!['continue','clarify'].includes(action)||
+    researchDeliveryV2&&deliveryTracker.hasPendingAnswer())return;
+   replyPrompt=null;
+   replyRequestedAt=now();
+   const content=action==='clarify'
+    ? 'The caller has replied to the previous question. Briefly ask for the specific missing choice in the current language, then listen.'
+    : 'Continue naturally from the caller’s latest reply in the current language. Pick up the offered explanation or address the latest question directly. Keep it brief and use facts already available.';
+   transmit({type:'session.commentary.append',event_id:id(),delegation_id:null,content:content+' Do not initiate a tool action, treat the reply as consent to change records, or repeat a greeting.'});
+   void emit({type:'origen.reply.recovery',action,source:direct?'rules':'decisions'});
+  };
+  clearReply();
+  replyTimer=schedule(()=>void check(),950);
+ }
  async function flushInput(){
   if(inputTimer)cancel(inputTimer);inputTimer=null;if(!inputId||!input)return;
   const item_id=inputId,transcript=input,inputEpoch=epoch;input='';inputId='';
@@ -142,6 +181,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   await emit({type:'conversation.item.input_audio_transcription.completed',item_id,transcript});
   if(researchDeliveryV2){speechObservation.callerStopped();deliveryTracker.callerStopped(transcript);}
   selectionRecovery.settled({transcript,itemId:item_id,epoch:inputEpoch});
+  recoverReply(transcript,inputEpoch);
   // Live can acknowledge a profile answer without delegating it. Give natural
   // delegation a brief head start, then ask the same guarded backend to process
   // this complete answer. This never parses or saves a profile in the adapter.
@@ -157,17 +197,23 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
   if(!force&&!isPlaybackIdle()){outputTimer=schedule(()=>void finishSpeech(),250);return;}
   const response_id=outputId,text=output,metadata=outputMetadata;outputId='';output='';outputMetadata={};
   const audible=getPlaybackVersion()>lastAudibleVersion;lastAudibleVersion=getPlaybackVersion();
+  // Playback already confirmed silence for this version. New audio still
+  // restarts the research boundary check through quietBoundary.
+  if(researchDeliveryV2&&audible&&!force)lastSoundVersion=lastAudibleVersion;
   const observation=researchDeliveryV2?speechObservation.finish({forced:force,playbackObserved:audible}):null;
-  if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
-  await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
-  // Continuous Live has no output-audio-done event. This is a conservative idle
-  // boundary for UI/drain scheduling, never a claim that a person heard speech.
-  await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
-  if(observation){
-   const {completedText,interrupted,...diagnostic}=observation;
-   await emit({type:'origen.research.speech_observed',response_id,...deliveryTracker.traceContext(),...diagnostic});
-   deliveryTracker.reply(text,{audible,forced:force,interrupted,completedText});
-  }
+  finishingOutput++;
+  try{
+   if(text)await emit({type:'response.output_audio_transcript.done',response_id,transcript:text});
+   await emit({type:'response.done',response:{id:response_id,status:'completed',metadata,output:[{type:'message',content:[{type:'output_audio'}]}]}});
+   // Continuous Live has no output-audio-done event. This is a conservative idle
+   // boundary for UI/drain scheduling, never a claim that a person heard speech.
+   await emit({type:'output_audio_buffer.stopped',response_id,liveBoundary:force?'forced_flush':audible?'idle_estimate':'unverified_audio'});
+   if(observation){
+    const {completedText,interrupted,...diagnostic}=observation;
+    await emit({type:'origen.research.speech_observed',response_id,...deliveryTracker.traceContext(),...diagnostic});
+    deliveryTracker.reply(text,{audible,forced:force,interrupted,completedText});
+   }
+  }finally{finishingOutput--;}
  }
  async function receive(e){
   if(closed)return;if(!live){await emit(e);return;}
@@ -179,6 +225,10 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    await emit({type:'session.created',session});const pending=queue;queue=[];pending.forEach(transmit);return;
   }
   if(e.type==='session.thinking.appended'||e.type==='session.instructions.appended'){
+   const comparison=e.type==='session.thinking.appended'&&comparisonAcknowledgments.get(e.client_event_id);
+   if(comparison){comparisonAcknowledgments.delete(e.client_event_id);comparison.pending.delete(e.client_event_id);
+    if(!comparison.pending.size)await emit({type:'origen.research.delivery',jobId:comparison.jobId,deliveryStage:'comparison_context_acknowledged',durationMs:now()-comparison.startedAt});
+   }
    const configuration=configurationAcknowledgments.get(e.client_event_id);
    if(configuration){configurationAcknowledgments.delete(e.client_event_id);configuration.pending.delete(e.client_event_id);await finishConfiguration(configuration);}
    if(e.type!=='session.thinking.appended')return;
@@ -207,14 +257,31 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    // under a NEW turn, so any work on the earlier fragment is still fenced.
    // Never carry words across an assistant reply or a longer silence.
    if(!inputId){
+    clearReply();
+    const afterSpeech=Number.isFinite(e.start_ms)&&Number.isFinite(lastAssistantEnd)?e.start_ms>=lastAssistantEnd:!outputId&&isPlaybackIdle();
+    const recentQuestion=lastAssistantConfiguration===configurationVersion&&lastOutputAt>replyRequestedAt&&
+     now()-lastOutputAt<15000&&/[?？]\s*$/u.test(lastOutputText);
+    replyPrompt=afterSpeech&&recentQuestion?lastOutputText.slice(-600):null;
     const continued=recentInput&&now()-recentInput.lastInput<2500;
     input=continued?recentInput.transcript:'';recentInput=null;
+    yieldPrefixLength=0;
     epoch++;inputId=id();turnItemId=inputId;await emit({type:'input_audio_buffer.speech_started',item_id:inputId,liveBoundary:continued?'transcript_continuation':'transcript_observed'});
    }
    if(closed)return;lastInput=now();
-   input+=e.delta;if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
+   if(researchDeliveryV2&&input&&isResearchAcknowledgment(input))yieldPrefixLength=input.length;
+   input+=e.delta;
+   // The latest transcript fragment can be slightly ahead of or behind the audio.
+   // Duck local playback only, leaving the provider's input and reply intact.
+   if(researchDeliveryV2&&outputId&&yieldedEpoch!==epoch&&!isPlaybackIdle()&&
+    Number.isFinite(e.start_ms)&&Number.isFinite(lastAssistantStart)&&Number.isFinite(lastAssistantEnd)&&
+    e.start_ms>=lastAssistantStart&&e.start_ms<=lastAssistantEnd+800&&yieldRequest.test(input.slice(yieldPrefixLength).trim())){
+    yieldedEpoch=epoch;
+    void emit({type:'origen.caller.yield',item_id:inputId,response_id:outputId});
+   }
+   if(inputTimer)cancel(inputTimer);inputTimer=schedule(()=>void flushInput(),1100);return;
   }
   if(e.type==='session.output_transcript.delta'&&typeof e.delta==='string'){
+   clearReply();replyPrompt=null;lastAssistantEnd=e.end_ms;lastAssistantConfiguration=configurationVersion;
    selectionRecovery.assistant(e.delta);
    selectionDelivery.assistant(e.delta);
    for(const response of responses.values())response.selectionSpeech=(response.selectionSpeech+e.delta).slice(-800);
@@ -233,6 +300,7 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
     // New caller fragments are classified after their quiet boundary, rather
     // than treating every "yes" as a cutoff of the whole research answer.
     outputId=id();
+   lastAssistantStart=e.start_ms;
     await emit({type:'response.created',response:{id:outputId,metadata:outputMetadata}});
     await emit({type:'output_audio_buffer.started',response_id:outputId,liveBoundary:'transcript_observed'});
    }
@@ -320,6 +388,9 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    return;
   }
   if(e.type==='error'){const error={...e.error,event_id:e.error?.client_event_id||e.client_event_id||e.error?.event_id};
+   const comparison=comparisonAcknowledgments.get(error.event_id);
+   if(comparison){for(const key of comparison.pending)comparisonAcknowledgments.delete(key);
+    await emit({type:'origen.research.delivery',jobId:comparison.jobId,deliveryStage:'comparison_context_failed',durationMs:now()-comparison.startedAt});}
    selectionRecovery.error(error.event_id);
    const configuration=configurationAcknowledgments.get(error.event_id)||updates.get(error.event_id);
    if(configuration){retireConfiguration(configuration);error.event_id=configuration.id;}
@@ -329,11 +400,27 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
  }
  function send(text){
   if(!live)return raw.send(text);const event=JSON.parse(text);
+  if(event.type==='origen.research.comparisons'){
+   if(event.comparisons&&Array.isArray(event.comparisons.peers)&&event.comparisons.peers.length<=2){
+    const ids=quietContext('computed-cost-comparisons',event.event_id||id(),event.comparisons);
+    const record={jobId:event.jobId,startedAt:now(),pending:new Set(ids)};
+    for(const key of ids)comparisonAcknowledgments.set(key,record);
+    void emit({type:'origen.research.delivery',jobId:event.jobId,deliveryStage:'comparison_context_supplied',durationMs:0});
+   }
+   return;
+  }
+  if(event.type==='origen.research.housing'){
+   if(['renting','with_family'].includes(event.choice))quietContext('current-call-housing-choice',event.event_id||id(),{
+    choice:event.choice,studentId:typeof event.studentId==='string'?event.studentId.slice(0,180):null,
+    source:'caller_statement',savedToProfile:false,appliesTo:'this student only, including subsequent campus comparisons',
+   });
+   return;
+  }
   if(event.type==='origen.research.ready'){
    if(ending)return;
    if(researchState?.jobId&&event.jobId&&researchState.jobId!==event.jobId)return;
    if(event.revision!==undefined&&researchState?.revision!==undefined&&event.revision!==researchState.revision)return;
-   if(researchDeliveryV2){deliveryTracker.ready(event,{awaitingReply:!!inputId||!!recentInput&&!repliedSinceInput});return;}
+   if(researchDeliveryV2){deliveryTracker.ready(event,{awaitingReply:!!inputId||!!recentInput&&!repliedSinceInput,pendingCallerText:input});return;}
    const delivery=supplyResearch(event);if(delivery.announced||delivery.quietOnly)return;
    researchReady=delivery;cancel(researchTimer);researchTimer=schedule(checkResearch,250);return;
   }
@@ -343,15 +430,20 @@ export function studentLiveChannel(raw,{getTurn=()=>'',schedule=setTimeout,cance
    researchState=event.request;
    if(changed){
     const snapshot=researchDeliveryV2?researchStateContext(researchState):{...researchState,elapsedMs:undefined};
-    quietContext('research-state',researchState?.requestId||'current',snapshot);
+    if(researchDeliveryV2&&deliveryTracker.topicChanged(input))snapshot.deliveryDisposition='caller_changed_topic';
+    const terminal=['completed','failed','cancelled'].includes(snapshot.state);
+    // The managed research tool receipt already identifies the pending work.
+    // Keep intermediate transitions in the app, without repeating them to Live.
+    if(!researchDeliveryV2||!researchState.quietProgress||terminal)quietContext('research-state',researchState?.requestId||'current',snapshot);
     // Live's quiet context and the managed Responses conversation are separate.
     // Retire its old pending tool receipt as well, without starting generation,
     // replaying a function output, or interfering with the spoken conversation.
-    if(researchDeliveryV2&&['completed','failed','cancelled'].includes(snapshot.state))transmit({type:'response.item.create',event_id:id(),item:{type:'message',role:'developer',content:[{type:'input_text',text:'Application research task update, not a new caller request. The newest state or receipt for this task replaces its older state. '+JSON.stringify({requestId:researchState?.requestId,...snapshot})}]}});
+    if(researchDeliveryV2&&terminal)transmit({type:'response.item.create',event_id:id(),item:{type:'message',role:'developer',content:[{type:'input_text',text:'Application research task update, not a new caller request. The newest state or receipt for this task replaces its older state. '+JSON.stringify({requestId:researchState?.requestId,...snapshot})}]}});
     void emit({type:'origen.research.state_changed',requestId:event.request?.requestId,revision:event.request?.revision,jobId:event.request?.jobId,state:event.request?.state});}return;
   }
   if(event.type==='origen.research.cancel'){
    const previous=researchState,scopeChanged=event.reason==='scope_changed';
+   if(scopeChanged){clearReply();replyPrompt=null;lastAssistantConfiguration=-1;}
    researchVersion++;researchState=null;clearResearch(scopeChanged?'scope_changed':'cancelled');
    // Scope cleanup also runs on the first student selection, with no research.
    // Keep the stale-work barrier without inventing a cancelled lookup for Live.

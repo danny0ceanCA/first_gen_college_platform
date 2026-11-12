@@ -41,6 +41,10 @@ test('a duplicate snapshot offered during inference preserves original request a
   assert.equal(row.reservationId, 'reservation-a'); assert.equal(row.costUsd, .000002);
   assert.equal(row.totalWorkerMs, 220, 'total starts at the original offer, not a duplicate offer');
   assert.equal(row.questionId, 'user:question-a');
+  const apiStarted = f.rows.find(item => item.type === 'decisions_api_started');
+  assert.equal(apiStarted.operationId, 'operation-a');
+  assert.equal(apiStarted.queueWaitMs, 20, 'queue timing survives until the operation ID exists');
+  assert.equal(apiStarted.buildMs, 0);
 });
 
 test('coalescing a pending snapshot does not clear the active request lifecycle', async () => {

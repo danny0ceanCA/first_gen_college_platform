@@ -6,6 +6,16 @@ const cases=[
  {language:'en',first:'The 2026 annual tuition is 12345 dollars.',tail:' Housing is estimated at',ack:'Yes, okay.',cut:'Wait, what about housing?',next:' Housing is separate from tuition.'},
  {language:'es',first:'La matrícula anual de 2026 es de 12345 dólares.',tail:' La vivienda se estima en',ack:'Sí, entiendo.',cut:'Espera, ¿y la vivienda?',next:' La vivienda es aparte de la matrícula.'},
 ];
+for(const cue of ['Hmm','Mm','Mm-hmm','Ajá'])test(`${cue} preserves a research caveat across an overlapping acknowledgment`,()=>{
+ const observation=researchSpeechObservation();
+ observation.output({delta:'The published total is a planning estimate,',start_ms:100,end_ms:700});
+ observation.caller({delta:cue,start_ms:400,end_ms:650});observation.callerStopped();
+ observation.output({delta:' not a bill.',start_ms:700,end_ms:1000});
+ const result=observation.finish({playbackObserved:true});
+ assert.equal(result.speechOutcome,'acknowledgment_overlap');
+ assert.equal(result.interrupted,false);
+ assert.equal(result.completedText,'The published total is a planning estimate, not a bill.');
+});
 for(const item of cases){
  test(`${item.language}: brief acknowledgment retains a completed answer without a restart`,()=>{
   const observation=researchSpeechObservation();

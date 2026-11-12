@@ -62,7 +62,16 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
   assert.match(speech,/State only qualifications supported by the findings/);
   assert.match(speech,/different amounts alone do not establish different inclusions or rules/);
   assert.match(speech,/A changed scenario outside its searched question is not researched, not searched-and-unverified/);
-  assert.match(speech,/Lead with the useful answer to the latest question, keeping its year and scenario/);
+  assert.match(speech,/give the useful fact with its year\/scenario/);
+  assert.match(speech,/finish a useful answer to the caller's question first/);
+  assert.match(speech,/begin with a direct answer to the caller's newest question, even if an earlier result arrives before or during your reply/);
+  assert.match(speech,/Give the categories before sharing the campus result/);
+  assert.match(speech,/distinguish typical expenses from verified campus-specific inclusions/);
+  assert.match(speech,/Give any material caveat once, in the same thought as the result/);
+  assert.match(speech,/conditions such as before aid/);
+  assert.match(speech,/without repeating the lesson unless asked or confusion returns/);
+  assert.match(speech,/Keep new year, scenario, coverage and eligibility limitations/);
+  assert.match(speech,/If they explicitly changed topics, leave the old result/);
   assert.match(speech,/A rejected replacement or reading an old report performs no search/);
   assert.match(speech,/Answer the latest question first using relevant verified findings/);
   assert.match(speech,/simple comparison or calculation when their year and scenario support it/);
@@ -79,7 +88,8 @@ for(const language of ['en','es'])test(`${language} research keeps latest questi
  assert.match(c.instructions,/explain any useful concept or distinction already supported by known context/);
  assert.match(c.instructions,/carry the answer forward without repeating the question/);
  assert.match(c.instructions,/name both campuses in institution/);
- assert.match(c.instructions,/without scripted hmm, uh or repeated Okay\/Alright acknowledgments/);
+ assert.match(c.instructions,/speech model chooses ordinary wording/);
+ assert.match(c.instructions,/do not prescribe listening sounds, an opening phrase or a repeated waiting announcement/);
  assert.match(c.instructions,/research only the unresolved portion if needed/);
  assert.match(c.instructions,/status questions reuse actual task state/);
  assert.match(c.instructions,/Read retained details without a checking preamble; the read starts no search/);
@@ -90,7 +100,7 @@ for(const language of ['en','es'])test(`${language} call-only speech keeps backe
  const i={...input,language,profile:{...input.profile,goals:'PRIVATE_PROFILE_GOALS'},memory:[{id:'m',mode:'planning',date:'2026-11-01',summary:'PRIVATE_OLD_SUMMARY'}],studentBrief:{available:true,memories:[{id:'n',status:'confirmed',category:'goal',content:'PRIVATE_SAVED_MEMORY'}]},workspace:{available:true,selection:'note',notes:[{selected:true,content:'PRIVATE_BINDER_NOTE'}],actions:[{selected:true,title:'PRIVATE_BINDER_ACTION'}]}};
  const c=voiceSession(i,{OPENAI_MODEL_VOICE:'gpt-live-1'}),live=studentLiveSession(c,i);
  assert.equal(live.model,'gpt-live-1');assert.equal(live.delegation.responses.model,'gpt-6-luna');
- assert.equal(live.delegation.responses.instructions,c.instructions);
+ assert.ok(live.delegation.responses.instructions.startsWith(c.instructions),'authorized backend context is retained before bounded research-answer guidance');
  assert.deepEqual(live.delegation.responses.tools.map(({strict,...tool})=>tool),c.tools);
  for(const text of ['PRIVATE_PROFILE_GOALS','PRIVATE_OLD_SUMMARY','PRIVATE_BINDER_NOTE'])assert.ok(c.instructions.includes(text),text);
  for(const speech of [live.instructions]){

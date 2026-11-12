@@ -1,13 +1,87 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectResearchReuse,reuseResearchRequest,mergeReusedResearchSources,cachedResearchForCoverage,parseReusedOnlyResearch,retainVerifiedResearch} from './research-reuse.mjs';
+import {selectResearchReuse,reuseResearchRequest,mergeReusedResearchSources,cachedResearchForCoverage,parseReusedOnlyResearch,retainVerifiedResearch,comparisonAddition,mergeComparisonAddition} from './research-reuse.mjs';
 import {voiceResearchCache} from '../src/voiceResearchCache.mjs';
+import {costHousingScenario} from './voice-housing-scope.mjs';
 const now=Date.parse('2026-11-05T17:00:00Z');
 const question='2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley';
 const finding={subject:'UC Berkeley',aspect:'tuition_fees',status:'verified',answer:'UC Berkeley 2026–27 undergraduate tuition and mandatory fees are $18,214. [1]',qualification:'California-resident published academic-year estimate before aid, not a personal bill. [1]'};
 const result={text:finding.answer+' '+finding.qualification,sources:[{url:'https://financialaid.berkeley.edu/costs',title:'Official costs',checkedAt:new Date(now-1000).toISOString()}],checkedAt:new Date(now-1000).toISOString(),voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
 const row={status:'completed',finished_at:new Date(now-1000).toISOString(),input:{mode:'finance',institution:'UC Berkeley',question},result};
 const query={mode:'finance',institution:'UC Berkeley and UC Santa Cruz',question:'Compare 2026–27 undergraduate tuition and mandatory fees for California residents at UC Berkeley and UC Santa Cruz'};
+
+test('explicit rental scope survives comparison phrasing without inferring an unspecified housing plan',()=>{
+ for(const text of ['off-campus renting scenarios for both (not on campus)','off-campus apartment rental','alquiler fuera del campus','fuera del campus y alquilando'])assert.equal(costHousingScenario(text),'renting',text);
+ for(const text of ['off campus, not renting','off campus renting is not the plan','renting off campus isn’t the plan','alquiler fuera del campus no es el plan','off-campus housing, arrangement unspecified','fuera del campus, modalidad sin especificar'])assert.equal(costHousingScenario(text),'off_campus',text);
+ for(const text of ['off campus renting or living with family','alquiler fuera del campus o con sus padres','off-campus renting or on campus'])assert.notEqual(costHousingScenario(text),'renting',text);
+});
+
+for(const language of ['en','es'])test(`${language}: cited partial budget stays with its discrepancy when adding a college`,()=>{
+ const previous=structuredClone(row);
+ previous.input.question=language==='en'?'2026–27 undergraduate annual tuition and total budget for California residents renting off campus':'Matrícula y presupuesto anual de pregrado 2026–27 para residentes de California que alquilan fuera del campus';
+ const partial={subject:'UC Berkeley — off-campus apartment rental, 2026–27',aspect:'total_budget',status:'partial',
+  answer:language==='en'?'US$49,692 before aid for the academic year. Published breakdown: Tuition and fees: $18,214; Housing: $14,386. [1]':'US$49,692 antes de la ayuda para el año académico. Desglose publicado: Matrícula y cuotas: $18,214; Alojamiento: $14,386. [1]',
+  qualification:language==='en'?'Another official page lists $49,420; this discrepancy is unresolved. Planning estimate, not a bill. [1]':'Otra página oficial indica $49,420; la discrepancia no está resuelta. Es una estimación, no una factura. [1]'};
+ previous.result.voiceBrief.findings.push(partial);previous.result.voiceBrief.status='partial';
+ const input={...previous.input,language,institution:'UC Davis'};
+ const reuse=selectResearchReuse({...input,institution:'UC Davis; UC Berkeley'},[previous],{now});
+ assert.equal(reuse.reusedEvidence[0].coverage,'reference');assert.equal(cachedResearchForCoverage(reuse),null);
+ const tuitionOnly=selectResearchReuse({...input,institution:'UC Berkeley',question:'2026–27 undergraduate annual tuition and mandatory fees for California residents'},[previous],{now});
+ const cached=cachedResearchForCoverage(tuitionOnly);
+ assert.ok(cached);assert.equal(cached.voiceBrief.status,'partial','fully covered tuition cannot upgrade a retained partial budget');
+ const plan=comparisonAddition(input,previous,{now});assert.deepEqual(plan.lookupInstitutions,['UC Davis']);
+ const retained=plan.reusedEvidence[0].findings.find(f=>f.aspect==='total_budget');
+ assert.equal(retained.status,'partial');assert.match(retained.qualification,/49,420/);
+ assert.match(retained.answer,/49,692/);assert.match(retained.answer,/14,386/);
+ const davis=structuredClone(result);davis.voiceBrief.findings=davis.voiceBrief.findings.map(f=>({...f,subject:'UC Davis'}));
+ const merged=mergeComparisonAddition(davis,plan);
+ assert.equal(merged.voiceBrief.status,'partial');
+ assert.equal(merged.voiceBrief.findings.find(f=>f.aspect==='total_budget').qualification,partial.qualification);
+ const stale=structuredClone(previous);stale.result.sources[0].checkedAt=new Date(now-300000).toISOString();
+ assert.deepEqual(comparisonAddition(input,stale,{now}).reusedEvidence,[],'a fresh task may continue without reusing stale source facts');
+ assert.equal(comparisonAddition({...input,question:input.question.replace('2026–27','2027–28')},previous,{now}),null);
+ const unsupported=structuredClone(previous);unsupported.result.voiceBrief.findings[1].status='unverified';
+ assert.deepEqual(comparisonAddition(input,unsupported,{now}).reusedEvidence[0].findings.map(f=>f.aspect),['tuition_fees']);
+});
+
+for(const language of ['en','es'])test(`${language}: an inaccessible previous campus does not block a clear same-scenario addition`,()=>{
+ const question=language==='en'?'2026–27 undergraduate transfer annual tuition and total budget for California residents renting off campus':'Matrícula y presupuesto anual de pregrado y transferencia 2026–27 para residentes de California que alquilan fuera del campus';
+ const previous={...structuredClone(row),input:{mode:'finance',institution:'UC Irvine',question}};
+ const tuition={...previous.result.voiceBrief.findings[0],subject:'UC Irvine',status:'partial',answer:'2026–27 tuition $14,202; Student Services Fee $1,386 [1].',qualification:'The official total does not reconcile. The full fee subtotal remains unverified [1].'};
+ const unknown={subject:'UC Irvine',aspect:'total_budget',status:'unverified',answer:'The annual rental total could not be verified.',qualification:'The official page was inaccessible.'};
+ previous.result.voiceBrief.findings=[tuition,unknown];previous.result.voiceBrief.status='partial';
+ const input={mode:'finance',language,institution:'UC Merced',question};
+ const plan=comparisonAddition(input,previous,{now});
+ assert.deepEqual(plan.lookupInstitutions,['UC Merced']);assert.doesNotMatch(plan.question,/Irvine/);
+ assert.equal(plan.reusedEvidence[0].coverage,'reference');assert.equal(plan.reusedEvidence[0].findings[0].status,'partial');
+ assert.match(plan.reusedEvidence[0].findings[0].qualification,/does not reconcile/);
+ const fresh={...structuredClone(result),voiceBrief:{...result.voiceBrief,status:'unverified',findings:[{...unknown,subject:'UC Merced'}]}};
+ const merged=mergeComparisonAddition(fresh,plan);
+ assert.equal(merged.voiceBrief.status,'partial');assert.equal(merged.voiceBrief.findings[0].status,'unverified');
+ assert.equal(merged.voiceBrief.findings[1].status,'partial');
+ previous.result.voiceBrief.findings=[unknown];previous.result.sources=[];
+ const emptyPlan=comparisonAddition(input,previous,{now});
+ assert.deepEqual(emptyPlan.reusedEvidence,[]);assert.deepEqual(emptyPlan.lookupInstitutions,['UC Merced']);
+ assert.equal(mergeComparisonAddition(fresh,emptyPlan).voiceBrief.status,'unverified');
+ for(const invalid of [
+  {...input,question:question.replace('2026–27','2027–28')},
+  {...input,question:language==='en'?question.replace('renting off campus','living with family'):question.replace('alquilan fuera del campus','viven con sus padres')},
+  {...input,question:question.replace(language==='en'?'California residents':'residentes de California',language==='en'?'nonresidents':'no residentes')},
+  {...input,question:question+(language==='en'?' per semester':' por semestre')},
+ ])assert.equal(comparisonAddition(invalid,previous,{now}),null,invalid.question);
+ assert.equal(comparisonAddition(input,{...previous,status:'running'},{now}),null);
+ assert.equal(comparisonAddition(input,{...previous,finished_at:new Date(now-300000).toISOString()},{now}),null);
+});
+
+test('new-campus results take priority over retained context within the eight-finding Live contract',()=>{
+ const fresh=structuredClone(result);
+ fresh.voiceBrief.findings=Array.from({length:8},(_,index)=>({...finding,subject:'UC Merced',answer:`Verified detail ${index+1} [1].`}));
+ const retained={...finding,answer:finding.answer.replace('[1]','[R1]'),qualification:finding.qualification.replace('[1]','[R1]')};
+ const input={comparisonAddition:true,institution:'UC Merced',reusedEvidence:[{findings:[retained],sources:[{ref:'R1',...result.sources[0]}]}]};
+ const merged=mergeComparisonAddition(fresh,input);
+ assert.ok(merged);assert.equal(merged.voiceBrief.findings.length,8);assert.equal(merged.retainedFindingCount,0);
+ assert.ok(merged.voiceBrief.findings.every(f=>f.subject==='UC Merced'));
+});
 
 for(const language of ['en','es'])test(`${language}: same fall cohort and annual total with term breakdown remain reusable`,()=>{
  const previous=structuredClone(row);
@@ -65,7 +139,7 @@ for(const language of ['en','es'])test(`${language}: a new-campus comparison ret
  const reuse=selectResearchReuse({mode:'finance',institution:'UC Santa Cruz',question},[previous],{now});
  assert.equal(reuse.reusedEvidence.length,1);assert.equal(reuse.reusedEvidence[0].findings[0].status,'verified');
  assert.deepEqual(reuse.lookupInstitutions,['UC Santa Cruz']);assert.match(reuse.reusedEvidence[0].findings[0].qualification,/California-resident/);
- const request=reuseResearchRequest({input:'{}',instructions:''},reuse);assert.match(request.instructions,/check the newly requested campus first/);
+ const request=reuseResearchRequest({input:'{}',instructions:''},reuse);assert.match(request.instructions,/check the newly requested option first/);
  const wrongYear=structuredClone(previous);wrongYear.result.voiceBrief.findings[0].subject='UC Berkeley — 2025–26';wrongYear.result.voiceBrief.findings[0].answer=wrongYear.result.voiceBrief.findings[0].answer.replace('2026–27','2025–26');
  assert.deepEqual(selectResearchReuse({mode:'finance',institution:'UC Santa Cruz',question},[wrongYear],{now}),{});
  const missingYear=structuredClone(previous);missingYear.result.voiceBrief.findings[0].subject='UC Berkeley';missingYear.result.voiceBrief.findings[0].answer=missingYear.result.voiceBrief.findings[0].answer.replace('2026–27','');
@@ -206,7 +280,7 @@ test('a newer comparison cannot refresh an inherited stale source or upgrade par
  assert.deepEqual(reuse.reusedEvidence.map(e=>e.institution),['UCLA']);
  assert.deepEqual(reuse.lookupInstitutions,['UC Irvine','UCLA','UC Berkeley']);
  assert.equal(reuse.reusedEvidence[0].coverage,'reference');
- assert.deepEqual(reuse.reusedEvidence[0].findings.map(f=>f.aspect),['total_budget']);
+ assert.deepEqual(reuse.reusedEvidence[0].findings.map(f=>[f.aspect,f.status]),[['tuition_fees','partial'],['total_budget','verified']]);
  assert.equal(reuse.reusedEvidence[0].checkedAt,previous.result.sources[0].checkedAt);
  const wrongSource=structuredClone(previous);wrongSource.result.sources[0].url='https://unofficial.example/costs';
  assert.deepEqual(selectResearchReuse(input,[wrongSource],{now}),{});

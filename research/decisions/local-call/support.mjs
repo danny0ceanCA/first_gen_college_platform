@@ -4,23 +4,25 @@ import { silentSidebandAudio } from './audio-activity.mjs';
 import { createConversationDelivery } from './conversation-delivery.mjs';
 import { createEarlySupportDelivery } from './early-support-delivery.mjs';
 
-// Local experimental support only. No generated wording, research observation,
-// transcript content or student record is allowed into the outbound payload.
+// Optional application-authored support. No generated wording, research
+// observation, transcript content or student record enters the outbound payload.
 export const SUPPORT_NOTES = Object.freeze({
   en: Object.freeze({
     starting_point: 'Conversation support observation: the caller explicitly asked for help finding a starting point. One small starting point grounded in what they already shared, or one gentle question, may help. This is optional context for the next relevant reply, with no separate acknowledgment, greeting or recap needed.',
     simpler_explanation: 'Conversation support observation: the caller explicitly asked for a simpler explanation. A short plain-language explanation of the idea already being discussed, with one familiar example if useful, may help. This is optional context for the next relevant reply, with no separate acknowledgment, greeting or recap needed.',
+    concrete_example: 'Conversation support observation: the caller asked for a concrete example. One short familiar example of the current idea may help; use a different example if the last one did not help. This is optional context for the next relevant reply. Do not interrupt, repeat, or start speech for this note.',
     next_step: 'Conversation support observation: the caller explicitly asked what to do next. One manageable next step grounded in the current conversation may help. This is optional context for the next relevant reply, with no separate acknowledgment, greeting or recap needed.',
   }),
   es: Object.freeze({
     starting_point: 'Observación de apoyo: la persona pidió ayuda explícitamente para encontrar por dónde empezar. Puede ayudar un primer paso pequeño basado en lo que ya compartió, o una pregunta amable. Es contexto opcional para la próxima respuesta pertinente; no requiere otro saludo, resumen ni anuncio.',
     simpler_explanation: 'Observación de apoyo: la persona pidió explícitamente una explicación más sencilla. Puede ayudar una explicación breve con palabras cotidianas de la idea que ya se está conversando, y un ejemplo familiar si sirve. Es contexto opcional para la próxima respuesta pertinente; no requiere otro saludo, resumen ni anuncio.',
+    concrete_example: 'Observación de apoyo: la persona pidió un ejemplo concreto. Puede ayudar un ejemplo cotidiano y breve de la idea actual; usa otro si el anterior no ayudó. Es contexto opcional para la próxima respuesta pertinente. No interrumpas, repitas ni empieces a hablar por esta nota.',
     next_step: 'Observación de apoyo: la persona preguntó explícitamente qué hacer después. Puede ayudar un solo paso manejable basado en la conversación actual. Es contexto opcional para la próxima respuesta pertinente; no requiere otro saludo, resumen ni anuncio.',
   }),
 });
 
 export function createSupportGate({ enabled = false, preferencesEnabled = false, conversationEnabled = false,
-  earlyEnabled = false, earlyObserveOnly = false, lateEnabled = false, getEarlyEvidence = () => null, scope = {}, language = 'en',
+  earlyEnabled = false, earlyObserveOnly = false, lateEnabled = false, betweenThoughtsEnabled = false, getEarlyEvidence = () => null, scope = {}, language = 'en',
   send, log = () => {}, now = () => performance.now(), makeId = randomUUID } = {}) {
   let currentScope = { ...scope }, currentLanguage = language;
   let generation = 0, question = null, started = false, closed = false, introReady = false, introBoundary = false;
@@ -43,8 +45,24 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
     : !playback.idle || now() - playback.at > 1500 ? 'playback_not_fresh_idle'
     : research || delegation || backends.size || pendingDelegations.size || pendingContext.size ? 'background_or_context_pending'
     : !['en', 'es'].includes(currentLanguage) ? 'language_unsupported' : null;
-  const early = createEarlySupportDelivery({ enabled: enabled && earlyEnabled, observeOnly: earlyObserveOnly, lateEnabled,
-    canDeliverLate: lateBlocked, getEvidence: getEarlyEvidence, now, log,
+  const betweenBlocked = () => !betweenThoughtsEnabled || closed || !started || !selected() ? 'session_or_scope_unready'
+    : selectionPending || !introReady ? 'intro_unready'
+    : inputOpen || getEarlyEvidence()?.inputOpen !== false ? 'caller_boundary_unconfirmed'
+    : outputOpen || getEarlyEvidence()?.outputOpen !== false
+      || getEarlyEvidence()?.assistantBoundaryRevision !== getEarlyEvidence()?.assistantOutputRevision ? 'output_boundary_unconfirmed'
+    : now() - audioActivityAt < 900 ? 'speech_in_progress'
+    : !playback.idle || now() - playback.at > 1500 ? 'playback_not_fresh_idle'
+    // A job running in the background does not itself prevent support. Pending
+    // delegations and context still fence the append's acknowledgment effects.
+    : delegation || backends.size || pendingDelegations.size || pendingContext.size ? 'background_or_context_pending'
+    : !['en', 'es'].includes(currentLanguage) ? 'language_unsupported' : null;
+  const deliveryState = () => ({ started, closed, selected: Boolean(selected()), selectionPending, introReady,
+    inputOpen, outputOpen, recentAudio: now() - audioActivityAt < 900,
+    playbackIdle: playback.idle, playbackAgeMs: Number.isFinite(playback.at) ? Math.max(0, now() - playback.at) : null,
+    research, delegation, backendCount: backends.size, delegationCount: pendingDelegations.size,
+    pendingContextCount: pendingContext.size });
+  const early = createEarlySupportDelivery({ enabled: enabled && earlyEnabled, observeOnly: earlyObserveOnly, lateEnabled, betweenThoughtsEnabled,
+    canDeliverLate: lateBlocked, canDeliverBetweenThoughts: betweenBlocked, getEvidence: getEarlyEvidence, now, log, deliveryState,
     canDeliver: () => closed || !started || !selected() ? 'session_or_scope_unready'
       : selectionPending || !introReady ? 'intro_unready'
       // Classification can run while the caller speaks, but optional context
@@ -85,11 +103,7 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
   });
   const preferences = createPreferenceDelivery({ enabled: enabled && preferencesEnabled, scope, language, now,
     log,
-    deliveryState: () => ({ started, closed, selected: Boolean(selected()), selectionPending, introReady,
-      inputOpen, outputOpen, recentAudio: now() - audioActivityAt < 900,
-      playbackIdle: playback.idle, playbackAgeMs: Number.isFinite(playback.at) ? Math.max(0, now() - playback.at) : null,
-      research, delegation, backendCount: backends.size, delegationCount: pendingDelegations.size,
-      pendingContextCount: pendingContext.size }),
+    deliveryState,
     canDeliver: () => closed || !started || !selected() ? 'session_or_scope_unready'
       : selectionPending || !introReady ? 'intro_unready'
       : inputOpen || outputOpen || now() - audioActivityAt < 900 ? 'speech_in_progress'
@@ -137,6 +151,7 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
     earlySupportRevision: early.revision,
     earlyAllowed: () => enabled && earlyEnabled && started && !closed && selected() && introReady && !selectionPending,
     lateAllowed: () => enabled && earlyEnabled && lateEnabled && !lateBlocked(),
+    betweenThoughtsAllowed: () => enabled && earlyEnabled && betweenThoughtsEnabled && !betweenBlocked(),
     considerEarly: early.consider,
     conversationStamp: conversation.stamp,
     considerConversation(candidate) {
@@ -259,7 +274,7 @@ export function createSupportGate({ enabled = false, preferencesEnabled = false,
     consider({ record, stamp: source } = {}) {
       checkAcknowledgments();
       if (!enabled) return blocked('disabled', record, source);
-      if (earlyEnabled && ['simpler_explanation', 'starting_point'].includes(record?.result?.supportNeed)) return blocked('early_support_owns_explanation', record, source);
+      if (earlyEnabled && ['simpler_explanation', 'concrete_example', 'starting_point'].includes(record?.result?.supportNeed)) return blocked('early_support_owns_explanation', record, source);
       if (conversationEnabled && conversation.status().pending) return blocked('conversation_update_pending', record, source);
       if (preferencesEnabled && preferences.status().pending) return blocked('preference_update_pending', record, source);
       if (closed || !started || !selected()) return blocked('session_or_scope_unready', record, source);

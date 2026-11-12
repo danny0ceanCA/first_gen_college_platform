@@ -1,4 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {studentLivePlayback} from './studentLivePlayback.mjs';
+test('a correction lowers playback and restores it without overwriting a volume change',()=>{
+ const playback=studentLivePlayback(),audio={volume:0.8,paused:false,muted:false};
+ playback.duck(audio);assert.equal(audio.volume,0.12);
+ playback.restoreVolume();assert.equal(audio.volume,0.8);
+ playback.duck(audio);audio.volume=0.5;
+ playback.stop();assert.equal(audio.volume,0.5);
+});
 test('Audio monitoring primes in the user gesture, observes silence, and releases its own resources',async()=>{
  let created=0,resumed=0,disconnected=0,closed=0,time=0,sound=.1,context,observed=0;
  class Context{constructor(){created++;this.state='suspended';context=this;}async resume(){resumed++;this.state='running';}createMediaStreamSource(){return {connect(){},disconnect(){disconnected++;}};}createAnalyser(){return {fftSize:8,getFloatTimeDomainData(samples){samples.fill(sound);}};}async close(){closed++;this.state='closed';}}

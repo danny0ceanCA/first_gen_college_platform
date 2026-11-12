@@ -25,16 +25,27 @@ test('durable metadata strips secrets, messages, full tool output and reasoning'
  assert.deepEqual(data,{providerStatus:'incomplete',incompleteReason:'max_output_tokens',providerRequestId:'req_safe123',providerResponseId:'resp_safe123',actions:[{type:'search',status:'completed'}]});
 });
 
+test('request coverage is distinct from provider completion in durable and service diagnostics',()=>{
+ const fields={requestStatus:'partial',requestedFactCount:4,missingFactCount:1,recoveryGapCount:1,conflictCount:0};
+ const durable=researchTraceData({...fields,providerStatus:'completed',missingFactText:'private request'});
+ assert.deepEqual(durable,{...fields,providerStatus:'completed'});
+ const service=diagnosticRecord({event:'voice.research.lifecycle',researchStage:'completed',...fields,missingFactText:'private request'});
+ for(const [key,value]of Object.entries(fields))assert.equal(service[key],value);
+ assert.ok(!JSON.stringify(service).includes('private request'));
+ assert.equal(researchTraceData({missingFactCount:9999}).missingFactCount,256);
+ assert.deepEqual(researchTraceData({requestStatus:'model said everything is fine'}),{});
+});
+
 for(const language of ['en','es'])test(`${language}: provider attempts link to one call/job with safe completion evidence`,async()=>{
  const sessionId=randomUUID(),jobId=randomUUID(),writes=[],logs=[];let available=true;
  const db={async query(sql,args){if(sql.includes('RETURNING id,input')){if(!available)return {rows:[]};available=false;return {rows:[{id:jobId,session_id:sessionId,created_at:new Date(Date.now()-500),started_at:new Date(),input:{mode:'finance',language,question:language==='es'?'Matrícula publicada':'Published tuition',institution:'Test College'}}]};}writes.push({sql,args});return {rows:[{status:'running'}],rowCount:1};}};
- let clientRequestId;
- await processResearchJob(db,{ORIGEN_RESEARCH_BRIEFS:'false'},{log:e=>logs.push(e),request:async(url,options)=>{clientRequestId=options.headers['X-Client-Request-Id'];return new Response(JSON.stringify({id:'resp_fixture',status:'completed',usage:{input_tokens:10,output_tokens:20},output:[{type:'web_search_call',status:'completed',action:{type:'search'}},{type:'message',content:[{type:'output_text',text:'Tuition is published. [1]',annotations:[{type:'url_citation',url:'https://test.edu/fees',title:'Fees',start_index:0,end_index:8}]}]}]}),{headers:{'x-request-id':'req_fixture'}});}});
+ let clientRequestId,requestedOutputLimit;
+ await processResearchJob(db,{ORIGEN_RESEARCH_BRIEFS:'false'},{log:e=>logs.push(e),request:async(url,options)=>{clientRequestId=options.headers['X-Client-Request-Id'];requestedOutputLimit=JSON.parse(options.body).max_output_tokens;return new Response(JSON.stringify({id:'resp_fixture',status:'completed',usage:{input_tokens:10,output_tokens:20},output:[{type:'web_search_call',status:'completed',action:{type:'search'}},{type:'message',content:[{type:'output_text',text:'Tuition is published. [1]',annotations:[{type:'url_citation',url:'https://test.edu/fees',title:'Fees',start_index:0,end_index:8}]}]}]}),{headers:{'x-request-id':'req_fixture'}});}});
  const events=writes.filter(w=>w.sql.startsWith('INSERT INTO origen_voice_research_trace_events')).map(w=>({jobId:w.args[1],sessionId:w.args[2],stage:w.args[3],data:w.args[5]}));
  assert.ok(events.length>=5);assert.ok(events.every(e=>e.jobId===jobId&&e.sessionId===sessionId));
  const attempt=events.find(e=>e.stage==='attempt_finished');assert.equal(attempt.data.providerRequestId,'req_fixture');assert.equal(attempt.data.providerResponseId,'resp_fixture');assert.equal(attempt.data.failureKind,'none');assert.equal(attempt.data.attemptId,clientRequestId);assert.match(clientRequestId,/^[a-f0-9-]{36}$/u);
  assert.ok(events.some(e=>e.stage==='completed'));assert.ok(logs.every(e=>e.researchCallKey&&e.researchJobKey));
- assert.equal(attempt.data.maxOutputTokens,3000);assert.equal(attempt.data.maxToolCalls,2);assert.match(attempt.data.configurationHash,/^[a-f0-9]{64}$/u);
+ assert.equal(attempt.data.maxOutputTokens,requestedOutputLimit);assert.ok(requestedOutputLimit<=6000);assert.equal(attempt.data.maxToolCalls,2);assert.match(attempt.data.configurationHash,/^[a-f0-9]{64}$/u);
  assert.doesNotMatch(JSON.stringify(events),/Published tuition|Matrícula publicada|Tuition is published/);
 });
 

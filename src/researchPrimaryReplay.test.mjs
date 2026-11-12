@@ -120,18 +120,21 @@ for(const [language,s] of Object.entries(scripts)){
   r.close();
  });
 
- test(`${language}: mentioning a tuition comparison does not silently replace the requested total budget`,()=>{
+ test(`${language}: a tuition reflection keeps the total gap primary while verified partial fees remain useful`,()=>{
   const research=result(s);
   research.voiceBrief.findings.push({subject:'UC Irvine',aspect:'tuition_fees',status:'verified',
    answer:language==='en'?'UC Irvine tuition and fees for 2026–27 are $18,000. [1]':'La matrícula y las cuotas de UC Irvine para 2026–27 son $18,000. [1]',
    qualification:s.qualification});
   const r=replay(s,research);r.caller(s.ask);r.answer(s.reply);r.caller(s.tuitionAside);
   r.ready(1,true);r.ack();r.answer(s.reply);r.advance(500);
-  assert.equal(r.announcements().length,0,'an incidental facet mention must not announce a different answer');
-  assert.ok(r.context().findings.every(f=>f.subject==='UC Irvine'&&f.aspect==='total_budget'));
+  assert.equal(r.announcements().length,1,'the pending total gap can accompany useful verified partial fees');
+  assert.match(r.announcements()[0].content,/attendance total is unverified so far.*UC Irvine/s);
+  assert.match(r.announcements()[0].content,/sourced tuition and fees/);
+  assert.ok(r.context().findings.every(f=>f.subject==='UC Irvine'));
+  assert.deepEqual(new Set(r.context().findings.map(f=>f.aspect)),new Set(['total_budget','tuition_fees']));
   r.ready(2,false);r.ack();r.advance(500);
   assert.equal(r.announcements().length,1);assert.match(r.announcements()[0].content,/UC Irvine/);
-  assert.doesNotMatch(r.announcements()[0].content,/18,000/);r.close();
+  assert.doesNotMatch(r.announcements()[0].content,/47,786/);r.close();
  });
 
  for(const contribution of ['requested','observed'])test(`${language}: ${contribution} comparison contribution does not mark the unspoken target gap as answered`,()=>{

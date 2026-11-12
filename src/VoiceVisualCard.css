@@ -1,0 +1,198 @@
+.origen-research-panel {
+  position: fixed;
+  z-index: 91;
+  inset-inline-end: max(1rem, env(safe-area-inset-right));
+  bottom: calc(var(--shared-voice-height, 6rem) + .65rem);
+  color: #312b25;
+  font-family: inherit;
+}
+
+.origen-research-panel {
+  inset-inline: 1rem;
+  top: 1rem;
+  bottom: calc(var(--shared-voice-height, 6rem) + 1rem);
+  margin: auto;
+  width: min(64rem, calc(100% - 2rem));
+  height: fit-content;
+  max-height: calc(100dvh - var(--shared-voice-height, 6rem) - 2rem);
+  overflow: auto;
+  box-sizing: border-box;
+  transform-origin: center;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: .68rem;
+  box-shadow: 0 .9rem 2.7rem #3e271e2b, 0 .22rem .75rem #3e271e16;
+}
+.origen-research-panel--single-cost { width: min(42rem, calc(100% - 2rem)); }
+.origen-research-panel--wide-comparison { width: min(76rem, calc(100% - 2rem)); }
+.origen-research-pill {
+  position: fixed;
+  z-index: 91;
+  inset-inline-end: 1rem;
+  bottom: calc(var(--shared-voice-height, 6rem) + 1rem);
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  max-width: calc(100vw - 2rem);
+  padding: .7rem 1rem;
+  border: 1px solid #ded5ca;
+  border-radius: 999px;
+  background: #fff;
+  color: #774431;
+  box-shadow: 0 .3rem 1.2rem #3e271e1c;
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  animation: origen-research-pill-in 220ms ease-out;
+}
+.origen-research-pill:hover { background: #faf7f2; }
+.origen-research-pill:focus-visible { outline: 2px solid #914b35; outline-offset: 3px; }
+.origen-research-pill small { border-radius: 999px; padding: .15rem .4rem; background: #e9f1e7; color: #3e5d3c; }
+@keyframes origen-research-pill-in { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .origen-research-pill { animation: none; } }
+.origen-research-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  display: flex;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.6rem;
+  padding: .26rem .55rem .26rem .72rem;
+  border-bottom: 1px solid #dedede;
+}
+.origen-research-heading:active,.origen-research-tools .origen-research-grip:active { cursor: grabbing; }
+.origen-research-tools .origen-research-grip { cursor: grab; }
+.origen-research-heading > svg { flex: 0 0 auto; color: #914b35; }
+.origen-research-heading h3 { margin: 0; font-size: .92rem; line-height: 1.2; font-weight: 730; }
+.origen-research-heading h3:focus { outline: 0; }
+.origen-research-scope {
+  padding-inline-start: .48rem;
+  border-inline-start: 1px solid #d9cec1;
+  color: #665a50;
+  font-size: .72rem;
+  line-height: 1.2;
+}
+.origen-research-tools { display: flex; align-items: center; gap: .16rem; margin-inline-start: auto; }
+.origen-research-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+  min-width: 1.95rem;
+  min-height: 2rem;
+  padding: .2rem .4rem;
+  border: 0;
+  border-radius: .3rem;
+  background: transparent;
+  color: #774431;
+  font-size: .73rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.origen-research-tools button span { color: #6c6157; font-variant-numeric: tabular-nums; }
+.origen-research-tools button:hover { background: #f1e8dc; }
+.origen-research-table-scroll { position: relative; overflow-x: auto; }
+.origen-research-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .82rem; line-height: 1.35; }
+.origen-research-table th,.origen-research-table td {
+  padding: .55rem .66rem;
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border-inline-end: 1px solid #e5e5e5;
+  border-bottom: 1px solid #e5e5e5;
+}
+.origen-research-table th:last-child,.origen-research-table td:last-child { border-inline-end: 0; }
+.origen-research-table tbody tr:last-child > * { border-bottom: 0; }
+.origen-research-table thead th { background: #fff; color: #313131; font-weight: 730; }
+.origen-research-table th[scope="row"] { width: 23%; min-width: 7.1rem; background: #fff; font-weight: 660; }
+.origen-research-table th[scope="col"]:not(:first-child),.origen-research-table td { min-width: 8.1rem; }
+.origen-research-table td { background: #fff; }
+.origen-research-table small { display: block; margin-top: .18rem; color: #63584e; font-size: .71rem; font-weight: 450; }
+.origen-research-table td.is-numeric { text-align: end; }
+.origen-research-value-line { display: flex; align-items: baseline; justify-content: space-between; gap: .18rem .35rem; }
+.origen-research-value-line:has(details[open]) { flex-wrap: wrap; }
+.is-numeric .origen-research-value-line { justify-content: end; }
+.origen-research-value { display: inline-block; color: #2d342c; font-weight: 650; }
+.is-numeric .origen-research-value { font-size: .96rem; font-weight: 740; font-variant-numeric: tabular-nums; }
+.origen-research-gap { color: #72675e; }
+.origen-research-cost-table { table-layout: fixed; font-size: .9rem; }
+.origen-research-cost-table thead th:not(:first-child) { text-align: end; }
+.origen-research-cost-table thead th small { line-height: 1.45; }
+.origen-research-cost-table th[scope="row"],.origen-research-panel--single-cost .origen-research-cost-table th[scope="row"] { width: auto; }
+.origen-research-cost-table .origen-research-cost-total th,
+.origen-research-cost-table .origen-research-cost-total td { vertical-align: middle; border-top: 2px solid #d9e1d6; padding-block: .7rem; }
+.origen-research-cost-table th:first-child { position: sticky; inset-inline-start: 0; z-index: 1; box-shadow: 1px 0 0 #e5e5e5; }
+.origen-research-cost-total .origen-research-value { font-size: 1.28rem; letter-spacing: -.025em; }
+.origen-research-cost-table .origen-research-cost-included th[scope="row"] { padding-inline-start: 1.5rem; font-weight: 540; }
+.origen-research-cost-notes { display: block; padding: .7rem .85rem; border-top: 1px solid #e5e5e5; color: #64574b; font-size: .8rem; }
+.origen-research-cost-notes p { margin: 0 0 .35rem; }
+.origen-research-cost-notes summary { width: fit-content; cursor: pointer; color: #784432; font-weight: 670; }
+.origen-research-cost-notes section { max-width: 72ch; margin-top: .65rem; }
+.origen-research-cost-notes h4,.origen-research-cost-notes h5 { margin: .55rem 0 .25rem; color: #312b25; }
+.origen-research-cost-notes ul { margin: .25rem 0 .7rem; padding-inline-start: 1rem; }
+.origen-research-cost-notes a { color: #834834; }
+.origen-research-cell-details { flex: 0 0 auto; text-align: start; }
+.origen-research-cell-details[open] { flex-basis: 100%; }
+.origen-research-cell-details summary {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  min-height: 1.5rem;
+  margin: -.3rem -.18rem -.24rem 0;
+  border-radius: .28rem;
+  list-style: none;
+  color: #785342;
+  cursor: pointer;
+}
+.origen-research-cell-details summary::-webkit-details-marker { display: none; }
+.is-numeric .origen-research-cell-details[open] summary { margin-inline-start: auto; }
+.origen-research-cell-details summary:hover,.origen-research-cell-details[open] summary { background: #eee4d7; }
+.origen-research-cell-details-body { margin-top: .32rem; padding: .32rem .38rem; border-top: 1px solid #e5e5e5; font-size: .71rem; }
+.origen-research-cell-details-body ul { margin: 0; padding-inline-start: .9rem; }
+.origen-research-cell-details-body a { color: #834834; text-decoration: underline; text-underline-offset: .16em; }
+.origen-research-footer { display: flex; justify-content: space-between; gap: .7rem; padding: .35rem .7rem; border-top: 1px solid #e5e5e5; color: #64574b; font-size: .7rem; }
+.origen-research-pending::before { content: ''; display: inline-block; width: .38rem; height: .38rem; margin-inline-end: .35rem; border-radius: 50%; background: #98703f; vertical-align: .08rem; }
+.origen-research-history { margin: 0; padding: 0; list-style: none; }
+.origen-research-history li+li { border-top: 1px solid #e4dbd0; }
+.origen-research-history button {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  padding: .53rem .7rem;
+  border: 0;
+  background: transparent;
+  color: #49372c;
+  text-align: start;
+  cursor: pointer;
+}
+.origen-research-history button:hover { background: #f2ebe0; }
+.origen-research-history strong,.origen-research-history small { display: block; overflow-wrap: anywhere; }
+.origen-research-history strong { font-size: .8rem; }
+.origen-research-history small,.origen-research-history time { color: #68594c; font-size: .7rem; }
+.origen-research-history small { margin-top: .14rem; }
+@media (max-width: 560px) {
+  .origen-research-panel { inset-inline: .65rem; width: calc(100% - 1.3rem); }
+  .origen-research-heading { gap: .34rem; padding-inline-start: .56rem; }
+  .origen-research-table th,.origen-research-table td { padding: .48rem .52rem; }
+  .origen-research-table th[scope="row"] { min-width: 6.1rem; }
+  .origen-research-table th[scope="col"]:not(:first-child),.origen-research-table td { min-width: 7rem; }
+  .origen-research-table th:first-child { position: sticky; inset-inline-start: 0; z-index: 1; }
+}
+
+/* Keep recurring college charges easy to locate without overpowering totals. */
+.origen-research-cost-table .origen-research-cost-tuition th,
+.origen-research-cost-table .origen-research-cost-tuition td { background: #f5f0e5; }
+
+.origen-research-table .origen-research-column-heading { position: relative; padding-inline-end: 1.8rem; }
+.origen-research-column-remove { position: absolute; top: .35rem; inset-inline-end: .2rem; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #91867c; cursor: pointer; opacity: .7; }
+.origen-research-column-remove:hover, .origen-research-column-remove:focus-visible { opacity: 1; color: #8f452e; background: #f5ece6; }
+.origen-research-column-remove:focus-visible { outline: 2px solid #ad725b; outline-offset: 1px; }
+.origen-research-columns-hidden { padding: 1rem; color: #75695e; font-size: .85rem; }

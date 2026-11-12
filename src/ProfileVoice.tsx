@@ -57,10 +57,11 @@ import {voiceWakeLock,type VoiceWakeLockStatus} from './voiceWakeLock.mjs';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from './voiceMemory.mjs';
 import {resolveScope,beforeScopeRequest} from './conversationScope.mjs';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff } from 'lucide-react';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 import './ProfileVoice.css';
+import {VoiceVisualCard,emptyResearchVisual,researchVisualReducer} from './VoiceVisualCard';
 
 const labels = {
   name:['Student name','Nombre'],stage:['Education stage','Etapa educativa'],gpa:['Reported GPA','GPA reportado'],school:['School','Escuela'],interest:['Academic interests','Intereses académicos'],activities:['Activities and responsibilities','Actividades y responsabilidades'],goals:['Goals','Metas'],needs:['Practical needs','Necesidades prácticas'],notes:['Attributed notes','Notas con atribución'],institutions:['Institutions of interest','Instituciones de interés'],entryTerm:['Intended entry term','Período de ingreso'],
@@ -194,6 +195,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const [audibleSpeaking,setAudibleSpeaking]=useState(false);
   const [userSpeaking,setUserSpeaking]=useState(false);
   const [latestAnswer,setLatestAnswer]=useState('');
+  const [researchVisual,dispatchResearchVisual]=useReducer(researchVisualReducer,emptyResearchVisual);
 
 
   const [finishing,setFinishing]=useState(false);
@@ -205,6 +207,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [audioBlocked,setAudioBlocked]=useState(false);
+  const [audioDegraded,setAudioDegraded]=useState(false);
   const invalidateMemoryPlayback=useRef<()=>void>(()=>{});
   const [wakeStatus,setWakeStatus]=useState<VoiceWakeLockStatus>('hidden');
   const [draftRecovery]=useState(()=>recoveryKey?privateRecovery(recoveryKey):null);
@@ -225,7 +228,22 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const logAttempt=useRef('');
   const logSequence=useRef(0);
   const [captureStatus,setCaptureStatus]=useState('Waiting for diagnostic events');
-  const captureRequested=history.cloud&&user?.email?.trim().toLowerCase()===CAPTURE_EMAIL;
+  const [captureSubject,setCaptureSubject]=useState<string>();
+  useEffect(()=>{
+    const subject=user?.sub;
+    if(!history.cloud||!subject)return;
+    const controller=new AbortController();
+    void apiFetch('/api/private-voice-capture',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'status'}),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])})
+      .then(async response=>{
+        if(!response.ok)return;
+        const status=await response.json();
+        if(!controller.signal.aborted)setCaptureSubject(status.enabled===true?subject:undefined);
+      }).catch(()=>{});
+    return ()=>controller.abort();
+  },[history.cloud,user?.sub]);
+  const captureRequested=history.cloud&&Boolean(user?.sub)
+    &&(captureSubject===user?.sub||user?.email?.trim().toLowerCase()===CAPTURE_EMAIL);
   const privateCapture=useRef(createVoiceCapture(async events=>{try{const response=await apiFetch('/api/private-voice-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'append',events}),keepalive:true,signal:AbortSignal.timeout(10000)});if(!response.ok)throw Object.assign(Error('capture_unavailable'),{status:response.status,retryable:![400,401,403,413].includes(response.status)});setCaptureStatus('Latest diagnostic batch saved');}catch(error){setCaptureStatus('Diagnostic upload pending — retrying');throw error;}}));
   privateCapture.current.enable(captureRequested);
   function capture(event:unknown){privateCapture.current.event(event,{subject:user?.sub,sessionId:logSession.current,attemptId:logAttempt.current,studentId:logTarget.current});}
@@ -255,6 +273,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     });
   }
   function cleanup(){
+    dispatchResearchVisual({type:'reset'});
     binderActivity.end(binderSource.current);binderSource.current='';
     resources.current.workspace?.stop();
     resources.current.studentSelection?.stop();
@@ -481,7 +500,10 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       // Use this call's immutable archive scope. Samples go through the existing
       // opt-in batch queue, never through one operational HTTP upload per sample.
       const audioDiagnosticScope={subject:user?.sub,sessionId,attemptId:logAttempt.current,studentId:logTarget.current};
-      const audioDiagnostics=startLiveAudioDiagnostics({pc,audio:audio.current,enabled:captureRequested,getAudioContextState:()=>livePlayback.contextState(),onEvent:(event,details)=>{
+      setAudioDegraded(false);
+      const audioDiagnostics=startLiveAudioDiagnostics({pc,audio:audio.current,enabled:captureRequested,onQuality:onboarding?undefined:degraded=>{
+        if(generation.current===version&&privacyLease.valid())setAudioDegraded(degraded);
+      },getAudioContextState:()=>livePlayback.contextState(),onEvent:(event,details)=>{
         if(generation.current!==version||!privacyLease.valid())return;
         privateCapture.current.event({type:'diagnostic',event,details},audioDiagnosticScope);
       }});resources.current.stopAudioDiagnostics=()=>audioDiagnostics.stop();
@@ -682,10 +704,24 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
+        if(e.type==='origen.visual.research.reset'){dispatchResearchVisual({type:'reset'});return;}
+        if(e.type==='origen.visual.research'){
+          const report=e.report;
+          log('research_table_received',{jobId:report?.id,updatedAt:report?.updatedAt,present:e.present===true,columnCount:report?.table?.columns?.length,rowCount:report?.table?.rows?.length});
+          if(import.meta.env.DEV&&!closing.current?.active()&&typeof report?.id==='string'&&
+            (report.language==='en'||report.language==='es')&&Number.isFinite(report.updatedAt)&&
+            Array.isArray(report.table?.columns)&&Array.isArray(report.table?.rows)){
+            dispatchResearchVisual({type:'receive',report:{...report,receivedAt:Date.now()},present:e.present===true});
+          }
+          return;
+        }
+        if(e.type==='origen.visual.diagnostic'){log('research_table_build_failed',{jobId:e.jobId});return;}
         capture(e);callTiming.event(e);
         if(e.type==='origen.research.active'){setResearching(e.active===true);return;}
         if(e.type==='origen.research.result'){sessionSources.current=mergeConversationSources(sessionSources.current,e.sources||[]);setSources(sessionSources.current);return;}
         if(closing.current?.active()){closing.current.event(e);return;}
+        if(e.type==='origen.caller.yield'){livePlayback.duck(audio.current);return;}
+        if(e.type==='input_audio_buffer.speech_stopped'||e.type==='output_audio_buffer.stopped')livePlayback.restoreVolume();
         onboardingVoice.current?.provider(e);
         turns.playback(e);
         saveCompletion.current?.event(e);
@@ -1037,11 +1073,12 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   },[detailsOpen,onCloseDetails]);
   useEffect(()=>{if(!autoStart||startedAutomatically.current)return;const timer=setTimeout(()=>{startedAutomatically.current=true;void start();},0);return()=>clearTimeout(timer);},[autoStart]);
   return <section className="profile-voice" aria-labelledby={`${mode}-voice-title`}>
+    {state==='live'&&!finishing&&<VoiceVisualCard state={researchVisual} dispatch={dispatchResearchVisual} language={language} onPresented={details=>log('research_table_rendered',details)}/>}
     <h3 id={`${mode}-voice-title`}>{mode==='loans'?t('Talk through student loans','Conversemos sobre los préstamos estudiantiles'):mode==='planning'?t('Talk through your plan','Conversemos sobre tu plan'):mode==='admissions'?t('Talk through college applications','Conversemos sobre las solicitudes universitarias'):mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
     <p>{mode==='loans'?t('Ask about loan types, interest, repayment or pausing payments. Origen checks official Federal Student Aid guidance.','Pregunta sobre tipos de préstamos, intereses, pagos o pausas. Origen consulta la información oficial de Federal Student Aid.'):mode==='planning'?t('Talk through course choices, college paths, transfer, degree goals or next steps. Build a plan that fits your stage and interests—in English or Spanish.','Conversa sobre cursos, caminos universitarios, transferencias, metas o próximos pasos. Crea un plan para tu etapa e intereses, en español o inglés.'):mode==='admissions'?t('Ask about UC applications, Cal State Apply, Common App or community college. We can explain a form field, check requirements, or help you understand your next step—in English or Spanish.','Pregunta sobre solicitudes de UC, Cal State Apply, Common App o colegios comunitarios. Podemos explicar una pregunta del formulario, consultar requisitos o ayudarte a entender el siguiente paso, en español o inglés.'):mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Origen to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Origen. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Origen. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
     {!onboarding&&<p className="small-text">{routing?t('AI-generated voice · Starting sends microphone audio and student names to OpenAI. After you confirm whom you mean, their profile context and previous summaries are included. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y los nombres de estudiantes. Después de confirmar de quién hablas, se incluye su contexto y los resúmenes anteriores. Las sesiones terminan a los 10 minutos.'):informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Los cambios del perfil requieren tu revisión. La sesión termina a los 10 minutos.')}</p>}
-    {captureRequested&&<p className="small-text" role="status">Private diagnostics include conversation transcripts, tool activity and context updates. {captureStatus}. Retained for 90 days; audio is not recorded.</p>}
-    {history.cloud&&!captureRequested&&<p className="small-text">{t('When enabled, private session details are kept for 90 days to diagnose problems. This adds no stored audio or transcript and does not enroll you in research.','Cuando está habilitado, los detalles privados de la sesión se conservan durante 90 días para diagnosticar problemas. Esto no agrega audio ni transcripciones guardadas y no te inscribe en investigación.')}</p>}
+    {captureRequested&&<p className="small-text" role="status">{t('Private diagnostics include conversation transcripts, tool activity, and context updates. They are retained for 90 days. Audio is not recorded.','Los diagnósticos privados incluyen transcripciones, actividad de herramientas y actualizaciones de contexto. Se conservan durante 90 días. El audio no se graba.')} {captureStatus}.</p>}
+    {history.cloud&&!captureRequested&&<p className="small-text">{t('Private diagnostics, when enabled, may include transcripts and technical events. They are kept for 90 days to troubleshoot calls. Audio is not recorded.','Cuando están habilitados, los diagnósticos privados pueden incluir transcripciones y eventos técnicos. Se conservan durante 90 días para resolver problemas con las llamadas. El audio no se graba.')}</p>}
 
     {connectionCard&&<CoordinatorConfirm card={connectionCard} t={t} onClose={()=>setConnectionCard(undefined)} onSent={()=>setNotice(t('Request sent. Your binder is still private.','Solicitud enviada. Tu carpeta sigue privada.'))}/>}
     <div className="voice-controls">
@@ -1051,6 +1088,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         <button type="button" className="button outline voice-end" aria-label={finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')} onClick={()=>{onboardingEndReason.current='user_end';if(closing.current?.active())closing.current.force();else if(farewellPending.current)end();else closeWithFarewell();}}><PhoneOff size={18}/><span className="voice-control-label">{finishing?t('Disconnect now','Desconectar ahora'):t('End conversation','Terminar conversación')}</span></button>
       </>}
       {state==='live'&&audioBlocked&&<button type="button" className="button outline voice-audio-recovery" onClick={resumeAudio}>{t('Play Origen audio','Reproducir audio de Origen')}</button>}
+      {state==='live'&&audioDegraded&&!audioBlocked&&!finishing&&<p className="voice-notice" role="status">{t('Audio may be choppy. If you missed something, ask Origen to repeat it.','El audio puede entrecortarse. Si no escuchaste algo, pídele a Origen que lo repita.')}</p>}
       {state==='live'&&wakeStatus==='unavailable'&&<p className="small-text voice-wake-notice" role="status">{t('Keep this screen open during your conversation. Your browser could not keep the display awake.','Mantén esta pantalla abierta durante la conversación. Tu navegador no pudo mantener la pantalla encendida.')}</p>}
     </div>
     <p className="voice-progress-status" role="status">{summarySaveState.failed?t('Summary not saved · retry below','Resumen sin guardar · reintenta abajo'):summarySaveState.saving?t('Saving your conversation…','Guardando tu conversación…'):recoveryState==='pending'?t('Preparing your summary…','Preparando tu resumen…'):summarySaved||recoveryState==='complete'?t('Summary saved · binder notes are organized separately','Resumen guardado · las notas se organizan por separado'):' '}</p>
@@ -1064,7 +1102,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     <p className="small-text">{history.cloud?t('Relevant saved notes, accepted actions and past summaries are shared with OpenAI as context. A summary is saved to your account when the conversation ends; for a new student, save the profile first.','Las notas guardadas, las acciones aceptadas y los resúmenes pertinentes se comparten con OpenAI como contexto. Al terminar, se guarda un resumen en tu cuenta; para un estudiante nuevo, guarda primero el perfil.'):t('Conversation summaries stay in this browser preview.','Los resúmenes de ejemplo se quedan en este navegador.')}</p>
     {summarySaveState.saving&&<p className="voice-save-status" role="status">{t('Saving conversation summary…','Guardando el resumen…')}</p>}
     {summarySaveState.failed&&<div className="summary-save-error"><p role="alert">{t('Conversation summary could not be saved. Retry before leaving this page.','No se pudo guardar el resumen. Intenta de nuevo antes de salir de esta página.')}</p><ErrorReference reference={errorReference} language={language}/><button type="button" className="button outline" disabled={summarySaveState.saving} onClick={()=>void retrySummaries()}>{t('Retry saving summary','Volver a guardar el resumen')}</button></div>}
-    {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{captureRequested?'Private transcripts and diagnostic events are requested for this account. '+captureStatus:t('When the server is reachable, technical events are logged without audio, transcripts or student details.','Cuando el servidor está disponible, se registran eventos técnicos sin audio, transcripciones ni datos del estudiante.')}</p></details>}
+    {diagnosticId&&<details className="small-text"><summary>{t('Diagnostic session','Sesión de diagnóstico')}</summary><p>{diagnosticId}</p>{failureCode&&<p>{t('Connection error: ','Error de conexión: ')}{failureCode}</p>}<p>{captureRequested?t('Private transcript and diagnostic capture is enabled.','La captura privada de transcripciones y diagnósticos está habilitada.')+' '+captureStatus:t('Technical call events are logged when the server is reachable.','Los eventos técnicos de la llamada se registran cuando el servidor está disponible.')}</p></details>}
     {researching&&<p role="status">{Date.now()-researchStarted.current>=20000?t('Still checking the official guidance. You can keep speaking while I look.','Sigo consultando la guía oficial. Puedes seguir hablando mientras busco.'):t('Checking official sources…','Consultando fuentes oficiales…')} <span>{Math.max(0,Math.floor((Date.now()-researchStarted.current)/1000))}s</span></p>}
     {latestAnswer&&<details className="voice-answer"><summary>{t('Latest answer','Última respuesta')}</summary><p>{latestAnswer}</p></details>}
     {sources.length>0&&<details className="voice-sources"><summary>{t('Official sources','Fuentes oficiales')} · {sources.length}</summary><h4>{t('Sources from this conversation','Fuentes de esta conversación')}</h4><ul>{sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a><small> · {t('Checked','Consultado')} {new Date(source.checkedAt).toLocaleDateString(language)}</small></li>)}</ul></details>}

@@ -5,7 +5,7 @@ import { buildDecisionRequest, parseDecisionResponse, shadowDisposition, SUPPORT
 export function providerResponse(choice = 'starting_point', addressed = 0.01) {
   return { model: 'gpt-6-luna', answers: [
     { name: 'support_need', type: 'choice', choice, confidence: 0.95,
-      probabilities: SUPPORT_NEEDS.map(value => ({ value, probability: value === choice ? 0.96 : 0.01 })) },
+      probabilities: SUPPORT_NEEDS.map(value => ({ value, probability: value === choice ? 0.96 : 0.04 / (SUPPORT_NEEDS.length - 1) })) },
     { name: 'already_addressed', type: 'predicate', probability: addressed },
   ], usage: { input_tokens: 100, output_tokens: 0, total_tokens: 100, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
 }

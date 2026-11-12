@@ -1,0 +1,13 @@
+export type ResearchFact={key:string;label:string;kind:'date'|'amount'|'number'|'rule'|'requirement'|'step'|'text'|'link';status:'verified'|'partial'|'unverified';value:string|null;amount:number|null;upperAmount:number|null;bound:'exact'|'up_to'|'at_least'|'range'|null;currency:string|null;unit:string|null;date:string|null;time:string|null;timeZone:string|null;order:number|null;sourceCitation:string;qualification:string};
+export type ResearchRecord={topic:string;scope:{cycle:string|null;term:string|null;population:string;program:string|null;jurisdiction:string|null;enrollment:string|null;delivery:string|null;validThrough:string|null};complete:boolean;expectedFacts:string[];facts:ResearchFact[]};
+export const researchRecordSchema:object;
+export const researchTopics:string[];
+export function normalizedText(value:unknown):string;
+export function calendarDate(value:unknown):boolean;
+export function validatedResearchRecord(value:unknown,sourceIds:Set<number>):ResearchRecord|null;
+export function researchRecordAudit(record:ResearchRecord):{missing:string[];unknownCutoffs:string[];incompleteSteps:boolean;complete:boolean};
+export function remapResearchRecord(record:ResearchRecord|undefined,remap:(text:string)=>string):ResearchRecord|undefined;
+export function withoutRecordAuditNotes(value:string):string;
+export function researchFactValue(fact:ResearchFact,language?:string):string;
+export function researchScopeLabel(record:ResearchRecord,language?:string):string;
+export function researchRecordFinding(record:ResearchRecord,qualification:string,language?:string):{answer:string;qualification:string;audit:ReturnType<typeof researchRecordAudit>;report:string};

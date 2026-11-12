@@ -81,10 +81,13 @@ test('Live preserves the larger delegated response budget required by sharing an
 for(const language of ['en','es'])test(`${language} scope and later configuration updates do not independently restart the opening`,()=>{
  const input={language,role:'parent',mode:'planning',routeConversations:true,targetConfirmed:true,studentId:'aiden',students:[{id:'aiden',name:'Aiden'}],profile:{name:'Aiden'},continuing:true};
  const first=studentLiveInstructions({...input,targetConfirmed:false,continuing:false});
- assert.match(first,/# Backchannel policy\nDo not produce backchannel interjections/);
+ assert.match(first,/# Backchannel policy\nUse occasional, brief and quiet listening cues/);
+ assert.match(first,/not factual agreement or authorization/);
+ assert.match(first,/Stay silent during a correction or a request to wait/);
  assert.match(first,/Acknowledgments before an answer are separate/);
- assert.match(first,/begin with the useful answer or one concrete clarification/);
- assert.match(first,/without hmm, mm-hmm, uh/);
+ assert.match(first,/optional conversational transitions in Personality & Tone/);
+ assert.match(first,/then give the useful answer or one concrete clarification/);
+ assert.doesNotMatch(first,/without hmm, mm-hmm, uh, or a routine Okay/);
  assert.match(first,/This listening rule does not delay your response after they finish/);
  for(const updateInput of [input,{...input,mode:'finance'},{...input,language:language==='en'?'es':'en'}]){
   const instructions=studentLiveInstructions(updateInput,[],[],undefined,{update:true});
@@ -103,7 +106,9 @@ for(const language of ['en','es'])test(`${language}: first selection stays conve
  assert.match(live.instructions,/For a name-only first selection, acknowledge once, promptly but gently/);
  assert.match(live.instructions,/one complete, self-contained phrase like "Of course\." or "Claro\."/);
  assert.match(live.instructions,/After the complete acknowledgment, listen/);
- assert.match(live.instructions,/A background status or brief update is not a caller interruption/);
+ assert.match(live.instructions,/Finish the short thought already underway before using a background update/);
+ assert.match(live.instructions,/continue from where you were, including any material caveat you still owe/);
+ assert.match(live.instructions,/Do not return to the replaced topic, even to give its status/);
  assert.match(live.instructions,/yield immediately, even mid-sentence/,'finishing a thought never overrides a real caller interruption');
  assert.match(live.instructions,/do not address the caller by that student's name/);
  assert.match(live.instructions,/Mention a lookup only for a lookup the caller actually requested/);
@@ -112,6 +117,9 @@ for(const language of ['en','es'])test(`${language}: first selection stays conve
  assert.match(live.instructions,/Tool dispatch is not completion/);
  assert.match(live.instructions,/Silence is not a request for another acknowledgment/);
  assert.match(live.instructions,/Slow the articulation itself/);
+ assert.match(live.instructions,/about half your usual speaking pace/);
+ assert.match(live.instructions,/in both English and Spanish/);
+ assert.match(live.instructions,/Give numbers room to land/);
  assert.match(live.instructions,/never speed up to squeeze it in/);
  assert.match(live.instructions,/Do not ask what they need help with before the selection receipt/);
  assert.doesNotMatch(live.instructions,/ask one warm, short question about what they want help with|single conversational invitation above while/);

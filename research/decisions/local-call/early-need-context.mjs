@@ -20,7 +20,7 @@ export function withEarlyNeedContext(snapshot, activeSupport, supportRevision = 
   // A new follow-up cannot be considered answered by an earlier explanation.
   const origins = [activeSupport?.originOutputRevision, snapshot.contributionOutputOriginRevision]
     .filter(value => Number.isSafeInteger(value) && value >= 0);
-  const origin = snapshot.triggerBasis === 'settled_late_experiment'
+  const origin = ['settled_late_experiment', 'between_thoughts_revalidation'].includes(snapshot.triggerBasis)
     ? (Number.isSafeInteger(snapshot.contributionOutputOriginRevision) ? snapshot.contributionOutputOriginRevision : null)
     : origins.length ? Math.max(...origins) : null;
   const rows = Number.isSafeInteger(origin)

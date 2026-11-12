@@ -52,8 +52,9 @@ const keyFor = stamp => JSON.stringify(STAMP_FIELDS.map(key => stamp?.[key]));
 const contributionFor = stamp => JSON.stringify([...SCOPE_FIELDS, 'contributionId'].map(key => stamp?.[key]));
 const cloneStamp = stamp => Object.fromEntries(STAMP_FIELDS.map(key => [key, stamp[key]]));
 
-export function createEarlySupportDelivery({ enabled = false, observeOnly = false, lateEnabled = false, getEvidence = () => null,
-  canDeliver = () => 'unavailable', canDeliverLate = () => 'unavailable', send, log = () => {}, now = () => performance.now() } = {}) {
+export function createEarlySupportDelivery({ enabled = false, observeOnly = false, lateEnabled = false, betweenThoughtsEnabled = false, getEvidence = () => null,
+  canDeliver = () => 'unavailable', canDeliverLate = () => 'unavailable', canDeliverBetweenThoughts = () => 'unavailable', deliveryState = () => ({}),
+  send, log = () => {}, now = () => performance.now() } = {}) {
   let closed = false, active = null, pending = null, attempts = 0, lastSentAt = -Infinity;
   let lastScope = null, lastContribution = null, deferredReason = null;
   let supportRevision = 0;
@@ -62,12 +63,22 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
   const emit = (stage, details = {}) => {
     try { log({ type: 'support_early_' + stage, callId: lastScope?.callId ?? null,
       studentId: lastScope?.studentId ?? null, language: lastScope?.language ?? null,
+      ...(['deferred', 'discarded', 'skipped'].includes(stage) ? { readiness: deliveryState() } : {}),
       ...details, playbackClaim: false }); } catch {}
+  };
+  const pendingIdentity = value => ({ operationId: value.operationId, requestId: value.requestId,
+    contributionId: value.stamp.contributionId, revision: value.stamp.revision,
+    deliveryMode: value.deliveryMode, triggerBasis: value.triggerBasis,
+    pendingMs: Math.max(0, now() - value.at) });
+  const dropPending = (reason, details = {}) => {
+    if (pending) emit('discarded', { ...pendingIdentity(pending), ...details, reason, contextSent: false });
+    pending = null;
+    return { sent: false, reason };
   };
   const clearActive = reason => {
     if (active) emit('state_cleared', { reason, contributionId: active.contributionId, contextSent: false });
     if (active) supportRevision++;
-    active = null; pending = null;
+    active = null; dropPending(reason);
   };
   function evidence() {
     let value;
@@ -92,11 +103,12 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
   };
   const replied = snapshot => snapshot?.assistantOutputStartedForContribution === true
     || answered.has(contributionFor(snapshot?.stamp));
-  function lateIneligible(record, snapshot) {
-    if (!lateEnabled) return 'late_experiment_disabled';
-    if (record.triggerBasis !== 'settled_late_experiment') return 'late_classification_required';
+  function lateIneligible(record, snapshot, between = false) {
+    if (between ? !betweenThoughtsEnabled : !lateEnabled) return between ? 'between_thoughts_disabled' : 'late_experiment_disabled';
+    if (record.triggerBasis !== (between ? 'between_thoughts_revalidation' : 'settled_late_experiment')) return 'late_classification_required';
     const origin = snapshot.contributionOutputOriginRevision;
     const revision = snapshot.assistantOutputRevision;
+    if (between && (snapshot.outputOpen !== false || snapshot.assistantBoundaryRevision !== revision)) return 'output_boundary_unconfirmed';
     if (!Number.isSafeInteger(origin) || origin < 0 || !Number.isSafeInteger(revision) || revision <= origin
       || record.assistantOutputRevision !== revision || record.assistantOutputOriginRevision !== origin) return 'late_output_revision_changed';
     const rows = (snapshot.assistantEvidence ?? []).filter(row => row.revision > origin);
@@ -108,53 +120,51 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
     if (!Number.isFinite(record.classifiedAtMs) || !Number.isFinite(classificationAge)
       || classificationAge < 0 || classificationAge > 2000) return 'late_classification_expired';
     const callerAge = now() - snapshot.lastObservedAtMs;
-    if (!Number.isFinite(callerAge) || callerAge < 0 || callerAge > 15000) return 'late_caller_evidence_expired';
+    if (!Number.isFinite(callerAge) || callerAge < 0 || callerAge > (between ? 45000 : 15000)) return 'late_caller_evidence_expired';
     if (snapshot.inputOpen !== false) return 'late_input_not_closed';
     return null;
   }
   function tick() {
     if (!enabled || closed || !pending) return { sent: false, reason: 'no_pending_support' };
     const snapshot = evidence();
+    if (!pending) return { sent: false, reason: 'no_pending_support' };
     if (!snapshot?.usable || !same(pending.stamp, snapshot.stamp)
       || pending.supportRevision !== supportRevision || !idsMatch(pending.sourceEventIds, snapshot.sourceEventIds)) {
-      pending = null;
-      return defer('stale_evidence');
+      return dropPending('stale_evidence');
     }
-    const late = pending.deliveryMode === 'late_experiment';
-    const details = { operationId: pending.operationId, requestId: pending.requestId,
-      contributionId: pending.stamp.contributionId, revision: pending.stamp.revision,
+    const between = pending.deliveryMode === 'between_thoughts';
+    const late = between || pending.deliveryMode === 'late_experiment';
+    const details = { ...pendingIdentity(pending),
       sourceEventIds: [...pending.sourceEventIds], sourceStartMs: snapshot.startMs, sourceEndMs: snapshot.endMs,
       boundaryBasis: 'native_input_fragment_evidence', sourceComplete: snapshot.complete === true,
       inputOpen: snapshot.inputOpen === true,
       inputBoundaryEvidence: snapshot.inputOpen === false ? 'matched_application_estimate' : 'open_native_transcript',
-      callerAudioEnded: 'unknown', deliveryMode: late ? 'late_experiment' : 'preanswer' };
+      callerAudioEnded: 'unknown', deliveryMode: between ? 'between_thoughts' : late ? 'late_experiment' : 'preanswer' };
     if (late) {
-      const reason = lateIneligible(pending, snapshot);
-      if (reason) { pending = null; return defer(reason, details); }
+      const reason = lateIneligible(pending, snapshot, between);
+      if (reason) return dropPending(reason, details);
       Object.assign(details, { assistantOutputRevision: pending.assistantOutputRevision,
         assistantOutputOriginRevision: pending.assistantOutputOriginRevision,
         sourceOutputEventIds: [...pending.sourceOutputEventIds], outputEvidenceComplete: true,
         outputEvidenceIsPlayback: false, triggerBasis: pending.triggerBasis,
-        classificationAgeMs: now() - pending.classifiedAtMs });
+        classificationAgeMs: now() - pending.classifiedAtMs,
+        ...(between ? { boundaryBasis: 'application_estimate_with_fresh_playback' } : {}) });
     } else if (replied(snapshot)) {
-      pending = null;
-      return defer('assistant_already_started', { ...details, evidence: 'observed_output_not_playback' });
+      return dropPending('assistant_already_started', { ...details, evidence: 'observed_output_not_playback' });
     }
     const age = now() - snapshot.lastObservedAtMs;
     if (!late && (!Number.isFinite(age) || age < 0 || age > 2000)) {
-      pending = null;
-      return defer('preanswer_evidence_expired', details);
+      return dropPending('preanswer_evidence_expired', details);
     }
     let blocked;
-    try { blocked = late ? canDeliverLate() : canDeliver(); } catch { blocked = 'delivery_state_unavailable'; }
+    try { blocked = between ? canDeliverBetweenThoughts() : late ? canDeliverLate() : canDeliver(); } catch { blocked = 'delivery_state_unavailable'; }
     if (blocked) return defer(blocked, details);
     if (!active || active.status !== 'validated' || !same(active.stamp, snapshot.stamp, SCOPE_FIELDS)) {
-      pending = null;
-      return defer('support_state_unavailable', details);
+      return dropPending('support_state_unavailable', details);
     }
     if (observeOnly) return defer('shadow_only', details);
     const contribution = contributionFor(snapshot.stamp);
-    if (attemptedContributions.has(contribution)) { pending = null; return defer('already_attempted_for_contribution', details); }
+    if (attemptedContributions.has(contribution)) return dropPending('already_attempted_for_contribution', details);
     if (attempts >= 4 || now() - lastSentAt < 2500) return defer('rate_limited', details);
 
     // Take the attempt before writing. A thrown/ambiguous write may already
@@ -180,10 +190,19 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
   return Object.freeze({
     tick,
     consider({ record, stamp } = {}) {
+      const between = record?.triggerBasis === 'between_thoughts_revalidation';
+      const late = between || record?.triggerBasis === 'settled_late_experiment';
+      let snapshot;
       const reject = reason => { emit('skipped', { reason, operationId: record?.operationId ?? null,
-        requestId: record?.requestId ?? null, contextSent: false }); return { accepted: false, sent: false, reason }; };
+        requestId: record?.requestId ?? null, freshnessMismatch: record?.freshnessMismatch ?? [],
+        contributionId: stamp?.contributionId, revision: stamp?.revision, triggerBasis: record?.triggerBasis,
+        assistantOutputRevision: record?.assistantOutputRevision,
+        currentAssistantOutputRevision: snapshot?.assistantOutputRevision,
+        assistantBoundaryRevision: snapshot?.assistantBoundaryRevision,
+        deliveryMode: between ? 'between_thoughts' : late ? 'late_experiment' : 'preanswer',
+        contextSent: false }); return { accepted: false, sent: false, reason }; };
       if (!enabled || closed) return reject('disabled_or_closed');
-      const snapshot = evidence();
+      snapshot = evidence();
       if (!snapshot?.usable || !validStamp(stamp)) return reject('stale_evidence');
       if (record?.status !== 'completed' || record.callId !== stamp.callId || record.studentId !== stamp.studentId
         || !Number.isSafeInteger(record.supportRevision) || record.supportRevision !== supportRevision
@@ -192,20 +211,19 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
       const captured = matchEarlyCapture(snapshot, stamp, record);
       if (!captured) return reject('stale_evidence');
       const result = record.result, decision = earlyResultDecision(result);
-      const late = record.triggerBasis === 'settled_late_experiment';
       if (late) {
         if (!captured.exact) return reject('stale_evidence');
-        const reason = lateIneligible(record, snapshot);
+        const reason = lateIneligible(record, snapshot, between);
         if (reason) return reject(reason);
         if (result?.assistantEvidencePresent !== true || result?.assistantEvidenceUnknown !== false) return reject('late_output_evidence_incomplete');
       }
       const key = keyFor(stamp) + ':' + record.supportRevision + ':' + record.assistantOutputRevision;
       if (processed.has(key)) return reject('duplicate');
       let blocked;
-      try { blocked = late ? canDeliverLate() : canDeliver(); } catch { return reject('delivery_state_unavailable'); }
+      try { blocked = between ? canDeliverBetweenThoughts() : late ? canDeliverLate() : canDeliver(); } catch { return reject('delivery_state_unavailable'); }
       if (['intro_unready', 'session_or_scope_unready', 'language_unsupported', 'unavailable'].includes(blocked)) return reject(blocked);
       boundedAdd(processed, key);
-      pending = null; deferredReason = null;
+      dropPending('replaced_by_new_classification'); deferredReason = null;
       if (!captured.exact) {
         // Preserve only an observation of an explicit need. The later suffix
         // may reverse it: a fresh full-evidence classification is mandatory.
@@ -217,7 +235,8 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
             laterContributions: 0, sent: false };
           emit('need_retained', { reason: 'newer_words_require_revalidation', supportRevision,
             contributionId: stamp.contributionId, observedRevision: stamp.revision, currentRevision: snapshot.stamp.revision,
-            sourceEventIds: captured.sourceEventIds, operationId: record.operationId, contextSent: false });
+            sourceEventIds: captured.sourceEventIds, operationId: record.operationId,
+            freshnessMismatch: ['revision'], revalidationRequested: true, contextSent: false });
           return { accepted: true, sent: false, reason: 'need_retained_requires_revalidation' };
         }
         return reject('stale_evidence');
@@ -259,8 +278,9 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
       if (active.sent) return reject('unchanged_support_already_supplied');
       pending = { stamp: cloneStamp(stamp), sourceEventIds: [...record.sourceEventIds], at: now(),
         supportRevision, operationId: record.operationId ?? null, requestId: record.requestId ?? null,
-        deliveryMode: late ? 'late_experiment' : 'preanswer', assistantOutputRevision: record.assistantOutputRevision,
-        ...(late ? { triggerBasis: record.triggerBasis, classifiedAtMs: record.classifiedAtMs,
+        deliveryMode: between ? 'between_thoughts' : late ? 'late_experiment' : 'preanswer', assistantOutputRevision: record.assistantOutputRevision,
+        triggerBasis: record.triggerBasis,
+        ...(late ? { classifiedAtMs: record.classifiedAtMs,
           assistantEvidenceComplete: record.assistantEvidenceComplete,
           assistantOutputOriginRevision: record.assistantOutputOriginRevision,
           sourceOutputEventIds: [...record.sourceOutputEventIds] } : {}) };
@@ -279,13 +299,19 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
       if ((event.type === 'session.output_transcript.delta' && event.delta)
         || (event.type === 'session.output_audio.delta' && !silentSidebandAudio(event))) {
         if (snapshot?.stamp) boundedAdd(answered, contributionFor(snapshot.stamp));
-        if (pending?.deliveryMode === 'late_experiment') {
-          pending = null; defer('late_new_output_requires_reclassification');
+        if (['late_experiment', 'between_thoughts'].includes(pending?.deliveryMode)) {
+          dropPending('late_new_output_requires_reclassification');
         }
         if (pending) tick();
       }
       if (event.type === 'session.input_transcript.delta' && pending && (!snapshot || !same(pending.stamp, snapshot.stamp))) {
-        pending = null; defer('new_input_requires_reclassification');
+        dropPending('new_input_requires_reclassification');
+        if (active && !active.sent && active.status === 'validated') {
+          active.status = 'provisional'; active.supportRevision = ++supportRevision;
+          emit('need_retained', { reason: 'newer_words_require_revalidation', supportRevision,
+            contributionId: active.contributionId, revalidationRequested: true,
+            freshnessMismatch: ['revision'], contextSent: false });
+        }
       }
     },
     boundary(event) {
@@ -311,9 +337,10 @@ export function createEarlySupportDelivery({ enabled = false, observeOnly = fals
     close() {
       if (closed) return;
       emit('closed', { attempts, pending: Boolean(pending), activeSupport: Boolean(active), contextSent: false });
-      closed = true; pending = null; active = null;
+      dropPending('call_closed');
+      closed = true; active = null;
     },
-    status() { return { enabled, observeOnly, lateEnabled, closed, attempts, pending: Boolean(pending), activeSupport: Boolean(active),
+    status() { return { enabled, observeOnly, lateEnabled, betweenThoughtsEnabled, closed, attempts, pending: Boolean(pending), activeSupport: Boolean(active),
       supportRevision, needStatus: active?.status ?? null, supportKind: active?.kind ?? null }; },
   });
 }
