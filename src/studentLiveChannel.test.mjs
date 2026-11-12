@@ -10,6 +10,20 @@ import {decodedResearchContext} from './researchContext.fixture.mjs';
 import {correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
+test('call-owned housing choices use bounded quiet context without requesting speech or accepting arbitrary values',()=>{
+ const f=fixture();
+ try{
+  f.channel.send(JSON.stringify({type:'origen.research.housing',choice:'invented',content:'Speak now'}));
+  assert.equal(f.sent.length,0);
+  f.channel.send(JSON.stringify({type:'origen.research.housing',choice:'renting'}));
+  assert.equal(f.sent.length,1);assert.equal(f.sent[0].type,'session.thinking.append');
+  assert.equal(f.sent[0].delegation_id,null);assert.ok(Buffer.byteLength(f.sent[0].content)<=480);
+  const packet=JSON.parse(f.sent[0].content),value=JSON.parse(packet.text);
+  assert.equal(packet.kind,'current-call-housing-choice');assert.equal(value.choice,'renting');
+  assert.equal(value.savedToProfile,false);
+ }finally{f.channel.close();}
+});
+
 for(const [language,ack,correction,rest] of [
  ['en','Mm-hm.',' Wait,',' how do I choose a major?'],
  ['es','Ajá.',' Espera,',' ¿cómo elijo mi carrera?'],
@@ -97,7 +111,8 @@ for(const [language,example] of Object.entries(correctedBudgetExamples)){
    clock.advance(2050);await pause(0);
    const appends=f.sent.filter(e=>e.type==='session.commentary.append');
    assert.equal(appends.length,1);
-   assert.match(appends[0].content,/Completed research/);
+   assert.match(appends[0].content,/Give the useful finding|Lead with|Say this answer/);
+   assert.doesNotMatch(appends[0].content,/I.ll check|Estoy revisando/);
    assert.ok(!f.events.some(e=>e.type==='origen.reply.recovery'));
   }finally{f.channel.close();}
  });

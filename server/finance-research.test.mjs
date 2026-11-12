@@ -40,9 +40,13 @@ for(const language of ['en','es'])test(`${language} campus cost overview preserv
  const body=financeResearchRequest({},{question,institution:'UC Santa Cruz',language});
  assert.equal(JSON.parse(body.input).question,question);
  assert.match(body.instructions,/do not require a separate registrar search before returning it/);
+ assert.match(body.instructions,/without an additional search just to fill out the table/);
  assert.match(body.instructions,/For a tuition or billed-charge question, retrieve the requested tuition\/mandatory-fee subtotal/);
  assert.match(body.instructions,/Do not automatically research every residency category/);
  assert.match(body.instructions,/never infer the student's circumstances/);
  assert.match(body.instructions,/never use aggregators as evidence/);
  assert.doesNotMatch(body.instructions,/retrieve a separate tuition and mandatory-fee subtotal.*alongside any overall budget/);
+ assert.match(body.instructions,/Tuition alone is an incomplete COA answer/);
+ assert.match(body.instructions,/most recent available complete published budget and its full breakdown/);
+ assert.match(body.instructions,/official campus PDF, catalog or budget archive/);
 });

@@ -220,6 +220,6 @@ test('focusing a covered completed check returns a terminal receipt, never anoth
   const first=await q.start({question:'Costs including tuition and housing',institution:'Example'});await tick();
   const result=await q.start({question:'Just tuition please',institution:'Example',replaceRequestId:first.requestId,replaceRevision:1,replacementChange:{kind:'focus_existing',uncoveredNeed:''}});
   assert.equal(result.status,'research_completed');assert.equal(result.researchPending,false);assert.equal(result.replacementApplied,false);assert.equal(posts,1);
-  assert.match(result.instruction,/check has ended/);assert.doesNotMatch(result.instruction,/source check is already accepted/);
+  assert.match(result.instruction,/Silent receipt/);assert.doesNotMatch(result.instruction,/check has ended/);assert.doesNotMatch(result.instruction,/source check is already accepted/);
  }finally{q.close();}
 });

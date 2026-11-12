@@ -40,6 +40,8 @@ export function localConfiguration(source = {}) {
     ORIGEN_BACKGROUND_RESEARCH: 'true', ORIGEN_LIVE_SERVER_CONTROL: 'true',
     ORIGEN_RESEARCH_DELIVERY_V2: 'true', OBSERVABILITY_EXPORT: 'false',
     ORIGEN_DECISIONS_COMPARISON_UPDATES: 'true',
+    ORIGEN_LOCAL_VISUAL_CARDS: source.ORIGEN_LOCAL_VISUAL_CARDS === 'false' ? 'false' : 'true',
+    ORIGEN_LOCAL_COST_CATALOG: source.ORIGEN_LOCAL_COST_CATALOG === 'true' ? 'true' : 'false',
     ORIGEN_DECISIONS_REPLY_RECOVERY: source.ORIGEN_DECISIONS_REPLY_RECOVERY === 'true' ? 'true' : 'false',
     GUARDIAN_EMAIL_TRANSPORT: 'disabled', REGISTRATION_EMAIL_TRANSPORT: 'disabled',
     ORIGEN_PRIVATE_VOICE_CAPTURE_SUBJECT: LOCAL_COPY.subject,
@@ -51,6 +53,7 @@ export function workerEnvironment(env, inherited = {}) {
   return { ...Object.fromEntries(names.filter(key => typeof inherited[key] === 'string').map(key => [key, inherited[key]])),
     ...Object.fromEntries(openaiNames.filter(key => env[key]).map(key => [key, env[key]])),
     NODE_ENV: 'development', RESEARCH_WORKER_DATABASE_URL: localUrl(LOCAL_COPY.workerRole), OBSERVABILITY_EXPORT: 'false',
+    ORIGEN_LOCAL_COST_CATALOG: env.ORIGEN_LOCAL_COST_CATALOG === 'true' ? 'true' : 'false',
   };
 }
 

@@ -57,10 +57,11 @@ import {voiceWakeLock,type VoiceWakeLockStatus} from './voiceWakeLock.mjs';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from './voiceMemory.mjs';
 import {resolveScope,beforeScopeRequest} from './conversationScope.mjs';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff } from 'lucide-react';
 import {loadLocal,saveLocal,type StudentProfile} from './planning';
 import './ProfileVoice.css';
+import {VoiceVisualCard,emptyResearchVisual,researchVisualReducer} from './VoiceVisualCard';
 
 const labels = {
   name:['Student name','Nombre'],stage:['Education stage','Etapa educativa'],gpa:['Reported GPA','GPA reportado'],school:['School','Escuela'],interest:['Academic interests','Intereses académicos'],activities:['Activities and responsibilities','Actividades y responsabilidades'],goals:['Goals','Metas'],needs:['Practical needs','Necesidades prácticas'],notes:['Attributed notes','Notas con atribución'],institutions:['Institutions of interest','Instituciones de interés'],entryTerm:['Intended entry term','Período de ingreso'],
@@ -194,6 +195,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   const [audibleSpeaking,setAudibleSpeaking]=useState(false);
   const [userSpeaking,setUserSpeaking]=useState(false);
   const [latestAnswer,setLatestAnswer]=useState('');
+  const [researchVisual,dispatchResearchVisual]=useReducer(researchVisualReducer,emptyResearchVisual);
 
 
   const [finishing,setFinishing]=useState(false);
@@ -271,6 +273,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
     });
   }
   function cleanup(){
+    dispatchResearchVisual({type:'reset'});
     binderActivity.end(binderSource.current);binderSource.current='';
     resources.current.workspace?.stop();
     resources.current.studentSelection?.stop();
@@ -701,6 +704,18 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
       dc.onmessage=async event=>{
         if(generation.current!==version)return;
         let e;try{e=JSON.parse(event.data);}catch{log('malformed_event');return;}
+        if(e.type==='origen.visual.research.reset'){dispatchResearchVisual({type:'reset'});return;}
+        if(e.type==='origen.visual.research'){
+          const report=e.report;
+          log('research_table_received',{jobId:report?.id,updatedAt:report?.updatedAt,present:e.present===true,columnCount:report?.table?.columns?.length,rowCount:report?.table?.rows?.length});
+          if(import.meta.env.DEV&&!closing.current?.active()&&typeof report?.id==='string'&&
+            (report.language==='en'||report.language==='es')&&Number.isFinite(report.updatedAt)&&
+            Array.isArray(report.table?.columns)&&Array.isArray(report.table?.rows)){
+            dispatchResearchVisual({type:'receive',report:{...report,receivedAt:Date.now()},present:e.present===true});
+          }
+          return;
+        }
+        if(e.type==='origen.visual.diagnostic'){log('research_table_build_failed',{jobId:e.jobId});return;}
         capture(e);callTiming.event(e);
         if(e.type==='origen.research.active'){setResearching(e.active===true);return;}
         if(e.type==='origen.research.result'){sessionSources.current=mergeConversationSources(sessionSources.current,e.sources||[]);setSources(sessionSources.current);return;}
@@ -1058,6 +1073,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
   },[detailsOpen,onCloseDetails]);
   useEffect(()=>{if(!autoStart||startedAutomatically.current)return;const timer=setTimeout(()=>{startedAutomatically.current=true;void start();},0);return()=>clearTimeout(timer);},[autoStart]);
   return <section className="profile-voice" aria-labelledby={`${mode}-voice-title`}>
+    {state==='live'&&!finishing&&<VoiceVisualCard state={researchVisual} dispatch={dispatchResearchVisual} language={language} onPresented={details=>log('research_table_rendered',details)}/>}
     <h3 id={`${mode}-voice-title`}>{mode==='loans'?t('Talk through student loans','Conversemos sobre los préstamos estudiantiles'):mode==='planning'?t('Talk through your plan','Conversemos sobre tu plan'):mode==='admissions'?t('Talk through college applications','Conversemos sobre las solicitudes universitarias'):mode==='finance'?t('Talk through college costs','Conversemos sobre los costos universitarios'):role==='student'?t('Tell us about yourself','Cuéntanos sobre ti'):t('Tell us about your student','Cuéntanos sobre tu estudiante')}</h3>
     <p>{mode==='loans'?t('Ask about loan types, interest, repayment or pausing payments. Origen checks official Federal Student Aid guidance.','Pregunta sobre tipos de préstamos, intereses, pagos o pausas. Origen consulta la información oficial de Federal Student Aid.'):mode==='planning'?t('Talk through course choices, college paths, transfer, degree goals or next steps. Build a plan that fits your stage and interests—in English or Spanish.','Conversa sobre cursos, caminos universitarios, transferencias, metas o próximos pasos. Crea un plan para tu etapa e intereses, en español o inglés.'):mode==='admissions'?t('Ask about UC applications, Cal State Apply, Common App or community college. We can explain a form field, check requirements, or help you understand your next step—in English or Spanish.','Pregunta sobre solicitudes de UC, Cal State Apply, Common App o colegios comunitarios. Podemos explicar una pregunta del formulario, consultar requisitos o ayudarte a entender el siguiente paso, en español o inglés.'):mode==='finance'?t('New to college financial aid? Start here. Ask out loud, pause, or ask Origen to explain it another way—in English or Spanish.','¿Es tu primera vez con la ayuda económica universitaria? Empieza aquí. Pregunta en voz alta, haz una pausa o pide otra explicación, en español o inglés.'):t('Have a live conversation with Origen. You can interrupt, ask questions and correct details. Suggested updates appear here for your review.','Conversa en vivo con Origen. Puedes interrumpir, hacer preguntas y corregir detalles. Las sugerencias aparecerán aquí para que las revises.')}</p>
     {!onboarding&&<p className="small-text">{routing?t('AI-generated voice · Starting sends microphone audio and student names to OpenAI. After you confirm whom you mean, their profile context and previous summaries are included. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y los nombres de estudiantes. Después de confirmar de quién hablas, se incluye su contexto y los resúmenes anteriores. Las sesiones terminan a los 10 minutos.'):informational?t('AI-generated voice · Starting sends microphone audio and the selected student’s name, education stage, institutions and entry term to OpenAI. This conversation does not update the profile. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían a OpenAI el audio y el nombre, la etapa educativa, las instituciones y el período de ingreso del estudiante. La conversación no modifica el perfil. Las sesiones terminan a los 10 minutos.'):t('AI-generated voice · Starting sends microphone audio and this profile to OpenAI. Profile changes require your review. Sessions end after 10 minutes.','Voz generada por IA · Al comenzar, se envían el audio del micrófono y este perfil a OpenAI. Los cambios del perfil requieren tu revisión. La sesión termina a los 10 minutos.')}</p>}

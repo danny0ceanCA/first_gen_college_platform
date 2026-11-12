@@ -22,7 +22,7 @@ async function reserveConversation(client,owner,item){
  if(!existing)await client.query('INSERT INTO origen_conversation_lifecycle(account_id,id,student_id,mode) VALUES($1,$2,$3,$4)',[owner,item.id,item.studentId,item.mode]);
 }
 export function createHistoryRepository(database){
- return async(subject,input,{beforeSave,afterSave}={})=>{
+ return async(subject,input,{beforeSave,afterSave,includeContextWindow=false}={})=>{
   if(input.action==='context'&&(input.studentId===undefined||input.studentId!==null&&!identifier(input.studentId)))throw fail(400,'memory_scope_required');
   if(!database)throw fail(503,'database_unavailable');
   const client=await databaseOperation(database,['save','import','reserve','defer'].includes(input.action)?'history.save':['delete','clear'].includes(input.action)?'history.delete':'history.read');
@@ -86,8 +86,9 @@ export function createHistoryRepository(database){
     await client.query('COMMIT');return {items:rows.map(memory)};
    }
    const rows=(await client.query(`SELECT id,student_id,mode,summary,sources,conversation_at FROM origen_conversation_summaries WHERE account_id=$1${input.studentId===null?' AND student_id IS NULL':input.studentId?' AND student_id=$2':''} ORDER BY conversation_at DESC,id DESC LIMIT ${input.action==='context'?24:100}`,input.studentId?[owner,input.studentId]:[owner])).rows;
-   const items=input.action==='context'?selectConversationMemory(rows.map(memory),input.mode):rows.map(memory).reverse();
-   await client.query('COMMIT');return {items};
+   const window=rows.map(memory);
+   const items=input.action==='context'?selectConversationMemory(window,input.mode):window.reverse();
+   await client.query('COMMIT');return {items,...(includeContextWindow&&input.action==='context'?{contextWindow:window}:{})};
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  };
 }

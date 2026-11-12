@@ -8,7 +8,7 @@ export function voicePreparationKey(input){
 }
 // No call controls, live tokens, prompts, consent or opening claims are cached.
 export function preparedVoiceContext(input){
- return Object.fromEntries(['caller','role','profile','students','experience','memory','plans','studentBrief','workspace','historicalEvidence','returnContext'].filter(key=>input[key]!==undefined).map(key=>[key,input[key]]));
+ return Object.fromEntries(['caller','role','profile','students','experience','memory','plans','studentBrief','workspace','historicalEvidence','returnContext','housingPlan'].filter(key=>input[key]!==undefined).map(key=>[key,input[key]]));
 }
 export async function voiceContextVersion(database,subject,{forPreparation=false}={}){
  if(!database)return undefined;

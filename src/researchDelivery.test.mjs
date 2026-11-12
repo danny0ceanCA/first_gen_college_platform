@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {researchDelivery,researchAnswerOverlap} from './researchDelivery.mjs';
 import {capturePayload} from './voiceCapture.mjs';
 import {discussionExamples,correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
+import {researchEvidence} from './voiceResearchProgress.mjs';
+import {publicRecord} from '../server/research-record.fixtures.mjs';
 
 const examples={
  en:{answer:'The published annual tuition is 12345 dollars at Example University.',qualification:'Housing is separate, and this is not a personalized aid award.',reply:'We can take this one step at a time.',caller:'Can we talk about the essays while you check?',ack:'Mm-hmm.'},
@@ -20,6 +22,298 @@ function fixture(){
   announcements:()=>sent.filter(e=>e.type==='session.commentary.append'),
  };
 }
+
+for(const language of ['en','es'])for(const progress of [false,true])test(`${language}: a completed ${progress?'checking acknowledgment':'courtesy acknowledgment'} releases ready research at the next pause`,()=>{
+ const f=fixture(),question=language==='es'?'¿Cuál es la matrícula?':'What is the tuition?';
+ f.delivery.supersede('new_request',question);f.delivery.caller();f.delivery.callerStopped();
+ f.ready(language,{question},{awaitingReply:true});f.ack();
+ // The result arrives after the caller finishes, while a native reply
+ // is still pending. Its completed acknowledgment releases the opportunity.
+ f.quiet(false);
+ f.delivery.reply(progress?(language==='es'?'Claro. Voy a revisar eso.':"Sure. I’ll check that."):(language==='es'?'Claro.':'Sure.'),{audible:true});
+ f.advance(1000);assert.equal(f.announcements().length,0,'never talk over playback');
+ f.quiet(true);f.advance(250);
+ assert.equal(f.announcements().length,1,'no extra three-second reply wait');
+ assert.ok(f.events.some(e=>e.deliveryReason==='acknowledgment_only'));
+ assert.ok(!f.events.some(e=>e.deliveryStage==='evidence_overlap_observed'),'progress is not delivery');
+ f.ack();f.advance(2000);assert.equal(f.announcements().length,1,'only one result contribution');
+ f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: an interrupted progress fragment cannot release a pending ordinary reply`,()=>{
+ const f=fixture();f.delivery.caller();f.ready(language,{}, {awaitingReply:true});f.ack();
+ f.delivery.reply(language==='es'?'Voy a revisar eso.':"I’ll check that.",{audible:true,interrupted:true,completedText:''});
+ f.advance(1500);assert.equal(f.announcements().length,0);f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: a completed contact and hours limitation is not announced twice`,()=>{
+ const f=fixture(),es=language==='es',evidence=publicRecord('student_support',language);
+ evidence.complete=false;
+ evidence.facts=['contact','hours'].map(key=>({...evidence.facts[0],key,label:key==='contact'?'Contact email':'Office hours',status:'unverified',value:null}));
+ evidence.expectedFacts=['contact','hours'];
+ const finding={subject:'Eastview College',aspect:'other',status:'partial',answer:'Contact email and office hours are unverified. [1]',qualification:'Official pages did not establish these details. [1]',evidence};
+ const result={status:'source_check_completed',sources:[{url:'https://eastview.edu/support'}],voiceBrief:{status:'partial',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ const question=es?'¿Cuál es el correo de contacto y el horario de Eastview?':'What are the contact email and office hours for Eastview?';
+ f.delivery.supersede('new_request',question);f.quiet(false);
+ f.ready(language,{question,result});f.ack();
+ f.delivery.reply(es?'El correo de contacto y el horario de Eastview siguen sin verificar.':'Eastview contact email and office hours are still unverified.',{audible:true});
+ f.quiet(true);f.advance(4000);
+ assert.equal(f.announcements().length,0);
+ assert.ok(f.events.some(event=>event.deliveryStage==='evidence_overlap_observed'&&event.deliveryReason==='requested_portion_answered'));
+ const context=decodedResearchContext(f.sent.filter(event=>event.type==='session.thinking.append').map(event=>JSON.parse(event.content)));
+ assert.deepEqual(context.continuation,{pending:false,statusIsSilent:true,announceOnlyNewUsefulFacts:true});
+});
+
+for(const language of ['en','es'])test(`${language}: a typed verified application fee does not hide the requested unverified deadline`,()=>{
+ const f=fixture(),es=language==='es',evidence=publicRecord('scholarships',language);
+ evidence.topic='admissions';evidence.scope.cycle=null;evidence.scope.term=null;
+ evidence.expectedFacts=['application_fee'];
+ evidence.facts=[{...evidence.facts[0],key:'application_fee',label:es?'Tarifa de solicitud':'Application fee',amount:100,bound:'exact',unit:'per application',qualification:'Nonrefundable. Current policy; entry cycle not specified.'}];
+ const findings=[
+  {subject:'Eastview College',aspect:'deadline',status:'unverified',answer:'The fall 2027 deadline is unverified.',qualification:'Requested entry cycle not confirmed.'},
+  {subject:'Eastview College',aspect:'other',status:'verified',answer:'Application fee: $100. [1]',qualification:'Nonrefundable. Current policy; entry cycle not specified. [1]',evidence},
+ ];
+ const question=es?'¿Cuál es la fecha límite y tarifa de solicitud de Eastview College para otoño de 2027?':'What are the fall 2027 application deadline and application fee for Eastview College?';
+ const result={status:'source_check_completed',sources:[{url:'https://eastview.edu/admissions'}],voiceBrief:{status:'partial',answer:findings[1].answer,qualification:findings[1].qualification,nextStep:'',findings}};
+ f.delivery.supersede('new_request',question);f.quiet(false);f.ready(language,{question,result});
+ const context=decodedResearchContext(f.sent.filter(event=>event.type==='session.thinking.append').map(event=>JSON.parse(event.content)));
+ assert.equal(context.findings.length,2);
+ assert.ok(context.findings.some(finding=>finding.aspect==='deadline'&&finding.status==='unverified'));
+ assert.ok(context.findings.some(finding=>finding.answer.includes('$100')&&finding.qualification.includes('entry cycle not specified')));
+ f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: saved-trace scoped gap does not trigger a second announcement after the native answer`,()=>{
+ const es=language==='es',evidence=publicRecord('scholarships',language);
+ evidence.topic='admissions';evidence.scope.cycle=null;evidence.scope.term=null;
+ evidence.expectedFacts=['application_fee'];
+ evidence.facts=[{...evidence.facts[0],key:'application_fee',label:es?'Tarifa de solicitud':'Application fee',amount:100,bound:'exact',unit:'per application',qualification:'Nonrefundable. Current policy; entry cycle not specified.'}];
+ const subject=es?'Eastview College — primer año, otoño de 2027':'Eastview College — fall 2027 first-year';
+ const question=es?'¿Cuál es la fecha límite y tarifa de solicitud de Eastview College para otoño de 2027?':'What are the fall 2027 application deadline and application fee for Eastview College?';
+ const missing={subject,aspect:'deadline',status:'unverified',answer:es?'La fecha límite solicitada aún no se pudo confirmar.':'The fall 2027 first-year deadline could not be confirmed.',qualification:es?`La información disponible no establece este dato para ${subject}.`:'The requested entry cycle remains unverified.'};
+ const fee={subject:'Eastview College',aspect:'other',status:'verified',answer:'Application fee: $100. [1]',qualification:'Nonrefundable. Current policy; entry cycle not specified. [1]',evidence};
+ const result={status:'source_check_completed',sources:[{url:'https://eastview.edu/admissions'}],voiceBrief:{status:'partial',answer:fee.answer,qualification:fee.qualification,nextStep:'',findings:[missing,fee]}};
+ const spoken=es?'Buena pregunta. Permíteme comprobar eso y te cuento. Estoy revisando fuentes oficiales y algo no se pudo confirmar. La fecha límite para primer año en otoño de 2027 aún no la tengo verificada, pero la tarifa sí está publicada: 100 dólares por solicitud, no reembolsable, con posibilidad de pedir una exención si cumples los requisitos. Esa política se actualizó en septiembre de 2026.':
+  'I am checking official sources. The first-year deadline for fall 2027 is still unverified, but the application fee is 100 dollars, nonrefundable. A fee waiver is possible.';
+ for(const variant of ['native','new_question','two_subjects','unconfirmed_audio','interrupted']){
+  const f=fixture(),current=structuredClone(result);
+  if(variant==='two_subjects')current.voiceBrief.findings.push({...missing,subject:'Pine Valley College'});
+  f.delivery.supersede('new_request',question);f.quiet(false);f.ready(language,{question,result:current});f.ack();
+  if(variant==='new_question'){f.delivery.caller();f.delivery.callerStopped(es?'¿Qué incluye la tarifa?':'What does the fee include?');}
+  f.delivery.reply(spoken,{audible:variant!=='unconfirmed_audio',interrupted:variant==='interrupted',completedText:variant==='interrupted'?'':spoken});
+  f.quiet(true);f.advance(1500);
+  assert.equal(f.events.some(event=>event.deliveryReason==='contextual_gap_observed'),variant==='native',variant);
+  if(variant==='native'){
+   assert.equal(f.announcements().length,0);
+   assert.ok(!f.events.some(event=>event.deliveryStage==='evidence_overlap_observed'),'a scoped gap is not proof the whole answer was heard');
+   const updated=structuredClone(current);updated.voiceBrief.findings[0]={...missing,status:'verified',answer:'Eastview College fall 2027 deadline: January 15, 2027. [1]',qualification:'First-year applicants only. [1]'};
+   f.ready(language,{question,evidenceVersion:2,result:updated});f.ack();f.advance(500);
+   assert.equal(f.announcements().length,1,'new verified evidence remains eligible');
+   assert.match(f.announcements()[0].content,/January 15|finding/);
+  }
+  f.delivery.clear();
+ }
+});
+
+for(const language of ['en','es'])test(`${language}: unavailable attendance total shares only the supported fee subtotal at the next quiet opportunity`,()=>{
+ const f=fixture(),question=language==='es'?'Costo total de asistencia de UC Santa Cruz fuera del campus':'Total cost of attendance for UC Santa Cruz off campus';
+ const subject='UC Santa Cruz',amount=language==='es'?'La matrícula y cuotas obligatorias suman USD 17,432.36. [1]':'Tuition and mandatory fees add up to USD 17,432.36. [1]';
+ const caveat=language==='es'?'2026–27; excluye el alojamiento.':'2026–27; excludes housing.';
+ const result={sources:[{url:'https://ucsc.edu/fees'}],voiceBrief:{status:'partial',answer:amount,qualification:caveat,nextStep:'',findings:[
+  {subject,aspect:'total_budget',status:'unverified',answer:'The attendance total is unverified.',qualification:'The off-campus budget is unconfirmed.'},
+  {subject,aspect:'housing',status:'unverified',answer:'Rent estimate is unverified.',qualification:'No verified rent allowance.'},
+  {subject,aspect:'tuition_fees',status:'partial',answer:amount,qualification:caveat},
+ ]}};
+ f.delivery.supersede('new_request',question);
+ f.quiet(false);
+ f.ready(language,{question,researchPending:true,result:researchEvidence(result,false)});
+ f.ack();f.advance(500);assert.equal(f.announcements().length,0);
+ f.quiet(true);f.advance(500);
+ const announcement=f.announcements()[0];
+ assert.match(announcement.content,/attendance total is not verified/);
+ assert.match(announcement.content,/sourced tuition and fees in finding .*scope and caveat/);
+ assert.match(announcement.content,/no overall amount/);
+ assert.ok(f.sent.some(event=>event.type==='session.thinking.append'&&event.content.includes('17,432.36')));
+ f.ready(language,{question,evidenceVersion:2,researchPending:false,result:researchEvidence(result,false)});
+ f.ack();f.advance(2000);assert.equal(f.announcements().length,1);
+});
+
+test('a caller asking if the result is ready gets the concise scoped total at the first safe pause',()=>{
+ const f=fixture(),question='For comparison with UC Berkeley, verify UC Davis cost of attendance.';
+ const answer='UC Davis publishes a 2026–27 California-resident, new-undergraduate budget of USD $49,009 for three quarters in a residence hall, before aid. This is a general undergraduate scenario, not a verified transfer-specific budget. [1]';
+ const qualification='The published budget omits the separately required new-student orientation fee; its amount remains unverified. Tuition uses rounded budget figures rather than the precise billing schedule. [2]';
+ const result={sources:[{url:'https://ucdavis.edu/budget'},{url:'https://ucdavis.edu/fees'}],
+  voiceBrief:{status:'partial',answer,qualification,nextStep:'',findings:[
+   {subject:'UC Davis',aspect:'tuition_fees',status:'partial',answer:'Annual tuition and fees: $18,077.13. [2]',qualification},
+   {subject:'UC Davis',aspect:'total_budget',status:'partial',answer:'Residence hall budget: $49,009. [1]',qualification},
+   {subject:'UC Berkeley',aspect:'total_budget',status:'verified',answer:'Residence hall budget: $54,674. [1]',qualification},
+  ]}};
+ f.delivery.supersede('new_request',question);
+ f.delivery.caller();
+ f.delivery.callerStopped('So do you have it?');
+ f.quiet(false);
+ f.ready('en',{question,result:researchEvidence(result,false)},{awaitingReply:true});
+ f.advance(500);
+ assert.equal(f.sent.length,0);
+ f.quiet(true);
+ f.advance(250);
+ assert.equal(f.sent[0].type,'session.commentary.append');
+ assert.match(f.sent[0].content,/49,009.*orientation fee/s);
+ assert.doesNotMatch(f.sent[0].content,/18,077|54,674|UC Berkeley/);
+ assert.ok(f.sent.some(event=>event.type==='session.thinking.append'));
+ f.ack();f.advance(3500);
+ assert.equal(f.announcements().length,1);
+});
+
+test('a verified comparison change uses the first quiet boundary without recapping the retained college',()=>{
+ const f=fixture(),question='Verify only the requested change for Eastview College (deadline): spring 2028.';
+ const findings=[
+  {subject:'Eastview College',aspect:'deadline',status:'verified',answer:'Spring 2028 deadline: September 1 [1].',qualification:'First-year applicants only.'},
+  {subject:'Pine Valley College',aspect:'deadline',status:'verified',answer:'Fall 2027 deadline: February 1 [2].',qualification:'First-year applicants only.'},
+ ];
+ const result={sources:[{url:'https://eastview.edu'},{url:'https://pinevalley.edu'}],
+  voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
+ f.quiet(false);
+ f.delivery.supersede('new_request',question);
+ f.ready('en',{question,comparisonSubject:'Eastview College',result});
+ f.advance(1000);
+ assert.equal(f.announcements().length,0);
+ f.quiet(true);
+ f.advance(250);
+ assert.equal(f.announcements().length,1);
+ assert.match(f.announcements()[0].content,/September 1.*First-year applicants only/);
+ assert.doesNotMatch(f.announcements()[0].content,/Pine Valley|February 1/);
+ f.ack();
+ f.advance(3000);
+ assert.equal(f.announcements().length,1);
+});
+
+for(const [language,ack,followUp,answer,qualification] of [
+ ['en','Alright','Alright, what is the difference between a budget and a bill?',
+  '2026–27 off-campus budget before aid: $49,692. [1]','California-resident undergraduate estimate. It is not a bill. [1]'],
+ ['es','Ajá','Ajá, ¿qué diferencia hay entre un presupuesto y una factura?',
+  'Presupuesto 2026–27 fuera del campus antes de la ayuda: $49,692. [1]','Estimado para residentes de California. No es una factura. [1]'],
+])test(language+': an acknowledgment releases the finished scoped result at the first quiet tick',()=>{
+ const f=fixture(),question=language==='en'?'Verify the cost of attendance and tuition for off-campus housing.':'Verifica el costo de asistencia y la matrícula para vivienda fuera del campus.';
+ const findings=[
+  {subject:'Example University',aspect:'tuition_fees',status:'verified',answer:'Tuition: $18,214. [1]',qualification},
+  {subject:'Example University',aspect:'total_budget',status:'verified',answer,qualification},
+ ];
+ const result={sources:[{url:'https://example.edu/budget'}],voiceBrief:{status:'verified',answer:findings[0].answer,qualification,nextStep:'',findings}};
+ for(const completedTurn of [ack,followUp]){
+  const run=completedTurn===ack?f:fixture();
+  run.delivery.supersede('new_request',question);
+  run.delivery.caller();run.quiet(false);
+  run.ready(language,{question,result},{awaitingReply:true,pendingCallerText:ack});
+  run.advance(1000);assert.equal(run.sent.length,0);
+  run.delivery.callerStopped(completedTurn);run.quiet(true);run.advance(250);
+  if(completedTurn===ack){
+   assert.equal(run.sent[0].type,'session.commentary.append');
+   assert.match(run.sent[0].content,/49,692/);
+   assert.ok(run.sent[0].content.includes(qualification.replace(' [1]','')));
+   assert.doesNotMatch(run.sent[0].content,/18,214/);
+   assert.ok(run.events.some(event=>event.deliveryReason==='after_acknowledgment'));
+   run.ack();run.advance(3500);assert.equal(run.announcements().length,1);
+  }else{
+   assert.equal(run.announcements().length,0);
+   run.delivery.reply(language==='en'?'A bill lists charges you actually owe.':'La factura indica los cargos que debes pagar.',{audible:true});
+   run.advance(250);run.ack();run.advance(250);
+   assert.equal(run.announcements().length,1);
+  }
+  run.delivery.clear();
+ }
+});
+
+test('a long qualified budget can speak once its own context arrives without waiting for secondary context',()=>{
+ const f=fixture(),question='Verify cost of attendance and tuition for an off-campus student.';
+ const qualification='California resident undergraduate, before aid and separate from what the university bills. '.repeat(5);
+ const findings=[
+  {subject:'Example University',aspect:'tuition_fees',status:'verified',answer:'Tuition: $18,214. [1]',qualification:'Annual recurring tuition and fees.'},
+  {subject:'Example University',aspect:'total_budget',status:'verified',answer:'2026–27 off-campus total: $49,692. [1]',qualification},
+ ];
+ f.delivery.supersede('new_request',question);
+ f.delivery.caller();f.quiet(false);
+ f.ready('en',{question,result:{sources:[{url:'https://example.edu/budget'}],voiceBrief:{status:'verified',answer:findings[0].answer,qualification:'One academic year.',nextStep:'',findings}}},
+  {awaitingReply:true,pendingCallerText:'Alright'});
+ f.delivery.callerStopped('Alright');f.quiet(true);
+ const lead=f.sent.filter(event=>event.type==='session.thinking.append'&&JSON.parse(event.content).group==='1-finding-1');
+ assert.ok(lead.length>1);
+ for(const event of lead.slice(0,-1))f.delivery.receive({type:'session.thinking.appended',client_event_id:event.event_id});
+ f.advance(250);assert.equal(f.announcements().length,0);
+ f.delivery.receive({type:'session.thinking.appended',client_event_id:lead.at(-1).event_id});
+ f.advance(250);
+ assert.equal(f.announcements().length,1);
+ assert.match(f.announcements()[0].content,/Lead with finding.*No status preamble/);
+ assert.ok(!f.events.some(event=>event.type==='origen.research.context_acknowledged'));
+ f.ack();f.advance(3500);assert.equal(f.announcements().length,1);
+ f.delivery.clear();
+});
+
+for(const [language,status] of [['en','Okay, how about now?'],['es','¿Y ahora?']])test(language+': a completed check can answer an explicit status question after a stray fragment',()=>{
+ const f=fixture(),question='2026–27 off-campus cost of attendance for UC Davis';
+ const answer='UC Davis published off-campus cost before aid is $44,760. [1]';
+ const qualification='Academic-year planning estimate, not a bill. [1]';
+ const result={sources:[{url:'https://ucdavis.edu/budget'}],voiceBrief:{status:'verified',answer,qualification,nextStep:'',findings:[
+  {subject:'UC Davis',aspect:'total_budget',status:'verified',answer,qualification},
+ ]}};
+ f.delivery.supersede('new_request',question);f.quiet(false);
+ f.ready(language,{question,result});f.ack();
+ f.delivery.caller();f.delivery.callerStopped('if');
+ f.delivery.reply('I am waiting for the check.',{interrupted:true,completedText:''});
+ f.advance(10000);assert.equal(f.announcements().length,0);
+ f.delivery.caller();f.delivery.callerStopped(status);f.quiet(true);f.advance(250);
+ assert.equal(f.announcements().length,1);
+ assert.match(f.announcements()[0].content,/44,760.*not a bill/s);
+ f.advance(4000);assert.equal(f.announcements().length,1);
+ f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: a qualified off-campus benchmark asks housing once across campus additions`,()=>{
+ const f=fixture(),es=language==='es';
+ const question=es?'¿Alquilaría o viviría con familiares?':'Would the student rent or live with family?';
+ const makeResult=subject=>({sources:[{url:'https://example.edu/costs'}],voiceBrief:{status:'partial',
+  answer:'Published off-campus budget: $40,000. [1]',qualification:'Published classification and components do not reconcile. [1]',nextStep:question,
+  findings:['off_campus','with_family'].map(housing=>({subject:subject+' '+housing,aspect:'total_budget',status:'partial',
+   answer:'Published budget: $40,000. [1]',qualification:'Published classification and components do not reconcile. [1]',
+   budget:{year:'2026-27',population:'California resident undergraduate',currency:'USD',period:'academic_year',housing,assumed:false,total:40000,sourceCitation:'[1]',complete:true,
+    expectedCategories:['tuition_fees','housing','food'],components:[['tuition_fees',10000],['housing',25000],['food',5085]].map(([key,amount])=>({key,sourceLabel:key,amount,role:'component',qualification:''}))}}))}});
+ f.ready(language,{question:'Cost of attendance off campus',result:makeResult('Eastview')});f.advance(250);
+ assert.equal(f.announcements().length,1);assert.ok(f.announcements()[0].content.includes(question));
+ assert.doesNotMatch(f.announcements()[0].content,/checking|revisando/);
+ f.delivery.supersede('new_request','Cost of attendance off campus');
+ f.ready(language,{jobId:'next',requestId:'next',question:'Cost of attendance off campus',result:makeResult('Pine Valley')});
+ f.advance(250);
+ assert.equal(f.announcements().filter(e=>e.content.includes(question)).length,1,'no repeated housing question for the next college');
+ f.delivery.clear();
+});
+
+for(const [language,question,spoken,ambiguous,tuition] of [
+ ['en','Will Aiden rent an apartment or stay with relatives?','Is he renting or living with family?','Yeah, off campus.','Berkeley’s annual tuition and required fees are $18,214. [1]'],
+ ['es','¿Va a alquilar un apartamento o vivir con familiares?','¿Alquilará o vivirá con familiares?','Sí, fuera del campus.','La matrícula y cuotas anuales de Berkeley son $18,214. [1]'],
+])test(language+': unresolved housing asks once and then gives tuition after a broad off-campus reply',()=>{
+ for(const native of [false,true]){
+  const f=fixture(),lookup='UC Berkeley annual off-campus cost of attendance and tuition';
+  const qualification='The overall estimate depends on the housing arrangement. [1]';
+  const result={sources:[{url:'https://berkeley.edu/budget'}],voiceBrief:{status:'partial',answer:tuition,qualification,nextStep:question,findings:[
+   {subject:'UC Berkeley',aspect:'total_budget',status:'partial',answer:'The source distinguishes two off-campus living arrangements. [1]',qualification:question+' [1]'},
+   {subject:'UC Berkeley',aspect:'tuition_fees',status:'verified',answer:tuition,qualification},
+  ]}};
+  f.delivery.supersede('new_request',lookup);
+  f.quiet(!native);f.ready(language,{question:lookup,result});
+  if(native){f.delivery.reply(spoken,{audible:true});f.quiet(true);}
+  f.advance(250);f.ack();
+  assert.equal(f.announcements().length,native?0:1);
+  if(!native)assert.ok(f.announcements()[0].content.includes(question));
+  f.delivery.caller();f.delivery.callerStopped(ambiguous);f.advance(250);
+  const fallback=f.announcements().at(-1).content;
+  assert.match(fallback,/18,214/);assert.match(fallback,/leave the overall total open/);
+  assert.ok(!fallback.includes(question));
+  for(const reply of ['Okay',ambiguous,'Go ahead']){f.delivery.caller();f.delivery.callerStopped(reply);f.advance(5000);}
+  assert.equal(f.announcements().length,native?1:2);
+  assert.equal(f.sent.some(e=>['response.create','session.instructions.append'].includes(e.type)),false);
+  f.delivery.clear();
+ }
+});
 
 const topicRequests=[
  ['en','What is the annual tuition?','Actually as for off, how do I transfer my course credits?',true],
@@ -161,7 +455,7 @@ for(const language of ['en','es']){
   const packets=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
   const evidence=decodedResearchContext(packets);
   assert.equal(evidence.text,text);assert.equal(evidence.taskState,'completed');assert.equal(evidence.researchPending,false);
-  assert.ok(f.sent.every(e=>Buffer.byteLength(e.content)<=480));assert.match(f.announcements()[0].content,/Completed research/);f.delivery.clear();
+  assert.ok(f.sent.every(e=>Buffer.byteLength(e.content)<=480));assert.match(f.announcements()[0].content,/Give the useful finding naturally/);f.delivery.clear();
  });
 }
 test('a partial context acknowledgment cannot produce an announcement',()=>{
@@ -177,7 +471,7 @@ test('commentary acknowledgment is not spoken delivery and does not trigger retr
 });
 for(const language of ['en','es'])test(`${language}: an acknowledgment alone cannot strand a finished result after the caller stops`,()=>{
  const f=fixture();f.ready(language);f.ack();f.delivery.caller();f.delivery.callerStopped();f.delivery.reply(examples[language].ack,{audible:true});
- f.advance(2750);assert.equal(f.announcements().length,0);f.advance(500);assert.equal(f.announcements().length,1);
+ f.advance(250);assert.equal(f.announcements().length,1,'completed acknowledgment needs no additional reply hold');
  f.advance(10000);assert.equal(f.announcements().length,1);f.delivery.clear();
 });
 test('resumed caller speech revokes the pending result opportunity until that speech ends',()=>{
@@ -196,7 +490,7 @@ for(const kind of ['context','commentary'])test(`${kind} provider errors retire 
 });
 test('failure speaks no fabricated findings and never restarts research',()=>{
  const f=fixture();f.ready('en',{result:{status:'research_failed'}});f.ack();f.advance(500);
- assert.match(f.announcements()[0].content,/failed.*No verified findings/);assert.equal(f.sent.filter(e=>e.type==='response.create').length,0);f.delivery.clear();
+ assert.match(f.announcements()[0].content,/unavailable information.*No verified findings/);assert.equal(f.sent.filter(e=>e.type==='response.create').length,0);f.delivery.clear();
 });
 test('long ongoing conversation explicitly defers unsolicited delivery without a silence prompt',()=>{
  const f=fixture();f.ready();f.ack();f.delivery.caller();f.advance(120000);
@@ -298,7 +592,7 @@ for(const language of ['en','es'])test(`${language}: initial findings are usable
 
 test('initial evidence can announce before recovery and final revision only refreshes context',()=>{
  const f=fixture();f.ready('en',{evidenceVersion:1,researchPending:true});f.ack();f.advance(500);
- assert.equal(f.announcements().length,1);assert.match(f.announcements()[0].content,/Initial sourced findings/);
+ assert.equal(f.announcements().length,1);assert.match(f.announcements()[0].content,/Give the useful finding naturally/);
  f.ready('en',{evidenceVersion:2,researchPending:false});f.ack();f.advance(5000);assert.equal(f.announcements().length,1);f.delivery.clear();
 });
 
@@ -328,7 +622,7 @@ for(const [language,s] of Object.entries(budgetScripts)){
   f.ready(language,{question:s.question,result:budgetResult(s)});f.ack();f.delivery.reply(s.ack,{audible:true});f.advance(500);
   assert.equal(f.announcements().length,1);const content=f.announcements()[0].content;
   assert.ok(content.includes(s.answer));assert.ok(content.includes(s.qualification));assert.match(content,/UC Berkeley/);
-  assert.match(content,/check has ended/);assert.match(content,/Do not say still checking/);
+  assert.doesNotMatch(content,/check has ended|still checking/);assert.match(content,/No task-status or completion announcement/);
   assert.ok(Buffer.byteLength(content)<=480);assert.ok(!f.events.some(e=>e.deliveryReason==='different_requested_portion'));f.delivery.clear();
  });
  test(`${language}: explicit housing-only follow-up is not satisfied by a total-budget finding`,()=>{
@@ -472,7 +766,60 @@ test('a newly selected unsupplied finding cannot use another finding context ack
  f.delivery.caller();f.delivery.callerStopped('What is the total budget for Campus4?');
  f.delivery.reply('We can compare those costs together.',{audible:true});f.quiet(true);f.advance(500);
  assert.equal(f.announcements().length,0);
- assert.ok(f.events.some(e=>e.deliveryReason==='requested_evidence_not_supplied'));f.delivery.clear();
+ assert.ok(f.events.some(e=>e.deliveryStage==='context_supplement_requested'&&e.deliveryReason==='requested_evidence_not_supplied'));
+ const supplement=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content));
+ assert.ok(decodedResearchContext(supplement).findings.some(finding=>finding.subject==='Campus4'));
+ f.advance(1000);assert.equal(f.announcements().length,0,'old acknowledgments do not acknowledge the additional unit');
+ f.ack();f.advance(250);assert.equal(f.announcements().length,1);
+ assert.match(f.announcements()[0].content,/Campus4|finding/);f.delivery.clear();
+});
+
+for(const [language,request] of [['en','Where is the tutoring center?'],['es','¿Dónde está el centro de tutoría?']])test(`${language}: a clear support request keeps old cost research quiet`,()=>{
+ const f=fixture();f.delivery.supersede('new_request','What is the cost of attendance?');
+ assert.equal(f.delivery.topicChanged(request),true);
+ f.delivery.caller();f.delivery.callerStopped(request);
+ f.ready(language,{question:'What is the cost of attendance?',result:budgetResult(budgetScripts.en)});
+ f.ack();f.advance(4000);
+ assert.equal(f.announcements().length,0);
+ assert.ok(f.events.some(event=>event.deliveryReason==='different_requested_portion'));
+ f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: a newly requested contact within an existing record is supplied before its optional answer`,()=>{
+ const f=fixture(),es=language==='es',evidence=publicRecord('admissions',language);
+ evidence.facts.push(publicRecord('student_support',language).facts[0]);evidence.expectedFacts.push('contact');
+ const question=es?'¿Cuál es la fecha límite de solicitud?':'What is the application deadline?';
+ const finding={subject:'Eastview College',aspect:'other',status:'verified',answer:'A source-backed overview is available. [1]',qualification:'First-year applicants; the source conditions apply. [1]',evidence};
+ const result={sources:[{url:'https://eastview.edu/policy'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ f.delivery.supersede('new_request',question);f.quiet(false);f.ready(language,{question,result,language});f.ack();
+ const before=f.sent.length;
+ f.delivery.caller();f.delivery.callerStopped(es?'¿Con quién puedo hablar?':'Who can I contact?');
+ f.delivery.reply(es?'Sí, podemos revisar el contacto adecuado.':'Yes, we can review the right contact.',{audible:true});
+ f.quiet(true);f.advance(250);
+ const additional=f.sent.slice(before).filter(event=>event.type==='session.thinking.append');
+ assert.ok(additional.length>0);assert.equal(f.announcements().length,0);
+ const context=decodedResearchContext(additional.map(event=>JSON.parse(event.content)));
+ assert.deepEqual(context.findings[0].focusedFacts.map(fact=>fact.key),['contact']);
+ assert.equal(context.findings[0].focusedFacts[0].qualification,evidence.facts[1].qualification);
+ f.advance(500);assert.equal(f.announcements().length,0);
+ f.ack();f.advance(250);assert.equal(f.announcements().length,1);
+ assert.match(f.announcements()[0].content,/requested fact keys \["contact"\]/);
+ assert.match(f.announcements()[0].content,/scope and caveats/);
+ const count=f.sent.length;f.advance(500);assert.equal(f.sent.length,count,'the same supplemental fact is not repeatedly sent');
+ f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: a reflection about another fact does not replace the requested deadline`,()=>{
+ const f=fixture(),es=language==='es',question=es?'¿Cuál es la fecha límite de la beca?':'What is the scholarship deadline?';
+ const evidence=publicRecord('scholarships',language);
+ const finding={subject:'Eastview College',aspect:'other',status:'verified',answer:'A source-backed overview is available. [1]',qualification:'The published conditions apply. [1]',evidence};
+ const result={sources:[{url:'https://eastview.edu/policy'}],voiceBrief:{status:'verified',answer:finding.answer,qualification:finding.qualification,nextStep:'',findings:[finding]}};
+ f.delivery.supersede('new_request',question);f.delivery.caller();
+ f.delivery.callerStopped(es?'Me pregunto cuál es el monto de la beca.':'I was thinking about the scholarship amount.');
+ f.quiet(false);f.ready(language,{question,result,language});
+ const context=decodedResearchContext(f.sent.filter(event=>event.type==='session.thinking.append').map(event=>JSON.parse(event.content)));
+ assert.deepEqual(context.findings[0].focusedFacts.map(fact=>fact.key),['deadline']);
+ f.delivery.clear();
 });
 
 test('long multibyte finding names use an acknowledged opaque reference within append bounds',()=>{
@@ -520,4 +867,23 @@ test('a non-interrupted unfinished transcript clause cannot count as a completed
  f.ready('en',{question:script.question,result:budgetResult(script)});f.ack();
  f.delivery.reply(script.answer,{audible:true,completedText:''});
  assert.ok(!f.events.some(e=>['evidence_overlap_observed','native_portion_observed'].includes(e.deliveryStage)));f.delivery.clear();
+});
+
+for(const language of ['en','es'])test(`${language}: recovery quietly retires obsolete references without repeating them or requesting speech`,()=>{
+ const f=fixture(),subject='Eastview College',question='2026–27 cost of attendance off campus';
+ const qualification='2026–27 rental benchmark before aid; living plan unconfirmed. [1]';
+ const fee={subject,aspect:'tuition_fees',status:'verified',answer:'Annual tuition and fees are $10,000 [1].',qualification};
+ const missing={subject,aspect:'total_budget',status:'unverified',answer:'Housing and food amounts could not be verified.',qualification:''};
+ const result=findings=>({sources:[{url:'https://eastview.edu/budget'}],voiceBrief:{status:'partial',answer:fee.answer,qualification,nextStep:'',findings}});
+ f.quiet(false);f.delivery.supersede('new_request',question);
+ f.ready(language,{question,evidenceVersion:1,researchPending:true,result:result([fee,missing])});f.ack();
+ const prior=decodedResearchContext(f.sent.filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ const retired=prior.findings.find(finding=>finding.aspect==='total_budget');assert.ok(retired?.findingId);
+ const start=f.sent.length;
+ f.ready(language,{question,evidenceVersion:2,researchPending:false,result:result([fee,{subject,aspect:'total_budget',status:'verified',answer:'Annual rental budget $40,000 before aid [1].',qualification}])});
+ const current=decodedResearchContext(f.sent.slice(start).filter(e=>e.type==='session.thinking.append').map(e=>JSON.parse(e.content)));
+ assert.ok(current.retiredFindingIds.includes(retired.findingId));
+ assert.ok(!current.findings.some(finding=>finding.aspect==='housing'));
+ assert.ok(current.findings.some(finding=>finding.aspect==='total_budget'));
+ f.ack();f.advance(2000);assert.equal(f.announcements().length,0,'quiet context never interrupts the current answer');
 });

@@ -1,0 +1,10 @@
+export type ResearchRequirement={key:string;label:string;kind:string};
+export type ResearchTask={version:1;revision:number;question:string;language:'en'|'es';entities:string[];requirements:ResearchRequirement[];scope:Record<string,string>};
+export function requestedResearchFacts(question:string,language?:string):ResearchRequirement[];
+export function researchTaskEntities(value:unknown):string[];
+export function createResearchTask(input?:{question?:string;language?:string;institution?:string;retainedEntities?:string[]},previous?:ResearchTask|null):ResearchTask;
+export function auditResearchTask(task:ResearchTask,result:unknown):{status:'complete'|'partial'|'unavailable';complete:boolean;missing:(ResearchRequirement&{entity:string})[];verifiedCount:number};
+export function researchFactMatchesRequirement(fact:unknown,requirement:ResearchRequirement):boolean;
+export function researchFindingMatchesTaskEntity(task:Partial<ResearchTask>,entity:string,finding:unknown):boolean;
+export function researchProgramScopeMatches(question:string,record:unknown):boolean;
+export function researchTaskRelationship(question:string,task:Partial<ResearchTask>):'related'|'changed'|'unknown';

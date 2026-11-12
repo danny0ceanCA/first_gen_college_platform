@@ -92,6 +92,11 @@ class Validation(unittest.TestCase):
         b,_=m.prepare(f);self.assertEqual(b[0]['normalized']['housing'],'off_campus_unspecified');self.assertTrue(b[0]['flagged'])
         self.assertEqual(m.housing_key('Commuter'),'commuter_unspecified')
 
+    def test_negated_parent_housing_does_not_become_living_with_family(self):
+        self.assertEqual(m.housing_key('Off-campus (not with parents)'),'renting')
+        self.assertEqual(m.housing_key('Commuter/Remote (with parents)'),'with_family')
+        self.assertEqual(m.housing_key('Off-campus'),'off_campus_unspecified')
+
     def test_orphan_and_duplicate_records_are_preserved_but_quarantined(self):
         f=fixture();f['items'][0]['values']['Budget ID']='missing'
         self.assertEqual(m.import_payload(f,None)['invalid_items'],1)

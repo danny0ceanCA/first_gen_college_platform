@@ -17,3 +17,11 @@ test('timing telemetry keeps bounded measurements and drops supplied words and i
  const invalid=clientDiagnosticRecord({event:'voice_timing',timingStage:'Private query',boundary:'name',candidateAudioMs:-5});assert.equal(invalid.timingStage,undefined);assert.equal(invalid.boundary,undefined);assert.equal(invalid.candidateAudioMs,undefined);
  const server=diagnosticRecord({event:'voice.context_timing',contextStage:'teachings',durationMs:15,outcome:'completed'});assert.equal(server.contextStage,'teachings');assert.equal(server.evidence,'server_observed');
 });
+
+test('timing classifier metadata is allowlisted without claiming semantic playback',()=>{
+ const record=diagnosticRecord(clientDiagnosticRecord({event:'voice_timing',timingStage:'transcript_classified',timingTextKind:'incomplete_preamble',timingClassifierVersion:'preamble-v2',timingAudioEvidence:'audio_energy_after_transcript',preambleResponseCount:50000,transcript:'Private student details',responseId:'private-response'}));
+ assert.equal(record.timingTextKind,'incomplete_preamble');assert.equal(record.timingClassifierVersion,'preamble-v2');assert.equal(record.timingAudioEvidence,'audio_energy_after_transcript');assert.equal(record.preambleResponseCount,10000);
+ assert.doesNotMatch(JSON.stringify(record),/Private student|private-response/);
+ const invalid=clientDiagnosticRecord({event:'voice_timing',timingTextKind:'Private student details',timingClassifierVersion:'secret',timingAudioEvidence:'answer_heard',preambleResponseCount:-1});
+ assert.equal(invalid.timingTextKind,undefined);assert.equal(invalid.timingClassifierVersion,undefined);assert.equal(invalid.timingAudioEvidence,undefined);assert.equal(invalid.preambleResponseCount,undefined);
+});

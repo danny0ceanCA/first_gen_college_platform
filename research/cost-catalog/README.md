@@ -1,5 +1,12 @@
 # Isolated published-cost staging
 
+The [updated-workbook local test release](UPDATED_WORKBOOK_TESTING.md) describes
+the v2.1 import, source checks, caveated test view and isolated voice adapter.
+
+The subsequent [PostgreSQL/provider preparation](POSTGRES_PREPARATION.md) adds
+dedicated local PostgreSQL storage, source-review gates and a default-off
+comparison/research adapter. It is not activated in the live application.
+
 Branch `v1.3-decisions-integration`. This importer reads the supplied UC workbook
 into its own local SQLite file. It does not connect to the application's
 Postgres database, load environment credentials, call OpenAI, fetch source URLs,

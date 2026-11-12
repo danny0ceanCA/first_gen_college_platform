@@ -11,6 +11,10 @@ import {discussionExamples} from '../src/researchDiscussion.fixture.mjs';
 import {voiceTargetResult} from '../src/voiceTargetResult.mjs';
 import {capturePayload} from '../src/voiceCapture.mjs';
 import {comparisonUpdateTool,comparisonFindings} from './voice-comparison-update.mjs';
+import {studentHousingPlan,costHousingScenario} from './voice-housing-scope.mjs';
+import {financeResearchRequest} from './finance-research.mjs';
+import {requestedResearchAspects} from '../src/researchQuestion.mjs';
+import {comparisonAddition,mergeComparisonAddition} from './research-reuse.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check,timeoutMs=1000){for(let n=0;n<timeoutMs/10;n++){if(check())return;await pause(10);}assert.fail('condition timed out');}
 const tool=(name,call_id,args={})=>({type:'function_call',name,call_id,arguments:JSON.stringify(args)});
@@ -24,6 +28,355 @@ function fixture(options={}){
  function call(items,id='r'){backend('response.created',id);for(const item of items)backend('response.output_item.done',id,{item});backend('response.completed',id);}
  return {engine,sent,events,jobs,backend,call};
 }
+
+for(const language of ['en','es'])test(language+': a known rental plan survives generic off-campus tool wording',async()=>{
+ const f=fixture({researchDeliveryV2:true,config:{language,housingPlan:'renting'}});
+ try{
+  const question=language==='es'?'Costo de asistencia fuera del campus para residente de California.':'California-resident cost of attendance living off campus.';
+  f.call([tool('lookup_financial_aid','known-rental',{question,institution:'UC Berkeley'})]);
+  await until(()=>f.jobs.some(job=>job.method==='POST'));
+  const posted=f.jobs.find(job=>job.method==='POST').body;
+  assert.equal(costHousingScenario(posted.question),'renting');
+ }finally{f.engine.close();}
+});
+test('an explicitly supplied isolated delivery sink owns research once while cached results and UI remain available',async()=>{
+ const ready=[];
+ const result={checkedAt:new Date().toISOString(),text:'Example has an annual fee of $100. [1]',sources:[{url:'https://example.edu/fees'}],voiceBrief:{status:'verified',answer:'Annual fee: $100. [1]',qualification:'For the published year. [1]',nextStep:'',findings:[{subject:'Example',aspect:'tuition_fees',status:'verified',answer:'Annual fee: $100. [1]',qualification:'For the published year. [1]'}]}};
+ const f=fixture({researchDeliveryV2:true,researchDeliverySink:e=>ready.push(e),jobRequest:async method=>method==='POST'?{id:'job-1',status:'queued'}:{id:'job-1',status:'completed',result}});
+ try{
+  f.call([tool('lookup_financial_aid','isolated-lookup',{institution:'Example',question:'Annual tuition and fees at Example'})]);
+  await until(()=>ready.length===1,2500);
+  assert.equal(ready[0].type,'origen.research.ready');assert.equal(ready[0].jobId,'job-1');
+  assert.ok(f.events.some(e=>e.type==='origen.research.result'&&e.jobId==='job-1'));
+  assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0);
+  // The ordinary pending-task state is still supplied quietly; the research
+  // evidence itself must only go to the injected owner.
+  assert.ok(f.sent.filter(e=>e.type==='session.thinking.append').every(e=>!e.content.includes('$100')));
+  assert.ok(f.events.some(e=>e.type==='origen.control.tool_result'),'formal tool still completes');
+ }finally{f.engine.close();}
+});
+test('a selective isolated sink returning false leaves primary evidence on its normal delivery path',async()=>{
+ const ready=[],result={text:'Annual fee is $100. [1]',sources:[{url:'https://example.edu/fee'}],voiceBrief:{status:'verified',answer:'Annual fee is $100. [1]',qualification:'Published amount. [1]',nextStep:'',findings:[{subject:'Example',aspect:'tuition_fees',status:'verified',answer:'Annual fee is $100. [1]',qualification:'Published amount. [1]'}]}};
+ const f=fixture({researchDeliveryV2:true,researchDeliverySink:e=>{ready.push(e);return false;},jobRequest:async method=>method==='POST'?{id:'job-1',status:'queued'}:{id:'job-1',status:'completed',result}});
+ try{f.call([tool('lookup_financial_aid','primary',{institution:'Example',question:'Annual tuition and fees'})]);await until(()=>ready.length===1,2500);
+  assert.ok(f.sent.some(e=>e.type==='session.thinking.append'&&e.content.includes('$100')),'normal context delivery still occurs');
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: a confirmed rental answer starts the missing budget check`,async()=>{
+ const es=language==='es',subject='UC Berkeley',checkedAt=new Date().toISOString();
+ const question=es?'Costo de asistencia 2026–27 fuera del campus.':'2026–27 cost of attendance off campus (housing arrangement unspecified).';
+ const answer='Annual tuition and mandatory fees are $18,214. [1]';
+ const qualification='Separate apartment and relatives budgets apply. [1]';
+ const result={checkedAt,text:answer,sources:[{url:'https://berkeley.edu/budget',checkedAt}],voiceBrief:{
+  status:'partial',answer,qualification,nextStep:'Apartment or relatives?',findings:[
+   {subject,aspect:'total_budget',status:'partial',answer:'Housing choice is needed. [1]',qualification},
+   {subject,aspect:'tuition_fees',status:'partial',answer,qualification},
+  ]}};
+ const posts=[];
+ const f=fixture({researchDeliveryV2:true,config:{language},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posts.push(body);return {id:`job-${posts.length}`,status:'queued'};}
+  return id==='job-1'?{status:'completed',result}:{status:'running'};
+ }});
+ const ask=async(delta,version)=>{
+  f.engine.playback({idle:true,version});
+  f.engine.receive({type:'session.output_transcript.delta',delta});
+  await until(()=>f.events.filter(e=>e.type==='origen.research.speech_observed').length===version,3000);
+ };
+ const reply=async(delta)=>{
+  f.engine.receive({type:'session.input_transcript.delta',delta});
+  await pause(0);
+  await f.engine.flush();
+ };
+ try{
+  f.call([tool('lookup_financial_aid','initial',{institution:subject,question})]);
+  await until(()=>f.events.some(e=>e.type==='origen.research.result'),2000);
+  const yes=es?'Sí':'Yeah';
+  await ask(es?'¿Va a alquilar un apartamento o vivir con familiares?':'Is he planning to rent an apartment or live with relatives?',1);
+  await reply(yes);
+  assert.equal(posts.length,1,'affirmation cannot resolve a two-option question');
+  await ask(es?'¿Va a alquilar un apartamento?':'Is he planning to rent an apartment?',2);
+  await reply(yes);
+  await until(()=>posts.length===2);
+  assert.equal(posts[1].institution,subject);
+  assert.equal(posts[1].studentId,'aiden');
+  assert.equal(posts[1].language,language);
+  assert.match(posts[1].question,es?/alquilar un apartamento fuera del campus/u:/renting an off-campus apartment/u);
+  await reply(yes);
+  assert.equal(posts.length,2,'the same spoken question cannot authorize another lookup');
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])for(const status of ['partial','verified'])test(`${language}: confirming the published rental benchmark updates the table without another lookup (${status})`,async()=>{
+ const es=language==='es',checkedAt=new Date().toISOString(),posts=[];
+ const question=es?'Costo de asistencia fuera del campus, modalidad sin especificar.':'Cost of attendance off campus, arrangement unspecified.';
+ const qualification=es?'Referencia de alquiler 2026–27; modalidad de vivienda sin confirmar. [1]':'2026–27 assumed rental benchmark; housing choice unconfirmed. [1]';
+ const finding={subject:'Eastview College — 2026–27',aspect:'total_budget',status,qualification,
+  answer:es?'US$40,000, alquiler fuera del campus. Desglose publicado: Matrícula y cuotas: $10,000; Vivienda y alimentación: $28,000; Libros: $2,000. [1]':
+   'US$40,000, renting off campus. Published breakdown: Tuition and fees: $10,000; Housing and food: $28,000; Books: $2,000. [1]'};
+ const result={checkedAt,text:finding.answer,sources:[{url:'https://eastview.edu/costs',checkedAt}],voiceBrief:{
+  status:'partial',answer:'Published budget $40,000 [1].',qualification,nextStep:'',findings:[finding]}};
+ const f=fixture({researchDeliveryV2:true,visualCards:true,config:{language},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posts.push(body);return {id:'benchmark',status:'queued'};}
+  return {status:'completed',result};
+ }});
+ try{
+  f.call([tool('lookup_financial_aid','benchmark',{institution:'Eastview College',question})]);
+  await until(()=>f.events.some(event=>event.type==='origen.visual.research'),2200);
+  assert.equal(f.events.filter(event=>event.type==='origen.visual.research').at(-1).report.housingBenchmark,true);
+  f.engine.receive({type:'session.input_transcript.delta',delta:es?'Él va a alquilar fuera del campus.':'He is renting off campus.'});
+  await pause(0);await f.engine.flush();
+  await until(()=>f.events.filter(event=>event.type==='origen.visual.research').at(-1).report.housingBenchmark===undefined);
+  assert.equal(posts.length,1);
+  assert.equal(f.events.filter(event=>event.type==='origen.visual.research').at(-1).report.housingScenario,'renting');
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: confirming a partial off-campus source benchmark narrows the table and the next campus without a recovery check`,async()=>{
+ const es=language==='es',posts=[],checkedAt=new Date().toISOString();
+ const result=subject=>({catalogLocalTesting:true,checkedAt,sources:[{url:'https://example.edu/costs',checkedAt}],text:'Published off-campus budget $40,000 [1].',voiceBrief:{
+  status:'partial',answer:'Published budget $40,000 [1].',qualification:'Source categories and sum remain qualified. [1]',
+  nextStep:es?'¿Alquilaría o viviría con familiares?':'Would the student rent or live with family?',
+  findings:['off_campus','with_family'].map(housing=>({subject:subject+' — '+housing,aspect:'total_budget',status:'partial',
+   answer:'Published 2026–27 budget: $40,000 [1].',qualification:'Published total differs from components by $85; source category unresolved. [1]',
+   budget:{year:'2026-27',population:'California-resident undergraduate',currency:'USD',period:'academic_year',housing,assumed:false,total:40000,sourceCitation:'[1]',complete:true,
+    expectedCategories:['tuition_fees','housing','food'],components:[['tuition_fees',10000],['housing',25000],['food',5085]].map(([key,amount])=>({key,sourceLabel:key,amount,role:'component',qualification:''}))}}))}});
+ const f=fixture({researchDeliveryV2:true,visualCards:true,config:{language},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posts.push(body);return {id:'scope-'+posts.length,status:'queued'};}
+  return {status:'completed',result:result(id==='scope-1'?'Eastview College':'Pine Valley College')};
+ }});
+ const say=async text=>{f.engine.receive({type:'session.input_transcript.delta',delta:text});await pause(0);await f.engine.flush();};
+ try{
+  const question=es?'Costo de asistencia para pregrado residente de California fuera del campus.':'California-resident undergraduate cost of attendance off campus.';
+  f.call([tool('lookup_financial_aid','scope-first',{institution:'Eastview College',question})]);
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'),2200);
+  await say(es?'Él vivirá fuera del campus, no con familiares.':'He will be off campus, not with family.');
+  await until(()=>f.events.filter(e=>e.type==='origen.visual.research').at(-1).report.confirmedHousingChoice==='renting');
+  assert.equal(posts.length,1,'qualified totals are reused without pretending they reconcile');
+  const housingContext=f.sent.filter(e=>e.type==='session.thinking.append').map(e=>{try{return JSON.parse(e.content);}catch{return null;}})
+   .filter(e=>e?.kind==='current-call-housing-choice');
+  assert.equal(housingContext.length,1);assert.equal(JSON.parse(housingContext[0].text).choice,'renting');
+  assert.equal(JSON.parse(housingContext[0].text).savedToProfile,false);
+  assert.equal(JSON.parse(housingContext[0].text).studentId,'aiden');
+  f.engine.receive({type:'session.output_transcript.delta',delta:es?'Usaré el escenario de alquiler.':'I will use the rental scenario.'});
+  await pause(0);await f.engine.flush();
+  await say(es?'Bueno, eh, ¿y Pine Valley College?':'Okay, um. What about Pine Valley College?');
+  f.call([tool('lookup_financial_aid','scope-next',{institution:'Pine Valley College; Eastview College',question})],'scope-next-response');
+  await until(()=>posts.length===2);
+  assert.equal(costHousingScenario(posts[1].question),'renting');
+  assert.equal(posts[1].visualComparisonCampus,'Pine Valley College','only the newly named campus is checked');
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'&&e.report.id==='scope-2'),2200);
+  assert.equal(f.events.filter(e=>e.type==='origen.visual.research').at(-1).report.confirmedHousingChoice,'renting');
+ }finally{f.engine.close();}
+});
+
+for(const language of ['en','es'])test(`${language}: undated costs, a natural pending rental answer, and a failed added campus keep the comparison`,async()=>{
+ const es=language==='es',posts=[],checkedAt=new Date().toISOString();let firstComplete=false;
+ const sources=[{url:'https://berkeley.edu/budget',checkedAt}];
+ const qualification='2026–27 published estimate. Scenario-dependent total unavailable.';
+ const result={checkedAt,sources,text:'Published tuition $18,214 [1].',voiceBrief:{status:'partial',answer:'Published tuition $18,214 [1].',qualification,nextStep:'',findings:[
+  {subject:'UC Berkeley — 2026–27 undergraduate',aspect:'tuition_fees',status:'partial',answer:'Annual tuition and fees: $18,214 [1].',qualification},
+  {subject:'UC Berkeley',aspect:'total_budget',status:'partial',answer:'Rental and relatives budgets differ. [1]',qualification},
+ ]}};
+ const f=fixture({researchDeliveryV2:true,visualCards:true,config:{language},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posts.push(body);return {id:'natural-'+posts.length,status:'queued'};}
+  if(id==='natural-1'&&!firstComplete)return {status:'running'};
+  if(id==='natural-3')return {status:'completed',result:{...result,voiceBrief:{...result.voiceBrief,status:'unverified',findings:[
+   {subject:'UC Davis',aspect:'total_budget',status:'unverified',answer:'The requested total was not verified.',qualification},
+  ]}}};
+  return {status:'completed',result};
+ }});
+ const say=async text=>{f.engine.receive({type:'session.input_transcript.delta',delta:text});await pause(0);await f.engine.flush();};
+ try{
+  await say(es?'Quiero saber el costo de Berkeley':'I want to learn about the cost of UC Berkeley');
+  f.call([tool('lookup_financial_aid','natural-initial',{institution:'UC Berkeley',question:'California-resident undergraduate cost of attendance off campus for the next available academic year, 2027–28.'})]);
+  await until(()=>posts.length===1);
+  assert.doesNotMatch(posts[0].question,/2027|next available/);
+  await say(es?'Sí, él probablemente va a alquilar cerca del campus':"Yeah, he's gonna be probably renting near campus");
+  assert.equal(posts.length,1,'the running check is preserved until its result');
+  firstComplete=true;
+  await until(()=>posts.length===2,2200);
+  assert.match(posts[1].question,es?/alquilar.*fuera del campus/u:/renting.*off campus/u);
+  await until(()=>f.events.filter(e=>e.type==='origen.visual.research').length>=2,2200);
+  f.engine.receive({type:'session.output_transcript.delta',delta:es?'Ese es el escenario de alquiler.':'That is the planned rental scenario.'});
+  await pause(0);await f.engine.flush();
+  await say(es?'¿Y UC Davis?':'What about for UC Davis');
+  f.call([tool('lookup_financial_aid','natural-davis',{institution:'UC Davis; UC Berkeley',question:'Compare UC Davis undergraduate costs renting off campus with Berkeley for 2027–28.'})],'natural-addition');
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'&&e.report.table.columns.includes('UC Davis')),2200);
+  const next=f.events.filter(e=>e.type==='origen.visual.research').at(-1).report;
+  assert.equal(next.comparisonReferenceId,'natural-2');
+  assert.doesNotMatch(posts[2].question,/2027/);
+ }finally{f.engine.close();}
+});
+
+for(const language of ['en','es'])test(`${language}: a retained official result feeds the voice tool and the same table without another job`,async()=>{
+ const checkedAt=new Date().toISOString(),subject='UC Santa Cruz';
+ const amount=language==='es'?'La suma anual de matrícula y cuotas obligatorias es USD 17,432.36. [1]':'Annual tuition and mandatory fees add up to USD 17,432.36. [1]';
+ const caveat=language==='es'?'Para residentes de California en 2026–27; excluye vivienda.':'For California residents in 2026–27; excludes housing.';
+ const findings=[{subject,aspect:'total_budget',status:'unverified',answer:'Attendance total could not be verified.',qualification:'Off-campus rental budget unconfirmed.'},
+  {subject,aspect:'tuition_fees',status:'partial',answer:amount,qualification:caveat}];
+ const result={checkedAt,sources:[{url:'https://ucsc.edu/fees',title:'University fees'}],text:amount,voiceBrief:{status:'partial',answer:amount,qualification:caveat,nextStep:'',findings}};
+ let posts=0;
+ const f=fixture({researchDeliveryV2:true,visualCards:true,config:{language},jobRequest:async method=>method==='POST'?
+  (posts++,{id:'job-1',status:'queued'}):{status:'completed',result}});
+ const query={institution:subject,question:language==='es'?'Costo de asistencia 2026–27 alquilando fuera del campus.':'2026–27 cost of attendance renting off campus.'};
+ try{
+  f.call([tool('lookup_financial_aid','fresh',query)]);
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'),2000);
+  f.call([tool('lookup_financial_aid','repeat',query)],'repeat');
+  await until(()=>f.sent.some(e=>e.item?.call_id==='repeat'));
+  const output=JSON.parse(f.sent.find(e=>e.item?.call_id==='repeat').item.output);
+  const [fresh,retained]=f.events.filter(e=>e.type==='origen.visual.research').map(e=>e.report);
+  assert.equal(posts,1);
+  assert.equal(output.status,'reused_verified_result');
+  assert.deepEqual(retained.table,fresh.table);
+  assert.equal(retained.id,fresh.id);
+  assert.deepEqual(retained.table.unverifiedTotals,[subject]);
+  assert.deepEqual(retained.table.rows.find(row=>row.aspect==='total_budget').cells,[null]);
+  const tuition=retained.table.rows.find(row=>row.aspect==='tuition_fees').cells[0];
+  const spoken=output.findings.find(finding=>finding.aspect==='tuition_fees');
+  assert.equal(tuition.answer,spoken.answer);assert.equal(tuition.qualification,spoken.qualification);
+  assert.match(output.instruction,/If the requested total is unverified, say so/);
+ }finally{f.engine.close();}
+});
+for(const [language,turns,partial=false] of [
+ ['en',['Okay, what about UC Davis?']],['es',['¿Y UC Davis?']],
+ ['en',['What about for UC Davis']],
+ ['en',['[lip smack] Well actually, um, what- uh what would be the, uh, can you- can you also compare with, uh, UC Davis'],true],
+ ['es',['Bueno, eh, puedes comparar también con, eh, UC Davis'],true],
+ ['en',['I see. What about [clear throat', 'I see. What about [clear throat] [gulp] uh', 'Bu-but yeah, UC Davis']],
+ ['es',['Entiendo. ¿Y qué tal…?', '[tos]', 'Sí, UC Davis']],
+])test(`${language}: Decisions adds Davis and retains Berkeley in the ${turns.length>1?'split':'single-turn'} comparison`,async()=>{
+ let now=Date.now();
+ const checkedAt=new Date(now).toISOString(),qualification='2026–27 annual estimate, before aid and not a bill.';
+ const result=(campus,slug,total,tuition)=>({
+  checkedAt,sources:[{url:`https://${slug}.edu/budget`,title:'Campus budget',checkedAt}],text:total,
+  voiceBrief:{status:'verified',answer:total,qualification,nextStep:'',findings:[
+   {subject:campus,aspect:'total_budget',status:'verified',answer:total+' [1]',qualification},
+   {subject:campus,aspect:'tuition_fees',status:'verified',answer:tuition+' [1]',qualification},
+  ]},
+ });
+ const berkeley=result('UC Berkeley — renting off campus','berkeley','$49,692 USD for the 2026–27 academic year, before aid.','Annual tuition and fees: $18,214.');
+ if(partial){berkeley.voiceBrief.status='partial';berkeley.voiceBrief.findings[0].status='partial';berkeley.voiceBrief.findings[0].qualification+=' Another official source lists $49,420; unresolved discrepancy [1].';}
+ const davis=result('UC Davis','ucdavis','Off-campus without parents budget: $44,760.','Annual tuition and fees: $18,077.13.');
+ const question='2026–27 undergraduate cost of attendance and tuition, living off campus and renting (not living with parents).';
+ const posts=[],logs=[];let decisions=0;
+ const f=fixture({now:()=>now,log:event=>logs.push(event),researchDeliveryV2:true,visualCards:true,config:{language},comparisonClient:{evaluate:async input=>{
+  decisions++;assert.equal(input.questions[0].name,'comparison_addition');assert.doesNotMatch(input.input,/49,692|18,214|Aiden/);
+  return {response:{answers:[{name:'comparison_addition',type:'choice',choice:'add',probabilities:[{value:'add',probability:1}]}]}};
+ }},jobRequest:async(method,id,body)=>{
+  if(method==='POST'){posts.push(body);return {id:'job-'+posts.length,status:'queued'};}
+  if(method==='DELETE')return {id,status:'cancelled'};
+  if(id==='job-1')return {id,status:'completed',result:berkeley};
+  const base={status:'completed',input:posts[0],result:berkeley,finished_at:checkedAt};
+  const plan=comparisonAddition(posts[1],base);
+  assert.deepEqual(plan.lookupInstitutions,['University of California, Davis']);
+  return {id,status:'completed',result:mergeComparisonAddition(davis,plan)};
+ }});
+ try{
+  f.call([tool('lookup_financial_aid','base',{question,institution:'UC Berkeley'})],'base');
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'&&e.report.id==='job-1'),2200);
+  for(const turn of turns){
+   now+=3000;
+   f.engine.receive({type:'session.input_transcript.delta',delta:turn});await pause(0);await f.engine.flush();
+  }
+  f.call([tool('lookup_financial_aid','add',{question:'Compare UC Davis and UC Berkeley. '+question,institution:partial?'UC Berkeley and University of California, Davis':'University of California, Davis; UC Berkeley'})],'add');
+  await until(()=>f.events.some(e=>e.type==='origen.visual.research'&&e.report.id==='job-2'),2200);
+  assert.equal(decisions,1);assert.equal(posts[1].retainedComparisonJobId,'job-1');
+  assert.equal(posts[1].institution,'University of California, Davis');assert.doesNotMatch(posts[1].question,/Berkeley/);
+  const table=f.events.find(e=>e.report?.id==='job-2').report.table;
+  assert.deepEqual(table.columns,['UC Davis','UC Berkeley']);
+  assert.match(table.rows.find(r=>r.aspect==='total_budget').cells[1].answer,/49,692/);
+  assert.deepEqual(logs.filter(e=>e.comparisonReason==='added_option').map(e=>e.comparisonStage),['checking','selected','queued']);
+  if(partial){
+   const cell=table.rows.find(r=>r.aspect==='total_budget').cells[1];
+   assert.equal(cell.status,'partial');assert.match(cell.qualification,/49,420/);
+  }
+ }finally{f.engine.close();}
+});
+for(const language of ['en','es'])test(`${language}: growing comparisons stay narrow after partial and unverified campuses`,async()=>{
+ let now=Date.now();const checkedAt=new Date(now).toISOString();
+ const names=['UC Berkeley','UC Davis','UC Irvine','UC Merced','UC Santa Cruz'];
+ const question=language==='en'?'2026–27 undergraduate transfer annual tuition and total budget for California residents renting off campus':'Matrícula y presupuesto anual de pregrado y transferencia 2026–27 para residentes de California que alquilan fuera del campus';
+ const posts=[],completed=new Map(),logs=[];let checks=0;
+ const makeResult=index=>{
+  const unknown=index===3,partial=index===2;
+  const findings=[{subject:names[index],aspect:'total_budget',status:unknown||partial?'unverified':'verified',
+   answer:unknown||partial?'The annual rental total could not be verified.':'2026–27 annual rental budget: $48,000 [1].',qualification:'Annual estimate, not a bill.'},
+  {subject:names[index],aspect:'tuition_fees',status:unknown?'unverified':partial?'partial':'verified',
+   answer:unknown?'The fee subtotal could not be verified.':'2026–27 tuition and fees: $18,000 [1].',qualification:partial?'The official subtotal does not reconcile [1].':'Annual fees exclude housing.'}];
+  return {checkedAt,text:findings.map(f=>f.answer).join(' '),sources:unknown?[]:[{url:`https://campus${index}.edu/cost`,title:names[index],checkedAt}],
+   voiceBrief:{status:unknown?'unverified':partial?'partial':'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
+ };
+ const f=fixture({now:()=>now,config:{language},researchDeliveryV2:true,visualCards:true,log:event=>logs.push(event),
+  comparisonClient:{evaluate:async input=>{
+   checks++;const task=JSON.parse(input.input);assert.equal(task.requestedCampus,names[checks]);
+   return {response:{answers:[{name:'comparison_addition',type:'choice',choice:'add',probabilities:[{value:'add',probability:1}]}]}};
+  }},jobRequest:async(method,id,body)=>{
+   if(method==='POST'){posts.push(body);return {id:'grow-'+posts.length,status:'queued'};}
+   if(method==='DELETE')return {id,status:'cancelled'};
+   const index=Number(id.split('-')[1])-1;
+   if(!completed.has(id)){
+    let result=makeResult(index);
+    if(index){
+     const plan=comparisonAddition(posts[index],{status:'completed',input:posts[index-1],result:completed.get('grow-'+index),finished_at:checkedAt},{now});
+     assert.ok(plan);assert.deepEqual(plan.lookupInstitutions,[names[index]]);
+     result=mergeComparisonAddition(result,plan);assert.ok(result);assert.ok(result.voiceBrief.findings.length<=8);
+    }
+    completed.set(id,result);
+   }
+   return {id,status:'completed',result:completed.get(id)};
+  }});
+ try{
+  for(let index=0;index<names.length;index++){
+   if(index){
+    now+=3000;
+    f.engine.receive({type:'session.input_transcript.delta',delta:language==='en'?`What about for ${names[index]}`:`¿Y ${names[index]}?`});
+    await pause(0);await f.engine.flush();
+   }
+   f.call([tool('lookup_financial_aid','grow-call-'+index,{institution:names.slice(0,index+1).reverse().join('; '),question})],'grow-response-'+index);
+   await until(()=>completed.has('grow-'+(index+1)),2200);
+   await pause(30);
+   if(index){assert.equal(posts[index].institution,names[index]);assert.equal(posts[index].retainedComparisonJobId,'grow-'+index);}
+  }
+  assert.equal(checks,4,'fourth addition remains eligible within the physical call research budget');
+  assert.equal(posts.length,5);assert.equal(logs.filter(e=>e.comparisonStage==='queued').length,4);
+  assert.equal(completed.get('grow-4').voiceBrief.findings.find(f=>f.subject==='UC Irvine').status,'partial');
+  assert.ok(completed.get('grow-5').voiceBrief.findings.every(f=>f.subject==='UC Santa Cruz'),'a fully unverified prior campus supplies no invented retained facts');
+ }finally{f.engine.close();}
+});
+for(const [language,record,question,scenario,explicit] of [
+ ['en','Aiden’s off-campus living situation does not guarantee any housing aid.','What is the total budget for a California-resident transfer?','off-campus housing, arrangement unspecified','What is the total budget living with family?'],
+ ['es','Aiden va a vivir fuera del campus.','¿Cuál es el presupuesto total para un estudiante residente de California?','alojamiento fuera del campus, modalidad sin especificar','¿Cuál es el presupuesto total si vive con su familia?'],
+])test(language+': finance delegation carries the selected housing plan before the worker starts',async()=>{
+ const brief={studentId:'aiden',profile:{name:'Aiden'},records:[{content:record}]};
+ assert.equal(studentHousingPlan(brief,'elodie'),undefined);
+ assert.equal(studentHousingPlan({...brief,records:[{content:'The official off-campus budget is an estimate.'}]},'aiden'),undefined);
+ const newerCorrection={content:language==='es'?'Aiden no va a vivir fuera del campus.':'Aiden is not living off campus.',date:'2026-11-10'};
+ assert.equal(studentHousingPlan({...brief,records:[...brief.records,newerCorrection]},'aiden'),undefined);
+ const housingPlan=studentHousingPlan(brief,'aiden');
+ assert.equal(housingPlan,'off_campus');
+ const recentBrief={...brief,records:[{content:'The intended living arrangement remains unclear.'}]};
+ assert.equal(studentHousingPlan(recentBrief,'aiden',[{studentId:'aiden',summary:record}]),'off_campus');
+ assert.equal(studentHousingPlan(recentBrief,'aiden',[{studentId:'elodie',summary:record}]),undefined);
+ const f=fixture({config:{language,housingPlan}});
+ try{
+  f.call([tool('lookup_financial_aid','housing',{question,institution:'UC Berkeley'})],'housing');
+  await until(()=>f.jobs.some(job=>job.method==='POST'));
+  const scoped=f.jobs.find(job=>job.method==='POST').body;
+  assert.ok(scoped.question.includes(scenario));
+  assert.doesNotMatch(scoped.question,/Aiden|housing aid/);
+  assert.deepEqual(requestedResearchAspects(scoped.question),['total_budget']);
+  const worker=financeResearchRequest({},scoped);
+  assert.equal(JSON.parse(worker.input).question,scoped.question);
+  assert.match(worker.instructions,/If the source has only one off-campus budget, use its own label/);
+  assert.match(worker.instructions,/housing choice unconfirmed/);
+  assert.match(worker.instructions,/unresolved housing choice does not block retrieving the published COA/);
+ }finally{f.engine.close();}
+ const next=fixture({config:{language,housingPlan}});
+ try{
+  next.call([tool('lookup_financial_aid','explicit',{question:explicit,institution:'UC Berkeley'})],'explicit');
+  await until(()=>next.jobs.some(job=>job.method==='POST'));
+  assert.equal(next.jobs.find(job=>job.method==='POST').body.question,explicit);
+ }finally{next.engine.close();}
+});
 for(const language of ['en','es'])test(language+': comparison keeps the saved figure in the receipt while only the changed campus is queued',async()=>{
  const es=language==='es',changed=es?'UC Berkeley':'UC Davis',unchanged=es?'UC Davis':'UC Berkeley';
  const sources=[
@@ -65,7 +418,8 @@ for(const language of ['en','es'])test(language+': comparison keeps the saved fi
   await speak(es?'¿Y si vive con su familia en el campus más lejos de nosotros?':'What if he lived at home at the campus closer to our family?');
   f.call([tool(comparisonUpdateTool.name,'update',{jobId:'job-1',revision:1})],'update');
   await until(()=>reply('update'));
-  const receipt=JSON.parse(reply('update'));
+  const receipt=JSON.parse(f.events.find(e=>e.type==='origen.control.tool_result'&&e.callId==='update').output);
+  assert.equal(JSON.parse(reply('update')).unchangedFindings,undefined);
   assert.equal(receipt.status,'research_pending');
   assert.equal(receipt.changedItem.subject,changed);
   assert.equal(receipt.unchangedFindings[0].name,unchanged);
@@ -86,9 +440,25 @@ function comparisonReport(aspect='deadline'){
  return {checkedAt,sources:names.map((name,i)=>({url:'https://campus'+i+'.edu/policy',title:name,checkedAt})),text:findings.map(f=>f.answer+' '+f.qualification).join(' '),
   voiceBrief:{status:'verified',answer:findings[0].answer,qualification:findings[0].qualification,nextStep:'',findings}};
 }
-async function comparisonFixture({language='en',aspect='deadline',result=comparisonReport(aspect),evaluate,post}={}){
+test('research visual is emitted to the browser after worker evidence, with no provider visual event',async()=>{
+ const result=comparisonReport();
+ const f=fixture({visualCards:true,researchDeliveryV2:true,jobRequest:async(method,id)=>method==='POST'?
+  {id:'visual-job',status:'queued'}:{id,status:'completed',result}});
+ try{
+  f.engine.receive({type:'session.input_transcript.delta',delta:'Compare these college deadlines.'});
+  await pause(0);await f.engine.flush();
+  assert.equal(f.events.some(event=>event.type.startsWith('origen.visual.')),false);
+  f.call([tool('lookup_financial_aid','visual-lookup',{institution:'Eastview College',question:'Compare published fall 2027 policies'})]);
+  await until(()=>f.events.some(event=>event.type==='origen.visual.research'),2000);
+  const visual=f.events.find(event=>event.type==='origen.visual.research');
+  assert.equal(visual.present,true);
+  assert.deepEqual(visual.report.table.columns,['Eastview College','Pine Valley College','Harbor College']);
+  assert.equal(f.sent.some(event=>event.type.startsWith('origen.visual.')),false);
+ }finally{f.engine.close();}
+});
+async function comparisonFixture({language='en',aspect='deadline',result=comparisonReport(aspect),evaluate,post,visualCards=false}={}){
  const posts=[],logs=[],results={'job-1':result};let decisions=0;
- const f=fixture({researchDeliveryV2:true,config:{language,tools:[...config.tools,{name:'lookup_college_applications'},comparisonUpdateTool]},log:event=>logs.push(event),
+ const f=fixture({researchDeliveryV2:true,visualCards,config:{language,tools:[...config.tools,{name:'lookup_college_applications'},comparisonUpdateTool]},log:event=>logs.push(event),
   comparisonClient:{evaluate:async request=>{decisions++;if(evaluate)return evaluate(request);const input=JSON.parse(request.input),choice=input.options.find(o=>o.subject===input.reference.subject&&o.aspect===input.reference.aspect).id;
    return {response:{answers:[{type:'choice',name:'comparison_update',choice,probabilities:[{value:choice,probability:1}]}]}};}},
   jobRequest:async(method,id,body)=>{if(method==='POST'){posts.push(body);return post?post(body,posts.length):{id:'job-'+posts.length,status:'queued'};}if(method==='DELETE')return {id,status:'cancelled'};return results[id]?{id,status:'completed',result:results[id]}:{id,status:'running'};}});
@@ -98,6 +468,30 @@ async function comparisonFixture({language='en',aspect='deadline',result=compari
  await until(()=>f.events.some(e=>e.type==='origen.research.result'&&e.jobId==='job-1'),2000);
  return {...f,posts,logs,results,speak,reply,decisions:()=>decisions,result};
 }
+test('an ordinary lookup for a clear comparison correction still uses Decisions and preserves the comparison in the visual',async()=>{
+ const f=await comparisonFixture({visualCards:true});
+ try{
+  const updated=structuredClone(f.result);
+  updated.voiceBrief.findings[0].answer='Spring 2028 deadline: September 1 [1].';
+  f.results['job-2']=updated;
+  await f.speak('Change Eastview College to spring 2028.');
+  f.call([tool('lookup_college_applications','fallback',{institution:'Eastview College',question:'Verify the spring 2028 application deadline for Eastview College.'})],'fallback');
+  await until(()=>f.reply('fallback'));
+  const receipt=JSON.parse(f.events.find(e=>e.type==='origen.control.tool_result'&&e.callId==='fallback').output);
+  assert.equal(JSON.parse(f.reply('fallback')).unchangedFindings,undefined);
+  assert.equal(f.decisions(),1);
+  assert.equal(f.posts[1].comparisonBaseJobId,'job-1');
+  assert.equal(f.posts[1].institution,'Eastview College');
+  assert.deepEqual(receipt.unchangedFindings.map(finding=>finding.subject),['Pine Valley College','Harbor College']);
+  assert.match(receipt.instruction,/no speech, recap, progress announcement, or new question/i);
+  await until(()=>f.events.some(event=>event.type==='origen.visual.research'&&event.report.id==='job-2'),2000);
+  const table=f.events.find(event=>event.type==='origen.visual.research'&&event.report.id==='job-2').report.table;
+  assert.deepEqual(table.columns,['Eastview College','Pine Valley College','Harbor College']);
+  assert.match(table.rows[0].cells[0].answer,/September 1/);
+  assert.ok(f.events.some(event=>event.type==='origen.research.state_changed'&&event.requestId==='fallback'&&event.state==='queued'));
+  assert.ok(!f.sent.some(event=>event.type==='session.thinking.append'&&/fallback/.test(event.content)&&/"state":"(?:requesting|queued|running)"/.test(event.content)));
+ }finally{f.engine.close();}
+});
 for(const [aspect,en,es] of [
  ['deadline','Change Eastview College to spring 2028.','Cambia Eastview College a primavera de 2028.'],
  ['eligibility','What if Eastview College enrollment is part time?','¿Qué pasa si la matrícula de medio tiempo es en Eastview College?'],
@@ -106,7 +500,7 @@ for(const [aspect,en,es] of [
  const f=await comparisonFixture({language,aspect});
  try{
   await f.speak(language==='es'?es:en);f.call([tool(comparisonUpdateTool.name,'change',{jobId:'job-1',revision:1})],'change');await until(()=>f.reply('change'));
-  const receipt=JSON.parse(f.reply('change'));
+  const receipt=JSON.parse(f.events.find(e=>e.type==='origen.control.tool_result'&&e.callId==='change').output);
   assert.equal(receipt.status,'research_pending');assert.equal(receipt.changedItem.subject,'Eastview College');assert.equal(receipt.changedItem.aspect,aspect);
   assert.deepEqual(receipt.unchangedFindings.map(e=>e.subject),['Pine Valley College','Harbor College']);
   assert.ok(receipt.unchangedFindings.every(e=>e.qualification.includes('program exceptions')&&e.answer.includes('2027')));
@@ -150,7 +544,7 @@ for(const language of ['en','es'])test(`${language}: a later change uses the new
   f.call([tool(comparisonUpdateTool.name,'old-base',{jobId:'job-1',revision:1})],'old-base');await until(()=>f.reply('old-base'));
   assert.equal(JSON.parse(f.reply('old-base')).status,'comparison_update_already_requested');assert.equal(f.decisions(),1);
   f.call([tool(comparisonUpdateTool.name,'second',{jobId:'job-2',revision:1})],'second');await until(()=>f.reply('second'));
-  const receipt=JSON.parse(f.reply('second'));assert.equal(receipt.status,'research_pending');assert.equal(receipt.changedItem.subject,'Pine Valley College');
+  const receipt=JSON.parse(f.events.find(e=>e.type==='origen.control.tool_result'&&e.callId==='second').output);assert.equal(receipt.status,'research_pending');assert.equal(receipt.changedItem.subject,'Pine Valley College');
   assert.match(receipt.unchangedFindings.find(e=>e.subject==='Eastview College').answer,/September 1/);assert.equal(f.posts[2].comparisonBaseJobId,'job-2');assert.equal(f.decisions(),2);
  }finally{f.engine.close();}
 });
@@ -722,7 +1116,11 @@ for(const language of ['en','es'])test(`delivery v2 crosses the real browser con
   assert.equal(provider.sent.filter(e=>e.type==='session.commentary.append').length,1);
   assert.equal(jobs.filter(j=>j.method==='POST').length,1);assert.equal(jobs[0].body.language,language);
   assert.equal(primaryWrites.length,0);assert.ok(!provider.sent.some(e=>['response.cancel','session.input_audio.mute','session.instructions.append'].includes(e.type)));
-  assert.ok(f.logs.some(e=>e.deliveryStage==='reply_observed'));assert.equal(f.logs.filter(e=>e.event==='voice.research.delivery'&&e.deliveryStage==='commentary_requested').length,1);assert.ok(!JSON.stringify(f.logs).includes('12345'));
+  assert.ok(f.logs.some(e=>e.deliveryStage==='reply_observed'));assert.equal(f.logs.filter(e=>e.event==='voice.research.delivery'&&e.deliveryStage==='commentary_requested').length,1);
+  // Check the protected amount as a standalone value, not five digits that
+  // may coincidentally occur inside a random identifier or timestamp.
+  assert.ok(!/\b12345\b/u.test(JSON.stringify(f.logs)));
+  assert.ok(!JSON.stringify(f.logs).includes(answer));
  }finally{channel.close();await f.close();}
 });
 

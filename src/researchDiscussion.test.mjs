@@ -1,8 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {researchAnswerOverlap,researchPortionObserved} from './researchDiscussion.mjs';
+import {researchAnswerOverlap,researchPortionObserved,researchImplicitLimitationObserved} from './researchDiscussion.mjs';
+import {publicRecord} from '../server/research-record.fixtures.mjs';
 
 import {discussionExamples,correctedBudgetExamples} from './researchDiscussion.fixture.mjs';
+
+for(const [language,answer,spoken] of [
+ ['en','The fall 2027 first-year deadline could not be confirmed.','I am checking official sources. The first-year deadline for fall 2027 is still unverified, but the application fee is 100 dollars.'],
+ ['es','La fecha límite solicitada aún no se pudo confirmar.','Estoy revisando fuentes oficiales y algo no se pudo confirmar. La fecha límite para primer año en otoño de 2027 aún no la tengo verificada, pero la tarifa sí está publicada: 100 dólares por solicitud, no reembolsable.'],
+])test(`${language}: a completed scoped gap after an earlier progress sentence is recognized conservatively`,()=>{
+ const subject=language==='es'?'Eastview College — primer año, otoño de 2027':'Eastview College — fall 2027 first-year';
+ const finding={subject,aspect:'deadline',status:'unverified',answer,qualification:language==='es'?`La información disponible no establece este dato para ${subject}.`:'The requested entry cycle remains unverified.'};
+ assert.equal(researchImplicitLimitationObserved(finding,spoken),true);
+ assert.equal(researchImplicitLimitationObserved(finding,spoken.replaceAll('2027','2028')),false);
+ assert.equal(researchImplicitLimitationObserved(finding,spoken.replaceAll('2027','2027 Pine Valley')),false);
+ assert.equal(researchImplicitLimitationObserved(finding,spoken.replaceAll('2027','2027 pine valley')),false);
+ assert.equal(researchImplicitLimitationObserved(finding,language==='es'?'La fecha límite sigue en revisión.':'The deadline is still being checked.'),false);
+ assert.equal(researchImplicitLimitationObserved(finding,language==='es'?'¿La fecha límite no está verificada?':'Is the deadline unverified?'),false);
+});
+
+for(const language of ['en','es'])test(`${language}: a partial support record with only unknown facts recognizes the completed limitation without requiring a repeat`,()=>{
+ const es=language==='es',evidence=publicRecord('student_support',language);
+ evidence.complete=false;
+ evidence.facts=['contact','hours'].map(key=>({...evidence.facts[0],key,label:key==='contact'?'Contact email':'Office hours',status:'unverified',value:null}));
+ evidence.expectedFacts=['contact','hours'];
+ const finding={subject:'Eastview College',aspect:'other',status:'partial',answer:'Contact email and office hours are unverified.',qualification:'Official pages did not establish these details.',evidence};
+ const full=es?'El correo de contacto y el horario de Eastview siguen sin verificar.':'Eastview contact email and office hours are still unverified.';
+ const one=es?'El correo de contacto de Eastview sigue sin verificar.':'Eastview contact email is still unverified.';
+ assert.equal(researchPortionObserved(finding,full),true);
+ assert.equal(researchPortionObserved(finding,one),false,'one missing fact does not retire the other');
+ assert.equal(researchPortionObserved(finding,full.replace('Eastview','Pine Valley')),false);
+ assert.equal(researchPortionObserved(finding,es?'Estoy verificando el correo de contacto y el horario de Eastview.':'I am checking Eastview contact email and office hours.'),false);
+ const mixed=structuredClone(finding);mixed.evidence.facts[1].status='verified';mixed.evidence.facts[1].value='9am to 5pm';
+ assert.equal(researchPortionObserved(mixed,full),false,'a limitation must not erase a verified answer');
+});
 
 for(const [language,{answer,spoken}] of Object.entries(discussionExamples)){
  test(`${language}: a naturally reordered answer is recognized without six verbatim words`,()=>assert.equal(researchAnswerOverlap(answer,spoken),true));
@@ -49,6 +80,34 @@ test('optional announcement suppression binds the amount to the same campus and 
   'La matrícula de UC Berkeley podría ser de unos dieciocho mil dólares, pero no he confirmado eso.'])assert.equal(researchPortionObserved(f,text),false,text);
 });
 
+for(const [language,example]of Object.entries({
+ en:{lead:"Here's the idea for Davis.",fact:'The published attendance budget for a California resident living off campus is forty four thousand seven hundred sixty before aid.',caveat:"The budget includes estimates that aren't billed.",
+  wrongSubject:'The published attendance budget for Berkeley is forty four thousand seven hundred sixty before aid.',pending:'I am still checking the numbers.',question:'Would you like to hear it?',negative:'The published attendance budget is not forty four thousand seven hundred sixty.'},
+ es:{lead:'En cuanto a UC Davis.',fact:'El presupuesto anual para un residente de California fuera del campus es de cuarenta y cuatro mil setecientos sesenta antes de la ayuda.',caveat:'El presupuesto es una estimación, no una factura.',
+  wrongSubject:'El presupuesto anual de Berkeley es de cuarenta y cuatro mil setecientos sesenta antes de la ayuda.',pending:'Todavía estoy verificando las cifras.',question:'¿Quieres escuchar el resultado?',negative:'El presupuesto anual no es de cuarenta y cuatro mil setecientos sesenta.'},
+}))test(`${language}: adjacent explicit campus lead recognizes the completed total without another announcement`,()=>{
+ const finding={subject:'UC Davis — California-resident undergraduate, 2026–27 entering cohort',aspect:'total_budget',status:'verified',
+  answer:language==='en'?'US$44,760 before aid for three quarters, off campus—not with parents. Published breakdown: Tuition and fees $18,078; housing $11,160; food $5,891. [1]':'Presupuesto de US$44,760 antes de la ayuda para tres trimestres, fuera del campus, sin los padres. Matrícula y cuotas $18,078; vivienda $11,160; comida $5,891. [1]'};
+ const spoken=`${example.lead} ${example.fact} ${example.caveat}`;
+ assert.equal(researchPortionObserved(finding,spoken),true);
+ for(const text of [
+  `${example.lead} ${example.wrongSubject}`,
+  `${example.lead} ${example.wrongSubject.replace('Berkeley','berkeley')}`,
+  `${example.lead} ${example.fact.replace(/before aid|antes de la ayuda/u,language==='en'?'for berkeley before aid':'para berkeley antes de la ayuda')}`,
+  `${example.lead} ${example.pending} ${example.fact}`,
+  `${example.lead} ${example.question} ${example.fact}`,
+  `${example.lead.replace('Davis','Berkeley')} ${example.fact}`,
+  `${example.lead.replace('.', '?')} ${example.fact}`,
+  `${example.lead} ${example.negative}`,
+  spoken.replace(/off campus|fuera del campus/u,language==='en'?'on campus':'dentro del campus'),
+  `${example.lead} ${example.fact.replace(/before aid|antes de la ayuda/u,language==='en'?'for 2025–26 before aid':'para 2025–26 antes de la ayuda')}`,
+  `${example.lead} ${example.fact.replace(/forty four thousand seven hundred sixty|cuarenta y cuatro mil setecientos sesenta/u,'45,760')}`,
+ ])assert.equal(researchPortionObserved(finding,text),false,text);
+ // This function has no unambiguous latest-question scope. Keep a nameless
+ // answer conservative instead of silently assuming which campus it describes.
+ assert.equal(researchPortionObserved(finding,`${example.fact} ${example.caveat}`),false);
+});
+
 const topicalPortions={
  en:[
   {aspect:'eligibility',answer:'The minimum GPA for North Campus scholarship eligibility is 3.25. Awards range from $100 to $17,000. [1]',spoken:'For North Campus scholarship eligibility, the minimum GPA is three point two five.',wrong:'For North Campus scholarship eligibility, the minimum GPA is three point five.'},
@@ -70,6 +129,17 @@ for(const [language,cases]of Object.entries(topicalPortions))for(const [index,ex
  assert.equal(researchPortionObserved(finding,example.spoken.replace(/\.$/u,'?')),false);
  const pending=(language==='en'?'I am still checking whether ':'Estoy verificando si ')+example.spoken;
  assert.equal(researchPortionObserved(finding,pending),false);
+});
+
+test('a dated benchmark and decimal fee already spoken do not need a repeated announcement',()=>{
+ const fees={subject:'UC Davis — 2026–27 California-resident undergraduate',aspect:'tuition_fees',status:'partial',
+  answer:'USD $18,077.13 for fall, winter and spring: tuition $14,202; services $1,386. [1]'};
+ const total={...fees,aspect:'total_budget',answer:'USD $44,760 before aid for three quarters. [1]'};
+ const spoken="I don't have a twenty twenty-seven to twenty-eight Davis figure, but for comparison, Davis's published twenty twenty-six to twenty-seven tuition and fees are eighteen thousand seventy-seven dollars and thirteen cents, before aid. That doesn't include insurance. Their twenty twenty-six to twenty-seven off-campus budget at Davis is forty four thousand seven hundred and sixty dollars before aid, and it's not the bill.";
+ assert.equal(researchPortionObserved(fees,spoken),true);
+ assert.equal(researchPortionObserved(total,spoken),true);
+ assert.equal(researchPortionObserved(total,spoken.replaceAll('Davis','Berkeley')),false);
+ assert.equal(researchPortionObserved(fees,spoken.replace('eighteen thousand seventy-seven','eighteen thousand seventy-eight')),false);
 });
 
 test('spoken decimal digits retain zeros and never collapse to an integer',()=>{

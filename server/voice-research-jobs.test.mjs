@@ -199,8 +199,10 @@ test('queue ownership, idempotency, cancellation and restricted worker RLS', {sk
    assert.equal(status,200,JSON.stringify(data));assert.equal(data.backgroundResearch,true);
    assert.ok(data.voiceSession.tools.some(tool=>tool.name==='cancel_background_research'));
   }
-  const input={sessionId:randomUUID(),requestKey:'call-1',studentId:'alex',question:'What is UC Davis cost?',institution:'UC Davis',mode:'finance',language:'en'};
+  const input={sessionId:randomUUID(),requestKey:'call-1',studentId:'alex',question:'What is UC Davis cost?',institution:'UC Davis',mode:'finance',language:'en',researchTask:{version:1,entities:['Untrusted College'],requirements:[]}};
   const first=await call('reader','POST',input);assert.equal(first.status,200,JSON.stringify(first));
+  const stored=(await f.owner.query('SELECT input FROM origen_voice_research_jobs WHERE id=$1',[first.body.id])).rows[0].input;
+  assert.deepEqual(stored.researchTask.entities,['UC Davis']);assert.equal(stored.researchTask.question,input.question);assert.ok(stored.researchTask.requirements.length);
   assert.equal((await call('reader','POST',input)).body.id,first.body.id);
   assert.equal((await call('other','GET',first.body.id)).status,404);
   assert.equal((await call('other','DELETE',first.body.id)).status,404);
@@ -216,11 +218,14 @@ test('queue ownership, idempotency, cancellation and restricted worker RLS', {sk
   await assert.rejects(worker.query('SELECT * FROM origen_students'),/permission denied/);
   let calls=0;
   const provider=async()=>{calls++;return new Response(JSON.stringify({output:[{type:'web_search_call',status:'completed'},{type:'message',content:[{type:'output_text',text:'Verified cost.',annotations:[{type:'url_citation',url:'https://financialaid.ucdavis.edu/cost',title:'Cost',start_index:0,end_index:8}]}]}]}));};
-  await processResearchJob(worker,{}, {request:provider});assert.equal(calls,1);
+  // A citation plus the words "Verified cost" supplies no actual figure. The
+  // bounded recovery may retry once, and must not claim complete coverage.
+  await processResearchJob(worker,{}, {request:provider});assert.equal(calls,2);
   const completed=await call('reader','GET',first.body.id);assert.equal(completed.body.status,'completed');assert.equal(completed.body.result.sources.length,1);
+  assert.equal(completed.body.result.requestCoverage.complete,false);
   await call('reader','DELETE',first.body.id);assert.equal((await call('reader','GET',first.body.id)).body.result,null);
   const next=await call('reader','POST',{...input,requestKey:'call-2',language:'es'});await call('reader','DELETE',next.body.id);
-  assert.equal(await processResearchJob(worker,{}, {request:provider}),false);assert.equal(calls,1);
+  assert.equal(await processResearchJob(worker,{}, {request:provider}),false);assert.equal(calls,2);
   for(let i=3;i<=6;i++)assert.equal((await call('reader','POST',{...input,requestKey:'call-'+i})).status,200);
   assert.equal((await call('reader','POST',{...input,requestKey:'call-7'})).status,429);
  }finally{

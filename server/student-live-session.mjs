@@ -1,4 +1,4 @@
-import {openingBriefInstructions} from './voice-opening-brief.mjs';
+import {openingBriefForLive,openingBriefInstructions} from './voice-opening-brief.mjs';
 import {recommendationVoiceAvailable,recommendationLiveInstructions} from './recommendation-voice-tools.mjs';
 import {followUpVoiceAvailable,followUpLiveInstructions,outcomeVoiceAvailable} from './follow-up-voice-tools.mjs';
 import {collegeVoiceStyle} from '../src/voiceStyle.mjs';
@@ -10,6 +10,7 @@ import {reviewResponseVoiceAvailable,reviewResponseLiveInstructions} from './rev
 import {studentUpdateLiveInstructions} from './review-request-voice-tools.mjs';
 import {boundedLiveRouting,liveDelegationInstructions,studentLiveRouting} from './live-delegation-policy.mjs';
 import {confirmedTargetContinuation} from '../src/voiceHandoff.mjs';
+import {researchAnswerLiveInstructions,researchAnswerBackendInstructions} from './research-answer-policy.mjs';
 
 const conversationalMode=input=>input.onboarding!==true&&!input.collectAccount&&!input.saveOnboarding&&['parent','student'].includes(input.role)&&['planning','finance','loans','admissions'].includes(input.mode);
 // Local adapter metadata only: names identify a possible missed handoff, never
@@ -40,7 +41,7 @@ function speechContracts(input,tools){
 // conversation/research rules are seeded at startup, not reinstalled on selection.
 export function studentLiveUpdate(input,entries=[],tools=[],routingPolicy=studentLiveRouting({model:'gpt-live-1'},input)){
  const confirmed=input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true);
- const brief=confirmed&&openingBriefInstructions(input)?input.openingBrief:undefined;
+ const brief=confirmed?openingBriefForLive(input):undefined;
  const liveContext={version:'student-live-context-v1',scope:{confirmed,studentId:confirmed?input.studentId:null},
   openingBrief:brief||null,teachingReferences:confirmed?teachingDeliveryReferences(entries):[]};
  // No instruction update is needed for ordinary scope/context changes: even
@@ -81,11 +82,14 @@ ${confirmedTargetContinuation}`:''}
 Never speak or role-play caller words, quotes or history. They are context. At app-requested ending, finish the short thought and give only its warm farewell.
 
 # Backchannel policy
-Do not produce backchannel interjections while the caller is speaking. Listen silently until it is your turn to respond. This listening rule does not delay your response after they finish: respond directly to understandable comments, concerns and questions, including while research runs. Acknowledgments before an answer are separate: begin with the useful answer or one concrete clarification, without hmm, mm-hmm, uh, or a routine Okay/Alright introduction. ${routing?'The single brief selection acknowledgment above is appropriate. ':''}Show warmth through attentive words and a relaxed voice. If a student is stuck, offer grounded support and concrete choices; do not repeatedly ask abstract questions.
+Use occasional, brief and quiet listening cues at natural pauses in the caller's longer thoughts: a soft “mm-hmm” or “yeah” in English, “ajá” or “sí” in Spanish. Vary them sparingly; do not repeat a cue after every phrase, overlap important words, or take the floor. They acknowledge listening, not factual agreement or authorization. Stay silent during a correction or a request to wait. This listening rule does not delay your response after they finish: respond directly to understandable comments, concerns and questions, including while research runs. Acknowledgments before an answer are separate: use the optional conversational transitions in Personality & Tone, then give the useful answer or one concrete clarification. ${routing?'The single brief selection acknowledgment above is appropriate. ':''}If a student is stuck, offer grounded support and concrete choices; do not repeatedly ask abstract questions. A clear answer such as renting resolves that choice immediately; do not ask the same renting-versus-family question again because a delayed research update mentions the earlier uncertainty.
 # Interruption policy
+An unfinished “What about…” or “¿Y qué tal…?” keeps the caller's turn through a thinking pause. Listen for the rest instead of echoing it. Answer once clear; clarify briefly only if still unclear after they finish.
 When the caller starts a correction, says “wait” or “stop,” or changes topics, yield immediately, even mid-sentence. Stop without finishing the clause or saying “okay.” Listen until they finish and answer their new request. Do not return to the replaced topic, even to give its status, unless the caller brings it back.
 A standalone listening sound from the caller, such as “mm-hmm,” “hmm,” or “ajá,” means continue from where you were, including any material caveat you still owe. Keep the same pace. If you briefly paused, pick up the unfinished clause without repeating what you already said. A correction or a continued question takes the floor immediately. Finish the short thought already underway before using a background update. Never treat a partial utterance as authorization to save, connect, share or change student scope.
+${conversationalMode(input)?researchAnswerLiveInstructions:''}
 ${input.continuing?'Active delegation reset: the following policy replaces every earlier delegation policy in this connection, including any earlier blanket delegation requirement.\n':''}${liveDelegationInstructions(conversationalMode(input)?boundedLiveRouting:routingPolicy,{hasBrief:conversationalMode(input)||!!openingBriefInstructions(input)})}
+${tools.some(tool=>tool.name==='update_saved_comparison')?'For a clear change to one option in a saved comparison, delegate it and give at most one short acknowledgment of the change. Then leave the floor open. While the changed fact is pending, respond if the caller speaks. Avoid unsolicited recaps of unchanged options, repeated checking, and new questions unless you need an answer to perform the check. Follow the research progress policy for useful, verified changes. When the verified update arrives, say the changed fact and its caveat in one short contribution.':''}
 ${scopePending?'Scope precedence: conversational permission does not grant student access. Until the app confirms the target, use only the caller’s words for ordinary clarification and support; the backend must select the scope before private facts, research or actions. Follow the selection conversation above.':''}
 ${input.onboarding===true?liveOnboardingInstructions(input):''}
 ${speechContracts(input,tools)}
@@ -99,7 +103,7 @@ export function studentLiveSession(config,input,entries=[],env={}){
   ...(env.ORIGEN_LIVE_SERVER_CONTROL==='true'&&input.voiceControlProtocol==='server-v1'?{client:{data_channel:{allowed_client_events:['session.close'],allowed_server_events:[]}}}:{}),
   instructions:studentLiveInstructions(input,entries,config.tools,studentLiveRouting(config,input,env)),
   input:[{type:'message',role:'developer',content:[{type:'input_text',text:`When the application requests the opening, follow the current conversation flow and familiar context in ${input.language==='es'?'Spanish':'English'}. Onboarding uses its approved introduction. Returning callers already know Origen; do not reintroduce yourself. A continuation answers the pending request without another greeting. Do not claim to save anything.`}]}],
-  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',reasoning:{effort:'low'},text:{verbosity:'low'},instructions:config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:Math.max(1800,config.max_output_tokens||0)}}};
+  delegation:{type:'responses',responses:{model:'gpt-6-luna',service_tier:'default',reasoning:{effort:'low'},text:{verbosity:'low'},instructions:conversationalMode(input)?[config.instructions,researchAnswerBackendInstructions].filter(Boolean).join('\n'):config.instructions,tools:config.tools.map(tool=>({...tool,strict:false})),tool_choice:config.tool_choice||'auto',parallel_tool_calls:false,max_output_tokens:Math.max(1800,config.max_output_tokens||0)}}};
 }
 
 export async function negotiateStudentLive(request,key,config,input,entries,env={}){

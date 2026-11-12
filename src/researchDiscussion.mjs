@@ -1,4 +1,5 @@
 import {researchFocus,findingSubjectMentioned,researchSubjectIdentity} from './researchFindings.mjs';
+import {requestedResearchFacts,researchFactMatchesRequirement} from './researchTask.mjs';
 // Local duplicate suppression, not an answer-quality grader or proof of hearing.
 // Compare the finding's quantities and distinctive words, allowing spoken number
 // formats and paraphrases. Nothing here initiates model work or controls playback.
@@ -61,11 +62,21 @@ function tokens(text){
   (_,ten,one)=>String(2000+tens[ten]+(units[one]??0)));
  plain=plain.replace(/\b(20\d{2})\s*(?:[-–—/]|(?:and|y|to|through|a)\s+['’]?)\s*(\d{2})\b/gu,(_,year,end)=>`${year} ${year.slice(0,2)+end}`);
  plain=plain.replace(/\b(\d{1,3})\s+(?:thousand|mil)\s+(\d{1,3})(?!\d)\b/gu,(_,thousands,remainder)=>String(Number(thousands)*1000+Number(remainder)));
+ plain=plain.replace(/\b(\d{1,3})\s+(?:thousand|mil)\b/gu,(_,thousands)=>String(Number(thousands)*1000));
  // Both 49,692 and 49.692 are grouped whole numbers. Decimal values remain
  // distinct tokens, so an unrecognized rendering cannot count as a match.
  plain=plain.replace(/\b\d{1,3}(?:[,.]\d{3})+(?!\d)/gu,n=>n.replace(/[,.]/gu,''));
  plain=plain.replace(/(?<=\d)[,.](?=\d)/gu,'decimal');
- return numberWords(plain.match(/[\p{L}\p{N}]+/gu)||[]);
+ const numeric=numberWords(plain.match(/[\p{L}\p{N}]+/gu)||[]),result=[];
+ for(let index=0;index<numeric.length;index++){
+  let cents=index+2;
+  if(['and','y'].includes(numeric[cents]))cents++;
+  if(/^\d+$/u.test(numeric[index])&&['dollar','dollars','dolar','dolares'].includes(numeric[index+1])&&
+   /^\d{1,2}$/u.test(numeric[cents]||'')&&['cent','cents','centavo','centavos'].includes(numeric[cents+1])){
+   result.push(`${numeric[index]}decimal${numeric[cents].padStart(2,'0')}`);index=cents+1;
+  }else result.push(numeric[index]);
+ }
+ return result;
 }
 export function researchAnswerOverlap(answer,spoken){
  // Repeating a number as a question or as a still-unverified possibility isn't
@@ -92,13 +103,50 @@ export function researchAnswerOverlap(answer,spoken){
 
 // A finished check can truthfully yield an unavailable answer. Do not count an
 // ongoing search, a promise to check, or a generic apology as that disclosure.
+export function researchFindingHasOnlyUnverifiedFacts(finding){
+ const facts=finding.evidence?.facts;
+ return finding.status==='unverified'||Array.isArray(facts)&&facts.length>0&&facts.every(fact=>fact.status==='unverified');
+}
 export function researchLimitationOverlap(finding,spoken,mentionsSubject){
  const text=fold(spoken).toLowerCase();
  const aspects=researchFocus(text);
  if(!mentionsSubject||(aspects.length&&!aspects.includes(finding.aspect)))return false;
  const pending=/\b(?:checking|verifying|investigating|searching|looking (?:up|for)|still trying|(?:will|going to) (?:check|verify|confirm|look|search)|revisando|comprobando|verificando|investigando|buscando|(?:voy|vamos) a (?:revisar|buscar|verificar|confirmar)|sigo intentando)\b/u;
  if(pending.test(text))return false;
- return /\b(?:could(?:n['’]?t| not)|cannot|can['’]?t|unable to|not able to|(?:haven['’]?t|have not) been able to) (?:verify|confirm|establish|find)|\b(?:haven['’]?t|have not) (?:yet )?(?:verified|confirmed)|\b(?:remain|remains|is|are) unverified|\b(?:no (?:pude|pudimos|logre|logramos|se pudo|se ha podido) (?:confirmar|verificar|encontrar)|no (?:esta|estan) verificad[oa]s?)\b/u.test(text);
+ const limitation=/\b(?:could(?:n['’]?t| not)|cannot|can['’]?t|unable to|not able to|(?:haven['’]?t|have not) been able to) (?:verify|confirm|establish|find)|\b(?:haven['’]?t|have not) (?:yet )?(?:verified|confirmed)|\b(?:remain|remains|is|are) (?:still |currently )?unverified|\b(?:no (?:pude|pudimos|logre|logramos|se pudo|se ha podido) (?:confirmar|verificar|encontrar)|no (?:esta|estan) (?:todavia |aun )?(?:verificad[oa]s?|confirmad[oa]s?)|no (?:la |lo |las |los )?tengo (?:todavia |aun )?(?:verificad[oa]s?|confirmad[oa]s?)|sigue[n]? sin (?:verificar|confirmar))\b/u;
+ if(!limitation.test(text))return false;
+ // A partial record may contain only unknown facts (e.g. contact and hours).
+ // Match each explicit missing fact rather than requiring a positive answer,
+ // or treating one disclosed gap as every requested detail being answered.
+ const facts=finding.evidence?.facts;
+ if(Array.isArray(facts)&&facts.length){
+  if(!facts.every(fact=>fact.status==='unverified'))return false;
+  const disclosed=String(spoken||'').split(/(?<=[.!?;])\s+|,\s*(?:but|pero)\s+/iu)
+   .filter(part=>limitation.test(fold(part).toLowerCase()))
+   .flatMap(part=>requestedResearchFacts(part));
+  return facts.every(fact=>disclosed.some(required=>researchFactMatchesRequirement(fact,required)));
+ }
+ return true;
+}
+
+// A caller-led answer need not repeat the institution's name in every sentence.
+// The controller may use this only for one explicit current subject, before any
+// later caller question. Require a complete scoped gap clause whose vocabulary
+// comes from that finding; another campus or unsupported scenario cannot match.
+// This suppresses an optional repeated announcement, not verifies full delivery.
+export function researchImplicitLimitationObserved(finding,spoken){
+ if(!researchFindingHasOnlyUnverifiedFacts(finding))return false;
+ const allowed=new Set([...tokens(`${finding.subject} ${finding.answer} ${finding.qualification}`),...stop,
+  ...'still currently yet cannot unable confirm confirmed verify verified unverified haven t couldn isn aren tengo aun todavia confirmada confirmado confirmadas confirmados verificada verificado verificadas verificados'.split(' ')]);
+ const statements=String(spoken||'').split(/(?<=[.!?;])\s+/u).flatMap(sentence=>sentence.split(/,?\s+\b(?:but|pero)\b\s+/iu));
+ return statements.some(statement=>{
+  const text=fold(statement).toLowerCase().trim();
+  if(!/^(?:the|that|this|i|la|el|esa|ese|no)\b/u.test(text)||/[?¿？]/u.test(text))return false;
+  if(!tokens(statement).every(word=>allowed.has(word)))return false;
+  if(!researchScopeCompatible(finding,statement))return false;
+  if(finding.aspect!=='other'&&!researchFocus(statement).includes(finding.aspect))return false;
+  return researchLimitationOverlap(finding,statement,true);
+ });
 }
 
 function concretePortion(source,aspect){
@@ -122,7 +170,7 @@ function concretePortion(source,aspect){
 // Omitted details alone do not make an otherwise relevant paraphrase a mismatch.
 export function researchScopeCompatible(finding,statement){
  const source=`${finding.subject} ${finding.answer}`;
- const years=text=>tokens(text).filter(t=>/^20\d{2}$/u.test(t));
+ const years=text=>tokens(String(text).replace(/\b(20\d{2})\s*[-–—]\s*(\d{2})\b/gu,(_,start,end)=>`${start} ${start.slice(0,2)}${end}`)).filter(t=>/^20\d{2}$/u.test(t));
  const expectedYears=years(source),spokenYears=years(statement);
  if(expectedYears.length&&spokenYears.some(year=>!expectedYears.includes(year)))return false;
  const scenarios=text=>{
@@ -136,14 +184,42 @@ export function researchScopeCompatible(finding,statement){
  const expected=scenarios(source),claimed=scenarios(statement);
  return !expected.length||claimed.every(scenario=>expected.includes(scenario));
 }
+// A short campus lead and its immediately following fact belong to one spoken
+// thought ("Here's the idea for Davis. The published budget is ..."). Carry
+// only an exact, explicit subject lead; never infer a campus from a previous
+// turn or carry past an intervening question/pending statement. The fact's
+// introductory vocabulary must come from that finding or generic fact words,
+// so a different named campus, even lowercased, cannot inherit this subject.
+function adjacentSubjectLead(finding,previous,statement){
+ if(!previous||/[?？]/u.test(previous)||!/^(?:the|its|el|la|los|las|su|sus)\s/iu.test(statement.trim()))return false;
+ const lead=fold(previous).replace(/[.!]\s*$/u,'').trim().replace(/^(?:here['’]s (?:the (?:idea|answer|result|update)|what we have) (?:for|about)|as for|regarding|about|for|en cuanto a|respecto a|en el caso de|sobre|para)\s+/iu,'');
+ if(lead===previous.trim()||!findingSubjectMentioned(finding.subject,lead,{exact:true}))return false;
+ const expected=new Set([...tokens(`${finding.subject} ${finding.answer}`),...stop,
+  ...'published annual yearly estimated estimate cost costs attendance budget living resident total minimum maximum amount rate result requirement deadline publicado publicada anual anuales estimado estimada costo costos coste asistencia presupuesto vivir residente total minimo minima maximo maxima monto importe tasa resultado requisito plazo'.split(' ')].map(stem));
+ const content=tokens(statement),firstNumber=content.findIndex(word=>/^\d/u.test(word));
+ if(firstNumber<0||!content.every(word=>/^\d/u.test(word)||expected.has(stem(word))))return false;
+ const named=fold(statement).replace(/^\s*\p{L}+/u,'').match(/\b[A-Z][\p{L}]+\b/gu)||[];
+ return named.every(name=>expected.has(stem(name.toLowerCase())))&&researchScopeCompatible(finding,previous);
+}
 // Retire an optional announcement when a native answer already explained a
 // relevant portion. This does not certify completeness or numerical accuracy.
 export function researchPortionObserved(finding,spoken){
  if(!findingSubjectMentioned(finding.subject,spoken))return false;
- if(finding.status==='unverified')return researchScopeCompatible(finding,spoken)&&researchLimitationOverlap(finding,spoken,true);
+ if(researchFindingHasOnlyUnverifiedFacts(finding))return researchScopeCompatible(finding,spoken)&&researchLimitationOverlap(finding,spoken,true);
  const uncertain=/\b(?:checking|verifying|still trying|will check|going to check|pending|might|may|hypothetical|suppose|not verified|not confirmed|have not verified|have not confirmed|haven['’]?t verified|haven['’]?t confirmed|revisando|verificando|voy a revisar|pendiente|podria|hipotetic\w*|supongamos|no he verificado|no he confirmado|sin verificar|sin confirmar)\b/u;
- const statements=String(spoken||'').split(/(?<=[.!?])\s+/u).filter(s=>!/[?？]\s*$/u.test(s)&&!uncertain.test(fold(s).toLowerCase()));
- const amounts=text=>tokens(text).filter(t=>/^\d+$/u.test(t)).map(Number).filter(n=>n>=1000&&(n<1900||n>2100));
+ const sentences=String(spoken||'').split(/(?<=[.!?])\s+/u).map(sentence=>{
+  // A limitation about a future year can precede a clearly dated benchmark.
+  // Compare the affirmative benchmark clause, preserving its own year/scope.
+  const contrast=sentence.match(/\b(?:but for (?:comparison|context)|pero (?:como (?:referencia|comparacion)|para comparar))[, ]+/iu);
+  return contrast&&/\b(?:don['’]?t have|do not have|could not confirm|couldn['’]?t confirm|no tengo|no pude confirmar)\b/iu.test(sentence.slice(0,contrast.index))
+   ?sentence.slice(contrast.index+contrast[0].length):sentence;
+ });
+ const statements=sentences.flatMap((statement,index)=>{
+  if(/[?？]\s*$/u.test(statement)||uncertain.test(fold(statement).toLowerCase()))return [];
+  return [!findingSubjectMentioned(finding.subject,statement)&&adjacentSubjectLead(finding,sentences[index-1],statement)
+   ?`${researchSubjectIdentity(finding.subject)}: ${statement}`:statement];
+ });
+ const amounts=text=>tokens(text).filter(t=>/^\d+(?:decimal\d+)?$/u.test(t)).map(t=>Number(t.replace('decimal','.'))).filter(n=>n>=1000&&(n<1900||n>2100));
  const expected=amounts(finding.answer);
  const sourceSentences=String(finding.answer||'').split(/(?<=[.!?;])\s+/u);
  const subject=researchSubjectIdentity(finding.subject);
@@ -152,13 +228,39 @@ export function researchPortionObserved(finding,spoken){
   if(!findingSubjectMentioned(finding.subject,statement))return false;
   if(!researchScopeCompatible(finding,statement))return false;
   const aspects=researchFocus(statement);
-  if(aspects.length&&finding.aspect!=='other'&&!aspects.includes(finding.aspect))return false;
+  const budgetHeadline=finding.aspect==='total_budget'&&finding.budget?.total!=null&&
+   /\b(?:estimate|estimated|estimad[oa]|estimaci[oó]n|presupuesto|budget)\b/iu.test(statement)&&
+   !aspects.includes('tuition_fees')&&amounts(statement).includes(finding.budget.total);
+  if(aspects.length&&finding.aspect!=='other'&&!aspects.includes(finding.aspect)&&!budgetHeadline)return false;
   // An explained requirement or deadline is useful delivery too. Compare one
   // complete sourced clause, retaining every number and its polarity, so an
   // optional addendum does not require reciting the whole multi-part finding.
   if(sourceSentences.some(source=>concretePortion(source,finding.aspect)&&negative(source)===negative(statement)&&researchAnswerOverlap(`${subject} ${source}`,statement)))return true;
-  if(!aspects.includes(finding.aspect)||negative(statement.split(/,?\s+(?:but|pero)\s+/iu)[0]))return false;
+  const numericNegation=/\b(?:not|no|never|cannot|isnt|arent|without|sin)\s*(?:(?:is|are|es|son|de|about|approximately)\s*)*\d/u.test(tokens(statement).join(' '));
+  if((!aspects.includes(finding.aspect)&&!budgetHeadline)||numericNegation)return false;
   const spokenAmounts=amounts(statement),approximate=/\b(?:about|roughly|around|near|approximately|cerca|aproximadamente|alrededor|unos|unas)\b/iu.test(statement);
   return expected.some(n=>spokenAmounts.some(s=>s===n||approximate&&Math.abs(s-n)/n<=0.02));
+ });
+}
+
+// Suppress an optional repeat of an exact, structured budget total. The caller
+// may hear a short headline rather than the full component list. Implicit
+// subject use requires the controller's single current campus guard; this is
+// not evidence that the complete breakdown or qualifications were delivered.
+export function researchBudgetTotalObserved(finding,spoken,{implicitSubject=false}={}){
+ if(finding.aspect!=='total_budget'||!finding.budget||finding.status==='unverified'||finding.budget.total==null)return false;
+ const expected=new Set(tokens(`${finding.subject} ${finding.budget.population} ${finding.answer}`));
+ const generic=new Set(tokens('for the published annual academic year California resident undergraduate off campus renting estimate budget total expenses costs cost attendance puts is at about approximately dollars USD en para el la publicado publicada anual año academico residente pregrado fuera del campus alquiler estimacion presupuesto total gastos costos es de unos aproximadamente dolares'));
+ return String(spoken||'').split(/(?<=[.!?])\s+/u).some(sentence=>{
+  if(!/[.!]["”’')]*\s*$/u.test(sentence)||/[?¿？]/u.test(sentence))return false;
+  // Keep the affirmative benchmark separate from an earlier cohort limitation.
+  const statement=sentence.split(/\b(?:but|pero)\s+(?=(?:for|para|en)\b)/iu).at(-1);
+  const normalized=fold(statement).toLowerCase();
+  if(/\b(?:not|no|isn|cannot|couldn|might|may|maybe|pending|checking|verifying|sin confirmar|podria|quizas|revisando)\b/u.test(normalized))return false;
+  if(!/\b(?:total|budget|presupuesto|expenses|gastos)\b/u.test(normalized)||!researchScopeCompatible(finding,statement))return false;
+  const quantities=tokens(statement);
+  if(!quantities.includes(String(finding.budget.total)))return false;
+  return (implicitSubject||findingSubjectMentioned(finding.subject,statement))&&
+   quantities.every(word=>/^\d+(?:decimal\d+)?$/u.test(word)||expected.has(word)||generic.has(word));
  });
 }

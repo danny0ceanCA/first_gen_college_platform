@@ -39,6 +39,7 @@ import {allowedRequest} from './origin.mjs';
 import {admissionsTool} from './admissions-research.mjs';
 import {planningTool} from './education-planning.mjs';
 import {financeTool} from './finance-research.mjs';
+import {studentHousingPlan} from './voice-housing-scope.mjs';
 import {scopeRouting} from './voice-scope.mjs';
 import {createFamilyRepository} from './family.mjs';
 import {collegeVoiceStyle,collegeBackendStyle} from '../src/voiceStyle.mjs';
@@ -205,8 +206,10 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       if(preparing&&versionBefore===undefined)return send(200,{preparedContextId:null});
       const cached=prepareEnabled&&!preparing&&input.preparedContextId?preparations.take(req.origenIdentity.sub,input.preparedContextId,preparationKey,versionBefore):undefined;
       contextTiming.preparation(preparing?'preparing':cached?'hit':input.preparedContextId?'miss':'cold');
+      input.housingPlan=undefined;
       if(cached){input={...input,...cached.context};storedRole=cached.storedRole;if(input.studentId!==undefined)await req.bindDiagnosticOperation?.('voice',input.studentId);}
       if(!cached){
+      let housingHistory=[];
       const continuityVersion=continuity?await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub)):undefined;
       if(req.origenAuthorized){
         // Saved context is server-owned; callers may only supply an unsaved setup draft.
@@ -228,7 +231,11 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         }
         if(input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed)){
           if(input.studentId!==null&&(typeof input.studentId!=='string'||!input.studentId||input.studentId.length>128))return send(400,{error:'invalid_request'});
-          try{input.memory=(await measure('history',()=>createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId,mode:input.mode}))).items;}catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
+          try{
+            const history=await measure('history',()=>createHistoryRepository(database)(req.origenIdentity.sub,{action:'context',studentId:input.studentId,mode:input.mode},
+              {includeContextWindow:informational&&!!input.studentId&&policy.retrieval&&env.ORIGEN_BACKGROUND_RESEARCH==='true'}));
+            input.memory=history.items;housingHistory=history.contextWindow||[];
+          }catch(error){req.log?.({event:'history_error',level:'error',code:safeErrorCode(error)});return send(error.status===404?404:503,{error:error.status===404?'student_not_found':'history_unavailable'});}
         }
       }
       if(input.routeConversations&&!input.targetConfirmed){input.memory=[];input.plans=[];input.profile={};}
@@ -259,6 +266,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
         if(continuity)input.returnContext=continuitySnapshot(input,await measure('continuity',()=>loadQuestionContinuity(database,req.origenIdentity.sub,input.studentId)));
       }
       if(continuity&&continuityVersion!==await measure('version',()=>voiceContextVersion(database,req.origenIdentity.sub)))return send(409,{error:'memory_changed'});
+      const suppressedHousingSources=new Set(input.studentBrief?.suppressedSummaryIds||[]);
+      input.housingPlan=housingHistory.length?studentHousingPlan(buildOpeningBrief(input),input.studentId,
+        housingHistory.filter(item=>!replacedSources.has(item.id)&&!suppressedHousingSources.has(item.id))):undefined;
       }
       if(continuity!==(req.origenAuthorized&&continuityEnabled(env,req.origenIdentity?.sub)))return send(409,{error:'memory_changed'});
       if(input.returnContext)input.returnContext=continuitySnapshot(input,input.returnContext.recentQuestions);
@@ -340,8 +350,9 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       }
       const controlScope={sessionId,studentId:input.studentId??null,confirmed:input.studentId!==undefined&&(!input.routeConversations||input.targetConfirmed===true)};
       const controlConfig={type:'realtime',routingPolicy,language:input.language,onboarding:input.onboarding===true,instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,selectionRecovery:studentSelectionRecovery(input,config.tools)};
+      const housingPlan=backgroundResearch&&controlScope.confirmed?input.housingPlan:undefined;
       const liveUpdate=updating&&config.model==='gpt-live-1'?studentLiveUpdate(input,teachingAccess?.entries||[],config.tools,routingPolicy):{};
-      const controlUpdateId=updating&&input.voiceControlProtocol==='server-v1'?voiceControl.stage(input.voiceControlId,req.origenIdentity.sub,{...controlConfig,...liveUpdate},controlScope):undefined;
+      const controlUpdateId=updating&&input.voiceControlProtocol==='server-v1'?voiceControl.stage(input.voiceControlId,req.origenIdentity.sub,{...controlConfig,...liveUpdate,housingPlan},controlScope):undefined;
       if(updating){teachingOutcome='prepared';return send(200,{...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,session:{...(controlUpdateId?{controlUpdateId}:{}),type:'realtime',instructions:config.instructions,tools:config.tools,tool_choice:config.tool_choice,max_output_tokens:config.max_output_tokens,...(config.model==='gpt-live-1'?{routingPolicy,...liveUpdate}:{})},guidance:tracked});}
       const useLive=config.model==='gpt-live-1';let liveResult;const negotiate=providerOperation('voice.negotiate',request,{model:config.model});
       let response;
@@ -359,7 +370,7 @@ export function createProfileVoiceHandler(env, request = fetch, log = ()=>{}, da
       teachingOutcome='provider_accepted';
       if(execution){await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'completed',durationMs:Date.now()-started,upstreamRequestId});execution=undefined;}
       await verifyFocusedResponse();
-      const voiceControlReceipt=useLive&&input.voiceControlProtocol==='server-v1'?voiceControl.register({subject:req.origenIdentity.sub,permissionRevision:req.origenPermissionRevision,providerId:liveResult.providerId,sessionId,scope:controlScope,config:{...controlConfig,requestedVoice:liveResult.requestedVoice}}):undefined;
+      const voiceControlReceipt=useLive&&input.voiceControlProtocol==='server-v1'?voiceControl.register({subject:req.origenIdentity.sub,permissionRevision:req.origenPermissionRevision,providerId:liveResult.providerId,sessionId,scope:controlScope,config:{...controlConfig,requestedVoice:liveResult.requestedVoice,housingPlan}}):undefined;
       openingDelivered=true;
       return send(200,{sdp,...(voiceControlReceipt?{voiceControl:voiceControlReceipt}:{}),...(backgroundResearch?{backgroundResearch:true}:{}),...(input.followUpProtocol==='student-follow-up-v1'?{followUpVoiceControls:!!liveMemorySession&&storedRole==='student',studentFollowUpVoice:input.studentFollowUpVoice,studentOutcomeVoice:input.studentOutcomeVoice,recommendationVoice:input.recommendationVoice}:{}),openingClaim:input.openingDecision?.claim,reviewResponseGuard,...(useLive?{voiceProvider:'live',voiceSession:controlConfig}:{}),...(input.coordinatorLinking?{coordinatorLinking:true}:{}),reviewVoiceSession,liveMemorySession,memoryRevision,memoryPolicy,playWelcome:input.onboarding===true&&(!input.mode||input.mode==='profile'),guidance:tracked});
     } catch(error) {req.log?.({event:'upstream_error',level:'error',code:safeErrorCode(error)});return send([400,403,404,409,429].includes(error.status)?error.status:502,{error:error.status?error.message:'voice_unavailable'});} finally {active--;if(openingClaim&&!openingDelivered)await createOpeningEvidenceRepository(database,env)(req.origenIdentity.sub,{action:'release',studentId:openingClaim.studentId,conversationId:openingClaim.conversationId,claimId:openingClaim.claimId}).catch(()=>{});await teachingAccess?.finish(teachingOutcome);if(execution)await guidance.finishExecution(req.origenIdentity.sub,execution,{status:'failed',durationMs:Date.now()-started,upstreamRequestId,errorCode:'voice_unavailable'}).catch(()=>req.log?.({event:'guidance_error',code:'operation_failed'}));}

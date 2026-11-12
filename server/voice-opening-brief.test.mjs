@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildOpeningBrief,openingBriefInstructions,openingBriefLimit} from './voice-opening-brief.mjs';
-import {studentLiveInstructions} from './student-live-session.mjs';
+import {studentLiveInstructions,studentLiveUpdate} from './student-live-session.mjs';
 import {voicePayloadCases} from '../scripts/voice-payload-report.mjs';
 
 const base=()=>({mode:'planning',role:'parent',routeConversations:true,targetConfirmed:true,studentId:'a',caller:{firstName:'Daniel'},profile:{id:'a',name:'Aiden',school:'Community college',goals:'Exploring transfer, not decided'},memory:[{id:'s',studentId:'a',date:'2026-11-01',summary:'A parent asked about essay ideas.'}],studentBrief:{memories:[],suppressedSummaryIds:[]}});
@@ -20,6 +20,18 @@ test('onboarding, unconfirmed target and mismatched profile never receive a brie
  for(const change of [{onboarding:true},{collectAccount:true},{saveOnboarding:true},{mode:'profile'},{studentId:undefined},{targetConfirmed:false},{profile:{id:'b',name:'Other student'}}])assert.equal(buildOpeningBrief({...base(),...change}),undefined);
  const input=base();input.openingBrief=buildOpeningBrief(input);assert.equal(openingBriefInstructions({...input,studentId:'b'}),'');
  assert.equal(openingBriefInstructions({...input,targetConfirmed:false}),'');
+});
+test('historical quoted campus costs stay in storage but are not supplied as evidence to Live',()=>{
+ for(const [language,summary,amount,topic] of [
+  ['en','Discussed the UC Berkeley off-campus cost of $49,692. Aiden plans to rent.','49,692','Aiden plans to rent.'],
+  ['es','Hablaron del costo de 44.760 dólares de UC Davis. Aiden piensa alquilar.','44.760','Aiden piensa alquilar.'],
+ ]){
+  const input={...base(),language};input.memory[0].summary=summary;
+  input.openingBrief=buildOpeningBrief(input);
+  const initial=studentLiveInstructions(input),refresh=studentLiveUpdate(input).liveContext.openingBrief.records[0].content;
+  for(const context of [initial,refresh]){assert.ok(context.includes(topic));assert.ok(!context.includes(amount));}
+  assert.equal(input.openingBrief.records[0].content,summary);
+ }
 });
 test('withdrawn, suppressed, foreign and excessive records stay out; no sentence is cut',()=>{
  const input=base();input.studentBrief={suppressedSummaryIds:['s'],memories:[]};

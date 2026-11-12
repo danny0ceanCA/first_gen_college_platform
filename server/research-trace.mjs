@@ -4,7 +4,7 @@ import {enumFields,numericFields} from './observability/event-catalog.mjs';
 import {runAsAccount} from './account-isolation.mjs';
 
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(value);
-export const researchTraceStages=Object.freeze(['claimed','attempt_started','attempt_finished','reuse_selected','recovery_decided','initial_published','completed','failed','cancelled','publish_rejected','poll','delivery','speech_observation','playback_observation','trace_gap']);
+export const researchTraceStages=Object.freeze(['claimed','attempt_started','attempt_finished','catalog_checked','reuse_selected','recovery_decided','initial_published','completed','failed','cancelled','publish_rejected','poll','delivery','speech_observation','playback_observation','trace_gap']);
 // Opaque, purpose-separated keys join service logs without placing call IDs in stdout.
 export function researchTraceKeys(sessionId,jobId){
  const key=(purpose,id)=>createHash('sha256').update(`origen-research-v1:${purpose}:${id.toLowerCase()}`).digest('hex').slice(0,32);
@@ -14,6 +14,7 @@ const categories={pass:['initial','recovery'],providerStatus:['queued','in_progr
 const numbers={...numericFields,queueMs:3600000,evidenceVersion:1000,verifiedCount:8,partialCount:8,unverifiedCount:8,retainedFindingCount:8,reusedCount:8,lookupCount:8,droppedCount:1000000};
 export function researchTraceData(input={}){
  const data={};
+ if(['matched','request_outside_catalog','campus_unmatched','comparison_too_large','multiple_years','scope_ambiguous','scenario_unavailable','projection_rejected','catalog_error'].includes(input.catalogReason))data.catalogReason=input.catalogReason;
  for(const key of ['requestedModel','providerModel'])if(typeof input[key]==='string'&&/^gpt-[a-zA-Z0-9_.-]{1,100}$/u.test(input[key]))data[key]=input[key];
  for(const key of ['maxOutputTokens','maxToolCalls'])if(Number.isSafeInteger(input[key])&&input[key]>=0)data[key]=Math.min(input[key],1000000);
  if(['none','minimal','low','medium','high','xhigh'].includes(input.reasoningEffort))data.reasoningEffort=input.reasoningEffort;

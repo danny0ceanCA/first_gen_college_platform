@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
 
-VERSION = 'coa-workbook-staging-v1.1'
+VERSION = 'coa-workbook-staging-v1.2'
 LOCAL = Path(__file__).resolve().parent / '.local'
 APP_ID = 0x4F434F41
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
@@ -62,6 +62,9 @@ def date_ok(value):
 
 def housing_key(value):
     s=normalized(value)
+    # A negated parent qualifier identifies independent off-campus housing;
+    # it must not match the positive "with parents" branch below.
+    if 'off' in s and 'not with parents' in s and not any(x in s for x in ['with relatives','with family']):return 'renting'
     if any(x in s for x in ['relative','at home','family','with parents','living with parents']):return 'with_family'
     if s=='commuter' or 'remote learner' in s:return 'commuter_unspecified'
     if 'off' in s:return 'renting' if any(x in s for x in ['apartment','private','shared','not with parents']) else 'off_campus_unspecified'
