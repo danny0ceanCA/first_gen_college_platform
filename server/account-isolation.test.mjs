@@ -33,6 +33,13 @@ test('account context rejects invalid identities and cannot become a retention j
  await runAsAccount({sub:'a'},async()=>assert.throws(()=>runRetentionJob(()=>{}),/retention_not_available/));
 });
 
+test('deadline errors destroy an isolated client rather than returning it to the pool',async()=>{
+ const releases=[];const database=isolateDatabase({connect:async()=>({query:async()=>({rows:[]}),release:error=>releases.push(error)})});
+ const c=await database.connect(),error=new DOMException('Request timed out','TimeoutError');
+ c.release(error);c.release();assert.deepEqual(releases,[error]);
+ const clean=await database.connect();clean.release();assert.equal(releases.at(-1),undefined);
+});
+
 // Dedicated disposable PostgreSQL only: real RLS/non-owner roles cannot be
 // verified by pg-mem or by running the assertions as a superuser/table owner.
 test('PostgreSQL runtime isolates accounts, linked profiles, tools, exports, and pooled sessions',{skip:!process.env.DATABASE_TEST_URL},async t=>{

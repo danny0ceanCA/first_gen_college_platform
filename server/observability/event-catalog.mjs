@@ -78,7 +78,7 @@ export const enumFields=Object.freeze({
  topic:Object.freeze(['options','transfer','costs','applications']),
  recapMode:Object.freeze(['background','foreground']),recapCache:Object.freeze(['none','generated','hit','coalesced','empty']),
  recapFailure:Object.freeze(['configuration','provider_http','provider_body','provider_incomplete','output_limit','provider_refusal','output_json','output_validation','source_changed','capacity','authorization','timeout','cancelled','source_read','provider_request']),
- retrievalStage:Object.freeze(['acquire','guard','scope','search','commit']),
+ retrievalStage:Object.freeze(['admission','acquire','guard','scope','search','commit']),
  sourceEvent:Object.freeze([...Object.keys(serverEvents),...clientEvents]),
  contextStage:Object.freeze(['version','memory','profile','history','workspace','retrieval','continuity','coordinator','session_guards','opening','brief','teachings','negotiate']),
  timingStage:Object.freeze(['speech_started','speech_end','backend_started','backend_model','transcript_classified','answer_candidate','first_audio','candidate_audio','turn_complete','call_complete','tool','history_tool','research_tool','context_request','configuration_ack','memory_request','research_request','workflow_request']),

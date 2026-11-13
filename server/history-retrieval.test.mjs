@@ -25,19 +25,46 @@ test('pool acquisition deadline returns fallback and releases a connection that 
  assert.equal(result.available,false);assert.equal(result.reason,'deadline');finish();await new Promise(r=>setImmediate(r));assert.equal(release,true);
 });
 
-test('a timed-out account guard stops issuing reads, rolls back, and releases its pool connection',async()=>{
- let resume,released=false;const queries=[],logs=[];
- const database={connect:async()=>({release(){released=true;},async query(sql){
+test('a timed-out account guard destroys its client without waiting for stuck SQL or rollback',async()=>{
+ let resume,released=false,releaseError;const queries=[],logs=[];
+ const database={connect:async()=>({release(error){released=true;releaseError=error;},async query(sql){
   queries.push(sql);
   if(sql.startsWith('INSERT INTO origen_subject_locks'))await new Promise(resolve=>{resume=resolve;});
   return {rows:[]};
  }})};
  const result=await retrieveStudentHistory(database,'private-account',{studentId:'alex',query:'private detail',timeoutMs:40,log:event=>logs.push(diagnosticRecord(event))});
  assert.equal(result.reason,'deadline');assert.equal(logs[0].retrievalStage,'guard');
+ assert.equal(released,true);assert.equal(releaseError.name,'TimeoutError');
  resume();await new Promise(resolve=>setImmediate(resolve));
- assert.equal(released,true);assert.equal(queries.at(-1),'ROLLBACK');
+ assert.ok(!queries.includes('ROLLBACK'),'destroyed clients must not queue cleanup on a stuck wire');
  assert.ok(!queries.some(sql=>sql.includes('FOR UPDATE')||sql.includes('FROM origen_accounts')),'No new reads after caller received the timeout fallback');
  assert.doesNotMatch(JSON.stringify(logs),/private-account|private detail/);
+});
+
+test('optional recall admits one search per account and two overall, without queueing reconnections',async()=>{
+ const pending=[];let acquired=0;
+ const database={connect:async()=>{acquired++;await new Promise(resolve=>pending.push(resolve));return {query:async()=>({rows:[]}),release(){}};}};
+ const a=retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer',timeoutMs:50,log:()=>{}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((await retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer'})).reason,'busy');
+ const b=retrieveStudentHistory(database,'two',{studentId:'alex',query:'transfer',timeoutMs:50,log:()=>{}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((await retrieveStudentHistory(database,'three',{studentId:'alex',query:'transfer'})).reason,'busy');assert.equal(acquired,2);
+ await Promise.all([a,b]);
+ assert.equal((await retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer'})).reason,'busy','a late pool acquisition retains its admission slot until it is released');
+ pending.splice(0).forEach(resolve=>resolve());await new Promise(resolve=>setImmediate(resolve));
+ const next=retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer',timeoutMs:10,log:()=>{}});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(acquired,3);await next;pending.splice(0).forEach(resolve=>resolve());
+});
+
+test('late completion of a destroyed search cannot clear a newer search admission',async()=>{
+ const guards=[];const database={connect:async()=>({release(){},async query(sql){if(sql.startsWith('INSERT INTO origen_subject_locks'))await new Promise(resolve=>guards.push(resolve));return {rows:[]};}})};
+ await retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer',timeoutMs:15,log:()=>{}});
+ const next=retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer',timeoutMs:80,log:()=>{}});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(guards.length,2);
+ guards[0]();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((await retrieveStudentHistory(database,'one',{studentId:'alex',query:'transfer'})).reason,'busy');
+ await next;guards[1]();await new Promise(resolve=>setImmediate(resolve));
 });
 
 test('history search receives the remaining SQL budget after slow guard work',async()=>{
@@ -54,7 +81,7 @@ test('history search receives the remaining SQL budget after slow guard work',as
  assert.equal(limits.length,2);assert.ok(limits[1]<limits[0]-30,'The search must not inherit a fresh full deadline');
 });
 test('history retrieval with real PostgreSQL and restricted RLS',{skip:!process.env.DATABASE_TEST_URL},async t=>{
- const f=await retrievalFixture();
+ const f=await retrievalFixture({runtimePoolSize:5,productionTimeouts:true});
  const detail=content=>({category:'constraint',content,language:'en',speaker:'parent'});
  try{
   await f.save('old','The student needs evening laboratories because of the bakery work schedule.');
@@ -137,6 +164,34 @@ test('history retrieval with real PostgreSQL and restricted RLS',{skip:!process.
     const result=await f.retrieve('astronomy',{timeoutMs:80});assert.equal(result.available,false);assert.equal(result.reason,'deadline');
    }finally{await lock.query('ROLLBACK');lock.release();}
    assert.equal((await f.retrieve('laboratories',{studentId:null})).available,true);
+  });
+  await t.test('overlapping bilingual recall cannot starve account checks during a blocked search',async()=>{
+   const lock=await f.owner.connect();
+   try{
+    await lock.query('BEGIN');await lock.query('LOCK origen_conversation_summaries IN ACCESS EXCLUSIVE MODE');
+    const searching=f.retrieve('laboratories',{timeoutMs:200,log:()=>{}});
+    const otherSearching=f.retrieve('laboratories',{timeoutMs:200,log:()=>{}},'other');
+    await new Promise(resolve=>setTimeout(resolve,30));
+    const start=performance.now();
+    const duplicates=await Promise.all(['laboratories','clases nocturnas','transfer','becas'].map(query=>f.retrieve(query,{timeoutMs:200,log:()=>{}})));
+    assert.ok(duplicates.every(r=>r.reason==='busy'));
+    const account=await f.as('reader',()=>f.db.query('SELECT id FROM origen_accounts WHERE auth0_subject=$1',['reader']));
+    assert.equal(account.rowCount,1);assert.ok(performance.now()-start<1000,'account checks must not wait for a five-second pool timeout');
+    assert.equal((await searching).reason,'deadline');
+    assert.equal((await otherSearching).reason,'deadline');
+    await new Promise(resolve=>setTimeout(resolve,20));
+    assert.equal(f.runtime.waitingCount,0);assert.equal(f.runtime.totalCount,f.runtime.idleCount,'no lingering transaction holds a runtime client');
+   }finally{await lock.query('ROLLBACK');lock.release();}
+   assert.equal((await f.retrieve('clases nocturnas',{log:()=>{}})).available,true);
+  });
+  await t.test('stored search documents and legacy fallback return the same current evidence',async()=>{
+   for(const query of ['laboratories','clases nocturnas']){
+    const current=await f.retrieve(query,{log:()=>{}});
+    assert.equal(current.available,true);
+    const receipt=(await f.owner.query("DELETE FROM origen_schema_migrations WHERE name='127_history_search_documents.sql' RETURNING *")).rows[0];
+    try{assert.deepEqual(await f.retrieve(query,{log:()=>{}}),current);}
+    finally{await f.owner.query('INSERT INTO origen_schema_migrations(name,checksum,applied_at) VALUES($1,$2,$3)',[receipt.name,receipt.checksum,receipt.applied_at]);}
+   }
   });
   await t.test('migration absence returns a usable fallback without full-table search',async()=>{
    const receipt=(await f.owner.query("DELETE FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql' RETURNING *")).rows[0];

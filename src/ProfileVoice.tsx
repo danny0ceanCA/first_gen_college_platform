@@ -52,7 +52,7 @@ import {withRequestDeadline} from './requestDeadline.mjs';
 import {useConversationHistory} from './ConversationHistory';
 import {voiceTurns} from './voiceTurns.mjs';
 import {voiceErrorEndsSession,voiceReplyCanRetry} from './voiceErrors.mjs';
-import {voiceConnectionRecovery,voiceProfile} from './voiceConnection.mjs';
+import {voiceConnectionRecovery,voiceTransportProbe,voiceProfile} from './voiceConnection.mjs';
 import {voiceWakeLock,type VoiceWakeLockStatus} from './voiceWakeLock.mjs';
 import {summarySaveQueue} from './summarySaveQueue.mjs';
 import {appendConversationTurn,mergeConversationSources,recentConversationMemory} from './voiceMemory.mjs';
@@ -708,7 +708,7 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
         if(e.type==='origen.visual.research'){
           const report=e.report;
           log('research_table_received',{jobId:report?.id,updatedAt:report?.updatedAt,present:e.present===true,columnCount:report?.table?.columns?.length,rowCount:report?.table?.rows?.length});
-          if(import.meta.env.DEV&&!closing.current?.active()&&typeof report?.id==='string'&&
+          if(!closing.current?.active()&&typeof report?.id==='string'&&
             (report.language==='en'||report.language==='es')&&Number.isFinite(report.updatedAt)&&
             Array.isArray(report.table?.columns)&&Array.isArray(report.table?.rows)){
             dispatchResearchVisual({type:'receive',report:{...report,receivedAt:Date.now()},present:e.present===true});
@@ -1006,7 +1006,9 @@ export function LocalProfileVoice({onBusy,onReviewProfile,workspaceFocus,onOnboa
           if(called)turns.toolsCompleted(liveBackend);else turns.completed();
         }
       };
-      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;captureDisconnect({source:'rtc_peer_recovery_failed',dataChannelState:dc.readyState});log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));});
+      const connection=voiceConnectionRecovery(()=>{if(generation.current!==version)return;captureDisconnect({source:'rtc_peer_recovery_failed',dataChannelState:dc.readyState});log('connection_failure',{code:'connection_lost'});end();setError(informational?t('Voice disconnected. Start another conversation to reconnect.','Se desconectó la voz. Inicia otra conversación para reconectar.'):t('Voice disconnected. You can reconnect or review the suggestions collected so far.','Se desconectó la voz. Puedes reconectar o revisar las sugerencias recibidas.'));},{probe:voiceTransportProbe(pc,dc),onEvent:details=>{
+        if(generation.current===version)capture({type:'diagnostic',event:'peer_connection_recovery',details});
+      }});
       const stopPlayback=resources.current.stopConnection;resources.current.stopConnection=()=>{stopPlayback?.();connection.stop();};
       let connectedRecorded=false;
       pc.onconnectionstatechange=()=>{if(generation.current===version&&pc.connectionState==='connected'&&!usage.current.id){usage.current.id=crypto.randomUUID();usageEvent('voice_start');usage.current.timer=setInterval(()=>{if(pc.connectionState==='connected')usageEvent('voice_heartbeat');},15000);}

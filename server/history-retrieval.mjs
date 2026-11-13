@@ -24,36 +24,45 @@ const parsed=value=>`(to_tsquery('english',${value}) || to_tsquery('spanish',${v
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const empty=(reason)=>({available:false,method:RETRIEVAL_VERSION,reason,items:[]});
 const date=value=>new Date(value).toISOString();
+// Optional recall cannot occupy all five runtime connections during overlapping
+// refreshes/reconnects. No queue or cached student evidence: fall back to the
+// existing brief when busy, leaving capacity for permission and account reads.
+const activeRetrievals=new WeakMap();
 
 // Private SQL candidates always require both the account and exact student/family
 // scope. RLS is an additional boundary. Fresh source rows supply all text; there
 // is no stale derived document to resurrect after deletion or correction.
-function candidateSql(studentId,continuity){
+function candidateSql(studentId,continuity,storedSearch=false){
+ const vector=column=>storedSearch?`${column.split('.')[0]}.history_search_document`:document(column);
  const scope=alias=>studentId===null?`${alias}.student_id IS NULL`:`${alias}.student_id=$2`;
  const suppressed=summary=>`NOT EXISTS(SELECT 1 FROM origen_memory_batches b WHERE b.account_id=$1 AND b.summary_id=${summary} AND b.suppressed)`;
  const sourceScope=(alias)=>`(${alias}.source_summary_id IS NULL OR EXISTS(SELECT 1 FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=${alias}.source_summary_id AND ${scope('source')}))`;
  const sources=alias=>continuity?`coalesce((SELECT source.sources FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=${alias}.source_summary_id AND ${scope('source')} AND ${suppressed('source.id')}),'[]'::jsonb)`:`'[]'::jsonb`;
- return `WITH search AS (SELECT ${parsed('$3')} AS query,$2::text AS scope), candidates AS (
+ // Score each scoped text vector once. Without this materialization PostgreSQL
+ // can inline the expression again for every coverage term and rank calculation.
+ return `WITH search AS (SELECT ${parsed('$3')} AS query,$2::text AS scope), term_queries AS MATERIALIZED (
+  SELECT ${parsed('term')} AS query FROM unnest($4::text[]) term
+ ), candidates AS MATERIALIZED (
   SELECT 'summary'::text AS kind,s.id,s.student_id,s.summary AS content,'und'::text AS language,
    encode(sha256(convert_to(s.summary,'UTF8')),'hex') AS version,s.id AS summary_id,s.conversation_at AS recorded_at,
-   'unreviewed'::text AS status,'unknown'::text AS speaker,s.organization_reported_by AS reported_by,s.mode AS topic,${document('s.summary')} AS document,${continuity?'s.sources':"'[]'::jsonb"} AS sources,NULL::text AS note_kind,
+   'unreviewed'::text AS status,'unknown'::text AS speaker,s.organization_reported_by AS reported_by,s.mode AS topic,${vector('s.summary')} AS document,${continuity?'s.sources':"'[]'::jsonb"} AS sources,NULL::text AS note_kind,
    NULL::jsonb AS organization,NULL::text AS source_quote,NULL::text AS source_version,s.conversation_at AS source_at,false AS context_current
-  FROM origen_conversation_summaries s,search WHERE s.account_id=$1 AND ${scope('s')} AND ${suppressed('s.id')} AND ${document('s.summary')} @@ search.query
+  FROM origen_conversation_summaries s,search WHERE s.account_id=$1 AND ${scope('s')} AND ${suppressed('s.id')} AND ${vector('s.summary')} @@ search.query
   UNION ALL
   SELECT 'memory',m.id::text,m.student_id,m.content,m.language,m.version::text,m.source_summary_id,m.updated_at,
-   m.status,m.speaker,m.reported_by,m.category,${document('m.content')},${sources('m')},NULL::text,
+   m.status,m.speaker,m.reported_by,m.category,${vector('m.content')},${sources('m')},NULL::text,
    to_jsonb(m)->'organization',m.source_quote,m.source_version,m.source_at,coalesce((to_jsonb(m)->>'context_current')::boolean,false)
   FROM origen_student_memories m,search WHERE m.account_id=$1 AND ${scope('m')} AND m.status IN ('proposed','confirmed') AND ${sourceScope('m')}
-   AND (m.status='confirmed' OR coalesce((to_jsonb(m)->>'context_current')::boolean,false) OR ${suppressed('m.source_summary_id')}) AND ${document('m.content')} @@ search.query
+   AND (m.status='confirmed' OR coalesce((to_jsonb(m)->>'context_current')::boolean,false) OR ${suppressed('m.source_summary_id')}) AND ${vector('m.content')} @@ search.query
   UNION ALL
   SELECT 'note',n.id::text,n.student_id,n.content,n.language,n.version::text,n.source_summary_id,n.updated_at,
-   'saved','unknown',(SELECT source.organization_reported_by FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=n.source_summary_id AND ${scope('source')}),n.topic,${document('n.content')},${sources('n')},n.kind,
+   'saved','unknown',(SELECT source.organization_reported_by FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=n.source_summary_id AND ${scope('source')}),n.topic,${vector('n.content')},${sources('n')},n.kind,
    to_jsonb(n)->'organization',n.source_quote,NULL::text,(SELECT source.conversation_at FROM origen_conversation_summaries source WHERE source.account_id=$1 AND source.id=n.source_summary_id AND ${scope('source')}),coalesce((to_jsonb(n)->>'context_current')::boolean,false)
   FROM origen_topic_notes n,search
-  WHERE n.account_id=$1 AND ${scope('n')} AND n.status='saved' AND ${sourceScope('n')} AND (coalesce((to_jsonb(n)->>'context_current')::boolean,false) OR ${suppressed('n.source_summary_id')}) AND ${document('n.content')} @@ search.query
+  WHERE n.account_id=$1 AND ${scope('n')} AND n.status='saved' AND ${sourceScope('n')} AND (coalesce((to_jsonb(n)->>'context_current')::boolean,false) OR ${suppressed('n.source_summary_id')}) AND ${vector('n.content')} @@ search.query
  ), scored AS (
   SELECT c.*,encode(sha256(convert_to(content,'UTF8')),'hex') AS content_hash,
-   (SELECT count(*)::float FROM unnest($4::text[]) term WHERE c.document @@ ${parsed('term')}) / cardinality($4::text[]) AS coverage,
+   (SELECT count(*)::float FROM term_queries t WHERE c.document @@ t.query) / cardinality($4::text[]) AS coverage,
    ts_rank_cd(c.document,search.query,32) AS rank
   FROM candidates c,search
   WHERE NOT (c.kind||':'||c.id=ANY($5::text[])) AND (c.summary_id IS NULL OR NOT(c.summary_id=ANY($6::text[])))
@@ -89,11 +98,21 @@ function selectItems(rows,terms,continuity){
 export async function retrieveStudentHistory(database,subject,{studentId,query,excludeRefs=[],excludeSummaryIds=[],minCoverage=0.34,timeoutMs=900,continuity=false,log=runtimeLog}={}){
  if(studentId!==null&&(typeof studentId!=='string'||!studentId||studentId.length>128))throw fail(400,'memory_scope_required');
  const terms=retrievalTerms(query);if(!terms.length)return empty('no_query');if(!database)return empty('unavailable');
+ let active=activeRetrievals.get(database);if(!active){active=new Map();activeRetrievals.set(database,active);}
+ if(active.has(subject)||active.size>=2){try{log({event:'memory.retrieval.finished',retrievalStage:'admission',outcome:'deferred',durationMs:0});}catch{}return empty('busy');}
+ const admission={};active.set(subject,admission);
+ const releaseAdmission=()=>{if(active.get(subject)===admission)active.delete(subject);};
  const concepts=[...new Set(terms.map(expand))];
  const started=performance.now(),deadline=Math.max(1,Math.min(1500,timeoutMs));
  let retrievalStage='acquire',outcome='completed',code;
  try{return await databaseQueryOperation('memory.retrieve',()=>withRequestDeadline(async signal=>{
-  const c=await database.connect();let transaction=false;
+  try{
+  const c=await database.connect();let transaction=false,discarded=false;
+  // A Promise deadline alone leaves SQL/locks alive until the wire responds.
+  // Destroy this one client on expiry, including hung SQL or ROLLBACK. Never
+  // return an unknown/aborted transaction to the shared pool.
+  const discard=()=>{if(discarded)return;discarded=true;try{c.release(signal.reason||new Error('retrieval_deadline'));}finally{releaseAdmission();}};
+  signal.addEventListener('abort',discard,{once:true});
   const check=()=>{if(signal.aborted)throw signal.reason;if(performance.now()-started>=deadline)throw new DOMException('Request timed out','TimeoutError');};
   // Guard queries can wait for another account operation. Once the caller has
   // timed out, do not keep issuing guard/read queries and occupying the pool.
@@ -107,17 +126,24 @@ export async function retrieveStudentHistory(database,subject,{studentId,query,e
    const account=(await c.query('SELECT id,role FROM origen_accounts WHERE auth0_subject=$1',[subject])).rows[0];
    if(!account)throw fail(404,'account_not_found');
    check();if(studentId!==null&&!(await c.query('SELECT id FROM origen_students WHERE account_id=$1 AND id=$2',[account.id,studentId])).rows.length)throw fail(404,'student_not_found');
-   check();const ready=(await c.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql') AS ready")).rows[0]?.ready;
+   check();const readiness=(await c.query("SELECT EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='045_historical_retrieval.sql') AS ready, EXISTS(SELECT 1 FROM origen_schema_migrations WHERE name='127_history_search_documents.sql') AS stored_search_ready")).rows[0];
+   const ready=readiness?.ready;
    if(!ready){await c.query('COMMIT');transaction=false;return empty('migration_pending');}
    check();retrievalStage='search';
    // The SQL search receives only the budget left after acquisition and guards.
    // A fixed initial statement_timeout would let it run past the total deadline.
    await c.query(`SET LOCAL statement_timeout='${Math.max(1,Math.ceil(deadline-(performance.now()-started)))}ms'`);check();
-   const rows=(await c.query(candidateSql(studentId,continuity),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
+   const rows=(await c.query(candidateSql(studentId,continuity,readiness?.stored_search_ready===true),[account.id,studentId,concepts.join(' | '),concepts,excludeRefs.slice(0,250),excludeSummaryIds.slice(0,250),Math.max(0.01,Math.min(1,minCoverage))])).rows;check();
    const reportedBy=['parent','student'].includes(account.role)?account.role:'unknown';
    const items=selectItems(rows.map(row=>['note','summary'].includes(row.kind)?{...row,reported_by:binderReporter({...row,organization_reported_by:row.reported_by},reportedBy)}:row),retrievalTerms(concepts.join(' ')),continuity);check();retrievalStage='commit';await c.query('COMMIT');transaction=false;check();
    return {available:true,method:RETRIEVAL_VERSION,reason:items.length?'matched':'no_relevant_history',items};
-  }finally{if(transaction)await c.query('ROLLBACK').catch(()=>{});c.release();}
+  }finally{
+   if(signal.aborted)discard();
+   if(!discarded&&transaction)await c.query('ROLLBACK').catch(()=>{});
+   signal.removeEventListener('abort',discard);
+   if(!discarded)c.release();
+  }
+  }finally{releaseAdmission();}
  },{timeoutMs:deadline}));}
  catch(error){outcome='failed';code=safeErrorCode(error);if([400,403,404].includes(error?.status))throw error;return empty(error?.name==='TimeoutError'||error?.name==='AbortError'||error?.code==='57014'?'deadline':'unavailable');}
  finally{try{log({event:'memory.retrieval.finished',retrievalStage,outcome,code,durationMs:performance.now()-started});}catch{/* Diagnostics cannot affect retrieval. */}}

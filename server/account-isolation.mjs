@@ -87,7 +87,7 @@ export function isolateDatabase(pool,{schema='public'}={}){
     try{const result=await raw.query(sql,values);await client.query('COMMIT');return result;}
     catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}
    },
-   release(){if(released)return;released=true;raw.release(active?new Error('unfinished_account_transaction'):undefined);},
+   release(error){if(released)return;released=true;raw.release(error||(active?new Error('unfinished_account_transaction'):undefined));},
   };
   return client;
  }
