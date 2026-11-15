@@ -1,5 +1,12 @@
 # Isolated published-cost staging
 
+## CSU production publication — November 14, 2026
+
+See [CSU production catalog and comparisons](CSU_PRODUCTION_RELEASE_2026_11_14.md).
+The selected 583 reconciled records across 23 CSU campus/location labels are
+published with source caveats; 236 unresolved records remain held. UC and CSU
+publications coexist. The original staging results below are historical.
+
 ## CSU workbook staging (November 12, 2026)
 
 `import_csu_workbook.py` imports the supplied CSU v1 workbook into a separate

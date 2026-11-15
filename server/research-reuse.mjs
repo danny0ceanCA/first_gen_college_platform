@@ -8,12 +8,15 @@ import {costHousingScenario} from './voice-housing-scope.mjs';
 import {createResearchTask,auditResearchTask} from '../src/researchTask.mjs';
 import {researchSourceAllowed as official} from './research-source-policy.mjs';
 import {sourceIsCurrent,sameResearchSource} from '../src/researchSourceValidity.mjs';
+import {costCampusName} from '../src/campusIdentity.mjs';
+import {findingSubjectMentioned} from '../src/researchFindings.mjs';
 
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[–—]/gu,'-');
-const campus=value=>fold(value).replace(/university of california|universidad de california/gu,'uc').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const campus=value=>fold(costCampusName(value)||value).replace(/university of california|universidad de california/gu,'uc').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const campuses=value=>String(value||'').split(/\s+(?:and|versus|vs\.?|y|contra)\s+|;/iu).map(s=>s.trim()).filter(Boolean);
 const subjectCampus=value=>campus(String(value||'').replace(/(?:university of california|universidad de california)\s*,\s*/iu,'UC ').split(/\s+[—–]\s+|\s+-\s+|[,(:]/u)[0]);
 const mentionsCampus=(text,name)=>{
+ if(costCampusName(name))return findingSubjectMentioned(name,text);
  const normalized=' '+campus(text)+' ',key=campus(name),alias=key.startsWith('uc ')?'uc'+key.slice(3).split(' ').map(part=>part[0]).join(''):'';
  return normalized.includes(' '+key+' ')||!!alias&&normalized.includes(' '+alias+' ');
 };

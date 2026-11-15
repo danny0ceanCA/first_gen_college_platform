@@ -12,8 +12,10 @@ export async function createProductionCatalogProvider(env,{Pool=pg.Pool}={}){
  try{
   const identity=(await pool.query("SELECT current_user AS role, current_setting('transaction_read_only') AS readonly")).rows[0];
   if(identity.role!=='origen_research_worker'||identity.readonly!=='on')throw Error('readonly_catalog_worker_required');
-  const readiness=(await pool.query('SELECT count(*)::int AS records FROM coa_catalog.production_published')).rows[0];
-  if(!readiness.records)throw Error('published_catalog_required');
+  // Readiness needs one published row, not a full scan and count of every
+  // campus release on the small production database.
+  const readiness=(await pool.query('SELECT 1 AS available FROM coa_catalog.production_published LIMIT 1')).rows[0];
+  if(!readiness?.available)throw Error('published_catalog_required');
  }catch(error){await pool.end();throw error;}
  return {lookup:createLocalCostLookup({query:pool.query.bind(pool),publication:'production'}),close:()=>pool.end()};
 }

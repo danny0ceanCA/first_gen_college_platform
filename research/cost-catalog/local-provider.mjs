@@ -5,7 +5,7 @@ import {researchTaskEntities} from '../../src/researchTask.mjs';
 import {requestedResearchAspects} from '../../src/researchQuestion.mjs';
 import {mergeComparisonAddition,retainVerifiedResearch} from '../../server/research-reuse.mjs';
 import {costCampusName} from './campus.mjs';
-import {residentCategories,cohortYear,sourceHousing,campusHousingRequest} from './scope.mjs';
+import {residentCategories,cohortYear,sourceHousing,campusHousingRequest,generalUndergraduatePrograms,standardUndergraduateRecord} from './scope.mjs';
 import {requestsCoa} from '../../server/coa-evidence.mjs';
 const fold=s=>String(s||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[-–]/gu,' ');
 const canonical=costCampusName;
@@ -26,7 +26,7 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
   const question=String(input.question||''),q=fold(question),language=input.language==='es'?'es':'en';
   if(!['finance','loans'].includes(input.mode)||input.forceRefresh||input.comparisonPlan||
    !/\b(?:cost of attendance|coa|costs?|tuition|fees|costo|costos|matricula|presupuesto)\b/u.test(q)||
-   /\b(?:eligib\w*|awards?|beca|scholarship|grant|aid offer|financial aid|ayuda financiera|graduate|masters?|doctoral|posgrado|maestria|doctorado)\b/u.test(q))return defer('request_outside_catalog');
+   /\b(?:eligib\w*|awards?|beca|scholarship|grant|aid offer|financial aid|ayuda financiera|graduate|masters?|doctoral|posgrado|maestria|doctorado|part time|tiempo parcial)\b/u.test(q))return defer('request_outside_catalog');
   const campuses=researchTaskEntities(input.visualComparisonCampus|| (input.lookupInstitutions?.length?input.lookupInstitutions:input.institution)).map(canonical);
   if(!campuses.length||campuses.some(c=>!c))return defer('campus_unmatched');
   const campusHousing=campusHousingRequest(question);
@@ -49,34 +49,38 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
   const residencyKnown=/\b(?:california resident|resident of california|residente (?:de |en )?california|nonresident|non resident|out of state|no residente)\b/u.test(q);
   const conditions=['campus=ANY($1::text[])'],params=[[...new Set(campuses)]];
   params.push(residentCategories(residency));conditions.push(`payload->'raw'->>'Residency'=ANY($${params.length}::text[])`);
-  conditions.push("payload->'raw'->>'Student level'='Undergraduate'","payload->'raw'->>'Program / degree'='General undergraduate'","coalesce(payload->'raw'->>'Dependent children','') IN ('','0')");
+  conditions.push("payload->'raw'->>'Student level'='Undergraduate'","coalesce(payload->'raw'->>'Dependent children','') IN ('','0')");
+  params.push(generalUndergraduatePrograms);conditions.push(`payload->'raw'->>'Program / degree'=ANY($${params.length}::text[])`);
   if(year.length){params.push(year[0]);conditions.push(`academic_year=$${params.length}`);}
   const rows=(await query('SELECT * FROM coa_catalog.'+view+' WHERE '+conditions.join(' AND '),params)).rows;
   const selected=[];
   for(const campus of [...new Set(campuses)])for(const scenario of scenarios){
-   let choices=rows.filter(r=>r.campus===campus&&r.payload.raw['Student level']==='Undergraduate'&&r.payload.raw['Program / degree']==='General undergraduate'&&residentCategories(residency).includes(r.payload.raw.Residency)&&
-    !String(r.payload.raw['Dependent children']||'').trim()&&sourceHousing(r)===scenario);
+   const eligible=rows.filter(r=>r.campus===campus&&standardUndergraduateRecord(r)&&residentCategories(residency).includes(r.payload.raw.Residency));
+   let choices=eligible.filter(r=>sourceHousing(r)===scenario);
    // A source's general 'off campus' figure may be useful as a benchmark for
    // rent only when it is expressly labelled; no replacement of personal facts.
    let housingBenchmark=false;
    if(!choices.length&&scenario==='renting'){
-    choices=rows.filter(r=>r.campus===campus&&r.payload.raw['Student level']==='Undergraduate'&&r.payload.raw['Program / degree']==='General undergraduate'&&residentCategories(residency).includes(r.payload.raw.Residency)&&!String(r.payload.raw['Dependent children']||'').trim()&&r.payload.normalized.housing==='off_campus_unspecified');
+    choices=eligible.filter(r=>r.payload.normalized.housing==='off_campus_unspecified');
     housingBenchmark=choices.length>0;
    }
    let commuterBenchmark=false;
-   if(!choices.length&&scenario==='with_family'){choices=rows.filter(r=>r.campus===campus&&!String(r.payload.raw['Dependent children']||'').trim()&&sourceHousing(r)==='commuter_unspecified');commuterBenchmark=choices.length>0;}
+   if(!choices.length&&scenario==='with_family'){choices=eligible.filter(r=>sourceHousing(r)==='commuter_unspecified');commuterBenchmark=choices.length>0;}
    if(!year.length&&choices.length){const newest=choices.map(r=>r.academic_year).sort().at(-1);choices=choices.filter(r=>r.academic_year===newest);}
    if(cohort)choices=choices.filter(r=>cohortYear(r.payload.raw['Normalized cohort key'])===Number(cohort[1]));
    else if(choices.length){const years=choices.map(r=>cohortYear(r.payload.raw['Normalized cohort key']));if(years.every(y=>y!==null)){const newest=Math.max(...years);choices=choices.filter(r=>cohortYear(r.payload.raw['Normalized cohort key'])===newest);}}
    if(scenario==='on_campus')choices=choices.filter(r=>{
     const label=r.payload.raw.Housing;
     return campusHousing?.form==='studio'?/studio|estudio/iu.test(label):campusHousing?.form==='apartment'?
-     /apartment|apartamento|departamento/iu.test(label)&&!/studio|estudio/iu.test(label):/residence hall|residencia/iu.test(label);
+     /apartment|apartamento|departamento/iu.test(label)&&!/studio|estudio/iu.test(label):/residence hall|residencia/iu.test(label)||
+     r.payload.normalized.import_contract==='csu-workbook-v1'&&/^(?:housing )?on[- ]campus(?: housing)?$|^living (?:in campus housing|in university housing|on[- ]campus)$/iu.test(label);
    });
    if(choices.length!==1)return defer(choices.length?'scope_ambiguous':'scenario_unavailable');
    const result=projectRecord(choices[0],language,{allowTesting:true});if(!result)return defer('projection_rejected');
    const es=language==='es',label=commuterBenchmark?(es?'Referencia de viajero/estudiante remoto':'Commuter/remote learner benchmark'):housingBenchmark?(es?'Referencia publicada fuera del campus':'Published off-campus benchmark'):scenario==='on_campus'&&campusHousing?.form==='apartment'?(es?'Apartamento en el campus':'On-campus apartment'):scenario==='on_campus'&&campusHousing?.form==='studio'?(es?'Apartamento estudio en el campus':'On-campus studio apartment'):{renting:['Renting off campus','Alquiler fuera del campus'],with_family:['Living with family','Vivir con familiares'],on_campus:['Residence halls','Residencias universitarias']}[scenario][es?1:0];
-   const assumptions=[commuterBenchmark?(es?'No hay categoría confirmada para vivir con familiares; se muestra la referencia de viajero/remoto. Confirma si corresponde.':'No confirmed family category; showing the published commuter/remote benchmark. Confirm applicability.'):'',!cohort?(es?'Referencia de la cohorte de ingreso; cohorte personal sin confirmar.':'Entering-cohort benchmark; personal cohort unconfirmed.'):'',!residencyKnown?(es?'Se muestra la referencia para residentes de California; residencia personal sin confirmar.':'Showing the California-resident benchmark; personal residency unconfirmed.'):'',housingBenchmark?(es?'Referencia publicada fuera del campus; no confirma el alquiler personal.':'Published off-campus benchmark; personal rental applicability unconfirmed.'):'',uncertain?(es?'Escenario de referencia; la vivienda personal aún no está confirmada.':'Scenario benchmark; the personal housing arrangement is not confirmed.'):''].filter(Boolean).join(' ');
+   const csu=choices[0].payload.normalized.import_contract==='csu-workbook-v1';
+   const enrollment=csu?choices[0].payload.raw.Enrollment:'';
+   const assumptions=[commuterBenchmark?(es?'No hay categoría confirmada para vivir con familiares; se muestra la referencia de viajero/remoto. Confirma si corresponde.':'No confirmed family category; showing the published commuter/remote benchmark. Confirm applicability.'):'',!cohort&&(!csu||cohortYear(choices[0].payload.raw['Normalized cohort key'])!==null)?(es?'Referencia de la cohorte de ingreso; cohorte personal sin confirmar.':'Entering-cohort benchmark; personal cohort unconfirmed.'):'',!residencyKnown?(es?'Se muestra la referencia para residentes de California; residencia personal sin confirmar.':'Showing the California-resident benchmark; personal residency unconfirmed.'):'',housingBenchmark?(es?'Referencia publicada fuera del campus; no confirma el alquiler personal.':'Published off-campus benchmark; personal rental applicability unconfirmed.'):'',uncertain?(es?'Escenario de referencia; la vivienda personal aún no está confirmada.':'Scenario benchmark; the personal housing arrangement is not confirmed.'):'',enrollment?(es?'Matrícula de referencia (texto de la fuente): '+enrollment+'.':'Published enrollment benchmark: '+enrollment+'.'):''].filter(Boolean).join(' ');
    result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,subject:campus+' — '+label}));
    if(assumptions){
     result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,qualification:f.qualification+' '+assumptions}));
