@@ -1,4 +1,4 @@
-import {validatedBudget} from './publishedBudget.mjs';
+import {validatedBudget,catalogEstimateSources} from './publishedBudget.mjs';
 import {validatedResearchRecord} from './researchRecord.mjs';
 import {costCampusName,mentionedCampuses} from './campusIdentity.mjs';
 // Small, source-linked units of a research result. These are reference data,
@@ -16,6 +16,7 @@ export function validatedResearchFindings(result={}){
    if(sourceIds.some(id=>!sources.has(id))||(f.status!=='unverified'&&!sourceIds.length))return [];
    const budget=f.budget&&validatedBudget(f.budget,sources);
    if(f.budget&&!budget)return [];
+   if(budget?.catalogEstimate&&!catalogEstimateSources(result.sources,budget.sourceCitation))return [];
    const evidence=f.evidence&&validatedResearchRecord(f.evidence,sources);
    if(f.evidence&&(!evidence||budget))return [];
    return [{subject:f.subject,aspect:f.aspect,status:f.status,answer:f.answer,qualification:f.qualification,sourceIds,...(budget?{budget}:{}),...(evidence?{evidence}:{})}];

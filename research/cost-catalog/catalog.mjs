@@ -7,6 +7,7 @@ import {sourceHousing} from './scope.mjs';
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const aliases={'berkeley':'UC Berkeley','uc berkeley':'UC Berkeley','davis':'UC Davis','uc davis':'UC Davis','merced':'UC Merced','uc merced':'UC Merced','ucla':'UCLA','uc los angeles':'UCLA','irvine':'UC Irvine','uc irvine':'UC Irvine','riverside':'UC Riverside','uc riverside':'UC Riverside','uc santa cruz':'UC Santa Cruz','uc san francisco':'UC San Francisco','uc santa barbara':'UC Santa Barbara','uc san diego':'UC San Diego'};
 const keys={'Tuition and mandatory fees':'tuition_fees','Tuition':'tuition_fees','Mandatory fees':'tuition_fees','Systemwide fees':'tuition_fees','Campus fees':'tuition_fees','Student services fee':'tuition_fees','Nonresident supplemental tuition':'tuition_fees','Housing':'housing','Food':'food','Housing and food':'housing_and_food','Housing and food combined':'housing_and_food','Combined living expenses':'housing_and_food','Books and supplies':'books','Transportation':'transportation','Personal expenses':'personal','Health insurance':'health_insurance','Document fee':'document_fee','Other expenses':'other_expenses','Loan fees':'other_expenses','Telephone':'other_expenses','Utilities':'other_expenses','One-time fees':'other_expenses'};
+export const catalogCostKey=category=>keys[category];
 const fields={studentLevel:'Student level',program:'Program / degree',cohort:'Normalized cohort key',residency:'Residency',enrollment:'Enrollment',housingLabel:'Housing',dependentChildren:'Dependent children',feeResidency:'Fee residency',coverageMonths:'Coverage months'};
 export function scopeMatch(record,scope){
  const raw=record.payload.raw;
@@ -18,14 +19,20 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
  const {raw,normalized,items}=record.payload,es=language==='es',groups=new Map(),production=record.caveated_publication===true,testing=allowTesting&&(record.test_publication===true||production);
  if(!testing&&(record.bucket!=='reconciled'||record.flagged||record.published_cents===null||/source conflict/i.test(raw['Scope and exclusions']||'')))return null;
  if(record.bucket==='invalid')return null;
- const urls=[...new Set([raw['Official source URL'],...items.flatMap(i=>[i.raw['Source override URL'],i.raw['Verification URL']])].filter(Boolean))];
+ const correction=record.payload.csuCorrection,projection=correction?.version===1?record.payload.catalogProjection||{}:{};
+ const estimate=testing&&record.payload.catalogEstimate?.version===1?record.payload.catalogEstimate:undefined;
+ const urls=[...new Set([raw['Official source URL'],...items.flatMap(i=>[i.raw['Source override URL'],i.raw['Verification URL']]),...(correction?.sources||[]).map(s=>s.url)].filter(Boolean))];
  for(const item of items){
   // Additional charges can be mutually exclusive alternatives. Keep each in
   // the detailed report; never sum them into an invented extra-charge amount.
   if(item.role!=='Included component')continue;
-  const key=keys[item.raw.Category]||(testing?'other_expenses':null);if(!key||!testing&&item.amount===null)return null;
+  if(projection.omittedZeroItemKeys?.includes(item.key)||estimate?.omittedZeroItemKeys?.includes(item.key)){
+   if(item.amount!==0)return null; // A stale amendment must never hide a charge.
+   continue;
+  }
+  const key=keys[projection.categoryOverrides?.[item.key]||item.raw.Category]||(testing?'other_expenses':null);if(!key||!testing&&item.amount===null)return null;
   const role=item.role==='Included component'?'component':'additional',identity=key+':'+role;
-  const group=groups.get(identity)||{key,role,cents:0,labels:[],notes:[],missing:false};group.cents+=Number(item.amount);group.missing||=item.amount===null;group.labels.push(item.raw['Original source label']);
+  const group=groups.get(identity)||{key,role,cents:0,known:0,labels:[],notes:[],missing:false};group.cents+=Number(item.amount);group.known+=item.amount===null?0:1;group.missing||=item.amount===null;group.labels.push(item.raw['Original source label']);
   if(item.raw['Conditions / notes'])group.notes.push(item.raw['Conditions / notes']);
   const url=item.raw['Verification URL']||item.raw['Source override URL'];if(url)group.notes.push(`[${urls.indexOf(url)+1}]`);
   groups.set(identity,group);
@@ -36,16 +43,22 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
  if(new Set(values.map(v=>v.key)).size!==values.length)return null;
  const classifiedHousing=sourceHousing(record);
  const unknownHousing=['unknown','commuter_unspecified','off_campus_unspecified'].includes(classifiedHousing);
- const budget={year:raw['Academic year'],population:[...new Set([raw['Student level'],raw['Program / degree'],raw['Residency'],raw['Entering cohort / applies to']].filter(Boolean))].join('; '),currency:raw.Currency,period:'academic_year',housing:testing&&unknownHousing?(classifiedHousing==='off_campus_unspecified'?'off_campus':'unspecified'):classifiedHousing,assumed:false,total:record.published_cents===null?null:Number(record.published_cents)/100,sourceCitation:urls.map((_,i)=>`[${i+1}]`).join(' '),complete:!values.some(v=>v.missing),
-  expectedCategories:values.filter(v=>v.role==='component').map(v=>v.key),components:values.map(v=>({key:v.key,role:v.missing?'missing':v.role,amount:v.missing?null:v.cents/100,sourceLabel:testing&&[...new Set(v.labels)].join('; ').length>120?v.key:[...new Set(v.labels)].join('; '),qualification:testing&&[...new Set(v.notes)].join(' ').length>300?(es?'Condiciones completas en los detalles de la fuente.':'Complete conditions in the source details.'):[...new Set(v.notes)].join(' ')}))};
+ const estimateLabels={'Nonresident supplemental tuition':es?'Matrícula de no residentes':'Nonresident tuition','Mandatory fees':es?'Cuotas obligatorias':'Mandatory fees'};
+ const catalogEstimate=estimate?{version:1,basis:estimate.basis,amount:estimate.amount,unresolved:estimate.unresolved.map(u=>({key:u.key,label:estimateLabels[u.category]||u.label,rate:u.rate,unit:u.unit,qualification:u.qualification}))}:undefined;
+ const population=[...new Set([raw['Student level'],raw['Program / degree'],raw['Residency'],raw['Entering cohort / applies to']].filter(Boolean))].join('; ');
+ const budget={year:raw['Academic year'],population:projection.population||(estimate&&population.length>160?[raw['Student level'],raw['Program / degree'],raw.Residency].filter(Boolean).join('; '):population),currency:raw.Currency,period:'academic_year',housing:testing&&unknownHousing?(classifiedHousing==='off_campus_unspecified'?'off_campus':'unspecified'):classifiedHousing,assumed:false,total:record.published_cents===null?null:Number(record.published_cents)/100,sourceCitation:urls.map((_,i)=>`[${i+1}]`).join(' '),complete:!values.some(v=>v.missing),
+  ...(catalogEstimate?{catalogEstimate}:{}),expectedCategories:values.filter(v=>v.role==='component').map(v=>v.key),components:values.map(v=>({key:v.key,role:v.missing&&(!estimate||!v.known)?'missing':v.role,amount:v.missing&&(!estimate||!v.known)?null:v.cents/100,sourceLabel:testing&&[...new Set(v.labels)].join('; ').length>120?v.key:[...new Set(v.labels)].join('; '),qualification:estimate&&v.missing?(es?'Parte conocida; no incluye los cargos pendientes.':'Known portion; unresolved charges are not included.'):testing&&[...new Set(v.notes)].join(' ').length>300?(es?'Condiciones completas en los detalles de la fuente.':'Complete conditions in the source details.'):[...new Set(v.notes)].join(' ')}))};
  if(raw['Budget period']!=='Academic year'||!validatedBudget(budget,new Set(urls.map((_,i)=>i+1)))||!testing&&!budgetAudit(budget).complete)return null;
  const coverage=raw['Coverage months']?(es?`Cubre ${raw['Coverage months']} meses.`:`Covers ${raw['Coverage months']} months.`):'';
  const testConditions=[production?(es?'Datos del catálogo publicado; los campos con limitaciones conservan sus advertencias. No es una factura.':'Published catalog data; fields with limitations retain their qualifications. Not a bill.'):es?'Datos del archivo para pruebas locales; la revisión oficial no confirma todos los campos. No es una factura.':'Workbook data for local testing; official rechecking has not confirmed every field. Not a bill.',
-  record.bucket==='derived'?(es?'No hay total publicado; no se presenta la suma calculada como total oficial.':'No published total; a calculated sum is not presented as an official total.'):'',
+  record.bucket==='derived'&&!estimate?(es?'No hay total publicado; no se presenta la suma calculada como total oficial.':'No published total; a calculated sum is not presented as an official total.'):'',
   record.bucket==='discrepancy'?(es?'El total publicado y sus componentes no coinciden.':'The published total and its components do not reconcile.'):'',
   unknownHousing?(es?'La modalidad de vivienda de la fuente no está resuelta.':'The source housing classification remains unresolved.'):'',
   /source conflict/i.test(raw['Scope and exclusions']||'')?(es?'Persiste un conflicto de alcance en la fuente.':'A source scope conflict remains.'):''];
- const qualification=(testing?[...testConditions,coverage]:[es?'Estimación publicada antes de ayuda; no es una factura personal.':'Published estimate before aid; not a personal bill.',coverage,raw['Summer treatment'],raw['Scope and exclusions']]).filter(Boolean).join(' ')+' '+budget.sourceCitation;
+ const rateUnit=unit=>({'Semester credit unit':es?'unidad semestral':'semester unit','Quarter credit unit':es?'unidad trimestral':'quarter unit'}[unit]||unit||(es?'unidad indicada por la fuente':'source unit'));
+ const estimateNote=estimate?.basis==='calculated'?(es?'Suma calculada de los costos registrados para este escenario; no es un total publicado por la universidad.':'Calculated from the listed costs for this scenario; not a university-published total.'):
+  estimate?.basis==='partial'?(es?'Estimación parcial. Sin incluir: ':'Partial estimate. Not included: ')+catalogEstimate.unresolved.map(u=>u.label+(u.rate===null?(es?' (importe pendiente)':' (amount unknown)'):` (USD $${u.rate}/${rateUnit(u.unit)}; ${es?'cantidad anual sin confirmar':'annual quantity unconfirmed'})`)).join('; ')+'.':'';
+ const qualification=(testing?[...testConditions,estimateNote,coverage,correction?.note?.[es?'es':'en']]:[es?'Estimación publicada antes de ayuda; no es una factura personal.':'Published estimate before aid; not a personal bill.',coverage,raw['Summer treatment'],raw['Scope and exclusions'],correction?.note?.[es?'es':'en']]).filter(Boolean).join(' ')+' '+budget.sourceCitation;
  const full={subject:record.campus,aspect:'total_budget',status:testing?'partial':'verified',...budgetFinding(budget,qualification,language),budget};
  const question=es?'¿Cuál es el costo total de asistencia?':'What is the total cost of attendance?';
  const finding={...full,answer:researchSpokenFinding(full,{question,language}).answer};
@@ -56,18 +69,23 @@ export function projectRecord(record,language='en',{allowTesting=false,now=Date.
  if(validUntil&&Date.parse(validUntil)<=now)return null;
  const sources=urls.map(url=>{
   const item=items.find(i=>(i.raw['Verification URL']||i.raw['Source override URL'])===url);
-  const sourceCheckedAt=testing&&item?sourceDate(item.raw['Verification checked']||item.raw['Item source checked']||raw['Source checked']):checkedAt;
+  const reviewedSource=correction?.sources?.find(s=>s.url===url);
+  const sourceCheckedAt=reviewedSource?sourceDate(reviewedSource.checkedAt):testing&&item?sourceDate(item.raw['Verification checked']||item.raw['Item source checked']||raw['Source checked']):checkedAt;
   const catalogValidity=sourceCheckedAt&&/^[a-f0-9]{64}$/u.test(record.batch_id||'')&&/^[a-f0-9]{64}$/u.test(record.record_digest||'')&&validUntil?{
    version:1,kind:production?'published_catalog':testing?'local_testing_catalog':'reviewed_catalog',batchId:record.batch_id,recordId:record.budget_key,recordDigest:record.record_digest,
-   sourceUrl:url,sourceCheckedAt,reviewedAt,retrievedAt,validUntil,reviewBasis:testing?'workbook_reported':'independent_review',
+   sourceUrl:url,sourceCheckedAt,reviewedAt,retrievedAt,validUntil,reviewBasis:reviewedSource?'independent_review':testing?'workbook_reported':'independent_review',
   }:null;
   return {url,title:record.campus+' published cost source',checkedAt:sourceCheckedAt,...(catalogValidity?{catalogValidity}:{})};
  });
- const additional=items.filter(i=>i.role==='Additional (outside total)').map(i=>`${i.raw['Original source label']}: USD ${i.amount/100}. ${i.raw['Conditions / notes']||''}`).join('\n');
+ const additional=items.filter(i=>i.role==='Additional (outside total)').map(i=>`${i.raw['Original source label']}: ${i.amount===null?'Amount unavailable':'USD '+i.amount/100}. ${i.raw['Conditions / notes']||''}`).join('\n');
  const parsed=parseResearchBrief({text:JSON.stringify({brief:{status:testing?'partial':'verified',answer:finding.answer,qualification,nextStep:'',findings:[finding]},report:full.answer+' '+qualification}),sources,checkedAt:retrievedAt},language);
  if(testing&&parsed){
   const review=record.review_evidence?.reviewNotes?.find(note=>note.values?.['Budget ID']===record.budget_key)?.values;
-  parsed.catalogAdditionalDetails=[raw['Scope and exclusions'],raw['Summer treatment'],review?JSON.stringify(review):'',...items.map(item=>`${item.raw['Original source label']}: ${item.amount===null?'Amount unavailable':'USD '+item.amount/100}. ${item.raw['Conditions / notes']||''}`)].filter(Boolean).join('\n');
+  const scope=correction?[
+   correction.note[es?'es':'en'],
+   'Full source scope: '+[raw['Student level'],raw['Program / degree'],raw.Residency,raw['Entering cohort / applies to'],raw.Housing,raw.Enrollment].filter(Boolean).join('; '),
+  ].join('\n'):raw['Scope and exclusions'];
+  parsed.catalogAdditionalDetails=[scope,raw['Summer treatment'],review?JSON.stringify(review):'',...items.map(item=>`${item.raw['Original source label']}: ${item.amount===null?'Amount unavailable':'USD '+item.amount/100}. ${item.raw['Conditions / notes']||''}`)].filter(Boolean).join('\n');
   parsed.text+=(production?'\nPublished catalog source details:\n':'\nWorkbook source details (local testing only):\n')+parsed.catalogAdditionalDetails;
  }
  // The shared parser rebuilds its canonical budget report. Retain non-additive

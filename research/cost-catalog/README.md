@@ -1,5 +1,13 @@
 # Isolated published-cost staging
 
+## Calculated and partial estimates — local only, November 15, 2026
+
+See [calculated totals and partial estimates](CSU_ESTIMATES_LOCAL_2026_11_15.md).
+The isolated selection contains 776 CSU scenarios: 607 previously selected
+budgets, 44 explicitly calculated estimates, and 125 partial estimates with all
+unknown charges preserved. The 43 disputed scenarios remain held. All 491 UC
+records are preserved. Production and the running microphone app are unchanged.
+
 ## CSU production publication — November 14, 2026
 
 See [CSU production catalog and comparisons](CSU_PRODUCTION_RELEASE_2026_11_14.md).

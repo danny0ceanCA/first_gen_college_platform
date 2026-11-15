@@ -1,5 +1,5 @@
 import {researchRecordSchema,validatedResearchRecord,researchRecordFinding} from '../src/researchRecord.mjs';
-import {publishedBudgetSchema,validatedBudget,budgetFinding} from '../src/publishedBudget.mjs';
+import {publishedBudgetSchema,validatedBudget,budgetFinding,catalogEstimateSources} from '../src/publishedBudget.mjs';
 import {researchBriefSelection} from '../src/researchBrief.mjs';
 import {researchAspects,findingSubjectMentioned,researchSubjectIdentity} from '../src/researchFindings.mjs';
 import {requestedResearchAspects} from '../src/researchQuestion.mjs';
@@ -51,6 +51,7 @@ export function parseResearchBrief(result,language='en'){
   }
   if(!f.budget)return f;
   const ids=new Set((result.sources||[]).map((source,index)=>source.id??index+1));
+  if(f.budget.catalogEstimate&&!catalogEstimateSources(result.sources,f.budget.sourceCitation)){rejectedBudgetCount++;return unavailable(f);}
   const budget=f.aspect==='total_budget'&&validatedBudget(f.budget,ids);
   if(!budget){rejectedBudgetCount++;return unavailable(f);}
   const normalized=budgetFinding(budget,f.qualification,language);

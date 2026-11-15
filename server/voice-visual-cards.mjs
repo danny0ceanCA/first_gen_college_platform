@@ -90,7 +90,8 @@ export function voiceVisualCards({emit,now=Date.now}){
    hasCoaBreakdown(finding)&&(finding.budget?.housing==='renting'&&finding.budget.assumed||costHousingScenario(finding.subject+' '+finding.answer)==='renting'&&
    /\b(?:benchmark|referencia)\b/iu.test(finding.qualification)&&
    /\b(?:unconfirmed|not confirmed|assumed|sin confirmar|no confirmad[oa]|supuest[oa])\b/iu.test(finding.qualification)));
-  const catalogBudgets=job.result?.catalogLocalTesting?validatedResearchFindings(job.result).flatMap(f=>f.budget?[f.budget]:[]):[];
+  const catalogResult=job.result?.catalogLocalTesting||job.result?.catalogPublication==='production';
+  const catalogBudgets=catalogResult?validatedResearchFindings(job.result).flatMap(f=>f.budget?[f.budget]:[]):[];
   const scopeNote=catalogBudgets.some(b=>b.housing==='unspecified')?
    (job.query.language==='es'?'Referencia de viajero/remoto; falta confirmar si corresponde a vivir con familiares.':'Commuter/remote benchmark; applicability to living with family is unconfirmed.'):
    catalogBudgets.some(b=>b.housing==='off_campus')?
@@ -104,7 +105,7 @@ export function voiceVisualCards({emit,now=Date.now}){
    // Catalog columns already carry their own published housing category and
    // qualifications. A requested personal scenario must not hide a labelled
    // source benchmark (generic off-campus or commuter), or relabel it as fact.
-   housingScenario:job.result?.catalogLocalTesting?undefined:job.query.confirmedHousingChoice||(rentalBenchmark?'renting':housing),
+   housingScenario:catalogResult?undefined:job.query.confirmedHousingChoice||(rentalBenchmark?'renting':housing),
    ...(scopeNote?{scopeNote}:{}),
    ...(job.query.confirmedHousingChoice?{confirmedHousingChoice:job.query.confirmedHousingChoice}:{}),
    ...(job.query.visualComparisonBaseId&&!job.query.visualComparisonCampus?{compareHousing:true}:{}),

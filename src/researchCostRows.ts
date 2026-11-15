@@ -147,14 +147,16 @@ export function researchCostRows<Cell extends CostCell>(inputRows:EvidenceRow<Ce
     const compatible=!housingScenario||columnCount>1||housingScenario===structured.housing||housingScenario==='off_campus'&&['off_campus','renting','with_family'].includes(structured.housing);
     if(!compatible||cell.status==='unverified'||!cell.sources?.length)return null;
     const component=structured.components.find((entry:{key:string;role:string})=>entry.key===id&&entry.role==='component');
-    let amount=id==='total_budget'?structured.total:component?.amount;
+    let amount=id==='total_budget'?(structured.catalogEstimate?.amount??structured.total):component?.amount;
     if(id==='tuition_fees'&&amount==null){
      const system=structured.components.find((entry:{key:string;role:string})=>entry.key==='systemwide_fees'&&entry.role==='component');
      const campus=structured.components.find((entry:{key:string;role:string})=>entry.key==='campus_fees'&&entry.role==='component');
      if(system?.amount!=null&&campus?.amount!=null)amount=system.amount+campus.amount;
     }
     if(amount==null)return null;
-    return {value:new Intl.NumberFormat('en-US',{style:'currency',currency:structured.currency,minimumFractionDigits:0,maximumFractionDigits:2}).format(amount),evidence:cell,feeScheduleOnly:false,included:false};
+    return {value:new Intl.NumberFormat('en-US',{style:'currency',currency:structured.currency,minimumFractionDigits:0,maximumFractionDigits:2}).format(amount),evidence:cell,feeScheduleOnly:false,included:false,
+     ...(id==='total_budget'&&structured.catalogEstimate?{estimateBasis:structured.catalogEstimate.basis}:{}),
+     ...(structured.catalogEstimate?.unresolved.some(u=>u.key===id)?{knownPortion:true}:{})};
    }
    const cell=evidence?.[index];
    const totalCell=budget?.[index];

@@ -1,6 +1,6 @@
 // Match source categories without inventing a student's eligibility or plan.
 export function residentCategories(residency){
- return residency==='California resident'?['California resident','California resident / AB540 eligible','CA Resident']:
+ return residency==='WUE'?['WUE']:residency==='California resident'?['California resident','California resident / AB540 eligible','CA Resident']:
   ['Nonresident','Non-California resident','Non California Resident','Non-California Resident','Nonresident (U.S. and foreign)'];
 }
 export const generalUndergraduatePrograms=['General undergraduate','General Undergraduate','General','Undergraduate','Standard Undergraduate',

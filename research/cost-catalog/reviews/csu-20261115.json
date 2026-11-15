@@ -1,0 +1,687 @@
+{
+  "version": 1,
+  "kind": "independently_reviewed_csu_corrections",
+  "baseBatchId": "cf0fe03601395617ac6a73981dd338058ba9244b51a2825ce7b14fa508d3d84a",
+  "sourceSha256": "510fccfb400b5a8666ff485ad8dd8bdaedf62b31608af1a23e6757123271fdb4",
+  "candidateSha256": "2d78359d0245f0eeda4ea134d019025f904d949adeb451179efeda843c939993",
+  "reviewedAt": "2026-11-15T18:33:46.386Z",
+  "sources": [
+    {
+      "id": "calpoly",
+      "url": "https://www.calpoly.edu/financial-aid/costs-and-affordability/undergraduate-costs-attendance-2026-2027",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:20.846107+00:00",
+      "method": "official_https_download",
+      "sha256": "f26705cc881c4f89199d990ee6e3c14035e41dc736a574e927a22fe7470b5cd9",
+      "finding": "SLO program/cohort/housing tables: 2026/2025 science-math-business-liberal-arts tuition 14682; 2021-or-earlier engineering/architecture/agriculture tuition 12138. Scoped totals and every included line checked."
+    },
+    {
+      "id": "pomona",
+      "url": "https://www.cpp.edu/financial-aid/undergraduate/prospective/cost.shtml",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:20.922853+00:00",
+      "method": "official_https_download",
+      "sha256": "530fb3bd3dcb8c00c00295a87803b903b997c4511063b78c1c7b56c796d61d54",
+      "finding": "2026-27 WUE columns: tuition10257, campus1728, food10670/5600/7863, housing0/11310/12563. Food-and-housing heading is followed by separate housing; its amounts equal the resident food row. All remaining categories and totals29243/34751/40421 reconcile."
+    },
+    {
+      "id": "sfsu",
+      "url": "https://www.sfsu.edu/departments/financial-aid/cost-attendance",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:33:46.386Z",
+      "method": "official_web_retrieval",
+      "finding": "2026-27 undergraduate living-at-home table: tuition6838, mandatory1982, combined living11826, books1100, transportation1836, personal4092, loan62; total27736. Housing is included in food, not an extra zero housing allowance. Verified with web retrieval after direct HTTP403."
+    },
+    {
+      "id": "sjsu",
+      "url": "https://www.sjsu.edu/faso/process/cost-of-attendance.php",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:33:46.386Z",
+      "method": "official_web_retrieval",
+      "finding": "2026-27 with-parent undergraduate/graduate/credential tuition9553/10944/10334; combined living11461, source food0*, transportation1976, books1004, personal3244, IRA245. Totals27483/28874/28264. Footnote says food and housing combined. Verified with web retrieval after direct TLS failure."
+    },
+    {
+      "id": "humboldt",
+      "url": "https://www.humboldt.edu/sites/default/files/financial-aid/2026-11/2027-coa.pdf",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:22.324297+00:00",
+      "method": "official_https_download",
+      "sha256": "d77493f8cb40e70801bde47ddb5872649cdd8a40f4424daf5fc8db0e47a1b20c",
+      "finding": "Credential Candidates section: source fee10930 conflicts with totals28774/30994/32156. Books934, combined living12536/14756/15918, personal2966, transportation1948. PDF layout and matching populations checked."
+    },
+    {
+      "id": "fall",
+      "url": "https://www.humboldt.edu/student-financial-services/fall-term-2026",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:21.777615+00:00",
+      "method": "official_https_download",
+      "sha256": "3bf21eb6c08c39124357d0bc2212674f68ce0608159072fdbc6318155d2a1ab8",
+      "finding": "Teaching Credential 6.1+ units: tuition3969 plus mandatory180+337+68+188+35+418 =5195 excluding optionalSIRF2."
+    },
+    {
+      "id": "spring",
+      "url": "https://www.humboldt.edu/student-financial-services/spring-term-2027",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:21.822686+00:00",
+      "method": "official_https_download",
+      "sha256": "150c7dc9806e83a2ac8cf855186c8be17a9e5f10957c6372ce8a4c33536a39c2",
+      "finding": "Teaching Credential 6.1+ units: tuition3969 plus mandatory180+337+68+188+35+418 =5195 excluding optionalSIRF2. Two-term required fees10390 reconcile the PDF grand totals."
+    },
+    {
+      "id": "csusm",
+      "url": "https://www.csusm.edu/finaid/costofattendance/index.html",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:21.822796+00:00",
+      "method": "official_https_download",
+      "sha256": "0667b40394696e0a17af6edb9f43add2dcc54b2ca474214928939f9a4765daa7",
+      "finding": "12 candidate overrides remain held: published 2026-27 WUE tuition9126 and NR per-level tuition18790/19890/20500 conflict with bursar schedule. Graduate on/off-campus columns also ambiguous."
+    },
+    {
+      "id": "csusmUg",
+      "url": "https://www.csusm.edu/sfs/tuition/undergraduate.html",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:21.401942+00:00",
+      "method": "official_https_download",
+      "sha256": "52f2bdeb1d9079d629eacc91593a0c69189be186ea35fc29393ae7f8f2c54c42",
+      "finding": "2026-27 WUE tuition5128.50/semester =10257/year. NR471/unit,12units/term. Tuition6838+24*471=18142/year; differs from COA18790."
+    },
+    {
+      "id": "csusmGrad",
+      "url": "https://www.csusm.edu/sfs/tuition/graduate.html",
+      "verified": true,
+      "checkedAt": "2026-11-15T18:26:21.314638+00:00",
+      "method": "official_https_download",
+      "sha256": "14dceb945405e4a6123661e5a8493bf0938acb340a83272b9f8f606c5fcc3be3",
+      "finding": "2026-27 graduate tuition4274/semester, NR471/unit. Annual8548+24*471=19852. Source COA20500 uses a different charge; original source totals kept held."
+    }
+  ],
+  "records": [
+    {
+      "budgetId": "CSU-0004",
+      "expectedDigest": "d4cf903aa2ab70a11f5a594014fc5592ca3fffa2e774cbc98c004e36cee7df5b",
+      "expectedTotalCents": 2877400,
+      "expectedIncludedSumCents": 2931400,
+      "sourceIds": [
+        "humboldt",
+        "fall",
+        "spring"
+      ],
+      "operations": [
+        {
+          "type": "credential_fee",
+          "itemKey": "CSU-0004-001",
+          "fromCents": 1093000,
+          "toCents": 1039000
+        }
+      ],
+      "note": {
+        "en": "Teaching credential, 6.1+ units in each fall/spring term. Required annual tuition and fees use the bursar schedules ($10,390), resolving the PDF fee discrepancy; optional SIRF is excluded.",
+        "es": "Credencial docente, 6.1 o más unidades en cada semestre de otoño y primavera. Las cuotas y matrícula anuales obligatorias usan las tarifas de tesorería ($10,390); se excluye SIRF opcional."
+      }
+    },
+    {
+      "budgetId": "CSU-0005",
+      "expectedDigest": "5b660ab02c9fe9961465a2a3e8360f4e88d1456c0823cc9dfe1e34e602191894",
+      "expectedTotalCents": 3099400,
+      "expectedIncludedSumCents": 3153400,
+      "sourceIds": [
+        "humboldt",
+        "fall",
+        "spring"
+      ],
+      "operations": [
+        {
+          "type": "credential_fee",
+          "itemKey": "CSU-0005-001",
+          "fromCents": 1093000,
+          "toCents": 1039000
+        }
+      ],
+      "note": {
+        "en": "Teaching credential, 6.1+ units in each fall/spring term. Required annual tuition and fees use the bursar schedules ($10,390), resolving the PDF fee discrepancy; optional SIRF is excluded.",
+        "es": "Credencial docente, 6.1 o más unidades en cada semestre de otoño y primavera. Las cuotas y matrícula anuales obligatorias usan las tarifas de tesorería ($10,390); se excluye SIRF opcional."
+      }
+    },
+    {
+      "budgetId": "CSU-0006",
+      "expectedDigest": "e8c54587dfe0aeb5aba219eccdca4dfb3093a240a87e6edef9c4fc5fd08d862d",
+      "expectedTotalCents": 3215600,
+      "expectedIncludedSumCents": 3269600,
+      "sourceIds": [
+        "humboldt",
+        "fall",
+        "spring"
+      ],
+      "operations": [
+        {
+          "type": "credential_fee",
+          "itemKey": "CSU-0006-001",
+          "fromCents": 1093000,
+          "toCents": 1039000
+        }
+      ],
+      "note": {
+        "en": "Teaching credential, 6.1+ units in each fall/spring term. Required annual tuition and fees use the bursar schedules ($10,390), resolving the PDF fee discrepancy; optional SIRF is excluded.",
+        "es": "Credencial docente, 6.1 o más unidades en cada semestre de otoño y primavera. Las cuotas y matrícula anuales obligatorias usan las tarifas de tesorería ($10,390); se excluye SIRF opcional."
+      }
+    },
+    {
+      "budgetId": "CSU-0021",
+      "expectedDigest": "e5529c619b9087233e4fe6b38357fe86ef60e9351f1e909e89363a8f38b79232",
+      "expectedTotalCents": 2924300,
+      "expectedIncludedSumCents": 2924300,
+      "sourceIds": [
+        "pomona"
+      ],
+      "operations": [
+        {
+          "type": "omit_zero_placeholder",
+          "itemKey": "CSU-0021-004"
+        }
+      ],
+      "note": {
+        "en": "WUE eligibility required. The food allowance and separately listed housing are counted once; original source labels are retained.",
+        "es": "Se requiere elegibilidad para WUE. La alimentación y la vivienda se cuentan una sola vez; se conservan las etiquetas originales."
+      }
+    },
+    {
+      "budgetId": "CSU-0022",
+      "expectedDigest": "0d86c2bbcc7b45edcbb8a51e40b4a67a5f2527e72cc7e3807c56b954f18e038b",
+      "expectedTotalCents": 3475100,
+      "expectedIncludedSumCents": 3475100,
+      "sourceIds": [
+        "pomona"
+      ],
+      "operations": [
+        {
+          "type": "category",
+          "itemKey": "CSU-0022-003",
+          "from": "Housing and food combined",
+          "to": "Food"
+        }
+      ],
+      "note": {
+        "en": "WUE eligibility required. The food allowance and separately listed housing are counted once; original source labels are retained.",
+        "es": "Se requiere elegibilidad para WUE. La alimentación y la vivienda se cuentan una sola vez; se conservan las etiquetas originales."
+      }
+    },
+    {
+      "budgetId": "CSU-0023",
+      "expectedDigest": "a51e2b4751ac1fc2158691c0c051d79f49d5a089234b05d222d220b0b834c071",
+      "expectedTotalCents": 4042100,
+      "expectedIncludedSumCents": 4042100,
+      "sourceIds": [
+        "pomona"
+      ],
+      "operations": [
+        {
+          "type": "category",
+          "itemKey": "CSU-0023-003",
+          "from": "Housing and food combined",
+          "to": "Food"
+        }
+      ],
+      "note": {
+        "en": "WUE eligibility required. The food allowance and separately listed housing are counted once; original source labels are retained.",
+        "es": "Se requiere elegibilidad para WUE. La alimentación y la vivienda se cuentan una sola vez; se conservan las etiquetas originales."
+      }
+    },
+    {
+      "budgetId": "CSU-0069",
+      "expectedDigest": "bae2030cec50262a6eea0c3e3b06f27a449b3c521cc47ed1c3097caab86a5aa0",
+      "expectedTotalCents": 4030400,
+      "expectedIncludedSumCents": 4030400,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2026 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0071",
+      "expectedDigest": "c98503b29204f9b8707e4b2ba11d61f3a0bd9b72a8ed1515fd23761cfad70c1f",
+      "expectedTotalCents": 4310600,
+      "expectedIncludedSumCents": 4310600,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2026 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0074",
+      "expectedDigest": "8e6ca95134a71ae0bfa86a567169649ceb4c3d183218303d878293f2362a6318",
+      "expectedTotalCents": 4310600,
+      "expectedIncludedSumCents": 4310600,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2026 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0077",
+      "expectedDigest": "5dfc4a61b3d38f91cbee358b29cb97a5c914148ef94d66ff5b676cc7c651248e",
+      "expectedTotalCents": 3434200,
+      "expectedIncludedSumCents": 3434200,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2026 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0085",
+      "expectedDigest": "878c4ff2051bc1fe95f2c5dfe2475780dc0f8e85dcaf30bc95509addda73f507",
+      "expectedTotalCents": 4310600,
+      "expectedIncludedSumCents": 4310600,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0086",
+      "expectedDigest": "12e126fcb26276af45566999b5755ef83ea9544a2e7dd4eba1f8ec2ba34c886b",
+      "expectedTotalCents": 6604000,
+      "expectedIncludedSumCents": 6604000,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; Nonresident; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0087",
+      "expectedDigest": "e780ed016dca467f484123e5d06cbc8c30d7c646678226134fc9a9191e33b26d",
+      "expectedTotalCents": 6847300,
+      "expectedIncludedSumCents": 6847300,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; International; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0088",
+      "expectedDigest": "f9c15d302efbe78c6c1872d1f5589835ea36efb356ca53ec2d4afab7fc4707d9",
+      "expectedTotalCents": 4310600,
+      "expectedIncludedSumCents": 4310600,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0089",
+      "expectedDigest": "9c8eaa27931f3fdaffba361971936252205ee34da03c165e7e51701051403d69",
+      "expectedTotalCents": 6604000,
+      "expectedIncludedSumCents": 6604000,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; Nonresident; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0090",
+      "expectedDigest": "c7539271e14dd37d73b5d4b1d947fdae3d6d5f4729ea00bde68dcae9397fee23",
+      "expectedTotalCents": 6847300,
+      "expectedIncludedSumCents": 6847300,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; International; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0091",
+      "expectedDigest": "f5f83bde5ba45e8c76a06fe247558733c1c8281a44c9ec039bc6a8d892d5a6ca",
+      "expectedTotalCents": 3434200,
+      "expectedIncludedSumCents": 3434200,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Science & Math / Business / Liberal Arts; California resident; 2025 entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0155",
+      "expectedDigest": "f5a308645811fe6eaa189976ac480ad352fc6cc6aad6f032c1420b89e062ce2d",
+      "expectedTotalCents": 4056200,
+      "expectedIncludedSumCents": 4056200,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Engineering / Architecture / Agriculture; California resident; 2021 or earlier entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0158",
+      "expectedDigest": "d579c30667fbe2db2db9cac7f8977a1d486e73cb4f9d3ca0f48a5b9a89c54b3f",
+      "expectedTotalCents": 4056200,
+      "expectedIncludedSumCents": 4056200,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Engineering / Architecture / Agriculture; California resident; 2021 or earlier entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0161",
+      "expectedDigest": "973885582b86e426f19faf4c3a693db4afa23e5a405704325c76e45d2c1aa085",
+      "expectedTotalCents": 3179800,
+      "expectedIncludedSumCents": 3179800,
+      "sourceIds": [
+        "calpoly"
+      ],
+      "operations": [
+        {
+          "type": "display_population",
+          "value": "Undergraduate; Engineering / Architecture / Agriculture; California resident; 2021 or earlier entry"
+        }
+      ],
+      "note": {
+        "en": "Program and entering cohort remain specific; the full original scope is retained in source details.",
+        "es": "Se conservan el programa y la cohorte específicos; el alcance original completo figura en los detalles de la fuente."
+      }
+    },
+    {
+      "budgetId": "CSU-0778",
+      "expectedDigest": "dc3958aa3b461ab7cb673e2c47232918a3c1c272294f28de807e0bd9ca175464",
+      "expectedTotalCents": 2773600,
+      "expectedIncludedSumCents": 2773600,
+      "sourceIds": [
+        "sfsu"
+      ],
+      "operations": [
+        {
+          "type": "omit_zero_placeholder",
+          "itemKey": "CSU-0778-003"
+        }
+      ],
+      "note": {
+        "en": "For living at home, housing is included in the combined food-and-housing allowance; it is not a second housing charge.",
+        "es": "Al vivir en casa, la vivienda está incluida en la asignación conjunta de alimentación y vivienda; no es un segundo cargo."
+      }
+    },
+    {
+      "budgetId": "CSU-0790",
+      "expectedDigest": "d8a0c3d206c0df2d339b410fc9ad3373b2a57c344056f6bd6e65ed109863b446",
+      "expectedTotalCents": 2748300,
+      "expectedIncludedSumCents": 2748300,
+      "sourceIds": [
+        "sjsu"
+      ],
+      "operations": [
+        {
+          "type": "omit_zero_placeholder",
+          "itemKey": "CSU-0790-003"
+        }
+      ],
+      "note": {
+        "en": "For living with parents, food and housing are combined. The source food-zero marker does not mean meals cost nothing.",
+        "es": "Al vivir con los padres, alimentación y vivienda están combinadas. El cero de alimentación no significa que comer sea gratis."
+      }
+    },
+    {
+      "budgetId": "CSU-0793",
+      "expectedDigest": "fa33d6a36615b21c23b4d4361058fbbc3f3e16a36d24476afd8b654cb28648e8",
+      "expectedTotalCents": 2887400,
+      "expectedIncludedSumCents": 2887400,
+      "sourceIds": [
+        "sjsu"
+      ],
+      "operations": [
+        {
+          "type": "omit_zero_placeholder",
+          "itemKey": "CSU-0793-003"
+        }
+      ],
+      "note": {
+        "en": "For living with parents, food and housing are combined. The source food-zero marker does not mean meals cost nothing.",
+        "es": "Al vivir con los padres, alimentación y vivienda están combinadas. El cero de alimentación no significa que comer sea gratis."
+      }
+    },
+    {
+      "budgetId": "CSU-0796",
+      "expectedDigest": "cb1f50ccf2b0d8b26c8cf41892cee3891cee3567f35936a1db00669185df19df",
+      "expectedTotalCents": 2826400,
+      "expectedIncludedSumCents": 2826400,
+      "sourceIds": [
+        "sjsu"
+      ],
+      "operations": [
+        {
+          "type": "omit_zero_placeholder",
+          "itemKey": "CSU-0796-003"
+        }
+      ],
+      "note": {
+        "en": "For living with parents, food and housing are combined. The source food-zero marker does not mean meals cost nothing.",
+        "es": "Al vivir con los padres, alimentación y vivienda están combinadas. El cero de alimentación no significa que comer sea gratis."
+      }
+    }
+  ],
+  "verifiedOverridesStillHeld": [
+    {
+      "budgetId": "CSU-0592",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0593",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0594",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0595",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0596",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0597",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0601",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0602",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0603",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0607",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0608",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    },
+    {
+      "budgetId": "CSU-0609",
+      "sourceIds": [
+        "csusm",
+        "csusmUg",
+        "csusmGrad"
+      ],
+      "reason": "Supported item override does not reconcile the source-published total; keep held. No source total has been overwritten."
+    }
+  ],
+  "heldPolicy": {
+    "incomplete": "Unknown annual units/components remain null.",
+    "derived": "Calculated-estimate candidates remain held; this correction release does not add a calculated-total contract.",
+    "sourceConflict": "Program/cohort/insurance/arithmetic disputes remain held."
+  }
+}

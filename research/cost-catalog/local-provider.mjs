@@ -45,8 +45,9 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
   const academicQuestion=cohort?question.replace(cohort[0],''):question;
   const years=[...academicQuestion.matchAll(/\b(20\d{2})[-–](?:20)?(\d{2})\b/gu)].map(m=>`${m[1]}-${m[2]}`);
   const year=[...new Set(years)];if(year.length>1)return defer('multiple_years');
-  const residency=/\b(?:nonresident|non resident|out of state|no residente)\b/u.test(q)?'Nonresident':'California resident';
-  const residencyKnown=/\b(?:california resident|resident of california|residente (?:de |en )?california|nonresident|non resident|out of state|no residente)\b/u.test(q);
+  const wue=/\b(?:wue|western undergraduate exchange)\b/u.test(q);
+  const residency=wue?'WUE':/\b(?:nonresident|non resident|out of state|no residente)\b/u.test(q)?'Nonresident':'California resident';
+  const residencyKnown=wue||/\b(?:california resident|resident of california|residente (?:de |en )?california|nonresident|non resident|out of state|no residente)\b/u.test(q);
   const conditions=['campus=ANY($1::text[])'],params=[[...new Set(campuses)]];
   params.push(residentCategories(residency));conditions.push(`payload->'raw'->>'Residency'=ANY($${params.length}::text[])`);
   conditions.push("payload->'raw'->>'Student level'='Undergraduate'","coalesce(payload->'raw'->>'Dependent children','') IN ('','0')");
@@ -85,6 +86,11 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
    if(assumptions){
     result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,qualification:f.qualification+' '+assumptions}));
     result.voiceBrief.qualification+=' '+assumptions;result.text+='\n'+assumptions;
+   }
+   if(wue){
+    const eligibility=es?'La elegibilidad para WUE debe confirmarse.':'WUE eligibility must be confirmed.';
+    result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,qualification:f.qualification+' '+eligibility}));
+    result.voiceBrief.qualification+=' '+eligibility;result.text+='\n'+eligibility;
    }
    if(!requestsCoa(question)&&aspects.length===1&&['tuition_fees','housing'].includes(aspects[0])){
     const original=result.voiceBrief.findings[0],component=original.budget.components.find(item=>item.key===aspects[0]&&item.role==='component');

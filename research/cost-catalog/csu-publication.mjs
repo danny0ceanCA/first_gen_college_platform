@@ -3,15 +3,16 @@ import {projectRecord} from './catalog.mjs';
 
 // A publication is an explicit selection, never a change to immutable imported
 // values, source-review dates, flags, or the strict independent-approval view.
-export function csuPublicationSnapshot(batch,{reviewedAt,validUntil}={}){
+export function csuPublicationSnapshot(batch,{reviewedAt,validUntil,allowEstimates=false}={}){
  if(batch.version!=='csu-coa-workbook-staging-v1.0'||!batch.budgets.length||
   !Number.isFinite(Date.parse(reviewedAt))||!Number.isFinite(Date.parse(validUntil))||Date.parse(validUntil)<=Date.parse(reviewedAt))throw Error('csu_review_required');
  const held=[],accepted=[];
  for(const b of batch.budgets){
   const reasons=[];
-  if(b.bucket!=='reconciled'||b.total===null||Math.abs(b.difference||0)>1)reasons.push('amounts_need_review');
+  const estimate=allowEstimates&&b.payload.catalogEstimate?.version===1&&batch.report.catalogEstimates;
+  if(!estimate&&(b.bucket!=='reconciled'||b.total===null||Math.abs(b.difference||0)>1))reasons.push('amounts_need_review');
   if(b.payload.issues.invalid?.length)reasons.push('invalid_source_or_scope');
-  if((b.payload.issues.review||[]).some(flag=>!['workbook_source_review_required','housing_scope_requires_review'].includes(flag)))reasons.push('source_override_needs_review');
+  if((b.payload.issues.review||[]).some(flag=>!['workbook_source_review_required','housing_scope_requires_review',...(estimate&&b.payload.catalogEstimate.reviewedOverride?['explicit_source_override_requires_review']:[])].includes(flag)))reasons.push('source_override_needs_review');
   if(/source conflict/iu.test(b.payload.raw['Scope and exclusions']||''))reasons.push('source_conflict');
   if(b.payload.raw['Budget period']!=='Academic year')reasons.push('period_needs_review');
   if(reasons.length){held.push({budgetId:b.key,campus:b.campus,reasons});continue;}

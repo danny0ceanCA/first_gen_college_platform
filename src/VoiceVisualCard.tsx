@@ -300,7 +300,8 @@ export function VoiceVisualCard({state,dispatch,language,onPresented}:{state:Res
               </th>)}</tr></thead>
             <tbody>{costRows?.map(row=>{
               const included=row.cells.some(Boolean)&&row.cells.every(cell=>!cell||cell.included);
-              const label=row.id==='total_budget'&&beforeAid
+              const estimated=row.id==='total_budget'&&row.cells.some(cell=>cell&&'estimateBasis' in cell);
+              const label=estimated?(tableLanguage?'Importe para planificar':'Planning amount'):row.id==='total_budget'&&beforeAid
                 ? (row.cells.some(cell=>cell?.evidence?.status==='partial')
                   ? (tableLanguage?'Total publicado antes de la ayuda':'Published total before aid')
                   : (tableLanguage?'Total estimado antes de la ayuda':'Estimated total before aid'))
@@ -314,6 +315,10 @@ export function VoiceVisualCard({state,dispatch,language,onPresented}:{state:Res
                   const year=scope?.match(/\b20\d{2}\s*[–—-]\s*(?:20)?\d{2}\b/u)?.[0];
                   return <td key={column} className="is-numeric" data-motion-key={JSON.stringify([row.id,column])}>
                     {cell?<><span className="origen-research-value">{displayAmount(cell.value)}</span>
+                      {'estimateBasis' in cell&&cell.estimateBasis&&<small>{cell.estimateBasis==='calculated'
+                        ?(tableLanguage?'Estimación calculada':'Calculated estimate'):(tableLanguage?'Estimación parcial':'Partial estimate')}</small>}
+                      {'estimateBasis' in cell&&cell.estimateBasis==='partial'&&evidence?.budget?.catalogEstimate&&<small>{tableLanguage?'Sin incluir: ':'Not included: '}{evidence.budget.catalogEstimate.unresolved.map(u=>u.label).join('; ')}</small>}
+                      {'knownPortion' in cell&&cell.knownPortion&&<small>{tableLanguage?'Parte conocida':'Known portion'}</small>}
                       {'derived' in cell&&cell.derived&&<small>{tableLanguage?'Suma de vivienda y alimentación':'Housing + food sum'}</small>}
                       {year&&!scopes[index].includes(year)&&<small>{year}</small>}
                       {'feeDetail' in cell&&cell.feeDetail&&<small>{cell.feeDetail.rounded

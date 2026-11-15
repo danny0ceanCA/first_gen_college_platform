@@ -1,0 +1,1099 @@
+{
+  "version": 1,
+  "kind": "local_csu_estimate_selection",
+  "baseBatchId": "cf0fe03601395617ac6a73981dd338058ba9244b51a2825ce7b14fa508d3d84a",
+  "sourceSha256": "510fccfb400b5a8666ff485ad8dd8bdaedf62b31608af1a23e6757123271fdb4",
+  "reviewedAt": "2026-11-15T19:33:29.161Z",
+  "reviewBasis": "workbook_reported",
+  "independentlyVerified": false,
+  "note": "Local-only arithmetic/representation selection. Source review dates and original values remain unchanged. Calculated estimates do not assert a university-published total. Partial bases exclude every unknown included charge. All other source disputes remain held.",
+  "disputedBudgetIds": [
+    "CSU-0123",
+    "CSU-0234",
+    "CSU-0237",
+    "CSU-0327",
+    "CSU-0328",
+    "CSU-0329",
+    "CSU-0330",
+    "CSU-0331",
+    "CSU-0337",
+    "CSU-0338",
+    "CSU-0339",
+    "CSU-0340",
+    "CSU-0341",
+    "CSU-0358",
+    "CSU-0361",
+    "CSU-0372",
+    "CSU-0373",
+    "CSU-0374",
+    "CSU-0428",
+    "CSU-0461",
+    "CSU-0462",
+    "CSU-0463",
+    "CSU-0464",
+    "CSU-0465",
+    "CSU-0466",
+    "CSU-0592",
+    "CSU-0593",
+    "CSU-0594",
+    "CSU-0595",
+    "CSU-0596",
+    "CSU-0597",
+    "CSU-0601",
+    "CSU-0602",
+    "CSU-0603",
+    "CSU-0607",
+    "CSU-0608",
+    "CSU-0609",
+    "CSU-0612",
+    "CSU-0613",
+    "CSU-0614",
+    "CSU-0615",
+    "CSU-0772",
+    "CSU-0773"
+  ],
+  "records": [
+    {
+      "budgetId": "CSU-0382",
+      "expectedDigest": "fd38191d42bc404be3990da5bab48e331ce425072d3b3da0a0f766d633be5b54",
+      "expectedKnownCents": 2910400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0384",
+      "expectedDigest": "ee127613a07940998edd01f0bb027a890322d2788fd91ee44475cbe8a5b592ea",
+      "expectedKnownCents": 3440600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0386",
+      "expectedDigest": "3fca55783a6e70b499fe5593491ff05bcc20bf588fc8f059ef4bdd766a77fb1d",
+      "expectedKnownCents": 4074300,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0388",
+      "expectedDigest": "74dc7c2d00867439a852934a63a1798114dffd5b28928d5b1fcf41917cb2e9e5",
+      "expectedKnownCents": 2980800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0390",
+      "expectedDigest": "58f8caa120298888b3091291744e6ff2220888a560a2bd27d2af472af207df3b",
+      "expectedKnownCents": 3511000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0392",
+      "expectedDigest": "5a5c67e8693479d12fc59cfa149063ab4d9ef0ac1ef89312107863e41a4b94db",
+      "expectedKnownCents": 4144700,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0394",
+      "expectedDigest": "3a8a16c07e181b43a69ac5c22d5ee90c12827720fe6ca86f898ce42f719419b1",
+      "expectedKnownCents": 3408600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0396",
+      "expectedDigest": "68c4337f01b88e62e65cfa660bffc399a29ad7759cce59c86e34d75461f34c54",
+      "expectedKnownCents": 3810200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0398",
+      "expectedDigest": "bbb80985f15ae3456ba28f189d5fd90ead221fd02508c805ed8b7ac9ffacf981",
+      "expectedKnownCents": 4501600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0417",
+      "expectedDigest": "7edc614302ece6a10afc4a0edb55b5c2f146bc04c5192716f5e9a47fd61131be",
+      "expectedKnownCents": 2853500,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0418",
+      "expectedDigest": "8dbeb74e43f590397125b53a5a349f891e26e500a104913499c3ddccea74767d",
+      "expectedKnownCents": 3407400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0419",
+      "expectedDigest": "6b0dd4c3f5de20350517427d5d052b031c46d2ac434d5f8d48fcae8675c9931b",
+      "expectedKnownCents": 4109400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0420",
+      "expectedDigest": "549009949136f76fff0364316c1499c478618696a2871087b267bb7215fb3d53",
+      "expectedKnownCents": 2963500,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0421",
+      "expectedDigest": "d902897c205f1c418ccef5a0639964c06c6e0cc15c2397cb06a2fd770529d132",
+      "expectedKnownCents": 3517400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0422",
+      "expectedDigest": "832eaa500c012f8249c5a476266bb67d6663a5b3c35ca8792051668f8c686449",
+      "expectedKnownCents": 4219400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0423",
+      "expectedDigest": "7bee4be8b32db9751b677fc4032557dc8e4715e5beba497afaa0feab3071a29c",
+      "expectedKnownCents": 3024500,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0424",
+      "expectedDigest": "3c425aac29d3f404711a8d1c45171a81e1373a93edfd9db2fe8a068649eaabd7",
+      "expectedKnownCents": 3578400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0425",
+      "expectedDigest": "6784b12153fbafcf238a7fce7f375b1fecdbd9f0491b7cfb495f2735dc9e2848",
+      "expectedKnownCents": 4280400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0434",
+      "expectedDigest": "3f3c9fcad198188430163e3af9f6b5d398737c1e6e1e04e9bbf1082e99099598",
+      "expectedKnownCents": 2640800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0435",
+      "expectedDigest": "3ebf3e28c60a1125b8337f7cd3c7d4eae394241bcc2bb4e4aa09cfe7ee71be25",
+      "expectedKnownCents": 3659600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0436",
+      "expectedDigest": "8e6e5fe80f6c9ed2849eb172342efc98301b963159c8cd08919f2f554e5b2b95",
+      "expectedKnownCents": 3740300,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0437",
+      "expectedDigest": "ed10699323840387a4ea4228807b3bb612d137571e7be8003a1b37d76a3b8ce3",
+      "expectedKnownCents": 2811800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0438",
+      "expectedDigest": "6df253c78db2d0ca6e6d324a3700fd486a4f0856888aec8f204f1a715815f100",
+      "expectedKnownCents": 3830600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0439",
+      "expectedDigest": "b5a833bb1084c6f1fea85aa07f3efc93214999c4140e28fbe6f2b8ee60f1a17d",
+      "expectedKnownCents": 3911200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0494",
+      "expectedDigest": "8a028e3e340be289dc6281694e2521c42c39b598ac29e814fa1a2cf76bc2bf70",
+      "expectedKnownCents": 2969600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0495",
+      "expectedDigest": "727819cd52eb70957177d3f4ba4757cd460ee88c54cbd23d8fe04f1eb6689cd8",
+      "expectedKnownCents": 3850000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0496",
+      "expectedDigest": "f3a0b613ab1c6f74bbe91fc7cfbe5860868d200fe9684fca3b08cf7c31a94e2f",
+      "expectedKnownCents": 3911200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0497",
+      "expectedDigest": "00851d0356e47e8777323d9bfb13ad305be34b7ced7f814ca682d5ac9607f39c",
+      "expectedKnownCents": 3079600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0498",
+      "expectedDigest": "f458d76622e69319ffcef9a6dd1c6853043c61b8bbe11ba6da5be2778ea47e30",
+      "expectedKnownCents": 3960000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0499",
+      "expectedDigest": "a7274a6dbb12bfb972c939a551af82a03073a553daba7b08eb28a698de032833",
+      "expectedKnownCents": 4021200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0500",
+      "expectedDigest": "4fbb3f663757943c41774df451de9ece7046a85aafb0c328617815547bcb0172",
+      "expectedKnownCents": 3140600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0501",
+      "expectedDigest": "2934cc84440cb82d9c8fb58cbd75575ce247844b9ce2316d0c47ee041c651643",
+      "expectedKnownCents": 4021000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0502",
+      "expectedDigest": "47cbecddc38e4e68d21419e11a7966bcd56340bbaaa9a1c8fae55d7b02f08cd7",
+      "expectedKnownCents": 4082200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0507",
+      "expectedDigest": "fa27f6075d509bf3428021c239388e38b669c2478ea3d963a43468657504ab2e",
+      "expectedKnownCents": 2548200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0508",
+      "expectedDigest": "8885b40cb898f9367337f8afa3d890d0163fb6ee89001569976c86ebf00510bc",
+      "expectedKnownCents": 3167300,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0509",
+      "expectedDigest": "a088cb8a63391cf3729a45bc87547ffb2a8feab3dfcd48e9e3ed29bba12f8774",
+      "expectedKnownCents": 3193300,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0510",
+      "expectedDigest": "ed453099c6d8481c75f5cddbd5c4ad0af006208e1c7999d922933ad88a889707",
+      "expectedKnownCents": 3785500,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0532",
+      "expectedDigest": "1989f2a574add5eb1de76390f6ddf8df99ad201fd9276b29974971190bf5ef7d",
+      "expectedKnownCents": 2397800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0533",
+      "expectedDigest": "e94d0693ef7d89b12982ef9e3ce748b37dc5b2f5a4d9f83db7954b3e9196b2e4",
+      "expectedKnownCents": 2948400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0534",
+      "expectedDigest": "7fd35f73c2fc21bf8f2ee3a07a6682113a76d15ffac30a92b2826b9ae4d5bc04",
+      "expectedKnownCents": 3991800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0535",
+      "expectedDigest": "497a15bc21f5afba5674e19897755931d3b31b8c088f085dd1cf811130e1d28a",
+      "expectedKnownCents": 2580000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0536",
+      "expectedDigest": "c76c980b873a26ba4cda5b7b47623be5b5878b2536fc24a67a7933cfbc9472e5",
+      "expectedKnownCents": 3130600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0537",
+      "expectedDigest": "4b6d00adb647094a2ed39a2ae639accbbee6f1463704bc878fd14fd2508f331a",
+      "expectedKnownCents": 4174000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0538",
+      "expectedDigest": "eaf159661e7eeb37513582f0b242b57b4af8f8a36a5b34172e38f149701630d9",
+      "expectedKnownCents": 2510200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0539",
+      "expectedDigest": "80eabc191209f651c8ca217a92807c77802a841aafca577c054bb7b78b5c2efc",
+      "expectedKnownCents": 3060800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0540",
+      "expectedDigest": "47b62dc8e51a45d833a88ac5c6d3def675e7be3b53cded19fdcae0428d3959da",
+      "expectedKnownCents": 4104200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0541",
+      "expectedDigest": "e994751772e5137fe2f7469676fdd31684261b4291eee3c66407d7b99b325b73",
+      "expectedKnownCents": 4005600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0542",
+      "expectedDigest": "dbab4445f6bb80b928b37ab0d58ead5c1886732c8b26888a67979606fb2a72c1",
+      "expectedKnownCents": 4556200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0543",
+      "expectedDigest": "e66f1c879a3c696e558ed630f5f3b12d7bfd9afff70301a6634d4c78580f4f98",
+      "expectedKnownCents": 5599600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0547",
+      "expectedDigest": "dfc9e8605efe3cdf5e9a0af6ccc304003426bcbaa808f7be8ec086b4f364e8b9",
+      "expectedKnownCents": 2952400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0548",
+      "expectedDigest": "d38821b260e4704df14ef29617dff959b12138ed47c1dbb855ad890e5b14aab9",
+      "expectedKnownCents": 3754400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0549",
+      "expectedDigest": "20a2561281bcf87039bab30988480cfd69d18535ac07fd681d9f38cafc5fa85b",
+      "expectedKnownCents": 4200400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0550",
+      "expectedDigest": "00ed4d5faa1fa9ae5216fae8589fc1ea5d48913b5227259c24bf6dc90aa9d6e2",
+      "expectedKnownCents": 3013400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0551",
+      "expectedDigest": "86dc6a3db269dc868a0a4ad9570057b482957e2f3332311b078cd746243c0f2c",
+      "expectedKnownCents": 3815400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0552",
+      "expectedDigest": "dc74cc50a63dbed3d9b184d674fc507f993a1b167792d1571ef8d59e06b36fc1",
+      "expectedKnownCents": 4261400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0553",
+      "expectedDigest": "f9291589023944df34015a5ef4f41b1f977e6b4b47db1ffcc75f944e4c33e03c",
+      "expectedKnownCents": 3184400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0554",
+      "expectedDigest": "69574f3258a5eb68b473305f09f566f224a9c5d5f95a1a14a98d93f9d669b21d",
+      "expectedKnownCents": 3986400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0555",
+      "expectedDigest": "c41244c3d1502c682ae6da91712d88b7e98d1f6e99b8aa9822cb10ae3c9e9efa",
+      "expectedKnownCents": 4432400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0556",
+      "expectedDigest": "cffe13e59d8d82fdc3726b7712648395c0bdc7cac12bd8ff9423d511aae5d68b",
+      "expectedKnownCents": 2842400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0557",
+      "expectedDigest": "e691f02237411ce61ce1190bfb64332a677f948c3c3ad141595786970ae7ceb3",
+      "expectedKnownCents": 3644400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0558",
+      "expectedDigest": "c3c992a34b0871957ecd756b4182178a658b37a4adb5ab92ae3fe93d51e4409a",
+      "expectedKnownCents": 4090400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0559",
+      "expectedDigest": "8d359f195313ea2401f3eabd525d752a12b03c6a2a11724d261334124a792951",
+      "expectedKnownCents": 2952400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0560",
+      "expectedDigest": "f6c38931580e4bc8fa4b72a46c3ebaa0a9fc0e8935598ea5ab3f9cee41385e54",
+      "expectedKnownCents": 3754400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0561",
+      "expectedDigest": "3de00c292e2e5a66d2862bba75c64dc985c422044d9589ff490d8121957d9435",
+      "expectedKnownCents": 4200400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0562",
+      "expectedDigest": "225c43dfab1abb40f8146c753d8d94c6d3f36c4a4c506ab792eef7afd8bf2600",
+      "expectedKnownCents": 3013400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0563",
+      "expectedDigest": "f6be208be783aeae6f78d7085baa999fc2c5ea4978ae13667b3c87450ea24660",
+      "expectedKnownCents": 3815400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0564",
+      "expectedDigest": "be8ea2cc473cc686159dceaa4f60f961db69de962476004c5872069171e0316c",
+      "expectedKnownCents": 4261400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0625",
+      "expectedDigest": "3026dc681a6c73311c4c83b17e65b8df2445e97055b95ead93dd5df661d33ff3",
+      "expectedKnownCents": 2660200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0626",
+      "expectedDigest": "7ddf31c10c47c622ce13278cdb8d5d775f12e11c6b69c33bd749078e249969a0",
+      "expectedKnownCents": 2909000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0627",
+      "expectedDigest": "8fd1e0b9bb99140537fa8c0363f555bde4570dca7546e65a37a8f1c34b864bf5",
+      "expectedKnownCents": 3774400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0628",
+      "expectedDigest": "b618cec8714a1ca3d3e2ab5d656894a951f2b6fb5b0faa4196df6c8eb4ec9339",
+      "expectedKnownCents": 2770200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0629",
+      "expectedDigest": "5d2a32fd4e4574a236f7526dbde21a95bf3d46ad48697c49fbcf25504aa02dc7",
+      "expectedKnownCents": 3019000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0630",
+      "expectedDigest": "77c8a6a1229a6f491ec4ed340ef6937db9f8e208dbc69ef3acde8f2c34b01e04",
+      "expectedKnownCents": 3884400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0631",
+      "expectedDigest": "07757c5d03a66dad49923880b2cb4ef5a838c70368712192ec5169dca9673fd2",
+      "expectedKnownCents": 2842800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0632",
+      "expectedDigest": "a85c66e02e4b50412da8a061533dfa5751823b655d989598f0742bc731269c20",
+      "expectedKnownCents": 3091600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0633",
+      "expectedDigest": "cb9d0203b312b150d2319768bacaf846c1f7477dd1ea806cd8cbe1b75b12c254",
+      "expectedKnownCents": 3957000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0635",
+      "expectedDigest": "a569f1e6eada72142635d904e947799e4c8efb26cbc743bf9e6b08043ee24245",
+      "expectedKnownCents": 2703800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0637",
+      "expectedDigest": "f85c861dc1a9314c3acafa2707928c26c718c0df615d81bd4e5c1ae1885c8370",
+      "expectedKnownCents": 2872000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0639",
+      "expectedDigest": "d49ae0a543422b34a45896b5c16a8b174a49f45952681ecfd59dafea8286daa1",
+      "expectedKnownCents": 3451400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0641",
+      "expectedDigest": "badfe5fc9613e9c4d110158f28da58836327ea25ce5389ba7da724359b99b753",
+      "expectedKnownCents": 2916200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0643",
+      "expectedDigest": "ba92e093a1b4b528336456644e55a94e6ce4cd4fdff1d645dea22b57c53d8f8c",
+      "expectedKnownCents": 3084400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0645",
+      "expectedDigest": "bc576a847e49d596d53c06261a185bfaf1be2f39343a3a77dceb78c70b5500a7",
+      "expectedKnownCents": 3663800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0647",
+      "expectedDigest": "10c379ef1e6117952862fb45a2d22a5b98e7774c0df65d866e6687d5acc247d8",
+      "expectedKnownCents": 742800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0649",
+      "expectedDigest": "09562f5faa42ade63ca3acfd7f78ca4943282a102e419ff6f757b9940e927903",
+      "expectedKnownCents": 688200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0651",
+      "expectedDigest": "1653c0b9abc4d0bca5fb7552f3df2b5c8f92b3df88aa8013a62ebfa8f780e617",
+      "expectedKnownCents": 744000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0653",
+      "expectedDigest": "b597d4766ab2553d8471e01ca7c407a16f039ad99761ef5fffb68774a5ac46ff",
+      "expectedKnownCents": 2874800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0655",
+      "expectedDigest": "45f36c4a3e3d5f27fb914d5705819e2628106cac7ea829a6288bc0d0c2e12ff4",
+      "expectedKnownCents": 3043000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0657",
+      "expectedDigest": "ae44a8f8faff1bb7f13dc58229c17b3626bef5f3d4959e7c81ab7a6e7b31af6d",
+      "expectedKnownCents": 3622400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0659",
+      "expectedDigest": "c7c20a0562049630979664814cfc7a0c5f61d1214443d348463e0a0f40443565",
+      "expectedKnownCents": 3016000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0661",
+      "expectedDigest": "3401bcd7832127d47fbacc77dea26245b731ddd4bb3030106e9096ffd0219cd7",
+      "expectedKnownCents": 3184200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0663",
+      "expectedDigest": "5fa9ab8d686ce6ddb955ba32102f255256c29c99407ab0733692f58f08cc48bb",
+      "expectedKnownCents": 3763600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0665",
+      "expectedDigest": "1de4fd397d2f1ccfbced6af51787c34cbe7df9c3cd8d2269907d659cd6465568",
+      "expectedKnownCents": 842600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0667",
+      "expectedDigest": "6d4999133abc0211cd556a326bcba93a98155d036634fbd400322b6a6811f918",
+      "expectedKnownCents": 788000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0669",
+      "expectedDigest": "73a20a59f6c309caba8fd277b8946fa850979a5c5bf97f4f45cabdd4fae2fca8",
+      "expectedKnownCents": 843800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0671",
+      "expectedDigest": "f2f31d86676c638a7bbc62627758f7acfd344f161e809fe687a439a50d4e2d95",
+      "expectedKnownCents": 2813800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0673",
+      "expectedDigest": "3d049be1d3995dc081722e03cb705146149070119908721d255f571238b8ffe5",
+      "expectedKnownCents": 2982000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0675",
+      "expectedDigest": "a75fb3b281f96743078bae779ba23f1b51d2046c0441664a8983517d81fce740",
+      "expectedKnownCents": 3561400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0677",
+      "expectedDigest": "b32ee039d725da2b449cc88d1d17a23d4126ec88468c152a59273da4f3a579ab",
+      "expectedKnownCents": 2980400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0679",
+      "expectedDigest": "c433e46cc928793909df1623a559d2601e0516fe94cb90153b8258397e3ccc32",
+      "expectedKnownCents": 3148600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0681",
+      "expectedDigest": "22fea5715b63ef4f6919272a464f4dc85715b4d036056daefed1000298b1edcf",
+      "expectedKnownCents": 3728000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0683",
+      "expectedDigest": "d62ce2df6ecf930c288ac937b2aa372701e221b71ca8d898557f7053805124c3",
+      "expectedKnownCents": 807000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0685",
+      "expectedDigest": "f932dc416d7470366b8474748418e3a28bc538528d3037321d12fb203e7bf909",
+      "expectedKnownCents": 752400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0687",
+      "expectedDigest": "490f376c29b680c79e68a553f0ea48b5d81929ca7c3baa1a5fa8d0cae217b70c",
+      "expectedKnownCents": 808200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0689",
+      "expectedDigest": "2e87cb4dbe1f14e5a856e6b4c3de74aba6c2e1d037728412090e3da9ddea6db8",
+      "expectedKnownCents": 3429400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0691",
+      "expectedDigest": "a045e2e3e62ba7e1d1a68c38d76741ff72db6c5270c1888db9e67de702f418da",
+      "expectedKnownCents": 3597600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0693",
+      "expectedDigest": "89909982e8a71981a21dc947d625f745d398e0635608f5b86ffebaa09ca8e168",
+      "expectedKnownCents": 4177000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0695",
+      "expectedDigest": "d0b1e3ec997e701642f7bdc82d82d8e5738befc4034279265ab2de9f85001c11",
+      "expectedKnownCents": 3929400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0697",
+      "expectedDigest": "efb089b6e893326be4c9372441fe40b419e31b0ecc2da23d2a60571840385d16",
+      "expectedKnownCents": 4097600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0699",
+      "expectedDigest": "4aeb092b93580e528cf75123719192ed73acc7556356361e43cb0ff208d4b5af",
+      "expectedKnownCents": 4677000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0701",
+      "expectedDigest": "2985a5a60815bd153974427fea9fefbed23336dd01aea0fb651bbc3852a96f16",
+      "expectedKnownCents": 1756000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0703",
+      "expectedDigest": "79277256ce55f063227666f6cf25b3cded3d74af1b2efad92c7726683868c906",
+      "expectedKnownCents": 1701400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0705",
+      "expectedDigest": "ad61bc1bde9da2d09da6ea87cc8bffc10851b589bdcd53f4d06b24718b5c901a",
+      "expectedKnownCents": 1757200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0707",
+      "expectedDigest": "a43be595ac7a4e85a688e75ed558e4126724c8e095fdaaaf16ea2701f4f6c876",
+      "expectedKnownCents": 2570400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0709",
+      "expectedDigest": "0d2862e9b204476b647697dbeb4bb5ac495564d1ffdcf42c52502a3b89208d27",
+      "expectedKnownCents": 2738600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0711",
+      "expectedDigest": "cbf7aa510f66b84ae299b43e06a7b5f3dc03cdfa6438299d3447e5e23a4bb98e",
+      "expectedKnownCents": 3318000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0713",
+      "expectedDigest": "a511bef98a779e9d61604dcf4aa605ba639e8834d679ef55f6b3566fa37b6bbd",
+      "expectedKnownCents": 2768800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0715",
+      "expectedDigest": "1f71b182876a37ee25eecb0c002e72ec6a244a2db56d84f9ab1e088dbe900131",
+      "expectedKnownCents": 2937000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0717",
+      "expectedDigest": "b8e0992a53bd7eacb62562ce5be2e9e8db578389521e15b5f9323d0942877b7f",
+      "expectedKnownCents": 3516400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0719",
+      "expectedDigest": "621e8ae37aa3fe9ca6efd022d0f78331c54b6c3e7ef722aaf72bcd561bda40af",
+      "expectedKnownCents": 611400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0721",
+      "expectedDigest": "9d96b164f34106a711a54a7838b20ac974889bf71877f2eb849e382b2d4674d4",
+      "expectedKnownCents": 556800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0723",
+      "expectedDigest": "7fc76d051b541bf48b62a78ea9cdea74ad3486e99fe8917afc13b879ea193bfb",
+      "expectedKnownCents": 612600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0725",
+      "expectedDigest": "c70148c9b6693c365baea625141421e28df6ecc02a445473b47d59236f836166",
+      "expectedKnownCents": 3839000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0727",
+      "expectedDigest": "c126e72fc102a4badc7519b8657c1c319c9870434cd3d12b8fa4435a6ae055c3",
+      "expectedKnownCents": 4007200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0729",
+      "expectedDigest": "90be855ed771c900efb1b6f2ab771a784ddd4420569ee1d752ffe6b6ad1e17f0",
+      "expectedKnownCents": 4586600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0731",
+      "expectedDigest": "c7ab4e6f52e2b327146e6ca4157136d0ab34c1d368ace9eb15400afe04d5c23b",
+      "expectedKnownCents": 4339000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0733",
+      "expectedDigest": "67ab59211f1b28c51b4ab7773cfc868f93e887641ed7259082cef1bcd62273eb",
+      "expectedKnownCents": 4507200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0735",
+      "expectedDigest": "40575aad7dd72a2a8e91452fb26cccfd4a6a965135e9c0a2ad55e0621932236e",
+      "expectedKnownCents": 5086600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0737",
+      "expectedDigest": "a5d92647fa3879ab82daad198cc86cce70145b86c21e61e972c5b8282b1f4b31",
+      "expectedKnownCents": 2165600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0739",
+      "expectedDigest": "32cfac6582e96a78202c7e5e2f3f95fe974cb1f751a4add4b27cd64962bc3eb4",
+      "expectedKnownCents": 2111000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0741",
+      "expectedDigest": "37b391e3d5b387143f61686499493d9e4d60bce135a7807be5dbaebfdfbf88c2",
+      "expectedKnownCents": 2166800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0743",
+      "expectedDigest": "63676491c9c0c934c5508694f1a246109e40615bc18ee6cf744212cf116dab27",
+      "expectedKnownCents": 4068000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0745",
+      "expectedDigest": "6ec19820ee2a4efefd9167313dab92af058441e5a6eb298f9d8118f7deaf844c",
+      "expectedKnownCents": 4236200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0747",
+      "expectedDigest": "a717cb59324404fbe59feaf41264e2b04f061213dad49a138ab6ccceaca28392",
+      "expectedKnownCents": 4815600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0749",
+      "expectedDigest": "cafbd397ac4b74c435c6f9835e68c34467778ad493e90de0ba2220a280f82da3",
+      "expectedKnownCents": 4568000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0751",
+      "expectedDigest": "13c3707d28e6ab089f94efafbf8866f3c64cd45edd76f6ad7670484de11e71d8",
+      "expectedKnownCents": 4736200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0753",
+      "expectedDigest": "6992e233d77d98cc72d72410c080e7710d803dec06b46fd94a64a881cfa34fc0",
+      "expectedKnownCents": 5315600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0755",
+      "expectedDigest": "e8af3d24802c950c02fff2ca4d70c8f735b75fae8442e78bb6915154fccf0611",
+      "expectedKnownCents": 2394600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0757",
+      "expectedDigest": "344461966d89513fa9d4f8095cbaba76c7c8bc431ea4bc87709f94d4218f8b2c",
+      "expectedKnownCents": 2340000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0759",
+      "expectedDigest": "7c414ded870ff87723c6bc9fa475a9aa42cc308330d48b98f8ffa624aa06b423",
+      "expectedKnownCents": 2395800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0767",
+      "expectedDigest": "453113be4698982edc118b1a79f05589ae96b6488b0a43c7a6602cd48c4dd768",
+      "expectedKnownCents": 2792600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0769",
+      "expectedDigest": "51d813a3571bf52d4ec37d9017909387be611fd1943e3a99c0843674b9aac037",
+      "expectedKnownCents": 3814200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0771",
+      "expectedDigest": "f240b5e5b8af0201649528a66c55c674f8004996c5ff5752850ecdd03fdaea7f",
+      "expectedKnownCents": 3794600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0774",
+      "expectedDigest": "201d52f10a2b52dbac975dc3c9ff70c7624b954bf68592c12b29ef74998a4948",
+      "expectedKnownCents": 5367000,
+      "basis": "calculated",
+      "reviewedOverride": {
+        "url": "https://bursar.sdsu.edu/tuition",
+        "checkedAt": "2026-11-15T19:33:29.161Z",
+        "annualAmountCents": 310800,
+        "note": "2026-on entrant cohort; AY2026-27 published1554 per term. Two fall/spring terms. Source COA total is preserved separately; this is an explicitly calculated total."
+      }
+    },
+    {
+      "budgetId": "CSU-0775",
+      "expectedDigest": "92756a4e56a3cd76cc33ff8522bb421824b10c5d96896d4406545b8685b82051",
+      "expectedKnownCents": 5347400,
+      "basis": "calculated",
+      "reviewedOverride": {
+        "url": "https://bursar.sdsu.edu/tuition",
+        "checkedAt": "2026-11-15T19:33:29.161Z",
+        "annualAmountCents": 310800,
+        "note": "2026-on entrant cohort; AY2026-27 published1554 per term. Two fall/spring terms. Source COA total is preserved separately; this is an explicitly calculated total."
+      }
+    },
+    {
+      "budgetId": "CSU-0783",
+      "expectedDigest": "965264e6758e28c9095bf401239d61be6e13bb65bd8fba477effef6fbcb014e8",
+      "expectedKnownCents": 3823400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0784",
+      "expectedDigest": "6b11ca0460be8c4eafd7a9e19884b7ac084aa014a66ba6797afc9bc37660967a",
+      "expectedKnownCents": 3994000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0785",
+      "expectedDigest": "708e622f6428a01aac1cc24cd6ada8934443cc22e87b52b32ae4d9f27eddafb0",
+      "expectedKnownCents": 2773600,
+      "basis": "partial",
+      "omittedZeroItemKeys": [
+        "CSU-0785-003"
+      ],
+      "combinedLivingSource": "https://www.sfsu.edu/departments/financial-aid/cost-attendance"
+    },
+    {
+      "budgetId": "CSU-0786",
+      "expectedDigest": "d27621ba7982e187962a89637178c8d7292824eeb12c213537f86b56d64f6fed",
+      "expectedKnownCents": 4002800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0787",
+      "expectedDigest": "1478075903b58c5f723aacf8ab55bdfce814fe1da41685d641d5ea73a55e519a",
+      "expectedKnownCents": 4173400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0788",
+      "expectedDigest": "7a16015a240ac894c037f1aa6653a1f80353e54d1998e5e98f140fe99f29e9c3",
+      "expectedKnownCents": 3933400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0789",
+      "expectedDigest": "54bb1ceed3cac02352ee70082b4f4d5a9a131c89e5d119cef7d93c9e8c2a325f",
+      "expectedKnownCents": 4104000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0799",
+      "expectedDigest": "e36d924ead7454a228fcc9dfc680858a212d609e0a69d76bf2c9f9d1e5d9fa66",
+      "expectedKnownCents": 2748300,
+      "basis": "partial",
+      "omittedZeroItemKeys": [
+        "CSU-0799-003"
+      ],
+      "combinedLivingSource": "https://www.sjsu.edu/faso/process/cost-of-attendance.php"
+    },
+    {
+      "budgetId": "CSU-0800",
+      "expectedDigest": "ed9283f860f2d24288d92d03ec47f3d9aa793a60813b8ead8f20acded90b9fb0",
+      "expectedKnownCents": 3773500,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0801",
+      "expectedDigest": "104ceb74582339e4d820dacc4b24944480392611c7d4c79a64a1dd22bb4d383d",
+      "expectedKnownCents": 3813700,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0802",
+      "expectedDigest": "fba0fadf196c0d5223da5242968894d763e612b7a1e4aa1ed5a8d8e915464317",
+      "expectedKnownCents": 2887400,
+      "basis": "partial",
+      "omittedZeroItemKeys": [
+        "CSU-0802-003"
+      ],
+      "combinedLivingSource": "https://www.sjsu.edu/faso/process/cost-of-attendance.php"
+    },
+    {
+      "budgetId": "CSU-0803",
+      "expectedDigest": "385f257969c06a4226da2c184e7ab75f986773b48ce4e83ecce4dff143c62f9d",
+      "expectedKnownCents": 3912600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0804",
+      "expectedDigest": "0730e30384ae36028d580d9d6c2b8701dc6514011866c9698283c017615694b1",
+      "expectedKnownCents": 3952800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0805",
+      "expectedDigest": "3114891b5b5055868809496e07661174f32ec8100a26fc5113c0fda5f49bd649",
+      "expectedKnownCents": 2826400,
+      "basis": "partial",
+      "omittedZeroItemKeys": [
+        "CSU-0805-003"
+      ],
+      "combinedLivingSource": "https://www.sjsu.edu/faso/process/cost-of-attendance.php"
+    },
+    {
+      "budgetId": "CSU-0806",
+      "expectedDigest": "aa7952f184cca176becbe712641cf7887925dcf806388361f82fab7a53563df8",
+      "expectedKnownCents": 3847600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0807",
+      "expectedDigest": "162789191ff2cce2da697382a39c9cd74608486f4d51fe4077d28500b80405e5",
+      "expectedKnownCents": 3891800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "CSU-0811",
+      "expectedDigest": "60c924c21f6501664aeeb708d2472e50fa41cae0adc1b51f4cdce4c1e33cce82",
+      "expectedKnownCents": 3004400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0812",
+      "expectedDigest": "f86dbef1c0beac322fd8dc7c82b16a3cf5d2987a45f4e38dd1e2ea253f55b90d",
+      "expectedKnownCents": 3304800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0813",
+      "expectedDigest": "a523d03e9c7de5ae995c6909d4a10ab52dca85872b7cdf156b8caceac1f230be",
+      "expectedKnownCents": 3792000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0814",
+      "expectedDigest": "618545701cac8fb774e7c5237f0ee3d47146c5343c88e4e6ad71dbaf6dad423c",
+      "expectedKnownCents": 4231800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0815",
+      "expectedDigest": "8889c409215ab6d46bd167d7a54f2ab9c4d8f8d7175bf6036d2d2e61552bf477",
+      "expectedKnownCents": 4532200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0816",
+      "expectedDigest": "bc291e9d868d3da289449dfbd7ff28709eb7e530a7519b2c02e93bd6394558c8",
+      "expectedKnownCents": 5019400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0817",
+      "expectedDigest": "0edc9a5110d8956990376a25831d54b00757b1427414e5528fab4ace5481024d",
+      "expectedKnownCents": 3160800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0818",
+      "expectedDigest": "dfe0494d54fd79fd7358b48814d0c89cd38063ff339848d7515fb8422d6a5ff1",
+      "expectedKnownCents": 3461200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "CSU-0819",
+      "expectedDigest": "f790794ae6abb719c6bf0039477dd174b41b3466a8ec39b0a0ad2a3dbbfdf85a",
+      "expectedKnownCents": 3948400,
+      "basis": "calculated"
+    }
+  ]
+}
