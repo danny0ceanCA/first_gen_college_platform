@@ -41,6 +41,12 @@ test('catalog estimates cannot replace source totals or hide missing charges',()
  const partial=fixture('partial').budget;partial.catalogEstimate.unresolved=[];assert.equal(validatedBudget(partial,new Set([1])),null);
 });
 
+test('catalog estimate source notes are bounded plain strings and survive validation',()=>{
+ const {budget}=fixture();budget.catalogEstimate.note='Source subtotal differs by $1,550.';
+ assert.equal(validatedBudget(budget,new Set([1])).catalogEstimate.note,budget.catalogEstimate.note);
+ for(const note of [{en:'not a runtime label'},'', 'x'.repeat(241)]){budget.catalogEstimate.note=note;assert.equal(validatedBudget(budget,new Set([1])),null);}
+});
+
 test('provider schema remains unchanged and an external response cannot invent catalog estimate provenance',()=>{
  assert.ok(!Object.hasOwn(publishedBudgetSchema.properties,'catalogEstimate'));
  const {budget}=fixture(),finding={subject:'Example University',aspect:'total_budget',status:'partial',answer:'Calculated estimate USD $400. [1]',qualification:'Estimate. [1]',budget};

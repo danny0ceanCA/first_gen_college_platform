@@ -318,6 +318,7 @@ export function VoiceVisualCard({state,dispatch,language,onPresented}:{state:Res
                       {'estimateBasis' in cell&&cell.estimateBasis&&<small>{cell.estimateBasis==='calculated'
                         ?(tableLanguage?'Estimación calculada':'Calculated estimate'):(tableLanguage?'Estimación parcial':'Partial estimate')}</small>}
                       {'estimateBasis' in cell&&cell.estimateBasis==='partial'&&evidence?.budget?.catalogEstimate&&<small>{tableLanguage?'Sin incluir: ':'Not included: '}{evidence.budget.catalogEstimate.unresolved.map(u=>u.label).join('; ')}</small>}
+                      {'estimateBasis' in cell&&evidence?.budget?.catalogEstimate?.note&&<small>{evidence.budget.catalogEstimate.note}</small>}
                       {'knownPortion' in cell&&cell.knownPortion&&<small>{tableLanguage?'Parte conocida':'Known portion'}</small>}
                       {'derived' in cell&&cell.derived&&<small>{tableLanguage?'Suma de vivienda y alimentación':'Housing + food sum'}</small>}
                       {year&&!scopes[index].includes(year)&&<small>{year}</small>}

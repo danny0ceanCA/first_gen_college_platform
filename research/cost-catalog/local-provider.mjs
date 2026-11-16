@@ -7,6 +7,7 @@ import {mergeComparisonAddition,retainVerifiedResearch} from '../../server/resea
 import {costCampusName} from './campus.mjs';
 import {residentCategories,cohortYear,sourceHousing,campusHousingRequest,generalUndergraduatePrograms,standardUndergraduateRecord} from './scope.mjs';
 import {requestsCoa} from '../../server/coa-evidence.mjs';
+import {lookupUcsfProgram} from './ucsf-program-lookup.mjs';
 const fold=s=>String(s||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[-–]/gu,' ');
 const canonical=costCampusName;
 export function assertLocalCatalogEnvironment(env){
@@ -26,11 +27,17 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
   const question=String(input.question||''),q=fold(question),language=input.language==='es'?'es':'en';
   if(!['finance','loans'].includes(input.mode)||input.forceRefresh||input.comparisonPlan||
    !/\b(?:cost of attendance|coa|costs?|tuition|fees|costo|costos|matricula|presupuesto)\b/u.test(q)||
-   /\b(?:eligib\w*|awards?|beca|scholarship|grant|aid offer|financial aid|ayuda financiera|graduate|masters?|doctoral|posgrado|maestria|doctorado|part time|tiempo parcial)\b/u.test(q))return defer('request_outside_catalog');
+   /\b(?:eligib\w*|awards?|beca|scholarship|grant|aid offer|financial aid|ayuda financiera)\b/u.test(q))return defer('request_outside_catalog');
   const campuses=researchTaskEntities(input.visualComparisonCampus|| (input.lookupInstitutions?.length?input.lookupInstitutions:input.institution)).map(canonical);
   if(!campuses.length||campuses.some(c=>!c))return defer('campus_unmatched');
+  if(campuses.length===1&&campuses[0]==='UC San Francisco'){
+   const result=await lookupUcsfProgram({input,query,view,publication});
+   if(result){const retained=input.comparisonAddition?mergeComparisonAddition(result,input):retainVerifiedResearch(result,input);report({outcome:'hit',reason:'named_ucsf_program',campuses,findings:retained.voiceBrief.findings.length});return retained;}
+   return defer('ucsf_program_or_scope_unclear');
+  }
+  if(/\b(?:graduate|masters?|doctoral|posgrado|maestria|doctorado|part time|tiempo parcial)\b/u.test(q))return defer('request_outside_catalog');
   const campusHousing=campusHousingRequest(question);
-  const housing=campusHousing?.scenario||costHousingScenario(question)||(/\b(?:residence halls?|dorms?|residencias universitarias)\b/u.test(q)?'on_campus':undefined);
+  const housing=campusHousing?.scenario||costHousingScenario(question)||(/\b(?:residence halls?|dorms?|residencias? universitarias?)\b/u.test(q)?'on_campus':undefined);
   const aspects=requestedResearchAspects(question);
   const feeOnly=!requestsCoa(question)&&aspects.length===1&&aspects[0]==='tuition_fees';
   // Missing personal scope is a labelled comparison, not a reason to search
@@ -74,11 +81,13 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
     const label=r.payload.raw.Housing;
     return campusHousing?.form==='studio'?/studio|estudio/iu.test(label):campusHousing?.form==='apartment'?
      /apartment|apartamento|departamento/iu.test(label)&&!/studio|estudio/iu.test(label):/residence hall|residencia/iu.test(label)||
-     r.payload.normalized.import_contract==='csu-workbook-v1'&&/^(?:housing )?on[- ]campus(?: housing)?$|^living (?:in campus housing|in university housing|on[- ]campus)$/iu.test(label);
+     /^(?:housing )?on[- ]campus(?: housing)?$|^living (?:in campus housing|in university housing|on[- ]campus)$/iu.test(label)&&
+      (r.payload.normalized.import_contract==='csu-workbook-v1'||!/\b(?:residence halls?|dorms?|residencias? universitarias?)\b/u.test(q));
    });
    if(choices.length!==1)return defer(choices.length?'scope_ambiguous':'scenario_unavailable');
    const result=projectRecord(choices[0],language,{allowTesting:true});if(!result)return defer('projection_rejected');
-   const es=language==='es',label=commuterBenchmark?(es?'Referencia de viajero/estudiante remoto':'Commuter/remote learner benchmark'):housingBenchmark?(es?'Referencia publicada fuera del campus':'Published off-campus benchmark'):scenario==='on_campus'&&campusHousing?.form==='apartment'?(es?'Apartamento en el campus':'On-campus apartment'):scenario==='on_campus'&&campusHousing?.form==='studio'?(es?'Apartamento estudio en el campus':'On-campus studio apartment'):{renting:['Renting off campus','Alquiler fuera del campus'],with_family:['Living with family','Vivir con familiares'],on_campus:['Residence halls','Residencias universitarias']}[scenario][es?1:0];
+   const onCampusBenchmark=scenario==='on_campus'&&!/residence hall|residencia|apartment|apartamento|studio/iu.test(choices[0].payload.raw.Housing);
+   const es=language==='es',label=commuterBenchmark?(es?'Referencia de viajero/estudiante remoto':'Commuter/remote learner benchmark'):housingBenchmark?(es?'Referencia publicada fuera del campus':'Published off-campus benchmark'):onCampusBenchmark?(es?'Referencia publicada en el campus':'Published on-campus benchmark'):scenario==='on_campus'&&campusHousing?.form==='apartment'?(es?'Apartamento en el campus':'On-campus apartment'):scenario==='on_campus'&&campusHousing?.form==='studio'?(es?'Apartamento estudio en el campus':'On-campus studio apartment'):{renting:['Renting off campus','Alquiler fuera del campus'],with_family:['Living with family','Vivir con familiares'],on_campus:['Residence halls','Residencias universitarias']}[scenario][es?1:0];
    const csu=choices[0].payload.normalized.import_contract==='csu-workbook-v1';
    const enrollment=csu?choices[0].payload.raw.Enrollment:'';
    const assumptions=[commuterBenchmark?(es?'No hay categoría confirmada para vivir con familiares; se muestra la referencia de viajero/remoto. Confirma si corresponde.':'No confirmed family category; showing the published commuter/remote benchmark. Confirm applicability.'):'',!cohort&&(!csu||cohortYear(choices[0].payload.raw['Normalized cohort key'])!==null)?(es?'Referencia de la cohorte de ingreso; cohorte personal sin confirmar.':'Entering-cohort benchmark; personal cohort unconfirmed.'):'',!residencyKnown?(es?'Se muestra la referencia para residentes de California; residencia personal sin confirmar.':'Showing the California-resident benchmark; personal residency unconfirmed.'):'',housingBenchmark?(es?'Referencia publicada fuera del campus; no confirma el alquiler personal.':'Published off-campus benchmark; personal rental applicability unconfirmed.'):'',uncertain?(es?'Escenario de referencia; la vivienda personal aún no está confirmada.':'Scenario benchmark; the personal housing arrangement is not confirmed.'):'',enrollment?(es?'Matrícula de referencia (texto de la fuente): '+enrollment+'.':'Published enrollment benchmark: '+enrollment+'.'):''].filter(Boolean).join(' ');
@@ -86,6 +95,10 @@ export function createLocalCostLookup({query,emit=()=>{},publication='local'}){
    if(assumptions){
     result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,qualification:f.qualification+' '+assumptions}));
     result.voiceBrief.qualification+=' '+assumptions;result.text+='\n'+assumptions;
+   }
+   if(onCampusBenchmark){
+    const scope=es?'Referencia general en el campus; no confirma un dormitorio o apartamento específico.':'General on-campus benchmark; not a confirmed dorm or apartment price.';
+    result.voiceBrief.findings=result.voiceBrief.findings.map(f=>({...f,qualification:f.qualification+' '+scope}));result.voiceBrief.qualification+=' '+scope;
    }
    if(wue){
     const eligibility=es?'La elegibilidad para WUE debe confirmarse.':'WUE eligibility must be confirmed.';

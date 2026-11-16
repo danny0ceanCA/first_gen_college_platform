@@ -1,0 +1,454 @@
+{
+  "version": 1,
+  "kind": "reviewed_uc_estimate_selection",
+  "baseBatchId": "e82224f4d7ffca16a1956d2358f70596bc72b0ec791f4475e195ec4b73b68f77",
+  "sourceSha256": "947bc7b3505a297095cec8fc61b430106dd6d0123beb9b34bfd804754aaa3bf5",
+  "reviewedAt": "2026-11-16T00:10:31.566Z",
+  "note": "User authorized 45 calculated UC estimates and 14 UCSF partial estimates for production testing. No source total or source-review date is replaced. UCI source subtotal discrepancies and TBD UCSF fees remain explicit.",
+  "currentSourceChecks": [
+    {
+      "url": "https://financialaid.berkeley.edu/how-aid-works/student-budgets-cost-of-attendance/",
+      "status": "retrieved",
+      "scope": "Published resident benchmarks and new-cohort nonresident tuition"
+    },
+    {
+      "url": "https://www.ucop.edu/operating-budget/_files/fees/202627/2026-27.pdf",
+      "status": "retrieved",
+      "scope": "Cohort nonresident tuition rates"
+    },
+    {
+      "url": "https://finaid.ucsf.edu/application-process/student-coa",
+      "status": "retrieved",
+      "scope": "Relevant fees remain TBD; living allowance and coverage"
+    },
+    {
+      "url": "https://www.ofas.uci.edu/cost/undergraduate-costs/continuing-students.php",
+      "status": "403",
+      "scope": "Prior dated review retained; not a fresh verification"
+    }
+  ],
+  "uciDiscrepancyBudgetIds": [
+    "UC-0112",
+    "UC-0117",
+    "UC-0118",
+    "UC-0123",
+    "UC-0124",
+    "UC-0129",
+    "UC-0130"
+  ],
+  "records": [
+    {
+      "budgetId": "UC-0002",
+      "expectedDigest": "12576fea76d6d8e9a1b0e9476a366074d18dc962c8369b1c7090c96ab65414a6",
+      "expectedPayloadDigest": "08770b84c85794c4a04a20b4e55702e89b28ffedeb0948fcf2ca339c0ac31c48",
+      "expectedKnownCents": 9394400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0004",
+      "expectedDigest": "fa6f8b0c3e8cc1dc80e8d026dc08e636e43d887cd44f7a60ace870be973311d1",
+      "expectedPayloadDigest": "981d71767b98f527ff785b8f6935906d78f0e4637601a05d195920a75c92c62a",
+      "expectedKnownCents": 9560400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0006",
+      "expectedDigest": "e47def851f6ecb7ee647af38eb7c421191e620f2aef88fbee11d2d54d5efaf38",
+      "expectedPayloadDigest": "45ab331ff233848465fac53f1e2694f65ebfda076596da2d847fdabb68f1879f",
+      "expectedKnownCents": 8896200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0008",
+      "expectedDigest": "66528db7587fd07102beba8fe3f570a2ef75eea18eca9397051cc9fe3026344a",
+      "expectedPayloadDigest": "8eae6f365678156519294c801d636599c2e05cafad1cc61598b3f93a3da53de4",
+      "expectedKnownCents": 7869800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0010",
+      "expectedDigest": "b41109ebf45175edde4340f91db88be1d3779ff9ca3476e095c4660d913bfa0a",
+      "expectedPayloadDigest": "b19c4ec544bb733a384e9af9b2634cd0454b5a7d27482068200e8899181a344a",
+      "expectedKnownCents": 9162200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0012",
+      "expectedDigest": "b4176839551e6185271fc4a58bce439680dc8028fb582d096b6d175741ca0435",
+      "expectedPayloadDigest": "a4fa3c371275c408abf669292619ee25e8ad87163acf64b7668438371a78e361",
+      "expectedKnownCents": 9328200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0014",
+      "expectedDigest": "807d4abafff6c5c08887ecc70f920b778f4066a9fbcff1acd46ea5e621698f1c",
+      "expectedPayloadDigest": "2cd7ba626da4fbe894dddce54c90e9dfaaf8b9050d6eeba1baef048f0463e0f1",
+      "expectedKnownCents": 8664000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0016",
+      "expectedDigest": "44315fad6699483c4e3e6a62e8674cf80538bcc5ab8c55cb13d568a157c9ec0e",
+      "expectedPayloadDigest": "58f111f6fe479a373f96d81cffbdfe36bf8be69c0ad12d3a090e83ca461ba208",
+      "expectedKnownCents": 7637600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0018",
+      "expectedDigest": "5e6b322c011d75beef0eb6f449b2290297119a38d2f01b47f1dbc9d49cacafe2",
+      "expectedPayloadDigest": "b6b6f701aac5fa111a4a6a92cdcac5bf2ae3d6e9a3bbfb1d06b49b9e1daab31b",
+      "expectedKnownCents": 8772200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0020",
+      "expectedDigest": "1cba3950416fa2a86a0ef3c586d870a88b22cfd0f54a4333afa0a9954e89fec6",
+      "expectedPayloadDigest": "c3fab4a594a6097ed6deabd5f96e5560cad0b1429053c2b3eb99b750763803c5",
+      "expectedKnownCents": 8938200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0022",
+      "expectedDigest": "b4ef1214323d060e24e07cc8ffda5987ddaeb78ff162db9d97345153d3ababe0",
+      "expectedPayloadDigest": "d3d31fd163d77b86733cd5a2d39810184c6b69d62af1628fab37d5ca21479406",
+      "expectedKnownCents": 8274000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0024",
+      "expectedDigest": "85a16989c3f5f9fd194015009f1b5f4d73cbfc6381767f97d1887465545ed939",
+      "expectedPayloadDigest": "14789542a62eb32727bb59b7b1205eca1025a1e1d5109b2bce90fb6b60323626",
+      "expectedKnownCents": 7247600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0026",
+      "expectedDigest": "7f907cbb927d66eba99a79a55e353a08f5e24767cec0eef567f80783576d61b0",
+      "expectedPayloadDigest": "b47704015639cf95299faa759e8e2dfcf8c1591a7177ea94c44c2a675b18c05d",
+      "expectedKnownCents": 8541200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0028",
+      "expectedDigest": "74487bc84b2667b0a7c5bd451cd8101a93043b874ef42a3b40714de1a3bcf237",
+      "expectedPayloadDigest": "a5697f4bb0b039edd0a22b274654d2d68cdb69c5d6890b10b75717853b9a9fb0",
+      "expectedKnownCents": 8707200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0030",
+      "expectedDigest": "a8b8a9ace38cdde6183de0b7b4c232c9b24e76a99042853821e5d55ff2355860",
+      "expectedPayloadDigest": "dc77fb553f945f557b4a8bdeb3b5645898b96dfcb011df0883b8779ac25ebf29",
+      "expectedKnownCents": 8043000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0032",
+      "expectedDigest": "59f0d1f8d09434484ac513d35bbf1717bff8c333cdb478849071714406edcab6",
+      "expectedPayloadDigest": "f29aab960bad85f1aa757ba44a7f4ba5bb04f2b523af999342acccf38243c304",
+      "expectedKnownCents": 7016600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0034",
+      "expectedDigest": "a7777ca63e2867d6fab23c2f699beec9b5f918ce2d549d2d9913de33a8959e6b",
+      "expectedPayloadDigest": "7b8a3cca732c30a172f44d3f08aaa700072fc5a2b992f0edcb1f05e933330f90",
+      "expectedKnownCents": 8321600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0036",
+      "expectedDigest": "16ac2a87cb7879a65721e7eb4ab22f2fb5215c5bc966d0b103b64eb6da9b075a",
+      "expectedPayloadDigest": "10a426b0a5aaa45523be72d7b0265acc3ff8c5cbefdd900fc01d9f05151ccaf7",
+      "expectedKnownCents": 8487600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0038",
+      "expectedDigest": "1fd6624ef3ded0626b8a61e87003d6b451472696ad633f4db29bf8241537fb0b",
+      "expectedPayloadDigest": "f574e6a020d6fa4d41483c34746f8ab75119dfdc011f8e2f0502038f082ce6a4",
+      "expectedKnownCents": 7823400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0040",
+      "expectedDigest": "2f2170135cbe06e7039420e29b92f9b4594f4f1bced39d28235ea7e48c6e55e5",
+      "expectedPayloadDigest": "8bf5d4fcc42270b42a90dfd029c5cb581a5685d01fd34b3206d0f186f563934d",
+      "expectedKnownCents": 6797000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0042",
+      "expectedDigest": "13a8642561812f57d1c9f43db14ba4d4197417b2049f392a76cb38ca2dc0e420",
+      "expectedPayloadDigest": "10f416c8b88ecf32e6069a1d7af8df136e3ad0b09fd934ae433de75ea32fd524",
+      "expectedKnownCents": 8141000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0044",
+      "expectedDigest": "c9715325629396ddacade8988d6d6a5ae3642a7e9c0eb8ea28cee0b419940140",
+      "expectedPayloadDigest": "5c13275a65eb43a903d07db014382cb818c29379ad2b164a5a45456e625bb3e6",
+      "expectedKnownCents": 8307000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0046",
+      "expectedDigest": "fa3292ffb737c2ee2f13498e53f7caf49abe213d5aba01853b07a7f9ce56e408",
+      "expectedPayloadDigest": "5bbb4e8f0829e27ca217c0dbca2fac21d04c2229c17d77cea1be832156ceb120",
+      "expectedKnownCents": 7642800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0048",
+      "expectedDigest": "c559b9fce82ea0ab9ade66e614137180c675b61166c6e98c59588f885ba05fa1",
+      "expectedPayloadDigest": "8d41ee189689641c1a75ebe18e2c69e459a2fa0411b800abdb3ae8e9981b27b4",
+      "expectedKnownCents": 6616400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0110",
+      "expectedDigest": "794034cbe9dc8090d0dc69be9917c32a862e2745fc9ce92c635f52c736fa0b75",
+      "expectedPayloadDigest": "8ae5d479a71e39264e1f2c27675613da9c938b32d95727ae7deb972e1eafd245",
+      "expectedKnownCents": 7587500,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0112",
+      "expectedDigest": "5aef3332d43c83eec5c8422b418be6538603d049db4b98ce39116e3988c5c8cb",
+      "expectedPayloadDigest": "27eaf7e059f798d3e258966e6727536711ac17179c9e2493a143448bba78056e",
+      "expectedKnownCents": 8447600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0114",
+      "expectedDigest": "192eb6a30c0b5fde72f19395e20d743aac4bb87a28e8c6ffd482e28349f6017f",
+      "expectedPayloadDigest": "85e189f1d7daf2aebd18f2efb490aa623211f6cfccda1d451486655978be926b",
+      "expectedKnownCents": 8940000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0115",
+      "expectedDigest": "242646348674a4b3d72772c74eedf293e52fc0ea373cccb45c94a1a09f89ba02",
+      "expectedPayloadDigest": "8b5181aaaf76842b2ec5b5d2785e1176764452c3e9c50ab65c03efc06b3f0b90",
+      "expectedKnownCents": 3595100,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0116",
+      "expectedDigest": "3397bc9a383392f796bb8eeb19ab1dd2f6911b5eb692c781e73e93f3404428f2",
+      "expectedPayloadDigest": "675e4b2510ba9d2c21fd2e51e196fc56dcab52ea5b99b4d44519b425472e397c",
+      "expectedKnownCents": 7355300,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0117",
+      "expectedDigest": "d11f6916e13b6779e7ef8a7269d2c84040f01b056629dcde168b7eb5f616effc",
+      "expectedPayloadDigest": "0ed5b4bfe9f84ef4088cdf283ce94fb3cd0c1ecfb6b32717f6cadc339a3ac9bd",
+      "expectedKnownCents": 4455200,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0118",
+      "expectedDigest": "542905998950d8eaceabc3f2ab69438ac11707941a12733951c585d32903fc85",
+      "expectedPayloadDigest": "3736ad3258566da0cae27a15e977fe60339ae06142b4f9a1c1cbf684f5f9f965",
+      "expectedKnownCents": 8215400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0119",
+      "expectedDigest": "59d5319ed24cbe251d0f68dcdaaab8fd245517fd02ecee678fb2094bb205e702",
+      "expectedPayloadDigest": "12724f544f79edbe1720c94a65c90beb21fac8741f812e3cc0d41f5d6e67e660",
+      "expectedKnownCents": 4947600,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0120",
+      "expectedDigest": "ff68bbc444f23553031ee112313bb5de29dfc3e357128318f6508fb978b5b3cc",
+      "expectedPayloadDigest": "754e4ed5eb0e945857be630bdb8406a0dbec11a8169f1342c14830e66e8290f4",
+      "expectedKnownCents": 8707800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0121",
+      "expectedDigest": "10a73686661f170bed494854f63ca3da029e3c6261d663d7a604528295546cb5",
+      "expectedPayloadDigest": "dddeea1bec6839d16f72996ddb897ad7a9da55b63d1fd38551ab96455410e03d",
+      "expectedKnownCents": 3545300,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0122",
+      "expectedDigest": "f83b94b5f5780710554e70dc8d911e772290401d2a77e2262a5b9409da41de49",
+      "expectedPayloadDigest": "8e3916b09643045d8b64a67b7b22478cf75bca560d045058e27633b52d1201c8",
+      "expectedKnownCents": 6965300,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0123",
+      "expectedDigest": "9fbf7a3206d5aebca4d56939995c737e8e451b231c3469db382dc0e234b593cd",
+      "expectedPayloadDigest": "29e398f5cecc1a7e4818fbd65912650822b1b0931a8dc24dda78109abcba078e",
+      "expectedKnownCents": 4405400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0124",
+      "expectedDigest": "8695a3a43e5bd4a9f082d7b3db644fcdbb7af70380f2bf0be4ccffebb68bbf20",
+      "expectedPayloadDigest": "9d96fd37f2cf6ff9db863f13c5f3934785ebc624977cb6ba20b8fe5d08a345a7",
+      "expectedKnownCents": 7825400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0125",
+      "expectedDigest": "e630dcd34f1300fd676b1209db5fe24eb6e4b1b55405fa390c441f4558750448",
+      "expectedPayloadDigest": "90af366e628b9264805c1126a24e3bf34783b7445653dc4ecceb746873609415",
+      "expectedKnownCents": 4897800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0126",
+      "expectedDigest": "0fc22de78c4bc5645ad154ac8fdcf27d4f893e480ccd57807bfa0584e39e2170",
+      "expectedPayloadDigest": "9c8f0bd48df9d96cf8b5a0372055c994094dd85ecdd0b34388c78060dbbdb64c",
+      "expectedKnownCents": 8317800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0127",
+      "expectedDigest": "a126eebb3a2ee76ccdd1947c3d8d7d0a6e10b87d462318b42aa0075c60c92d07",
+      "expectedPayloadDigest": "caf65f2e580d16c7f3495ac0de625936b74b57b5486a94b50621632bf966e818",
+      "expectedKnownCents": 3476900,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0128",
+      "expectedDigest": "0a52abc6345888cd57753a82817061aab0cfea2c3bf3b03d230e0ad8d9249232",
+      "expectedPayloadDigest": "60dfc27fa0d464333618de9a3c3ece95caa8bdf1332ab3cb7e50a5771bb42d65",
+      "expectedKnownCents": 6734300,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0129",
+      "expectedDigest": "380ce05e92a412b2716921cc82d0264f95b05dc04be55700b789546398334915",
+      "expectedPayloadDigest": "9ef35358c408d5bfd70691d29f0ee4d976c6dcceb1b622fe3a25632280ff34ad",
+      "expectedKnownCents": 4337000,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0130",
+      "expectedDigest": "6d42c36cdffd17516ae7cf61eed246308293fbe55fddb85e70e58500394fd49a",
+      "expectedPayloadDigest": "ab29465d0ba62f89158e56d064e0aafa09804f5c14d0dc382b7422b8584a210b",
+      "expectedKnownCents": 7594400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0131",
+      "expectedDigest": "a72f998c82ea567566f0b2e63889130ee04fc3c11464ab6b9ebecc0d0a9ceff5",
+      "expectedPayloadDigest": "6e0848f9c6aea7027d27eeb48278853c9dea0433d985ff45b70585e2163b5d68",
+      "expectedKnownCents": 4829400,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0132",
+      "expectedDigest": "381c01391c319d92c92d2a2cebad0ac80f1fcb3e5ac4c62bab8d10823ace7464",
+      "expectedPayloadDigest": "4015a6eec21bfc17b620b8f7b99e834a68f33f911d782196bcaee7c021a24dcf",
+      "expectedKnownCents": 8086800,
+      "basis": "calculated"
+    },
+    {
+      "budgetId": "UC-0353",
+      "expectedDigest": "093f10895916cac449466b5dc8e8917e3d0f993f244e7a643239815bcef4921a",
+      "expectedPayloadDigest": "e9f2979c8daab99c67737ea296e6567cb968d3485a06f699e5c1f43f1829c71d",
+      "expectedKnownCents": 2905200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0354",
+      "expectedDigest": "c8e15e2c0966b512e58dae7b4e8fb5f6824f8bbaabdd54f149a204b06436fa1a",
+      "expectedPayloadDigest": "dcfbcf06041be1e5d890088cdc87dc6776a4414323d275ec6361fbd465844715",
+      "expectedKnownCents": 645600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0355",
+      "expectedDigest": "b851df23b7f4ee0c87a86c23d0f0fa0b2c19057b0c2c0c3d7497d4635e666fcd",
+      "expectedPayloadDigest": "f52c51655051ea1ee2cfd301768adf83052aee62a38da883eb066fd39cfcea54",
+      "expectedKnownCents": 2905200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0356",
+      "expectedDigest": "81b02ef860b7fc3120fe4e508f859211d4494d7b1df392ec045d8fc3323743cd",
+      "expectedPayloadDigest": "f6e64264eb356c8c9be8e8e0bca863600cc917f3c5ec7e5bfc73f399b5a16434",
+      "expectedKnownCents": 3550800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0357",
+      "expectedDigest": "eadd41a30aa442d5a004eb50dde0b71392f830cff358c84e05b622fba8742347",
+      "expectedPayloadDigest": "b40c70a0014ea0768946562a4579723ee57909465559abb62fe5775b541c3bbe",
+      "expectedKnownCents": 645600,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0358",
+      "expectedDigest": "6b38a8ed26044ee9894b6d08014b4e2838ca3152f956707ae575e404bd0cf377",
+      "expectedPayloadDigest": "c2d84504e3c812753df15ce2184709951b56892bc775bcbc8eca65b3580d3c7b",
+      "expectedKnownCents": 2905200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0359",
+      "expectedDigest": "8e497612b1238f0aab691b4ea81f5ad901211a37d4859a10d3355382e0bde193",
+      "expectedPayloadDigest": "7162a09bde99d407a947bdcfdf221a360640f6880eec3dd5cd93e30d061ed592",
+      "expectedKnownCents": 4415400,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0360",
+      "expectedDigest": "3885548ed690586ac0d728b4110eefce3b853c77bcedddd3fb6cb062e438836f",
+      "expectedPayloadDigest": "6e8a9ad9b6e11c9bc440d03b9a8262abc7043134844c3579b0b58714f03133dd",
+      "expectedKnownCents": 3550800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0361",
+      "expectedDigest": "55a4373ec0552c8cf1c520250e54485ce84d47fc10d58acde0ae34f275cd7d33",
+      "expectedPayloadDigest": "ab429aed68776e78c9891c7f80152a29eba32a3defd6cdbeb4564dbc0ec046cf",
+      "expectedKnownCents": 3550800,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0362",
+      "expectedDigest": "8d5652926fc7c43eca4dc46055bef04f896f3a0e7e9745703df80928d408d605",
+      "expectedPayloadDigest": "5757e3dacf971576bc9ed3b91bc0c1aa9948c128f2394d5f0d31d0fceb41bee7",
+      "expectedKnownCents": 2905200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0363",
+      "expectedDigest": "6b06a5b9d8c95ec58c722b8c5c0b113213a32db63b6738e651fe4708e783c998",
+      "expectedPayloadDigest": "6c36c588541cfa44a9f31adcb38046b79cbe3f400c58141ddea0b12d979221b4",
+      "expectedKnownCents": 2905200,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0489",
+      "expectedDigest": "74e71261a192c810b2bd602181b2fb12a813db03b9a2a0f5dedefa9114189934",
+      "expectedPayloadDigest": "5164e304abf0ee418a8aee62ea5d2682343be78415fa7d6784e7d991558fbf64",
+      "expectedKnownCents": 3308000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0490",
+      "expectedDigest": "dff6714646141b8a98a3d41f7f9c63b0f3df07e0185a5a734d4fa5a9cde65ad4",
+      "expectedPayloadDigest": "a85ecb9f179e23203b64b506c97d2fec655a5b6dd53da2276736c613694fd22a",
+      "expectedKnownCents": 3308000,
+      "basis": "partial"
+    },
+    {
+      "budgetId": "UC-0491",
+      "expectedDigest": "4c6997fc08c49bb2e4ac6ad31fab0a3a4a9ef5b533e4bbe759306bce50c112ba",
+      "expectedPayloadDigest": "2da617b17d679434140fefbb8e11c03b2e56cec70ce084ab288d580840423d8b",
+      "expectedKnownCents": 3308000,
+      "basis": "partial"
+    }
+  ]
+}

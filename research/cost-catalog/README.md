@@ -1,12 +1,22 @@
 # Isolated published-cost staging
 
+## UC estimate extension — November 15, 2026
+
+See [UC calculated and partial estimates](UC_ESTIMATES_2026_11_15.md).
+The reviewed UC selection adds 45 calculated and 14 explicitly partial estimates,
+preserving all 491 UC scenarios and the 776-scenario CSU release. Missing UCSF
+fees and coverage periods and the seven Irvine subtotal discrepancies stay
+explicit. Preparation, local testing and production publication are separate;
+production activation receipts are recorded under `.local/uc-estimates-20261115/`.
+
 ## Calculated and partial estimates — local only, November 15, 2026
 
 See [calculated totals and partial estimates](CSU_ESTIMATES_LOCAL_2026_11_15.md).
 The isolated selection contains 776 CSU scenarios: 607 previously selected
 budgets, 44 explicitly calculated estimates, and 125 partial estimates with all
 unknown charges preserved. The 43 disputed scenarios remain held. All 491 UC
-records are preserved. Production and the running microphone app are unchanged.
+records are preserved. This section describes the original isolated rehearsal.
+The subsequent CSU production release uses these 776 scenarios, with 43 held.
 
 ## CSU production publication — November 14, 2026
 

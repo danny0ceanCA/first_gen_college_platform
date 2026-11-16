@@ -1,4 +1,4 @@
-export type CatalogEstimate={version:1;basis:'calculated'|'partial';amount:number;unresolved:{key:string;label:string;rate:number|null;unit:string;qualification:string}[]};
+export type CatalogEstimate={version:1;basis:'calculated'|'partial';amount:number;unresolved:{key:string;label:string;rate:number|null;unit:string;qualification:string}[];note?:string};
 export type PublishedBudget={year:string;population:string;currency:'USD'|'CAD'|'EUR'|'GBP'|'MXN';period:'academic_year'|'calendar_year'|'semester'|'quarter'|'month';housing:'renting'|'with_family'|'on_campus'|'off_campus'|'unspecified';assumed:boolean;total:number|null;sourceCitation:string;complete:boolean;expectedCategories:string[];components:{key:string;sourceLabel:string;amount:number|null;role:'component'|'subtotal'|'excluded'|'additional'|'missing';qualification:string}[];catalogEstimate?:CatalogEstimate};
 export const budgetKeys:string[];
 export const publishedBudgetSchema:Record<string,unknown>;

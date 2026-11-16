@@ -23,7 +23,8 @@ export function validatedCatalogEstimate(value,budget){
  if(value.unresolved.some(u=>!u||!budgetKeys.includes(u.key)||typeof u.label!=='string'||!u.label.trim()||u.label.length>120||
   !(u.rate===null||Number.isFinite(u.rate)&&u.rate>=0&&u.rate<=10000000)||typeof u.unit!=='string'||u.unit.length>100||
   typeof u.qualification!=='string'||u.qualification.length>500))return null;
- return {version:1,basis:value.basis,amount:value.amount,unresolved:value.unresolved.map(u=>({...u}))};
+ if(value.note!==undefined&&(typeof value.note!=='string'||!value.note.trim()||value.note.length>240))return null;
+ return {version:1,basis:value.basis,amount:value.amount,unresolved:value.unresolved.map(u=>({...u})),...(value.note?{note:value.note}:{})};
 }
 export function catalogEstimateSources(sources=[],citation){
  const ids=citation===undefined?null:[...String(citation).matchAll(/\[(\d+)\]/gu)].map(m=>Number(m[1]));
