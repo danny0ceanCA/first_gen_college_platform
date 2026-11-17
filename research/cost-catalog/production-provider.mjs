@@ -6,7 +6,9 @@ import {createLocalCostLookup} from './local-provider.mjs';
 export async function createProductionCatalogProvider(env,{Pool=pg.Pool}={}){
  if(env.ORIGEN_COST_CATALOG!=='true')throw Error('production_catalog_not_enabled');
  if(!env.RESEARCH_WORKER_DATABASE_URL)throw Error('research_worker_database_required');
- const pool=new Pool({connectionString:env.RESEARCH_WORKER_DATABASE_URL,max:2,
+ // The worker role allows three connections: two for jobs/traces and one for
+ // all catalog reads. Nursing shares this same read-only query interface.
+ const pool=new Pool({connectionString:env.RESEARCH_WORKER_DATABASE_URL,max:1,
   connectionTimeoutMillis:3000,statement_timeout:1500,query_timeout:2000,
   options:'-c default_transaction_read_only=on'});
  try{
@@ -17,5 +19,6 @@ export async function createProductionCatalogProvider(env,{Pool=pg.Pool}={}){
   const readiness=(await pool.query('SELECT 1 AS available FROM coa_catalog.production_published LIMIT 1')).rows[0];
   if(!readiness?.available)throw Error('published_catalog_required');
  }catch(error){await pool.end();throw error;}
- return {lookup:createLocalCostLookup({query:pool.query.bind(pool),publication:'production'}),close:()=>pool.end()};
+ const query=pool.query.bind(pool);
+ return {query,lookup:createLocalCostLookup({query,publication:'production'}),close:()=>pool.end()};
 }

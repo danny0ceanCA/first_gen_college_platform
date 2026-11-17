@@ -31,6 +31,12 @@ sentences can accompany a withheld price, with the full original in the report.
 Unknown component prices remain explicitly unpriced and never become zero.
 Scope clarifications also carry pending review in the finding delivered to Live.
 
+Nursing and UC/CSU share one verified read-only catalog pool with a maximum of
+one connection. Together with the job/trace pool's maximum of two, this fits
+the production worker role's three-connection limit. Temporarily unavailable
+nursing discovery retries after 30 seconds instead of disabling nursing for
+the lifetime of the worker. Concurrent retries share the same discovery query.
+
 The pinned operator is `scripts/publish-nursing-catalog.mjs` (`inspect`,
 `publish`, `verify` plus the full batch ID). It verifies the confirmed Render
 workspace, worker, database, repository and external TLS target. Credentials
@@ -108,7 +114,7 @@ python -m unittest discover -s research/nursing-catalog/vendor/staging_v24/nursi
 $env:ORIGEN_NURSING_LOCAL_TEST='true'
 $env:ORIGEN_NURSING_BATCH='<full-batch-id>'
 node --test research/nursing-catalog/postgres.test.mjs
-node --test research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs
+node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,
