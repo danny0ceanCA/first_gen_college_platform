@@ -30,11 +30,17 @@ test('every supplied nursing record is retrievable with retained caveats in Engl
   assert.equal(result.nursingCatalog.pending,true);assert.equal(result.nursingCatalog.sourceVerified,false);
   const brief=researchBriefSelection(result);assert.equal(brief.evidenceFormat,'brief-v1');assert.equal(brief.verification,'partial');
   assert.equal(brief.findings.length,1);assert.ok(brief.sources.length);
+  assert.match(brief.findings[0].qualification,/pending|pendiente/i);
+  for(const key of ['Program / degree','Institution / location note','Academic year','Entering cohort / applies to','Budget period','Residency','Housing','Enrollment','Cost coverage']){
+   const value=r.payload.values[key];if(value)assert.ok(brief.text.includes(value),`${r.budget_id}: live scope ${key}`);
+  }
   for(const item of groups.get(r.budget_id)||[])assert.ok(result.text.includes(item.id),item.id);
   for(const decision of r.payload.normalized.caveated_decisions)assert.ok(result.text.includes(decision.required_caveat));
  }
  const lmc=await lookup({mode:'finance',institution:'Los Medanos College',question:'Los Medanos vocational nursing costs',language:'en'});
  assert.ok(lmc);assert.ok(lmc.text.includes('5,369'));assert.ok(lmc.text.includes('5,321'));
+ const conflictBrief=researchBriefSelection(lmc).text;
+ for(const phrase of ['5,369','5,619','5,321','5,821','Spring 2026','remains unconfirmed'])assert.ok(conflictBrief.includes(phrase),phrase);
  const bls=await lookup({mode:'finance',institution:'Cal State Los Angeles',question:'BLS certification cost for nursing reference NUR-0042',language:'en'});
  assert.match(bls.voiceBrief.answer,/\$40–\$60/);assert.equal(bls.voiceBrief.status,'partial');
  const site=await lookup({mode:'finance',institution:'Carrington College',question:'Vocational nursing at Carrington College in Bakersfield',language:'en'});

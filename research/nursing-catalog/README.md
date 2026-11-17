@@ -22,6 +22,15 @@ than dropping their qualifications; focused component questions can return the
 scoped component instead. No voice prompt, scheduler, floor control or Live API
 event contract changes are required, and lookup adds no model call.
 
+The bounded fallback retains the complete program, location, cohort, year and
+scenario scope, including pending review. Required decision caveats and
+unresolved applicability take priority over suggested figures. Whole statements
+can use either field of the same finding; source paragraphs are never cut to
+fit a monetary claim. When a long source history cannot fit, complete warning
+sentences can accompany a withheld price, with the full original in the report.
+Unknown component prices remain explicitly unpriced and never become zero.
+Scope clarifications also carry pending review in the finding delivered to Live.
+
 The pinned operator is `scripts/publish-nursing-catalog.mjs` (`inspect`,
 `publish`, `verify` plus the full batch ID). It verifies the confirmed Render
 workspace, worker, database, repository and external TLS target. Credentials
@@ -99,6 +108,7 @@ python -m unittest discover -s research/nursing-catalog/vendor/staging_v24/nursi
 $env:ORIGEN_NURSING_LOCAL_TEST='true'
 $env:ORIGEN_NURSING_BATCH='<full-batch-id>'
 node --test research/nursing-catalog/postgres.test.mjs
+node --test research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,
@@ -107,6 +117,13 @@ idempotency, immutable records, actual PostgreSQL constraints, rollback and the
 complete supplied-workbook round trip. The database tests roll back their data.
 Before and after the real import, all existing UC/CSU rows, approvals, releases
 and test-view membership are compared to confirm they are unchanged.
+
+Projection regressions reassemble the actual bounded Live evidence packets in
+English and Spanish to check conflict endpoints, validity dates, unknown prices,
+campus scope and additional-fee warnings. The supplied-record sweep checks all
+1,016 records in both languages for retained live scope and pending review.
+Production checks use the deployed provider and actual restricted worker login
+against production data; they verify payloads, not audible model delivery.
 
 The V24.1 adapter and its tests live under `vendor/staging_v24/` with their
 original directory relationships. Local compatibility changes specify UTF-8
