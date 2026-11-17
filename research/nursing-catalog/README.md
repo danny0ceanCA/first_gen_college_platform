@@ -37,6 +37,16 @@ the production worker role's three-connection limit. Temporarily unavailable
 nursing discovery retries after 30 seconds instead of disabling nursing for
 the lifetime of the worker. Concurrent retries share the same discovery query.
 
+Nursing requests never substitute a general UC/CSU undergraduate budget when
+their program or scope is unavailable. A miss remains on the ordinary research
+path. Explicit NUR references still enforce institution, year, program, site,
+residency, housing and enrollment; conflicting or multiple references return a
+pending clarification without a price. Cost-item references identify their own
+line items, while total-budget questions cannot select a component as the total.
+Multi-component questions do not receive an invented combined subtotal. The
+shared research-aspect classifier preserves focused requests such as total
+tuition and distinguishes them from a complete program budget.
+
 The pinned operator is `scripts/publish-nursing-catalog.mjs` (`inspect`,
 `publish`, `verify` plus the full batch ID). It verifies the confirmed Render
 workspace, worker, database, repository and external TLS target. Credentials
@@ -114,7 +124,7 @@ python -m unittest discover -s research/nursing-catalog/vendor/staging_v24/nursi
 $env:ORIGEN_NURSING_LOCAL_TEST='true'
 $env:ORIGEN_NURSING_BATCH='<full-batch-id>'
 node --test research/nursing-catalog/postgres.test.mjs
-node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs
+node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs research/nursing-catalog/lookup-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

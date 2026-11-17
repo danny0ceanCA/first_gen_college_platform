@@ -1,6 +1,6 @@
 import pg from 'pg';
 import {createProductionCatalogProvider as createCostProvider} from '../cost-catalog/production-provider.mjs';
-import {createNursingLookup} from './lookup.mjs';
+import {createNursingLookup,isNursingCatalogRequest} from './lookup.mjs';
 
 // Compose with the established UC/CSU provider. No new Live tool or model call.
 export async function createProductionCatalogProvider(env,{Pool=pg.Pool,now=Date.now}={}){
@@ -21,5 +21,10 @@ export async function createProductionCatalogProvider(env,{Pool=pg.Pool,now=Date
   return discovering;
  };
  await discover();
- return {lookup:async(input,options)=>await (await discover())?.(input,options)||await costs.lookup(input,options),close:costs.close};
+ return {lookup:async(input,options)=>{
+  // A miss or outage is not evidence that a general undergraduate budget
+  // applies to nursing. Returning null keeps the ordinary research path.
+  if(!isNursingCatalogRequest(input))return costs.lookup(input,options);
+  return await (await discover())?.(input,options)||null;
+ },close:costs.close};
 }

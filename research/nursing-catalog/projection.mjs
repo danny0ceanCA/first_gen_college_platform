@@ -1,4 +1,5 @@
 import {researchBriefSelection} from '../../src/researchBrief.mjs';
+import {requestedResearchAspects} from '../../src/researchQuestion.mjs';
 
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
@@ -7,8 +8,8 @@ const boundedBrief=(answer,qualification)=>answer.length<=700&&qualification.len
 // Keep complete statements together in one finding. The two fields share a
 // bounded voice unit; moving a whole statement between them loses no caveat.
 // A long source paragraph is never cut to make room for a monetary claim.
-function caveatedFallback({college,scope,pending,selected,answer,citation,decisions,conditions,es}){
- let lead=selected?.normalized.value_representation==='Unpriced or variable'?answer:
+function caveatedFallback({college,scope,pending,selected,answer,citation,decisions,conditions,es,preserveAnswer=false,includeSuggestions=true}){
+ let lead=preserveAnswer||selected?.normalized.value_representation==='Unpriced or variable'?answer:
   es?`${college}: esta referencia contiene condiciones o conflictos; no establece un precio completo confirmado. ${citation}`:
   `${college}: this reference has qualifications or conflicts; it does not establish a confirmed complete price. ${citation}`;
  let qualification=pending+' '+scope;
@@ -25,7 +26,7 @@ function caveatedFallback({college,scope,pending,selected,answer,citation,decisi
  // Only quote a decision's suggested amounts if all its warnings are present.
  for(const d of decisions){
   const required=append(d.required_caveat),unresolved=append(d.still_unresolved);
-  if(required&&unresolved)append(d.suggested_wording);
+  if(required&&unresolved&&includeSuggestions)append(d.suggested_wording);
  }
  for(const text of [...new Set(conditions.filter(Boolean))]){
   if(append(text))continue;
@@ -70,16 +71,23 @@ export function projectNursingRecord(row,items,language='en',question=''){
  const decisions=n.caveated_decisions||[];
  const conditions=[v['Scope and exclusions'],v['Required source-scope handling'],...decisions.flatMap(d=>[d.required_caveat,d.still_unresolved])].filter(Boolean);
  const allItems=items.map(r=>r.payload??r);
- const feeOnly=/\b(?:tuition|matricula|colegiatura|fees|cuotas)\b/u.test(q)&&!/\b(?:total|coa|cost of attendance|costo de asistencia|breakdown|desglose)\b/u.test(q);
+ const requestedAspects=requestedResearchAspects(question);
+ const aggregate=requestedAspects.includes('total_budget');
+ const feeOnly=!aggregate&&requestedAspects.includes('tuition_fees');
+ const requestedItemIds=[...new Set([...question.matchAll(/\bNUR-\d{4}-\d{3}\b/giu)].map(m=>m[0].toUpperCase()))];
  const named=allItems.filter(i=>{
   const tokens=fold(i.values['Original source label']).split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the'].includes(x));
   return tokens.length&&tokens.some(token=>q.split(' ').includes(token));
  });
  const tuition=allItems.filter(i=>/tuition|matricula|colegiatura/u.test(fold(i.values.Category+' '+i.values['Original source label']))&&!/nonresident|non resident|supplemental/u.test(fold(i.values.Category)));
- let selected=feeOnly?tuition.length===1?tuition[0]:null:named.length===1?named[0]:null;
+ const multipleComponents=!aggregate&&(requestedItemIds.length>1||!requestedItemIds.length&&named.length>1);
+ const missingComponent=!aggregate&&requestedItemIds.length===1&&!allItems.some(i=>i.id===requestedItemIds[0]);
+ let selected=aggregate||multipleComponents||missingComponent?null:requestedItemIds.length===1?allItems.find(i=>i.id===requestedItemIds[0]):named.length===1?named[0]:feeOnly&&tuition.length===1?tuition[0]:null;
  const totalRange=allItems.find(i=>/program total|total program|published.*total/u.test(fold(i.values['Original source label']))&&['Published range','Published lower bound','Published upper bound'].includes(i.normalized.value_representation));
  let answer;
- if(selected){answer=`${v.College}: ${selected.values['Original source label']}: ${itemValue(selected,es)}; ${selected.values['Amount period']}. ${citation}`;conditions.push(selected.values['Conditions / notes'],selected.normalized.caveated_handling);}
+ if(missingComponent)answer=es?`${v.College}: no se encontró la partida solicitada en esta referencia. No se ha establecido su importe. ${citation}`:`${v.College}: the requested cost item was not found in this reference. Its amount is not established. ${citation}`;
+ else if(multipleComponents)answer=es?`${v.College}: se solicitaron varias partidas; la referencia no establece un subtotal combinado para ellas. Hay que conservar el importe y alcance de cada partida. ${citation}`:`${v.College}: several components were requested; this reference does not establish a combined subtotal for them. Each component needs its own amount and scope. ${citation}`;
+ else if(selected){answer=`${v.College}: ${selected.values['Original source label']}: ${itemValue(selected,es)}; ${selected.values['Amount period']}. ${citation}`;conditions.push(selected.values['Conditions / notes'],selected.normalized.caveated_handling);}
  else if(feeOnly)answer=es?`${v.College}: la referencia no establece un subtotal único de matrícula para este alcance. ${citation}`:`${v.College}: this reference does not establish one tuition subtotal for this scope. ${citation}`;
  else if(n.published_cents!==null)answer=`${v.College}: ${es?'importe publicado':'source-published amount'} ${money(n.published_cents)} USD; ${scope}. ${citation}`;
  else if(totalRange){selected=totalRange;answer=`${v.College}: ${es?'rango o límite publicado':'source-published range or bound'} ${itemValue(totalRange,es)}; ${scope}. ${citation}`;}
@@ -93,22 +101,26 @@ export function projectNursingRecord(row,items,language='en',question=''){
  // Long records remain fully available in the report and focused follow-ups.
  if(!boundedBrief(answer,qualification)){
   ({answer,qualification}=caveatedFallback({college:v.College,scope,pending,selected,answer,citation,
-   decisions:relevantDecisions,conditions,es}));
+   decisions:relevantDecisions,conditions,es,preserveAnswer:multipleComponents||missingComponent||feeOnly&&!selected,
+   includeSuggestions:!multipleComponents&&!missingComponent}));
  }
  const detail=[`${record.id}: ${v.College}`,scope,fullQualification,...allItems.map(i=>{
   const id=sourceId(i.normalized.source_url)||mainId;
   return `${i.id}: ${i.values['Original source label']}: ${itemValue(i,es)}; ${i.values['Amount period']}; ${i.values['Relationship to total']}. ${i.values['Conditions / notes']||''} ${i.normalized.caveated_handling||''} [${id}]`;
  }),...decisions.map(d=>`${d.suggested_wording||''} ${d.required_caveat} ${d.still_unresolved||''}`)].join('\n');
- const finding={subject:v.College,aspect:feeOnly?'tuition_fees':'total_budget',status:'partial',answer,qualification,budget:null,evidence:null};
+ const aspect=feeOnly?'tuition_fees':(selected&&selected!==totalRange||multipleComponents||missingComponent)?'other':'total_budget';
+ const finding={subject:v.College,aspect,status:'partial',answer,qualification,budget:null,evidence:null};
  const result={text:detail,parts:[{text:detail}],sources,checkedAt:v['Source checked'],voiceBrief:{status:'partial',answer,qualification,nextStep:'',findings:[finding]},catalogPublication:'production',nursingCatalog:{recordId:record.id,pending:true,sourceVerified:false,publicationId:row.publication_id},catalogAdditionalDetails:detail};
  if(researchBriefSelection(result).evidenceFormat!=='brief-v1')throw Error('nursing_brief_not_bounded');
  return result;
 }
 
-export function nursingClarification(records,language='en'){
+export function nursingClarification(records,language='en',{scopeConflict=false,multipleReferences=false}={}){
  const es=language==='es',r=records[0];if(!r)return null;
- const options=[...new Set(records.map(r=>[r.program,r.payload.values['Institution / location note'],r.academic_year_raw,r.payload.values['Entering cohort / applies to'],r.budget_period,r.residency,r.housing,r.enrollment].filter(Boolean).join(' / ')))];
- const answer=es?'Hay varias referencias de enfermería con alcances diferentes. Falta identificar el programa, período o modalidad antes de citar un importe.':'There are several nursing references with different scopes. The program, period or scenario needs to be identified before quoting an amount.';
+ const options=[...new Set(records.map(r=>[r.budget_id,r.program,r.payload.values['Institution / location note'],r.academic_year_raw,r.payload.values['Entering cohort / applies to'],r.budget_period,r.residency,r.housing,r.enrollment].filter(Boolean).join(' / ')))];
+ const answer=scopeConflict?(es?'La referencia de enfermería no coincide con la institución o el escenario solicitado. Hay que confirmar la referencia y su alcance antes de citar un importe.':'The nursing reference conflicts with the requested institution or scenario. Confirm the reference and scope before quoting an amount.'):
+  multipleReferences?(es?'Se solicitaron varias referencias de enfermería. Sus alcances deben mantenerse separados; no se ha seleccionado un precio único.':'Several nursing references were requested. Their scopes must be kept separate; no single price has been selected.'):
+  es?'Hay varias referencias de enfermería con alcances diferentes. Falta identificar el programa, período o modalidad antes de citar un importe.':'There are several nursing references with different scopes. The program, period or scenario needs to be identified before quoting an amount.';
  const qualification=es?'Los registros siguen pendientes de revisión de fuentes. El alcance aún no está confirmado.':'The records remain pending source review. The applicable scope is not yet confirmed.';
  const url=r.source_url;return {text:answer+'\n'+options.join('\n'),parts:[{text:answer+'\n'+options.join('\n')}],sources:[{id:1,url,title:r.campus}],checkedAt:r.payload.values['Source checked'],voiceBrief:{status:'partial',answer:answer+' [1]',qualification,nextStep:options.slice(0,3).join('; '),findings:[{subject:r.campus,aspect:'total_budget',status:'partial',answer:answer+' [1]',qualification}]},catalogPublication:'production',nursingCatalog:{pending:true,clarification:true}};
 }

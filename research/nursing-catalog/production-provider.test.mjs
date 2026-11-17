@@ -4,7 +4,7 @@ import {createProductionCatalogProvider} from './production-provider.mjs';
 
 const env={ORIGEN_COST_CATALOG:'true',RESEARCH_WORKER_DATABASE_URL:'postgresql://fixture.invalid/catalog'};
 function fixture({failure=false,absent=false}={}){
- let discovery=0,ended=0;
+ let discovery=0,ended=0,generalQueries=0;
  const pools=[];
  class Pool{
   constructor(options){pools.push(options);}
@@ -21,11 +21,12 @@ function fixture({failure=false,absent=false}={}){
      'Official source URL':'https://example.edu/nursing','Source checked':'2026-11-15'},
     normalized:{source_verified:false,automatic_production_permission:false,published_cents:10000,caveated_decisions:[]}}}]};
    if(sql.includes('production_items'))return {rows:[]};
+   if(sql.includes('FROM coa_catalog.production_published WHERE')){generalQueries++;return {rows:[]};}
    throw Error('unexpected_query');
   }
   async end(){ended++;}
  }
- return {Pool,pools,get discovery(){return discovery;},get ended(){return ended;}};
+ return {Pool,pools,get discovery(){return discovery;},get ended(){return ended;},get generalQueries(){return generalQueries;}};
 }
 const request={mode:'finance',institution:'Example College',question:'Nursing reference NUR-0001',language:'en'};
 
@@ -38,6 +39,16 @@ test('nursing and UC/CSU share one verified read-only catalog connection',async(
   assert.equal(result.nursingCatalog.recordId,'NUR-0001');assert.equal(result.nursingCatalog.pending,true);
  }finally{await provider.close();}
  assert.equal(f.ended,1);
+});
+
+test('an unmatched nursing request cannot fall through to general undergraduate pricing',async()=>{
+ const f=fixture(),provider=await createProductionCatalogProvider(env,{Pool:f.Pool});
+ try{
+  assert.equal(await provider.lookup({mode:'finance',institution:'UC Berkeley',question:'Nursing cost of attendance for a California resident renting off campus',language:'en'}),null);
+  assert.equal(f.generalQueries,0,'no undergraduate prices may substitute for nursing');
+  await provider.lookup({mode:'finance',institution:'UC Berkeley',question:'General undergraduate cost of attendance for a California resident renting off campus',language:'en'});
+  assert.equal(f.generalQueries,1,'ordinary undergraduate pricing keeps its existing path');
+ }finally{await provider.close();}
 });
 
 for(const problem of ['failure','absent'])test(`${problem}: nursing discovery retries without disabling the established provider`,async()=>{
