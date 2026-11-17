@@ -1,0 +1,5428 @@
+{
+  "basis": "Observed CSU workbook category values; NOT verified importer enum",
+  "version": "candidate-1",
+  "source_workbook": "nursing_v11",
+  "canonical_categories": [
+    "Books and supplies",
+    "Estimated uniform expenses",
+    "Food",
+    "Health insurance",
+    "Housing",
+    "Housing and food combined",
+    "Living expenses",
+    "Loan fees",
+    "Mandatory fees",
+    "Nonresident supplemental tuition",
+    "Personal expenses",
+    "Professional program fees",
+    "Transportation",
+    "Tuition",
+    "Tuition and mandatory fees"
+  ],
+  "normalization": "Casefold, replace underscore with space and ampersand with and, collapse whitespace; only listed exact aliases, no substring guessing",
+  "rules": [
+    {
+      "raw_category": "AS clinical lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "AS nursing program",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ASCMC",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ASI fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ASU",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 24
+    },
+    {
+      "raw_category": "ATI EHR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "ATI books tests exit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI first installment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI live review",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI package",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI persemester",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "ATI platform books tests exit exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI second installment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI testing resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "ATI textbook",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI textbooks",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI_pharm",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI_year1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ATI_year2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Accident insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Activity",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Actual loan fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Additional background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Additional program expenses combined",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Administration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Advertised discounted tuition and fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Agency placement",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Anatomy software",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Annual TB physical vaccines",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Annual mask fit testing times2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 20
+    },
+    {
+      "raw_category": "Application fee excluded from published total",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Application fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Approximate tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Athletic one sport",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BLS",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "BLS CPR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "BLS Certification",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "BLS certification $40\u201360",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BLS renewal after year2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BRN application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "BRN application/NCLEX",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BRN examination application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BRN_application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "BRN_livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "BS nursing fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BVNPT NCLEX third party",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "BVNPT application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "BVNPT_posting",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Background DOJ/FBI",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Background Screening",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Background Screening ADB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background and drug screen TBD",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background check",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 12
+    },
+    {
+      "raw_category": "Background drug",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background drug tracking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background drugscreen",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Background drugtest",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Background/drug",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Background/drug/immunization tracking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Basic Needs Center",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Board applications",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Book fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Book shipping",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 43
+    },
+    {
+      "raw_category": "Books $800\u20131000",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books / supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books NCLEXprep",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books ancillary content third party",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books and Supplies",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 12
+    },
+    {
+      "raw_category": "Books and course materials",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books and handouts",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books and supplies",
+      "normalized_category": "Books and supplies",
+      "status": "exact_template_value",
+      "row_count": 53
+    },
+    {
+      "raw_category": "Books digital content LMS",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books estimate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Books handouts",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books materials supplies equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 16
+    },
+    {
+      "raw_category": "Books online resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books supplies",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 103
+    },
+    {
+      "raw_category": "Books supplies equipment",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 29
+    },
+    {
+      "raw_category": "Books supplies including20lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Books supplies materials Complio",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books supplies materials equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 15
+    },
+    {
+      "raw_category": "Books supplies technology",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Books supplies uniforms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Books supplies uniforms and services",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books uniforms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books variable",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Books/materials",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 40
+    },
+    {
+      "raw_category": "Books/materials/equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Books/supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 17
+    },
+    {
+      "raw_category": "Bren Events Center",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Bundled direct costs academic year 1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Bundled direct costs academic year 2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Bundled tuition books supplies technology lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Bus pass",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "CARP",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "CPR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 29
+    },
+    {
+      "raw_category": "CPR BLS",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "CPR alternative",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "CPR maskfit background drugscreen",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "CSNAdues",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Campus fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 17
+    },
+    {
+      "raw_category": "Campus life",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Campus studentfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Campusfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Canvas access",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Capital outlay",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Cards CPR fire MAB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Castle Branch screening tracking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "CastleBranch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "CastleBranch MyClinicalExchange",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "CastleBranch medical background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Center representation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Child care",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Childcare",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Clinical Place Tool - My Clinical Exchange",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Clinical Placement Tool - My Clinical Exchange",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Clinical commuting",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Clinical compliance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical course fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Clinical exchange",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical lab supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical onboarding",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Clinical orientation/tracking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Clinical requirements",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Clinical transport/parking $1200\u20134400",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Clinical transportation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "College registration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "College registrationfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Community health lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Completion-phase tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Compliance tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Complio",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Comprehensive Assessment & Review Program",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Comprehensive Assessment & Review Program (CARP)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Computer iPad",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Conditional fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Confirmatoryifpositive",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Consultation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Core books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Core nursing fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Core tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Core tuition18 quarter units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Corequisite tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Course tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Dependent care",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 16
+    },
+    {
+      "raw_category": "Dependentcare",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Device first year only",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Disability needlestick",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Document fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Dorm student association",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Drug Screening",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Drug background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Drug screen",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Drug screen fingerprint",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Drug/background/health/e-learning",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Drugscreen",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "ELNEC",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Elsevier",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Elsevier exams/LMS",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Elsevier resources testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Elsevier_books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enhancement",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Enrollment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 25
+    },
+    {
+      "raw_category": "Enrollment and fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Enrollment fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Enrollment health fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Enrollment materials package",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enrollment parking campusstudentfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enrollment tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Enrollment11credits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enrollment13.5credits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enrollment49units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Enrollment9.5credits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Entrance application first exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Equipment and program workbooks excluding textbooks",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Equipment lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Equipment stethoscope",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Estimated fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Exam fees included line",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Exam prep and test",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Exam prep testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Exams and licensing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Expendable supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Experience",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Exxat annual",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Exxat background/compliance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Exxat initial access",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "FBI background check",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Fall semester 1 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Fall semester 2 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Fall/spring four terms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Fall1 block1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Fall1 block2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Fall2 block1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Federal loan fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 13
+    },
+    {
+      "raw_category": "Fingerprint",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Fire card",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Fire safety class",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "First aid/BLS",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "First namepin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "First-period tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Flu Vaccine",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Flu Vaccine (either 3rd or 4th Semester",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Fluvaccine",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Food",
+      "normalized_category": "Food",
+      "status": "exact_template_value",
+      "row_count": 89
+    },
+    {
+      "raw_category": "Food and housing",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Food and housing combined",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Food housing",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 88
+    },
+    {
+      "raw_category": "Food/housing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "G131",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G160",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G160C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G170",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G170C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G175",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G175C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G271",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G285",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G285C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G290",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G290C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G295",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "G295C",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "GE STRF",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "GE books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "GE digital resources technology",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "GE registration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "GE tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "General education resource",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "General fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "General transportation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Grad PLUS loan fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Graduate association",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Graduation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 13
+    },
+    {
+      "raw_category": "Graduation and VN term3 fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Graduation fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Graduationfee classconsensus",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Groceries",
+      "normalized_category": "Food",
+      "status": "candidate_alias",
+      "row_count": 11
+    },
+    {
+      "raw_category": "Hardcopy books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Health",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 16
+    },
+    {
+      "raw_category": "Health Insurance",
+      "normalized_category": "Health insurance",
+      "status": "candidate_alias",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Health assessment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Health assessment lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Health center fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Health center representation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Health clearance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Health insurance",
+      "normalized_category": "Health insurance",
+      "status": "exact_template_value",
+      "row_count": 55
+    },
+    {
+      "raw_category": "Health insurance optional",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Health student fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Health tests $300\u20131800",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "HealthStream annual",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "HepB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Hospital onboarding $50\u2013100",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Housing",
+      "normalized_category": "Housing",
+      "status": "exact_template_value",
+      "row_count": 90
+    },
+    {
+      "raw_category": "Housing and food",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 44
+    },
+    {
+      "raw_category": "Housing food",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Housing or food/housing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Housing rent",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Housing utilities",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Housing/food",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Hurst review",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "IDcard",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "IV pack",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Immunization Screening ADB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Immunization Tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Immunizations titers drugs atstudenthealth",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Insurance fall2026",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Insurance spring/summer2027",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Interim Permittee License",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Interimpermit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Kaplan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Kaplan package",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "LMS eBooks simulations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Lab Supplies (Tote)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Lab clinical liability",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Lab consumables",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Lab equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Lab fees supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Lab pack $450\u2013550",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Lab pervisit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Lab supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Lab supplies kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Labkit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Laboratory fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Laptop",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Learning NCLEXresources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Learning management",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Learning resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Level1 tuition and fees bundled",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Level2 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Level3 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Level4 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Liability",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Liability annual",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Liability insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Liability insurance annual",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Liability renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "License Application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Licensing exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensing exam fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensing fees tests",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Licensure",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 26
+    },
+    {
+      "raw_category": "Licensure / certification",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Licensure application fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensure estimate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensure fingerprint",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensure pin other postprogram aggregate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Licensureapplication sourcequote",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "LiveScan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Living",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Living Expenses",
+      "normalized_category": "Living expenses",
+      "status": "candidate_alias",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Living expenses",
+      "normalized_category": "Living expenses",
+      "status": "exact_template_value",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Loan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Loan fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 11
+    },
+    {
+      "raw_category": "Loan fee if borrowing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Loan fees",
+      "normalized_category": "Loan fees",
+      "status": "exact_template_value",
+      "row_count": 55
+    },
+    {
+      "raw_category": "Local student nursing association",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "MMR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Major tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Malpractice",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Malpractice annual",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Malpractice insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Malpractice renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Mandatory campus fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Mandatory fees",
+      "normalized_category": "Mandatory fees",
+      "status": "exact_template_value",
+      "row_count": 16
+    },
+    {
+      "raw_category": "Mask Fit Testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Mask Fit Testing Renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Mask fit $104\u2013225",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Materials",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Materials Fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Materials Fee (Health Stream)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Materials other",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Materials supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Meal plan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Meals",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Medical screening/immunization insurance-dependent",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Medical supplies and scrubs",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Mentalhealth fingerprinting",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Mentalhealthcertification",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Mentalhealthclinical certification",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Microbiology lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Miscellaneous",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Miscellaneous/Personal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "MyClinicalExchange $20\u201340",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "MyClinicalWallet",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "N170/N171 lecture lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "N172 lecture lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "N173/N174 lecture lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "N176 lecture lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "NCLEX Exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "NCLEX after graduation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX application exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX approximate fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX prep materials and skills lab supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX registration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "NCLEX review ATI",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX_application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX_application_exam_livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "NCLEX_exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "NCLEX_license",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NCLEX_review",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "NCLEX_textbook",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NSA_direct_ask_accessories",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NSO insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "NURS221 transition requirement",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NURS3001 1\u00d7625",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NURS3400 3\u00d7625",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NURS3605 3\u00d7625",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "NURS3700 3\u00d7625",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Name tag $9\u201312 each",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Namebadge",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Namebadge each",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "National Student Nursing Association - 1 yr membership",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "National Student Nursing Association: 2-yr membership",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "National association",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "New-student document charge",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Nonresident capital outlay",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Nonresident fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Nonresident supplement",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 20
+    },
+    {
+      "raw_category": "Nonresident supplemental tuition",
+      "normalized_category": "Nonresident supplemental tuition",
+      "status": "exact_template_value",
+      "row_count": 11
+    },
+    {
+      "raw_category": "Nonresident tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 17
+    },
+    {
+      "raw_category": "Nonresident tuition and capital outlay",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Nonresident tuition at26units/year",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Nurse pack",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing Pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Nursing ancillary",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 24
+    },
+    {
+      "raw_category": "Nursing fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Nursing patch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing preceptorship lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing published annual fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing tuition36units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursing tuition9units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Nursingpin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Nursingtuition9units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "One-time computer",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Online learning platforms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Optional parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "OptionalID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Optionaljacket",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Orientation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Orientation workshop",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Other",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 20
+    },
+    {
+      "raw_category": "Parking Permit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Parking persemester",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Parking summer",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Patch each",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Pearson exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Personal",
+      "normalized_category": "Personal expenses",
+      "status": "candidate_alias",
+      "row_count": 226
+    },
+    {
+      "raw_category": "Personal / miscellaneous",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Personal Expenses",
+      "normalized_category": "Personal expenses",
+      "status": "candidate_alias",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Personal miscellaneous",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 19
+    },
+    {
+      "raw_category": "Phone, Internet, Utilities",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "PhotoID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Physical & Immunizations (outside source, no insurance)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical PPD drug test",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical TB vaccine third party",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Physical and Immunizations (outside source w/o insurance)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Physical atstudenthealth",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Physical immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Physical immunizations titers",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical laboratory",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical labs",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical labs immunization lowerbound",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical labs immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical labs vaccines",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Physical titers vaccines",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Physical/immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Pinning",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "PostADN BSN term",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "PostADN BSN term(s)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Prerequisite tuition35units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Professional liability insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Professional nursing RNRS/UNRS482P",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Professional supplemental tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Program / clinical fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Program commute",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Program cost (unresolved tuition/fee composition)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Program deposit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Program fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Program tuition (36.5 units)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Published approximate program aggregate; not itemized",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Published estimated program direct cost",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Published program tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Quantiferon",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "RN_or_VN_licensure_addition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Random drug screen",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Recreation center",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Registration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 79
+    },
+    {
+      "raw_category": "Registration application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Registration enrollment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Registration fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Remaining core and electives60 quarter units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Representation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Resource fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Room and board",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Room board",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Room board 2meals",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Room board 3meals",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "STRF",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 76
+    },
+    {
+      "raw_category": "SafeMedicate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Sales tax",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "School fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "Science tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Scissors hemostat penlight",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Screening",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Screeningadministration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Scrubs",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Scrubs and ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Second-period tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Semester 1 books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 1 standardized testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 1 tuition (12 units)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 2 books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 2 standardized testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 2 tuition (12 units)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 3 books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 3 standardized testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 3 tuition (12 units)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 4 books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 4 standardized testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester 4 tuition (12 units)",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Semester parking times4",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Services",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Sherpath",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Shoes",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Simulation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Simulation lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Site compliance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Skillkit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Skills kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Skills kit grant-funded",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Skills lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Skills lab kits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Skillslabsupplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Software",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Software NCLEX",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Spring semester 1 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Spring semester 2 tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Spring1 block1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Spring1 block2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "State boardexam sourcequoted",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Stethoscope",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Stethoscope variable",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Stethoscope watch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Student Center Fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Student Fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Student Health Fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Student ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Student Representative Fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Student association activity",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Student body",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Student center",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Student fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Student fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Student health",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "Student representation activities",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Student service",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Student services",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Student services access",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Student success",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Student supplykits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Summer",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Summer BSN courses and term fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Summer fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Summer tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Supplemental nonresident tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Supplemental nonresident tuition capital",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Supplemental out of state tuition fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Supplies and lab fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Supplies and licensure preparation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Supply kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Syllabi",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "TB Renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TB Test Renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TB pertest",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "TB_chest_xray",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TBtest",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TEAS_guide",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TEAS_practice",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "TEAS_transcript",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tdap",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Technology",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 42
+    },
+    {
+      "raw_category": "Technology LMS CourseKey",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Technology period1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Technology period2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Technology period3",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Textbooks",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 9
+    },
+    {
+      "raw_category": "Textbooks ATI",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Textbooks HESI",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Textbooks and handouts",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Textbooks and workbooks",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Textbooks digital content",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Textbooks handouts",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Textbooks materials miscellaneous",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Textbooks software",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Textbooks syllabi quoted4semesters",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Textbooks workbooks",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Textbooks/learning materials",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Titers TB immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "TracPrac",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Transcripts",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Transfer assessment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Transition books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Transition tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Transport",
+      "normalized_category": "Transportation",
+      "status": "candidate_alias",
+      "row_count": 22
+    },
+    {
+      "raw_category": "Transportation",
+      "normalized_category": "Transportation",
+      "status": "exact_template_value",
+      "row_count": 250
+    },
+    {
+      "raw_category": "Tuition",
+      "normalized_category": "Tuition",
+      "status": "exact_template_value",
+      "row_count": 171
+    },
+    {
+      "raw_category": "Tuition / program fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Tuition 30units at450",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition ASB parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition Fall2026",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition Spring2027",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition Summer2026",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition Summer2027",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition Winter2027",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition academic block1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Tuition academic block2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Tuition academic block3",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition and Fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Tuition and fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 42
+    },
+    {
+      "raw_category": "Tuition and standard program fees including books and graduation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 16
+    },
+    {
+      "raw_category": "Tuition and university fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Tuition clinical theory placement",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition eight semesters",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition entireprogram",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 61
+    },
+    {
+      "raw_category": "Tuition financialaid block1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Tuition financialaid block2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Tuition financialaid block3",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Tuition for 26 nursing units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition including books uniforms HESI online quizzing CPR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition including student insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition only",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "Tuition quoted approximate72credits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Tuition rate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Tuition year1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Tuition year2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Tuition*",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Tuition/fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Tuition13.5units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition13units",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition30units at550",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tuition45units including optional",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Tutoring lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "UD-C 3\u00d7395",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "UD-D 3\u00d7395",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "UWorld",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 19
+    },
+    {
+      "raw_category": "Uniform (Scrub top, scrub pants, shoes, stethoscope, watch) *Lab Coat optional",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform (Scrub top, scrub pants, shoes, stethoscope, watch) - Lab Coat optional",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform (scrub top, scrub pants, shoes, stethoscope, watch) - Lab coat optional",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "Uniform accessories",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Uniform and ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform books supplies combined",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Uniform equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "Uniform labcoat",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform pants",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform per set recommended2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Uniform shoes",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Uniform shoes labcoat",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform shoes third party",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Uniform shoes watch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform tops",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniform/equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Uniform/shoes",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Uniforms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Uniforms/lab coat/ID",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "University fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 36
+    },
+    {
+      "raw_category": "University union",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Unsubsidized loan fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Utilities",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "Utilities/phone/internet",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Varicella",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "Watch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "Wellness",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "Wolters Kluwer resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "actual_loan_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "additional_books",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "arm_patch_each",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "asb_card",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "aso",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "assaultive_behavior_cert",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "assessment_testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "asu",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ati",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "ati_package",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ati_predictor",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ati_semesters1_2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "ati_semesters3_4",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "average_loan_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 14
+    },
+    {
+      "raw_category": "background_CPR",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "background_drug",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 11
+    },
+    {
+      "raw_category": "background_drug_healthscreen_quoted",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "background_drug_tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "background_drug_tracking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "badge",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 15
+    },
+    {
+      "raw_category": "badge_with_pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "behavioral_health_book",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "behavioral_health_software",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "books",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 83
+    },
+    {
+      "raw_category": "books_and_supplies",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 6
+    },
+    {
+      "raw_category": "books_equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "books_instruments",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "books_learning",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "books_media",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "books_resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "books_supplies",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 79
+    },
+    {
+      "raw_category": "books_supplies_ipad_resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "books_syllabi",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "books_year1",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "books_year2",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "brn_application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "campus_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "campus_parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "capgown",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "castlebranch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "certification",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "clinical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "clinical_gas",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "clinical_misc",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "clinical_parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "clinical_site",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "clinical_supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "clinical_training",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "clinical_travel",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "compliance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 11
+    },
+    {
+      "raw_category": "complio_background_drug",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "computer_allowance_up_to_with_documentation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "computer_related",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "conditional_varicella",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "course_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 53
+    },
+    {
+      "raw_category": "course_materials",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "course_rate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "cpr",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "cpr_firstaid_fire",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "dependentcare_allowance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 12
+    },
+    {
+      "raw_category": "deposit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "docucare",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "document_tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "drug",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 15
+    },
+    {
+      "raw_category": "drug_background",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "drug_clinical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "dues",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "educational_supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "enrollment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 28
+    },
+    {
+      "raw_category": "enrollment_basic_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "enrollment_campus_parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "enrollment_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 43
+    },
+    {
+      "raw_category": "enrollment_tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "federal_loan_origination",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 16
+    },
+    {
+      "raw_category": "fees_malpractice",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "fingerprint",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "fingerprinting",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "fire",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "fire_card",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "fire_safety",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "flu",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "flu_TB",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "food",
+      "normalized_category": "Food",
+      "status": "candidate_alias",
+      "row_count": 29
+    },
+    {
+      "raw_category": "food_housing",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 59
+    },
+    {
+      "raw_category": "graduate_livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "graduation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "graduation_cap_gown",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "graduation_cap_pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "graduation_uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "green_uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "health",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 42
+    },
+    {
+      "raw_category": "health_fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "health_fee_listed",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "health_immunization",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "health_immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "health_insurance",
+      "normalized_category": "Health insurance",
+      "status": "candidate_alias",
+      "row_count": 3
+    },
+    {
+      "raw_category": "health_renewal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "health_studentfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "healthfee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "hepatitis",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "hesi",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "housing",
+      "normalized_category": "Housing",
+      "status": "candidate_alias",
+      "row_count": 29
+    },
+    {
+      "raw_category": "housing_and_food",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 6
+    },
+    {
+      "raw_category": "housing_food",
+      "normalized_category": "Housing and food combined",
+      "status": "candidate_alias",
+      "row_count": 10
+    },
+    {
+      "raw_category": "immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "initial_license",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "interim_permit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "kaplan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "lab_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "lab_kits",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "labcoat",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "laptop_if_not_owned",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "laptop_reported_range",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "learning_resources",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "liability",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "liability_insurance",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "license_application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "licensing_exam_fingerprinting",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "licensure",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 11
+    },
+    {
+      "raw_category": "licensure_bundle",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "licensure_livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "livescan_clinical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "livescan_photo",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "living",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "magnet_badge_addon",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "malpractice",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "mandatory_fees",
+      "normalized_category": "Mandatory fees",
+      "status": "candidate_alias",
+      "row_count": 219
+    },
+    {
+      "raw_category": "mask_fit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "materials",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "medical_surgical_kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "misc_supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "miscellaneous_personal",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "nclex",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "nclex_application",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "nclex_exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "nclex_review",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "nonresident_additional_tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "nonresident_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "nonresident_rate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "nonresident_tuition",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 18
+    },
+    {
+      "raw_category": "nursing_packs",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "nursing_pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "official_transcript_each",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "one_time_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "online_modules",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_CNSA",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "optional_course",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "optional_fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "optional_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "optional_interim",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_interim_permit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "optional_nurs081",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_nurs082",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_nurs083",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_nurs084",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "optional_student_body",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "optional_tablet_if_not_owned",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "osha",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "other",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "parking",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 37
+    },
+    {
+      "raw_category": "parking_listed",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "parking_per_semester",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "parking_student",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "parking_student_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "pearson",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "personal",
+      "normalized_category": "Personal expenses",
+      "status": "candidate_alias",
+      "row_count": 107
+    },
+    {
+      "raw_category": "pharm",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "phone",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "phone_monthly_data",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "physical",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "physical_bundle",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "physical_cpr_update",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "physical_exam",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "physical_immunization",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "physical_immunizations",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "physical_lab",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "physical_lab_immunization",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "physical_lab_titers",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "physical_labs",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "physical_labs_vaccines",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "pin",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "pinning",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "pinning_uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "program_aggregate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 8
+    },
+    {
+      "raw_category": "program_total",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "psych_mental_livescan",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "registration",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "representation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "screening",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "senior_pictures",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "shoes",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "skills_kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 11
+    },
+    {
+      "raw_category": "skills_pack",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "skills_tote",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 6
+    },
+    {
+      "raw_category": "software",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "standardized_testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "stethoscope",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "stethoscope_watch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "student_body",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "student_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "student_health_rep_aso",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "student_representation",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "studentfees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 5
+    },
+    {
+      "raw_category": "studentservices_listed",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "supplies",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 10
+    },
+    {
+      "raw_category": "supplies_equipment",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "supply_kit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "testing",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "textbooks",
+      "normalized_category": "Books and supplies",
+      "status": "candidate_alias",
+      "row_count": 5
+    },
+    {
+      "raw_category": "tote",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "tracker",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 3
+    },
+    {
+      "raw_category": "transport",
+      "normalized_category": "Transportation",
+      "status": "candidate_alias",
+      "row_count": 36
+    },
+    {
+      "raw_category": "transportation",
+      "normalized_category": "Transportation",
+      "status": "candidate_alias",
+      "row_count": 78
+    },
+    {
+      "raw_category": "transportation_fee",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "tuition",
+      "normalized_category": "Tuition",
+      "status": "candidate_alias",
+      "row_count": 114
+    },
+    {
+      "raw_category": "tuition_and_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "tuition_campus_health_student_center",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "tuition_fees",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 15
+    },
+    {
+      "raw_category": "tuition_per_unit",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "tuition_rate",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 9
+    },
+    {
+      "raw_category": "uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 28
+    },
+    {
+      "raw_category": "uniform_accessories",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "uniform_bundle",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "uniform_shoes",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "uniform_shoes_coat",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 2
+    },
+    {
+      "raw_category": "uniform_shoes_stethoscope",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "uniforms",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "variable_cost",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 7
+    },
+    {
+      "raw_category": "varicella_if_needed",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "warmup_jacket",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    },
+    {
+      "raw_category": "watch",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 4
+    },
+    {
+      "raw_category": "white_uniform",
+      "normalized_category": null,
+      "status": "unmapped_review_required",
+      "row_count": 1
+    }
+  ],
+  "safety": [
+    "Preserve Original source label unchanged and existing raw Category in separate Raw category field before replacement.",
+    "candidate_alias is lexical categorization only, not source/amount/total approval.",
+    "Unmapped normalized category must remain null and remain in review; do not replace with generic Other or Mandatory fees.",
+    "Books alone is grouped under broad Books and supplies category without asserting supplies included.",
+    "Do not split bundled amounts or alter relationship, amount, source, scope or period.",
+    "Tuition and fees stays unmapped: Mandatory status not established by label alone.",
+    "Clinical, licensing, CPR, STRF, parking, deposits and nursing supplies need importer-supported extensions or manual source-specific mapping."
+  ]
+}
