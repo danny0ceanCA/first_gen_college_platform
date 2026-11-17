@@ -21,6 +21,11 @@ export function createNursingLookup({query,campuses}){
    if(years.length)selected=selected.filter(r=>r.academic_year_key===years[0]);
    const target=pathwayTokens(question);
    if(target.size)selected=selected.filter(r=>{const own=pathwayTokens(r.program);return [...target].every(t=>own.has(t)||t==='accelerated'&&own.has('absn')||t==='absn'&&own.has('accelerated')&&own.has('bsn')||t==='lvn'&&own.has('vn')||t==='vocational'&&own.has('vn')||t==='bridge'&&own.has('lvn')&&own.has('rn'));});
+   const locations=[...new Set(selected.flatMap(r=>String(r.payload.values['Institution / location note']||'').split(/[;()]/u).map(fold)).filter(s=>s&&!['california','not specified','not applicable','unknown'].includes(s)))];
+   const namedLocations=locations.filter(location=>(' '+q+' ').includes(' '+location+' '));
+   if(namedLocations.length)selected=selected.filter(r=>namedLocations.some(location=>(' '+fold(r.payload.values['Institution / location note'])+' ').includes(' '+location+' ')));
+   const part=/\b(?:part time|parttime|tiempo parcial)\b/u.test(q),full=/\b(?:full time|fulltime|tiempo completo)\b/u.test(q);
+   if(part!==full&&(part||full))selected=selected.filter(r=>new RegExp(part?'part time|parttime|tiempo parcial':'full time|fulltime|tiempo completo','u').test(fold(r.program+' '+r.enrollment)));
    const nonresident=/\b(?:nonresident|non resident|out of state|no residente)\b/u.test(q);
    const resident=!nonresident&&/\b(?:california resident|in state|residente de california)\b/u.test(q);
    if(nonresident)selected=selected.filter(r=>/nonresident|non resident|out of state|no residente/u.test(fold(r.residency)));

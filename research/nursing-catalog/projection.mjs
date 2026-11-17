@@ -25,7 +25,7 @@ export function projectNursingRecord(row,items,language='en',question=''){
  const mainId=sourceId(v['Official source URL']);if(!mainId)return null;
  const citation=`[${mainId}]`,q=fold(question);
  const pending=es?'Referencia del catálogo pendiente de revisión independiente.':'Catalog reference pending independent source review.';
- const scope=[v['Program / degree'],v['Academic year'],v['Budget period'],v.Residency,v.Housing,v['Cost coverage']].filter(Boolean).join('; ');
+ const scope=[v['Program / degree'],v['Institution / location note'],v['Academic year'],v['Entering cohort / applies to'],v['Budget period'],v.Residency,v.Housing,v.Enrollment,v['Cost coverage']].filter(Boolean).join('; ');
  const decisions=n.caveated_decisions||[];
  const conditions=[v['Scope and exclusions'],v['Required source-scope handling'],...decisions.flatMap(d=>[d.required_caveat,d.still_unresolved])].filter(Boolean);
  const allItems=items.map(r=>r.payload??r);
@@ -63,7 +63,7 @@ export function projectNursingRecord(row,items,language='en',question=''){
 
 export function nursingClarification(records,language='en'){
  const es=language==='es',r=records[0];if(!r)return null;
- const options=[...new Set(records.map(r=>[r.program,r.academic_year_raw,r.budget_period,r.residency,r.housing].filter(Boolean).join(' / ')))];
+ const options=[...new Set(records.map(r=>[r.program,r.payload.values['Institution / location note'],r.academic_year_raw,r.payload.values['Entering cohort / applies to'],r.budget_period,r.residency,r.housing,r.enrollment].filter(Boolean).join(' / ')))];
  const answer=es?'Hay varias referencias de enfermería con alcances diferentes. Falta identificar el programa, período o modalidad antes de citar un importe.':'There are several nursing references with different scopes. The program, period or scenario needs to be identified before quoting an amount.';
  const url=r.source_url;return {text:answer+'\n'+options.join('\n'),parts:[{text:answer+'\n'+options.join('\n')}],sources:[{id:1,url,title:r.campus}],checkedAt:r.payload.values['Source checked'],voiceBrief:{status:'partial',answer:answer+' [1]',qualification:es?'Los registros siguen pendientes de revisión de fuentes.':'The records remain pending source review.',nextStep:options.slice(0,3).join('; '),findings:[{subject:r.campus,aspect:'total_budget',status:'partial',answer:answer+' [1]',qualification:es?'El alcance aún no está confirmado.':'The applicable scope is not yet confirmed.'}]},catalogPublication:'production',nursingCatalog:{pending:true,clarification:true}};
 }

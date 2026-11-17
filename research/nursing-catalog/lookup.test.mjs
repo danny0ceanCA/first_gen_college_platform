@@ -37,6 +37,8 @@ test('every supplied nursing record is retrievable with retained caveats in Engl
  assert.ok(lmc);assert.ok(lmc.text.includes('5,369'));assert.ok(lmc.text.includes('5,321'));
  const bls=await lookup({mode:'finance',institution:'Cal State Los Angeles',question:'BLS certification cost for nursing reference NUR-0042',language:'en'});
  assert.match(bls.voiceBrief.answer,/\$40–\$60/);assert.equal(bls.voiceBrief.status,'partial');
+ const site=await lookup({mode:'finance',institution:'Carrington College',question:'Vocational nursing at Carrington College in Bakersfield',language:'en'});
+ assert.equal(site.nursingCatalog.recordId,'NUR-0924');assert.ok(site.text.includes('Bakersfield'));
  const ordinary=await lookup({mode:'finance',institution:'UC Davis',question:'General undergraduate tuition',language:'en'});assert.equal(ordinary,null);
  const refresh=await lookup({mode:'finance',institution:'Los Medanos College',question:'Nursing NUR-0547',language:'en',forceRefresh:true});assert.equal(refresh,null);
 });
