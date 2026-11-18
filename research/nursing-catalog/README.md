@@ -62,6 +62,15 @@ overall totals and appended housing-scenario metadata remain budget requests.
 Negated or contradictory residency statements are evaluated before selecting
 a fee scenario. Residency words alone do not select a supplemental-tuition item.
 
+Housing selection distinguishes living with parents from living away from them,
+including negated English/Spanish statements. An unspecified away-from-parents
+category does not establish on-campus or rented housing. Explicit credit loads
+must fit a source enrollment band, including exact six-unit and decimal cutoff
+categories; curriculum unit totals do not establish a per-term fee band.
+Entire-program questions cannot use a single program year, continuation phase
+or mixed rate schedule. Conflicting references require clarification without a
+price; unmatched natural-language scenarios continue to ordinary research.
+
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
 remain ordinary research tasks; an explicit before-aid price request can still
@@ -158,6 +167,7 @@ node --test research/nursing-catalog/postgres.test.mjs
 node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs research/nursing-catalog/lookup-safety.test.mjs
 node --test research/nursing-catalog/context-safety.test.mjs
 node --test research/nursing-catalog/matching-refresh.test.mjs
+node --test research/nursing-catalog/scenario-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

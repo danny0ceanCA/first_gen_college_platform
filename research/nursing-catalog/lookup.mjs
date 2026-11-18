@@ -1,6 +1,7 @@
 import {costCampusName} from '../cost-catalog/campus.mjs';
 import {projectNursingRecord,nursingClarification} from './projection.mjs';
 import {nursingRequestNeedsResearch,matchesNursingCohort,nursingResidency,nursingResidencyMatches} from './scope.mjs';
+import {nursingHousing,nursingHousingMatches,nursingCreditLoad,nursingCreditLoadMatches,nursingWholeProgramRequest,nursingWholeProgramMatches} from './scenarios.mjs';
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const institutionKey=s=>fold(costCampusName(s)||s).replace(/\b(?:university|college|of|the)\b/gu,'').replace(/\s+/gu,' ').trim();
 const pathwayTokens=s=>new Set((fold(s).match(/\b(?:absn|bsn|adn|lvn|vn|rn|msn|dnp|phd|anesthesia|accelerated|traditional|vocational|bridge|completion)\b/gu)||[]));
@@ -48,10 +49,10 @@ export function createNursingLookup({query,campuses,now=Date.now}){
   const residency=nursingResidency(question);
   if(residency.conflict)return conflict();
   selected=selected.filter(r=>nursingResidencyMatches(r.residency,residency));
-  const housing=/\b(?:with family|with parents|con padres|con familia)\b/u.test(q)?/family|parents|relatives|at home/:/\b(?:off campus|fuera del campus)\b/u.test(q)?/off campus/:/\b(?:on campus|en el campus)\b/u.test(q)?/on campus|residence hall/:null;
-  if(housing)selected=selected.filter(r=>housing.test(fold(r.housing)));
-  const period=/\b(?:entire program|whole program|programa completo)\b/u.test(q)?/program/:null;
-  if(period)selected=selected.filter(r=>period.test(fold(r.budget_period)));
+  const housing=nursingHousing(question),creditLoad=nursingCreditLoad(question);
+  if(housing.conflict)return conflict();
+  selected=selected.filter(r=>nursingHousingMatches(r.housing,housing)&&nursingCreditLoadMatches(r,creditLoad));
+  if(nursingWholeProgramRequest(question))selected=selected.filter(nursingWholeProgramMatches);
   if(!selected.length)return id?conflict():null;
   if(selected.length!==1){observe({outcome:'hit',reason:'nursing_scope_clarification'});return nursingClarification(selected,input.language,{now:now()});}
   const record=selected[0];
