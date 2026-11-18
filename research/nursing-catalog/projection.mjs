@@ -74,7 +74,7 @@ export function projectNursingRecord(row,items,language='en',question='',{now=Da
  const decisions=n.caveated_decisions||[];
  const conditions=[v['Scope and exclusions'],v['Required source-scope handling'],...decisions.flatMap(d=>[d.required_caveat,d.still_unresolved])].filter(Boolean);
  const allItems=items.map(r=>r.payload??r);
- const requestedAspects=requestedResearchAspects(question),componentQuery=nursingComponentQuery(question);
+ const requestedAspects=requestedResearchAspects(question),componentQuery=nursingComponentQuery(question,{institution:v.College});
  const aggregate=requestedAspects.includes('total_budget')&&!componentQuery.componentTotal;
  const feeOnly=!aggregate&&requestedAspects.includes('tuition_fees');
  const requestedItemIds=[...new Set([...question.matchAll(/\bNUR-\d{4}-\d{3}\b/giu)].map(m=>m[0].toUpperCase()))];

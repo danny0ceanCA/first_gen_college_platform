@@ -71,6 +71,14 @@ Entire-program questions cannot use a single program year, continuation phase
 or mixed rate schedule. Conflicting references require clarification without a
 price; unmatched natural-language scenarios continue to ordinary research.
 
+College names are removed from component matching so words such as "Health"
+in an institution name cannot select insurance for a general cost question.
+Explicit component requests remain available. Program matching keeps FNP,
+PMHNP and nurse-anesthesia routes distinct, including common credential aliases.
+Admission prerequisites, accreditation and state/board approval require ordinary
+research, including mixed requests for those facts and prices. A cost reference
+does not establish an admission requirement or an approval status.
+
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
 remain ordinary research tasks; an explicit before-aid price request can still
@@ -168,6 +176,7 @@ node --test research/nursing-catalog/production-provider.test.mjs research/nursi
 node --test research/nursing-catalog/context-safety.test.mjs
 node --test research/nursing-catalog/matching-refresh.test.mjs
 node --test research/nursing-catalog/scenario-safety.test.mjs
+node --test research/nursing-catalog/request-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

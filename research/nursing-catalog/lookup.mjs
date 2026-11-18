@@ -2,10 +2,10 @@ import {costCampusName} from '../cost-catalog/campus.mjs';
 import {projectNursingRecord,nursingClarification} from './projection.mjs';
 import {nursingRequestNeedsResearch,matchesNursingCohort,nursingResidency,nursingResidencyMatches} from './scope.mjs';
 import {nursingHousing,nursingHousingMatches,nursingCreditLoad,nursingCreditLoadMatches,nursingWholeProgramRequest,nursingWholeProgramMatches} from './scenarios.mjs';
+import {nursingProgramMatches} from './program.mjs';
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const institutionKey=s=>fold(costCampusName(s)||s).replace(/\b(?:university|college|of|the)\b/gu,'').replace(/\s+/gu,' ').trim();
-const pathwayTokens=s=>new Set((fold(s).match(/\b(?:absn|bsn|adn|lvn|vn|rn|msn|dnp|phd|anesthesia|accelerated|traditional|vocational|bridge|completion)\b/gu)||[]));
-export const isNursingCatalogRequest=input=>/\bNUR-\d{4}\b/iu.test(String(input.question||''))||/\b(?:nurs\w*|enfermer\w*|bsn|absn|adn|lvn|msn|dnp|rn)\b/u.test(fold((input.question||'')+' '+(input.institution||'')));
+export const isNursingCatalogRequest=input=>/\bNUR-\d{4}\b/iu.test(String(input.question||''))||/\b(?:nurs\w*|enfermer\w*|bsn|absn|adn|lvn|msn|dnp|rn|fnp|pmhnp|crna)\b/u.test(fold((input.question||'')+' '+(input.institution||'')));
 export const canUseNursingCatalog=input=>!input.forceRefresh&&['finance','loans'].includes(input.mode)&&!input.comparisonPlan&&isNursingCatalogRequest(input)&&!nursingRequestNeedsResearch(input.question);
 export function createNursingLookup({query,campuses,now=Date.now}){
  return async(input,{observe=()=>{}}={})=>{
@@ -38,8 +38,7 @@ export function createNursingLookup({query,campuses,now=Date.now}){
    if(r.academic_year_key){own.add(r.academic_year_key.slice(0,4));own.add('20'+r.academic_year_key.slice(-2));}
    return singleYears.every(year=>own.has(year));
   });
-  const target=pathwayTokens(question);
-  if(target.size)selected=selected.filter(r=>{const own=pathwayTokens(r.program);return [...target].every(t=>own.has(t)||t==='accelerated'&&own.has('absn')||t==='absn'&&own.has('accelerated')&&own.has('bsn')||t==='lvn'&&own.has('vn')||t==='vocational'&&own.has('vn')||t==='bridge'&&own.has('lvn')&&own.has('rn'));});
+  selected=selected.filter(r=>nursingProgramMatches(r.program,question));
   selected=selected.filter(r=>matchesNursingCohort(r,question));
   const locations=[...new Set(locationRows.flatMap(r=>String(r.payload.values['Institution / location note']||'').split(/[;()]/u).map(fold)).filter(s=>s&&!['california','not specified','not applicable','unknown'].includes(s)))];
   const namedLocations=locations.filter(location=>(' '+q+' ').includes(' '+location+' '));

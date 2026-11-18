@@ -18,9 +18,12 @@ const aliases=[
 ];
 export function componentText(value){return aliases.reduce((text,[pattern,replacement])=>text.replace(pattern,replacement),fold(value));}
 const nouns='health insurance|personal expenses|application fee|document fee|student id|tuition|books|supplies|equipment|uniform|transportation|food|housing';
-export function nursingComponentQuery(question){
+export function nursingComponentQuery(question,{institution}={}){
  const excluded=new RegExp(`\\b(?:excluding|without|not including|except|sin incluir|sin|excluyendo|no incluyas) (?:the |el |la |los |las )?(?:${nouns})(?: (?:and|y) (?:${nouns}))*\\b`,'gu');
- const scoped=fold(question).replace(/\b(?:housing scenario (?:off campus housing arrangement unspecified|renting off campus|living with family)|modalidad de vivienda (?:alojamiento fuera del campus modalidad sin especificar|alquiler fuera del campus|vivir con familiares))$/u,'');
+ // A college name identifies the subject, not a requested charge. Remove the
+ // complete name before fee matching; an explicit fee outside it stays intact.
+ const campus=fold(institution),query=campus?(' '+fold(question)+' ').split(' '+campus+' ').join(' ').trim():fold(question);
+ const scoped=query.replace(/\b(?:housing scenario (?:off campus housing arrangement unspecified|renting off campus|living with family)|modalidad de vivienda (?:alojamiento fuera del campus modalidad sin especificar|alquiler fuera del campus|vivir con familiares))$/u,'');
  const text=componentText(scoped).replace(excluded,' ').replace(/\s+/gu,' ').trim();
  const requested=new RegExp(`\\b(?:${nouns})\\b`,'u').test(text);
  const componentTotal=new RegExp(`\\b(?:(?:total (?:costs? (?:of|for) )?(?:the )?|(?:costs?|budget|costo|costos|presupuesto)(?: total)? (?:of|for|de|del|para) (?:the |los |las |el |la )?)(?:${nouns})|(?:${nouns}) (?:costs?|budget|costo|costos|presupuesto))\\b`,'u').test(text);

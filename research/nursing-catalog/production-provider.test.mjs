@@ -45,6 +45,7 @@ test('an unmatched nursing request cannot fall through to general undergraduate 
  const f=fixture(),provider=await createProductionCatalogProvider(env,{Pool:f.Pool});
  try{
   assert.equal(await provider.lookup({mode:'finance',institution:'UC Berkeley',question:'Nursing cost of attendance for a California resident renting off campus',language:'en'}),null);
+  for(const specialty of ['FNP','PMHNP','CRNA'])assert.equal(await provider.lookup({mode:'finance',institution:'UC Berkeley',question:`${specialty} cost of attendance for a California resident renting off campus`,language:'en'}),null);
   assert.equal(f.generalQueries,0,'no undergraduate prices may substitute for nursing');
   await provider.lookup({mode:'finance',institution:'UC Berkeley',question:'General undergraduate cost of attendance for a California resident renting off campus',language:'en'});
   assert.equal(f.generalQueries,1,'ordinary undergraduate pricing keeps its existing path');

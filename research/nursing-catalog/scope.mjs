@@ -1,13 +1,16 @@
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 
 // A catalog price cannot establish an award, personal net cost, eligibility or
-// an application deadline. Before-aid boundaries still request the gross price.
+// an application deadline. Admissions and approval require separate evidence
+// too. Before-aid boundaries still request the gross price.
 export function nursingRequestNeedsResearch(question){
  const q=fold(question)
   .replace(/\b(?:before|without|excluding|prior to) (?:any )?(?:financial aid|aid|scholarships?|grants?|loans?|waivers?)\b/gu,'')
   .replace(/\b(?:antes de|sin|sin incluir) (?:la |las |los |el )?(?:ayuda financiera|ayuda|becas?|prestamos?|subsidios?)\b/gu,'')
   .replace(/\bfirst aid\b/gu,'');
- return /\b(?:eligib\w*|elegib\w*|qualif(?:y|ies|ied|ying)|calific\w*|scholarships?|becas?|grants?|subsidios?|loans?|prestamos?|aid|ayuda financiera|ayuda estudiantil|cuanta ayuda|fafsa|pell|cal grant|waiv\w*|exenci\w*|deadlines?|due date|fecha limite|plazos?|net (?:cost|price)|out of pocket|costo neto)\b/u.test(q);
+ return /\b(?:eligib\w*|elegib\w*|qualif(?:y|ies|ied|ying)|calific\w*|scholarships?|becas?|grants?|subsidios?|loans?|prestamos?|aid|ayuda financiera|ayuda estudiantil|cuanta ayuda|fafsa|pell|cal grant|waiv\w*|exenci\w*|deadlines?|due date|fecha limite|plazos?|net (?:cost|price)|out of pocket|costo neto)\b/u.test(q)||
+  /\b(?:prerequisites?|prerrequisitos?|admission requirements?|entrance requirements?|requisitos de (?:admision|ingreso)|accredit\w*|acredit\w*|approved|approval|aprobados?|aprobadas?|aprobacion|application process|how to apply|como (?:aplicar|solicitar)|required documents|documentos (?:necesarios|requeridos))\b/u.test(q)||
+  /\b(?:what|which|que|cuales)\b.*\b(?:requirements?|requisitos|entrance exams?|examenes de (?:admision|ingreso))\b/u.test(q);
 }
 
 // Negated personal scope is not an affirmative resident category. Keep
