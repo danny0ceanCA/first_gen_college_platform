@@ -1,5 +1,6 @@
 import {researchBriefSelection} from '../../src/researchBrief.mjs';
 import {requestedResearchAspects} from '../../src/researchQuestion.mjs';
+import {catalogDate,nursingSourceProvenance} from './provenance.mjs';
 
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
@@ -55,14 +56,15 @@ export function itemValue(item,es=false){
  }
 }
 
-export function projectNursingRecord(row,items,language='en',question=''){
+export function projectNursingRecord(row,items,language='en',question='',{now=Date.now()}={}){
  const record=row.payload??row,v=record.values,n=record.normalized,es=language==='es';
  if(n.source_verified!==false||n.automatic_production_permission!==false)throw Error('nursing_source_status_changed');
+ if(row.valid_until!==undefined&&(!catalogDate(row.valid_until)||Date.parse(catalogDate(row.valid_until))<=now))return null;
  const sources=[],sourceId=url=>{
   let parsed;try{parsed=new URL(url);}catch{return null;}
   if(parsed.protocol!=='https:'||parsed.username||parsed.password||parsed.port)return null;
   const existing=sources.find(s=>s.url===url);if(existing)return existing.id;
-  const id=sources.length+1;sources.push({id,url,title:v.College+' — '+v['Program / degree']});return id;
+  const id=sources.length+1;sources.push({id,url,title:v.College+' — '+v['Program / degree'],...nursingSourceProvenance(row,url,now)});return id;
  };
  const mainId=sourceId(v['Official source URL']);if(!mainId)return null;
  const citation=`[${mainId}]`,q=fold(question);
@@ -76,7 +78,9 @@ export function projectNursingRecord(row,items,language='en',question=''){
  const feeOnly=!aggregate&&requestedAspects.includes('tuition_fees');
  const requestedItemIds=[...new Set([...question.matchAll(/\bNUR-\d{4}-\d{3}\b/giu)].map(m=>m[0].toUpperCase()))];
  const named=allItems.filter(i=>{
-  const tokens=fold(i.values['Original source label']).split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the'].includes(x));
+  const label=fold(i.values['Original source label']);
+  if(label.includes(' ')&&(' '+q+' ').includes(' '+label+' '))return true;
+  const tokens=label.split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the','student','students','new','continuing','entering','full','time','year','annual','academic','fee','fees','charge','charges'].includes(x));
   return tokens.length&&tokens.some(token=>q.split(' ').includes(token));
  });
  const tuition=allItems.filter(i=>/tuition|matricula|colegiatura/u.test(fold(i.values.Category+' '+i.values['Original source label']))&&!/nonresident|non resident|supplemental/u.test(fold(i.values.Category)));
@@ -115,12 +119,12 @@ export function projectNursingRecord(row,items,language='en',question=''){
  return result;
 }
 
-export function nursingClarification(records,language='en',{scopeConflict=false,multipleReferences=false}={}){
+export function nursingClarification(records,language='en',{scopeConflict=false,multipleReferences=false,now=Date.now()}={}){
  const es=language==='es',r=records[0];if(!r)return null;
  const options=[...new Set(records.map(r=>[r.budget_id,r.program,r.payload.values['Institution / location note'],r.academic_year_raw,r.payload.values['Entering cohort / applies to'],r.budget_period,r.residency,r.housing,r.enrollment].filter(Boolean).join(' / ')))];
  const answer=scopeConflict?(es?'La referencia de enfermería no coincide con la institución o el escenario solicitado. Hay que confirmar la referencia y su alcance antes de citar un importe.':'The nursing reference conflicts with the requested institution or scenario. Confirm the reference and scope before quoting an amount.'):
   multipleReferences?(es?'Se solicitaron varias referencias de enfermería. Sus alcances deben mantenerse separados; no se ha seleccionado un precio único.':'Several nursing references were requested. Their scopes must be kept separate; no single price has been selected.'):
   es?'Hay varias referencias de enfermería con alcances diferentes. Falta identificar el programa, período o modalidad antes de citar un importe.':'There are several nursing references with different scopes. The program, period or scenario needs to be identified before quoting an amount.';
  const qualification=es?'Los registros siguen pendientes de revisión de fuentes. El alcance aún no está confirmado.':'The records remain pending source review. The applicable scope is not yet confirmed.';
- const url=r.source_url;return {text:answer+'\n'+options.join('\n'),parts:[{text:answer+'\n'+options.join('\n')}],sources:[{id:1,url,title:r.campus}],checkedAt:r.payload.values['Source checked'],voiceBrief:{status:'partial',answer:answer+' [1]',qualification,nextStep:options.slice(0,3).join('; '),findings:[{subject:r.campus,aspect:'total_budget',status:'partial',answer:answer+' [1]',qualification}]},catalogPublication:'production',nursingCatalog:{pending:true,clarification:true}};
+ const url=r.source_url;return {text:answer+'\n'+options.join('\n'),parts:[{text:answer+'\n'+options.join('\n')}],sources:[{id:1,url,title:r.campus,...nursingSourceProvenance(r,url,now)}],checkedAt:r.payload.values['Source checked'],voiceBrief:{status:'partial',answer:answer+' [1]',qualification,nextStep:options.slice(0,3).join('; '),findings:[{subject:r.campus,aspect:'total_budget',status:'partial',answer:answer+' [1]',qualification}]},catalogPublication:'production',nursingCatalog:{pending:true,clarification:true}};
 }

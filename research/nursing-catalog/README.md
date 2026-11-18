@@ -47,6 +47,22 @@ Multi-component questions do not receive an invented combined subtotal. The
 shared research-aspect classifier preserves focused requests such as total
 tuition and distinguishes them from a complete program budget.
 
+Cost-only references do not answer scholarship, loan, eligibility, net-cost or
+deadline questions, including mixed requests for prices and funding. These
+remain ordinary research tasks; an explicit before-aid price request can still
+use the catalog. Cohort matching separately checks entering/continuing status,
+program year and recorded start term. A nine-month fall-start budget is not
+interchangeable with a twelve-month summer-start budget. Generic student wording
+does not select an unrelated new-student document charge.
+
+Published rows issue the same bounded catalog-provenance contract used by the
+existing research reuse path. Batch, record digest, original workbook-reported
+source date, retrieval time and publication expiry travel with every source.
+The original source date is not refreshed. `workbook_reported` provenance and
+`partial` findings remain distinct from independent review or verified coverage;
+missing provenance and expired releases fail the reuse checks. This changes no
+Responses continuation, Conversations API storage or Live event contract.
+
 The pinned operator is `scripts/publish-nursing-catalog.mjs` (`inspect`,
 `publish`, `verify` plus the full batch ID). It verifies the confirmed Render
 workspace, worker, database, repository and external TLS target. Credentials
@@ -125,6 +141,7 @@ $env:ORIGEN_NURSING_LOCAL_TEST='true'
 $env:ORIGEN_NURSING_BATCH='<full-batch-id>'
 node --test research/nursing-catalog/postgres.test.mjs
 node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs research/nursing-catalog/lookup-safety.test.mjs
+node --test research/nursing-catalog/context-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {readExport} from './postgres.mjs';
+import {readExport,hash} from './postgres.mjs';
 import {projectNursingRecord,itemValue} from './projection.mjs';
 import {createNursingLookup} from './lookup.mjs';
 import {researchBriefSelection} from '../../src/researchBrief.mjs';
 import {localClient} from '../cost-catalog/postgres.mjs';
+import {sourceIsCurrent} from '../../src/researchSourceValidity.mjs';
 const id=process.env.ORIGEN_NURSING_BATCH;
 
 test('bounds, unknowns and explicit zero retain their meanings',()=>{
@@ -20,16 +21,19 @@ test('bounds, unknowns and explicit zero retain their meanings',()=>{
 test('every supplied nursing record is retrievable with retained caveats in English and Spanish',{skip:!id},async()=>{
  const b=await readExport(id),groups=new Map();
  for(const i of b.items){const list=groups.get(i.budget_id)||[];list.push(i);groups.set(i.budget_id,list);}
- const rows=b.budgets.map(r=>({batch_id:b.id,budget_id:r.id,campus:r.values.College,program:r.values['Program / degree'],academic_year_raw:r.values['Academic year'],academic_year_key:r.normalized.academic_year,budget_period:r.values['Budget period'],residency:r.values.Residency,housing:r.values.Housing,source_url:r.values['Official source URL'],payload:r}));
+ const checkedNow=Date.parse('2026-11-17T12:00:00Z');
+ const rows=b.budgets.map(r=>({batch_id:b.id,budget_id:r.id,campus:r.values.College,program:r.values['Program / degree'],academic_year_raw:r.values['Academic year'],academic_year_key:r.normalized.academic_year,budget_period:r.values['Budget period'],residency:r.values.Residency,housing:r.values.Housing,source_url:r.values['Official source URL'],payload:r,record_digest:hash(r),publication_id:'published-fixture',caveated_publication:true,valid_until:'2026-12-17T00:00:00Z'}));
  const map=new Map(rows.map(r=>[r.budget_id,r]));
  const query=async(sql,p)=>({rows:sql.includes('production_items')?(groups.get(p[1])||[]).map(payload=>({payload})):typeof p[0]==='string'?[map.get(p[0])].filter(Boolean):rows.filter(r=>p[0].includes(r.campus))});
- const lookup=createNursingLookup({query,campuses:[...new Set(rows.map(r=>r.campus))]});
+ const lookup=createNursingLookup({query,campuses:[...new Set(rows.map(r=>r.campus))],now:()=>checkedNow});
  for(const r of rows)for(const language of ['en','es']){
   const result=await lookup({mode:'finance',institution:r.campus,question:`Nursing reference ${r.budget_id}`,language});
   assert.ok(result,r.budget_id+' '+language);assert.equal(result.nursingCatalog.recordId,r.budget_id);
   assert.equal(result.nursingCatalog.pending,true);assert.equal(result.nursingCatalog.sourceVerified,false);
   const brief=researchBriefSelection(result);assert.equal(brief.evidenceFormat,'brief-v1');assert.equal(brief.verification,'partial');
   assert.equal(brief.findings.length,1);assert.ok(brief.sources.length);
+  assert.ok(result.sources.every(s=>sourceIsCurrent(s,checkedNow)),r.budget_id+' current publication provenance');
+  assert.ok(result.sources.every(s=>!sourceIsCurrent(s,Date.parse('2026-12-17T00:00:00Z'))),r.budget_id+' publication expiry');
   assert.match(brief.findings[0].qualification,/pending|pendiente/i);
   for(const key of ['Program / degree','Institution / location note','Academic year','Entering cohort / applies to','Budget period','Residency','Housing','Enrollment','Cost coverage']){
    const value=r.payload.values[key];if(value)assert.ok(brief.text.includes(value),`${r.budget_id}: live scope ${key}`);

@@ -13,7 +13,7 @@ export async function createProductionCatalogProvider(env,{Pool=pg.Pool,now=Date
   if(!discovering)discovering=(async()=>{
    try{
     const campuses=(await costs.query('SELECT DISTINCT campus FROM nursing_catalog.production_budgets ORDER BY campus')).rows.map(r=>r.campus);
-    if(campuses.length)lookup=createNursingLookup({query:costs.query,campuses});
+    if(campuses.length)lookup=createNursingLookup({query:costs.query,campuses,now});
    }catch{/* An unavailable nursing publication must not disable UC/CSU. */}
    if(!lookup)retryAt=now()+30000;
    return lookup;
