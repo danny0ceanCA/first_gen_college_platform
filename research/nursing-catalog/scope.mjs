@@ -10,6 +10,25 @@ export function nursingRequestNeedsResearch(question){
  return /\b(?:eligib\w*|elegib\w*|qualif(?:y|ies|ied|ying)|calific\w*|scholarships?|becas?|grants?|subsidios?|loans?|prestamos?|aid|ayuda financiera|ayuda estudiantil|cuanta ayuda|fafsa|pell|cal grant|waiv\w*|exenci\w*|deadlines?|due date|fecha limite|plazos?|net (?:cost|price)|out of pocket|costo neto)\b/u.test(q);
 }
 
+// Negated personal scope is not an affirmative resident category. Keep
+// contradictory/ambiguous statements separate from a chosen fee scenario.
+export function nursingResidency(question){
+ let q=fold(question),notResident=false,notNonresident=false;
+ q=q.replace(/\b(?:not (?:a |an )?(?:nonresident|non (?:california |ca )?resident|out of state)|no soy (?:un |una )?no residente)\b/gu,()=>{notNonresident=true;return ' ';});
+ q=q.replace(/\b(?:not (?:a |an )?(?:(?:california|ca) resident|resident (?:of|in) california|in state)|no soy (?:un |una )?residente (?:de|en) california)\b/gu,()=>{notResident=true;return ' ';});
+ const nonresident=notResident||/\b(?:nonresidents?|non (?:california |ca )?residents?|out of state|no residente)\b/u.test(q);
+ q=q.replace(/\b(?:nonresidents?|non (?:california |ca )?residents?|out of state|no residente)\b/gu,' ');
+ const resident=/\b(?:(?:california|ca) resident|resident (?:of|in) california|in state|residente (?:de|en) california)\b/u.test(q);
+ return {nonresident,resident,conflict:resident&&nonresident||notNonresident&&!resident||notNonresident&&nonresident};
+}
+
+export function nursingResidencyMatches(label,requested){
+ const own=fold(label),nonresident=/\b(?:nonresidents?|non (?:california |ca )?residents?|out of state|no residente)\b/u.test(own);
+ if(requested.nonresident)return nonresident;
+ if(requested.resident)return !nonresident&&/\b(?:(?:california|ca) resident|resident tuition|resident (?:of|in) california)\b/u.test(own);
+ return true;
+}
+
 const seasonWords='summer|fall|autumn|spring|winter|verano|otono|primavera|invierno';
 const season=value=>({verano:'summer',otono:'fall',autumn:'fall',primavera:'spring',invierno:'winter'}[value]||value);
 const yearWords=['first|primer|primero','second|segundo','third|tercer|tercero','fourth|cuarto','fifth|quinto','sixth|sexto'];

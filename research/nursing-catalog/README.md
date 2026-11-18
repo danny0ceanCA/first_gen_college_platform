@@ -37,6 +37,12 @@ the production worker role's three-connection limit. Temporarily unavailable
 nursing discovery retries after 30 seconds instead of disabling nursing for
 the lifetime of the worker. Concurrent retries share the same discovery query.
 
+Successful campus discovery refreshes before each eligible nursing lookup, with
+concurrent reads coalesced on the same read-only pool. Publishing a new campus
+does not require a worker restart. Empty publications and transient discovery
+failures retain the bounded 30-second retry policy; fresh budget queries and
+publication expiry still determine which records can be used.
+
 Nursing requests never substitute a general UC/CSU undergraduate budget when
 their program or scope is unavailable. A miss remains on the ordinary research
 path. Explicit NUR references still enforce institution, year, program, site,
@@ -46,6 +52,15 @@ line items, while total-budget questions cannot select a component as the total.
 Multi-component questions do not receive an invented combined subtotal. The
 shared research-aspect classifier preserves focused requests such as total
 tuition and distinguishes them from a complete program budget.
+
+Component matching recognizes English/Spanish lexical aliases such as
+books/textbooks/libros while retaining the original source label, amount and
+role. A recognized component request with no matching item never falls back to
+the full budget.
+Exclusions and component-only totals preserve their requested scope; explicit
+overall totals and appended housing-scenario metadata remain budget requests.
+Negated or contradictory residency statements are evaluated before selecting
+a fee scenario. Residency words alone do not select a supplemental-tuition item.
 
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
@@ -142,6 +157,7 @@ $env:ORIGEN_NURSING_BATCH='<full-batch-id>'
 node --test research/nursing-catalog/postgres.test.mjs
 node --test research/nursing-catalog/production-provider.test.mjs research/nursing-catalog/projection.test.mjs research/nursing-catalog/lookup.test.mjs research/nursing-catalog/lookup-safety.test.mjs
 node --test research/nursing-catalog/context-safety.test.mjs
+node --test research/nursing-catalog/matching-refresh.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

@@ -1,6 +1,7 @@
 import {researchBriefSelection} from '../../src/researchBrief.mjs';
 import {requestedResearchAspects} from '../../src/researchQuestion.mjs';
 import {catalogDate,nursingSourceProvenance} from './provenance.mjs';
+import {componentText,nursingComponentQuery} from './components.mjs';
 
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
@@ -67,25 +68,25 @@ export function projectNursingRecord(row,items,language='en',question='',{now=Da
   const id=sources.length+1;sources.push({id,url,title:v.College+' — '+v['Program / degree'],...nursingSourceProvenance(row,url,now)});return id;
  };
  const mainId=sourceId(v['Official source URL']);if(!mainId)return null;
- const citation=`[${mainId}]`,q=fold(question);
+ const citation=`[${mainId}]`;
  const pending=es?'Referencia del catálogo pendiente de revisión independiente.':'Catalog reference pending independent source review.';
  const scope=[v['Program / degree'],v['Institution / location note'],v['Academic year'],v['Entering cohort / applies to'],v['Budget period'],v.Residency,v.Housing,v.Enrollment,v['Cost coverage']].filter(Boolean).join('; ');
  const decisions=n.caveated_decisions||[];
  const conditions=[v['Scope and exclusions'],v['Required source-scope handling'],...decisions.flatMap(d=>[d.required_caveat,d.still_unresolved])].filter(Boolean);
  const allItems=items.map(r=>r.payload??r);
- const requestedAspects=requestedResearchAspects(question);
- const aggregate=requestedAspects.includes('total_budget');
+ const requestedAspects=requestedResearchAspects(question),componentQuery=nursingComponentQuery(question);
+ const aggregate=requestedAspects.includes('total_budget')&&!componentQuery.componentTotal;
  const feeOnly=!aggregate&&requestedAspects.includes('tuition_fees');
  const requestedItemIds=[...new Set([...question.matchAll(/\bNUR-\d{4}-\d{3}\b/giu)].map(m=>m[0].toUpperCase()))];
  const named=allItems.filter(i=>{
-  const label=fold(i.values['Original source label']);
-  if(label.includes(' ')&&(' '+q+' ').includes(' '+label+' '))return true;
-  const tokens=label.split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the','student','students','new','continuing','entering','full','time','year','annual','academic','fee','fees','charge','charges'].includes(x));
-  return tokens.length&&tokens.some(token=>q.split(' ').includes(token));
+  const label=componentText(i.values['Original source label']);
+  if(label.includes(' ')&&(' '+componentQuery.text+' ').includes(' '+label+' '))return true;
+  const tokens=label.split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the','student','students','new','continuing','entering','full','time','year','annual','academic','fee','fees','charge','charges','resident','nonresident','non','california','state','campus'].includes(x));
+  return tokens.length&&tokens.some(token=>componentQuery.text.split(' ').includes(token));
  });
  const tuition=allItems.filter(i=>/tuition|matricula|colegiatura/u.test(fold(i.values.Category+' '+i.values['Original source label']))&&!/nonresident|non resident|supplemental/u.test(fold(i.values.Category)));
  const multipleComponents=!aggregate&&(requestedItemIds.length>1||!requestedItemIds.length&&named.length>1);
- const missingComponent=!aggregate&&requestedItemIds.length===1&&!allItems.some(i=>i.id===requestedItemIds[0]);
+ const missingComponent=!aggregate&&(requestedItemIds.length===1&&!allItems.some(i=>i.id===requestedItemIds[0])||!requestedItemIds.length&&componentQuery.requested&&!named.length);
  let selected=aggregate||multipleComponents||missingComponent?null:requestedItemIds.length===1?allItems.find(i=>i.id===requestedItemIds[0]):named.length===1?named[0]:feeOnly&&tuition.length===1?tuition[0]:null;
  const totalRange=allItems.find(i=>/program total|total program|published.*total/u.test(fold(i.values['Original source label']))&&['Published range','Published lower bound','Published upper bound'].includes(i.normalized.value_representation));
  let answer;

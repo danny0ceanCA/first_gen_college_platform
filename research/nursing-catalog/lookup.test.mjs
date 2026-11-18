@@ -50,6 +50,11 @@ test('every supplied nursing record is retrievable with retained caveats in Engl
  const site=await lookup({mode:'finance',institution:'Carrington College',question:'Vocational nursing at Carrington College in Bakersfield',language:'en'});
  assert.equal(site.nursingCatalog.recordId,'NUR-0924');assert.ok(site.text.includes('Bakersfield'));
  const ordinary=await lookup({mode:'finance',institution:'UC Davis',question:'General undergraduate tuition',language:'en'});assert.equal(ordinary,null);
+ const books=await lookup({mode:'finance',institution:'UC Davis',question:'Cuanto cuestan los libros de enfermeria NUR-0001?',language:'es'});
+ assert.match(books.voiceBrief.answer,/2,150/);assert.ok(!books.voiceBrief.answer.includes('100,808'));
+ const nonresident=await lookup({mode:'finance',institution:'UCLA',question:'What is the MSN nursing cost for an entering student off campus? I am not a California resident.',language:'en'});
+ assert.equal(nonresident?.nursingCatalog?.recordId,'NUR-0015');assert.ok(!nonresident.voiceBrief.answer.includes('76,712'));
+ assert.ok(!nonresident.voiceBrief.answer.includes('Nonresident supplemental tuition'));
  const refresh=await lookup({mode:'finance',institution:'Los Medanos College',question:'Nursing NUR-0547',language:'en',forceRefresh:true});assert.equal(refresh,null);
 });
 
