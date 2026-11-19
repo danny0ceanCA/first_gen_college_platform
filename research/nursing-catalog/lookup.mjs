@@ -1,10 +1,9 @@
-import {costCampusName} from '../cost-catalog/campus.mjs';
 import {projectNursingRecord,nursingClarification} from './projection.mjs';
 import {nursingRequestNeedsResearch,matchesNursingCohort,nursingResidency,nursingResidencyMatches} from './scope.mjs';
 import {nursingHousing,nursingHousingMatches,nursingCreditLoad,nursingCreditLoadMatches,nursingWholeProgramRequest,nursingWholeProgramMatches} from './scenarios.mjs';
 import {nursingProgramMatches} from './program.mjs';
+import {nursingInstitutionKey as institutionKey,nursingQuestionInstitutions,nursingAcademicYears,nursingAcademicYearMatches} from './reference-scope.mjs';
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
-const institutionKey=s=>fold(costCampusName(s)||s).replace(/\b(?:university|college|of|the)\b/gu,'').replace(/\s+/gu,' ').trim();
 export const isNursingCatalogRequest=input=>/\bNUR-\d{4}\b/iu.test(String(input.question||''))||/\b(?:nurs\w*|enfermer\w*|bsn|absn|adn|lvn|msn|dnp|rn|fnp|pmhnp|crna)\b/u.test(fold((input.question||'')+' '+(input.institution||'')));
 export const canUseNursingCatalog=input=>!input.forceRefresh&&['finance','loans'].includes(input.mode)&&!input.comparisonPlan&&isNursingCatalogRequest(input)&&!nursingRequestNeedsResearch(input.question);
 export function createNursingLookup({query,campuses,now=Date.now}){
@@ -16,23 +15,28 @@ export function createNursingLookup({query,campuses,now=Date.now}){
    return nursingClarification(references,input.language,{multipleReferences:true,now:now()});
   }
   const requested=(input.lookupInstitutions?.length?input.lookupInstitutions:[input.institution]).filter(Boolean).map(institutionKey);
+  const questionInstitutions=nursingQuestionInstitutions(question,campuses);
   let matches=campuses.filter(c=>requested.includes(institutionKey(c)));
   if(!matches.length)matches=campuses.filter(c=>(' '+q+' ').includes(' '+fold(c)+' ')||(' '+q+' ').includes(' '+institutionKey(c)+' '));
   const names=[...new Set(matches.map(institutionKey))];if(!id&&names.length!==1)return null;
+  if(!id&&(questionInstitutions.included.some(name=>name!==names[0])||questionInstitutions.excluded.includes(names[0])))return null;
   const params=[id||matches],where=id?'budget_id=$1':'campus=ANY($1::text[])';
   const rows=(await query('SELECT * FROM nursing_catalog.production_budgets WHERE '+where+' ORDER BY budget_id',params)).rows;
   if(!rows.length)return null;
   const conflict=()=>nursingClarification(rows,input.language,{scopeConflict:true,now:now()});
-  if(id&&requested.length&&(new Set(requested).size!==1||!requested.includes(institutionKey(rows[0].campus))))return conflict();
+  if(id){
+   const own=institutionKey(rows[0].campus);
+   if(requested.length&&(new Set(requested).size!==1||!requested.includes(own))||questionInstitutions.included.some(name=>name!==own)||questionInstitutions.excluded.includes(own))return conflict();
+  }
   // IDs identify records, not permission to ignore a caller's new scope. Site
   // names come from the whole campus so a different site can be recognized.
   const locationRows=id&&rows.some(r=>r.payload.values['Institution / location note'])?
    (await query('SELECT * FROM nursing_catalog.production_budgets WHERE campus=ANY($1::text[]) ORDER BY budget_id',[[...new Set(rows.map(r=>r.campus))]])).rows:rows;
   let selected=rows;
-  const years=[...new Set([...question.matchAll(/\b(20\d{2})[-–](?:20)?(\d{2})\b/gu)].map(m=>m[1]+'-'+m[2]))];
+  const academicRequest=nursingAcademicYears(question),years=academicRequest.years;
   if(years.length>1)return id?conflict():null;
-  if(years.length)selected=selected.filter(r=>r.academic_year_key===years[0]);
-  const singleYears=[...new Set([...question.normalize('NFKD').replace(/\p{M}/gu,'').matchAll(/\b(?:for|in|year|ano|en|para)\s+(20\d{2})(?![-–\d])/giu)].map(m=>m[1]))];
+  if(years.length)selected=selected.filter(r=>nursingAcademicYearMatches(r,years[0]));
+  const singleYears=[...new Set([...academicRequest.text.normalize('NFKD').replace(/\p{M}/gu,'').matchAll(/\b(?:for|in|year|ano|en|para)\s+(20\d{2})(?!(?:\s*[-–—/]\s*\d)|\d)/giu)].map(m=>m[1]))];
   if(singleYears.length)selected=selected.filter(r=>{
    const own=new Set([...String(r.academic_year_raw||'').matchAll(/20\d{2}/gu)].map(m=>m[0]));
    if(r.academic_year_key){own.add(r.academic_year_key.slice(0,4));own.add('20'+r.academic_year_key.slice(-2));}

@@ -27,6 +27,6 @@ export function nursingComponentQuery(question,{institution}={}){
  const text=componentText(scoped).replace(excluded,' ').replace(/\s+/gu,' ').trim();
  const requested=new RegExp(`\\b(?:${nouns})\\b`,'u').test(text);
  const componentTotal=new RegExp(`\\b(?:(?:total (?:costs? (?:of|for) )?(?:the )?|(?:costs?|budget|costo|costos|presupuesto)(?: total)? (?:of|for|de|del|para) (?:the |los |las |el |la )?)(?:${nouns})|(?:${nouns}) (?:costs?|budget|costo|costos|presupuesto))\\b`,'u').test(text);
- const overall=/\b(?:coa|cost of attendance|costo de asistencia|(?:whole|entire) program|total (?:nursing )?program|overall (?:cost|budget)|presupuesto total de enfermeria|(?:costo total|presupuesto) del programa)\b/u.test(text);
- return {text,requested,componentTotal:componentTotal&&!overall};
+ const overall=/\b(?:coa|cost of attendance|costo de asistencia|(?:whole|entire) program|total (?:nursing )?program|overall(?:(?: nursing)? program| nursing)? (?:cost|budget)|presupuesto total de enfermeria|(?:costo total|presupuesto) del programa)\b/u.test(text);
+ return {text,requested,overall,componentTotal:componentTotal&&!overall};
 }

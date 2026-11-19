@@ -79,6 +79,15 @@ Admission prerequisites, accreditation and state/board approval require ordinary
 research, including mixed requests for those facts and prices. A cost reference
 does not establish an admission requirement or an approval status.
 
+An explicit item reference retains its scope when the user asks for its total;
+several items do not become a combined subtotal. Explicit overall-budget
+questions can still mention an item without becoming item-only requests.
+Academic-year checks accept slash, dash and spaced ranges, including an
+explicit two-year source header, without treating a calendar date as a range.
+Institutions named in the question must agree with the selected institution
+and reference. Strong university aliases and full catalog names count as
+institution mentions; a bare site city does not select another university.
+
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
 remain ordinary research tasks; an explicit before-aid price request can still
@@ -177,6 +186,7 @@ node --test research/nursing-catalog/context-safety.test.mjs
 node --test research/nursing-catalog/matching-refresh.test.mjs
 node --test research/nursing-catalog/scenario-safety.test.mjs
 node --test research/nursing-catalog/request-safety.test.mjs
+node --test research/nursing-catalog/reference-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,
