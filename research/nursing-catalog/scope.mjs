@@ -1,5 +1,17 @@
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 
+export function nursingPriceRequest(question){
+ const raw=String(question||''),q=fold(raw),reference=/\bNUR-\d{4}\b/iu.test(raw);
+ if(/\b(?:costs?|prices?|tuition|fees?|budgets?|amounts?|expenses?|charges?|pay|how much|costos?|precios?|cuestas?|cuestan|matricula|colegiatura|cuotas?|presupuestos?|importes?|montos?|tarifas?|gastos|pagar)\b/u.test(q))return true;
+ if(reference&&/\b(?:caveats?|qualifications?|source scope|salvedades?|advertencias?)\b/u.test(q))return true;
+ if(reference&&/\btotal\b/u.test(q)&&/\b(?:items?|partidas?)\b/u.test(q))return true;
+ // Reference and label-style finance selections remain inspectable. A
+ // substantive program question is not a price request just because of mode.
+ const inquiry=/\b(?:how|what|which|why|when|where|who|whether|online|hybrid|que|cual|cuales|cuant[oa]s?|como|donde|en linea|presencial)\b/u.test(q);
+ const yesNo=/^(?:is|are|does|do|can|has|have|es|esta|estan)\b|\b(?:and|y) (?:is|are|does|do|can|es|esta|estan)\b/u.test(q);
+ return !inquiry&&!yesNo;
+}
+
 // A catalog price cannot establish an award, personal net cost, eligibility or
 // an application deadline. Admissions and approval require separate evidence
 // too. Before-aid boundaries still request the gross price.
@@ -8,6 +20,10 @@ export function nursingRequestNeedsResearch(question){
   .replace(/\b(?:before|without|excluding|prior to) (?:any )?(?:financial aid|aid|scholarships?|grants?|loans?|waivers?)\b/gu,'')
   .replace(/\b(?:antes de|sin|sin incluir) (?:la |las |los |el )?(?:ayuda financiera|ayuda|becas?|prestamos?|subsidios?)\b/gu,'')
   .replace(/\bfirst aid\b/gu,'');
+ const duration=/\b(?:how long|how much (?:time|longer)|how many (?:clinical |clock )?(?:weeks|months|years|semesters|quarters|hours|credits|units)|program (?:length|duration)|cuanto dura|cuanto tiempo|cuantas horas|cuantos (?:creditos|meses|anos)|duracion del programa)\b/u.test(q);
+ const budgetPeriod=/\b(?:budget|allowance|presupuesto)\b.*\b(?:cover|covers|cubre|abarca)\b/u.test(q)&&!/(?:program|programa|degree)/u.test(q);
+ const modality=/(?:^|\band\b)\s*(?:is|are|can|does)\b.*\b(?:online|hybrid|in person|evening|weekend)\b/u.test(q)||/\b(?:es|esta|estan) (?:en linea|presencial|hibrid[oa])\b/u.test(q);
+ if(duration&&!budgetPeriod||modality||/\b(?:(?:graduation|retention|acceptance|admission|employment|pass) rates?|job placement|salary|salaries|wages|earnings|tasa de (?:graduacion|aprobacion)|salarios?|sueldos?|gpa)\b/u.test(q))return true;
  return /\b(?:eligib\w*|elegib\w*|qualif(?:y|ies|ied|ying)|calific\w*|scholarships?|becas?|grants?|subsidios?|loans?|prestamos?|aid|ayuda financiera|ayuda estudiantil|cuanta ayuda|fafsa|pell|cal grant|waiv\w*|exenci\w*|deadlines?|due date|fecha limite|plazos?|net (?:cost|price)|out of pocket|costo neto)\b/u.test(q)||
   /\b(?:prerequisites?|prerrequisitos?|admission requirements?|entrance requirements?|requisitos de (?:admision|ingreso)|accredit\w*|acredit\w*|approved|approval|aprobados?|aprobadas?|aprobacion|application process|how to apply|como (?:aplicar|solicitar)|required documents|documentos (?:necesarios|requeridos))\b/u.test(q)||
   /\b(?:what|which|que|cuales)\b.*\b(?:requirements?|requisitos|entrance exams?|examenes de (?:admision|ingreso))\b/u.test(q);

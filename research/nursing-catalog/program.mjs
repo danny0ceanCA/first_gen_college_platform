@@ -13,15 +13,22 @@ function credentials(value){
 }
 const pathways=text=>new Set((text.match(/\b(?:absn|bsn|adn|lvn|vn|rn|msn|dnp|phd|anesthesia|accelerated|traditional|vocational|bridge|completion)\b/gu)||[]));
 const specialtySet=text=>new Set(specialties.filter(([,pattern])=>new RegExp(`\\b(?:${pattern})\\b`,'u').test(text)).map(([name])=>name));
+function route(value){
+ const text=fold(value);
+ return {entry:/\b(?:prelicensure|pre licensure|first nursing degree|initial rn licensure|entry level (?:bsn|msn)|elmsn|master s entry program|traditional (?:prelicensure )?bsn|bsn traditional)\b/u.test(text),
+  completion:/\b(?:postlicensure|post licensure|rn (?:to )?bsn|rn (?:to )?msn|bsn (?:online )?(?:completion|completer))\b/u.test(text)};
+}
 
 export function nursingProgramMatches(program,question){
+ const requestedRoute=route(question),ownRoute=route(program);
+ if(requestedRoute.entry&&requestedRoute.completion||requestedRoute.entry&&(!ownRoute.entry||ownRoute.completion)||requestedRoute.completion&&(!ownRoute.completion||ownRoute.entry))return false;
  let requested=credentials(question);
  const excluded=new Set();
  for(const [name,pattern] of specialties){
   requested=requested.replace(new RegExp(`\\b(?:not|except|excluding|no)(?: (?:a|an|the))? (?:${pattern})\\b`,'gu'),()=>{excluded.add(name);return ' ';});
  }
  const own=credentials(program),target=pathways(requested),ownPathways=pathways(own);
- if(![...target].every(t=>ownPathways.has(t)||t==='accelerated'&&ownPathways.has('absn')||t==='absn'&&ownPathways.has('accelerated')&&ownPathways.has('bsn')||t==='lvn'&&ownPathways.has('vn')||t==='vocational'&&ownPathways.has('vn')||t==='bridge'&&ownPathways.has('lvn')&&ownPathways.has('rn')))return false;
+ if(![...target].every(t=>ownPathways.has(t)||t==='traditional'&&ownRoute.entry||t==='completion'&&ownRoute.completion||t==='rn'&&ownRoute.completion&&ownPathways.has('bsn')||t==='accelerated'&&ownPathways.has('absn')||t==='absn'&&ownPathways.has('accelerated')&&ownPathways.has('bsn')||t==='lvn'&&ownPathways.has('vn')||t==='vocational'&&ownPathways.has('vn')||t==='bridge'&&ownPathways.has('lvn')&&ownPathways.has('rn')))return false;
  const wanted=specialtySet(requested),available=specialtySet(own);
  if([...wanted].some(t=>!available.has(t))||[...excluded].some(t=>available.has(t)))return false;
  // NP/FNP/PMHNP and nurse-anesthesia routes are distinct even at one degree

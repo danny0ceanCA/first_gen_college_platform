@@ -98,6 +98,15 @@ BLS and CPR charges require matching original source labels; an absent charge
 cannot select the program budget or another test. These unresolved requests
 retain pending status, complete source scope and the original full report.
 
+Site matching honors exclusions and requires every positive site to be covered
+by the source row. A shared-site row may still cover a specifically requested
+site. Entry/prelicensure and completion/RN-to-BSN routes remain distinct;
+generic degree acronyms alone cannot override an explicit route. Finance mode
+does not turn questions about program length, modality, outcomes or curriculum
+hours into price questions. Those requests, including mixed price/information
+questions, continue to ordinary research. Reference inspection and shorthand
+finance selections retain their existing catalog path.
+
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
 remain ordinary research tasks; an explicit before-aid price request can still
@@ -198,6 +207,7 @@ node --test research/nursing-catalog/scenario-safety.test.mjs
 node --test research/nursing-catalog/request-safety.test.mjs
 node --test research/nursing-catalog/reference-safety.test.mjs
 node --test research/nursing-catalog/pricing-safety.test.mjs
+node --test research/nursing-catalog/pathway-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

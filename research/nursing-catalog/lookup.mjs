@@ -1,11 +1,11 @@
 import {projectNursingRecord,nursingClarification} from './projection.mjs';
-import {nursingRequestNeedsResearch,matchesNursingCohort,nursingResidency,nursingResidencyMatches} from './scope.mjs';
+import {nursingRequestNeedsResearch,nursingPriceRequest,matchesNursingCohort,nursingResidency,nursingResidencyMatches} from './scope.mjs';
 import {nursingHousing,nursingHousingMatches,nursingCreditLoad,nursingCreditLoadMatches,nursingWholeProgramRequest,nursingWholeProgramMatches} from './scenarios.mjs';
 import {nursingProgramMatches} from './program.mjs';
-import {nursingInstitutionKey as institutionKey,nursingQuestionInstitutions,nursingAcademicYears,nursingAcademicYearMatches} from './reference-scope.mjs';
+import {nursingInstitutionKey as institutionKey,nursingQuestionInstitutions,nursingAcademicYears,nursingAcademicYearMatches,nursingSiteRequest,nursingSiteMatches} from './reference-scope.mjs';
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export const isNursingCatalogRequest=input=>/\bNUR-\d{4}\b/iu.test(String(input.question||''))||/\b(?:nurs\w*|enfermer\w*|bsn|absn|adn|lvn|msn|dnp|rn|fnp|pmhnp|crna)\b/u.test(fold((input.question||'')+' '+(input.institution||'')));
-export const canUseNursingCatalog=input=>!input.forceRefresh&&['finance','loans'].includes(input.mode)&&!input.comparisonPlan&&isNursingCatalogRequest(input)&&!nursingRequestNeedsResearch(input.question);
+export const canUseNursingCatalog=input=>!input.forceRefresh&&['finance','loans'].includes(input.mode)&&!input.comparisonPlan&&isNursingCatalogRequest(input)&&!nursingRequestNeedsResearch(input.question)&&nursingPriceRequest(input.question);
 export function createNursingLookup({query,campuses,now=Date.now}){
  return async(input,{observe=()=>{}}={})=>{
   const question=String(input.question||''),q=fold(question),ids=[...new Set([...question.matchAll(/\bNUR-\d{4}\b/giu)].map(m=>m[0].toUpperCase()))],id=ids[0];
@@ -44,9 +44,8 @@ export function createNursingLookup({query,campuses,now=Date.now}){
   });
   selected=selected.filter(r=>nursingProgramMatches(r.program,question));
   selected=selected.filter(r=>matchesNursingCohort(r,question));
-  const locations=[...new Set(locationRows.flatMap(r=>String(r.payload.values['Institution / location note']||'').split(/[;()]/u).map(fold)).filter(s=>s&&!['california','not specified','not applicable','unknown'].includes(s)))];
-  const namedLocations=locations.filter(location=>(' '+q+' ').includes(' '+location+' '));
-  if(namedLocations.length)selected=selected.filter(r=>namedLocations.some(location=>(' '+fold(r.payload.values['Institution / location note'])+' ').includes(' '+location+' ')));
+  const site=nursingSiteRequest(question,locationRows);
+  selected=selected.filter(r=>nursingSiteMatches(r.payload.values['Institution / location note'],site));
   const part=/\b(?:part time|parttime|tiempo parcial)\b/u.test(q),full=/\b(?:full time|fulltime|tiempo completo)\b/u.test(q);
   if(part!==full&&(part||full))selected=selected.filter(r=>new RegExp(part?'part time|parttime|tiempo parcial':'full time|fulltime|tiempo completo','u').test(fold(r.program+' '+r.enrollment)));
   const residency=nursingResidency(question);
