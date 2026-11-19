@@ -88,6 +88,16 @@ Institutions named in the question must agree with the selected institution
 and reference. Strong university aliases and full catalog names count as
 institution mentions; a bare site city does not select another university.
 
+Quoted prices retain their pricing period. An item explicitly labeled
+"Scenario period" inherits the budget period; unspecified periods do not
+establish a requested monthly, annual or unit rate. Enrollment load and program
+year remain separate from billing period. The lookup does not prorate or
+annualize amounts. Budget exclusions and requested splits of bundles withhold
+an amount rather than quote the unchanged total. Named NCLEX, TEAS, HESI, ATI,
+BLS and CPR charges require matching original source labels; an absent charge
+cannot select the program budget or another test. These unresolved requests
+retain pending status, complete source scope and the original full report.
+
 Cost-only references do not answer scholarship, loan, eligibility, net-cost or
 deadline questions, including mixed requests for prices and funding. These
 remain ordinary research tasks; an explicit before-aid price request can still
@@ -187,6 +197,7 @@ node --test research/nursing-catalog/matching-refresh.test.mjs
 node --test research/nursing-catalog/scenario-safety.test.mjs
 node --test research/nursing-catalog/request-safety.test.mjs
 node --test research/nursing-catalog/reference-safety.test.mjs
+node --test research/nursing-catalog/pricing-safety.test.mjs
 ```
 
 The 58 supplied adapter tests and four repository integration tests cover bounds,

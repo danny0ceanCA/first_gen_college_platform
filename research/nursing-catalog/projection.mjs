@@ -1,7 +1,8 @@
 import {researchBriefSelection} from '../../src/researchBrief.mjs';
 import {requestedResearchAspects} from '../../src/researchQuestion.mjs';
 import {catalogDate,nursingSourceProvenance} from './provenance.mjs';
-import {componentText,nursingComponentQuery} from './components.mjs';
+import {componentText,nursingComponentQuery,nursingChargeIdentifiers,nursingComponentMentioned} from './components.mjs';
+import {nursingPricePeriodMatches} from './price-period.mjs';
 
 const fold=s=>String(s??'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
@@ -80,17 +81,29 @@ export function projectNursingRecord(row,items,language='en',question='',{now=Da
  const feeOnly=!aggregate&&requestedAspects.includes('tuition_fees');
  const named=allItems.filter(i=>{
   const label=componentText(i.values['Original source label']);
+  if(componentQuery.identifiers.length&&!componentQuery.identifiers.some(id=>nursingChargeIdentifiers(label).includes(id))&&!componentQuery.components.filter(name=>name!=='fees').some(name=>nursingComponentMentioned(label,name)))return false;
   if(label.includes(' ')&&(' '+componentQuery.text+' ').includes(' '+label+' '))return true;
   const tokens=label.split(' ').filter(x=>x.length>2&&!['published','estimated','program','nursing','cost','costs','expense','expenses','total','and','the','student','students','new','continuing','entering','full','time','year','annual','academic','fee','fees','charge','charges','resident','nonresident','non','california','state','campus'].includes(x));
   return tokens.length&&tokens.some(token=>componentQuery.text.split(' ').includes(token));
  });
  const tuition=allItems.filter(i=>/tuition|matricula|colegiatura/u.test(fold(i.values.Category+' '+i.values['Original source label']))&&!/nonresident|non resident|supplemental/u.test(fold(i.values.Category)));
  const multipleComponents=!aggregate&&(requestedItemIds.length>1||!requestedItemIds.length&&named.length>1);
- const missingComponent=!aggregate&&(requestedItemIds.length===1&&!allItems.some(i=>i.id===requestedItemIds[0])||!requestedItemIds.length&&componentQuery.requested&&!named.length);
+ const missingNamedCharge=componentQuery.identifiers.some(id=>!allItems.some(i=>nursingChargeIdentifiers(i.values['Original source label']).includes(id)));
+ const missingComponent=missingNamedCharge||!aggregate&&(requestedItemIds.length===1&&!allItems.some(i=>i.id===requestedItemIds[0])||!requestedItemIds.length&&componentQuery.requested&&!named.length);
  let selected=aggregate||multipleComponents||missingComponent?null:requestedItemIds.length===1?allItems.find(i=>i.id===requestedItemIds[0]):named.length===1?named[0]:feeOnly&&tuition.length===1?tuition[0]:null;
  const totalRange=allItems.find(i=>/program total|total program|published.*total/u.test(fold(i.values['Original source label']))&&['Published range','Published lower bound','Published upper bound'].includes(i.normalized.value_representation));
+ const exclusionBlocked=componentQuery.exclusions.length&&(aggregate||!selected||componentQuery.exclusions.some(name=>nursingComponentMentioned(selected.values['Original source label'],name)));
+ const identityBlocked=selected&&componentQuery.identifiers.some(id=>!nursingChargeIdentifiers(selected.values['Original source label']).includes(id));
+ const ownPeriod=selected?.values['Amount period'];
+ const pricePeriod=selected?(/^scenario period$/iu.test(ownPeriod||'')?v['Budget period']:ownPeriod):v['Budget period'];
+ const periodBlocked=!missingComponent&&!multipleComponents&&!nursingPricePeriodMatches(question,pricePeriod);
+ const scopeBlocked=Boolean(exclusionBlocked||periodBlocked||identityBlocked);
  let answer;
- if(missingComponent)answer=es?`${v.College}: no se encontró la partida solicitada en esta referencia. No se ha establecido su importe. ${citation}`:`${v.College}: the requested cost item was not found in this reference. Its amount is not established. ${citation}`;
+ if(scopeBlocked)answer=identityBlocked?
+  (es?`${v.College}: la partida seleccionada no establece el importe del cargo solicitado. Hay que confirmar la partida antes de citar un importe. ${citation}`:`${v.College}: the selected item does not establish the amount of the requested named charge. Confirm the item before quoting an amount. ${citation}`):exclusionBlocked?
+  (es?`${v.College}: la referencia no establece un importe con esas exclusiones. No se ha recalculado el total ni dividido una partida agrupada. ${citation}`:`${v.College}: this reference does not establish an amount with those exclusions. No total has been recalculated or bundle split. ${citation}`):
+  (es?`${v.College}: la referencia no establece un importe para el período solicitado. Hay que conservar el período de la fuente; no se ha prorrateado ni anualizado. ${citation}`:`${v.College}: this reference does not establish an amount for the requested pricing period. Keep the source period; no proration or annualization has been made. ${citation}`);
+ else if(missingComponent)answer=es?`${v.College}: no se encontró la partida solicitada en esta referencia. No se ha establecido su importe. ${citation}`:`${v.College}: the requested cost item was not found in this reference. Its amount is not established. ${citation}`;
  else if(multipleComponents)answer=es?`${v.College}: se solicitaron varias partidas; la referencia no establece un subtotal combinado para ellas. Hay que conservar el importe y alcance de cada partida. ${citation}`:`${v.College}: several components were requested; this reference does not establish a combined subtotal for them. Each component needs its own amount and scope. ${citation}`;
  else if(selected){answer=`${v.College}: ${selected.values['Original source label']}: ${itemValue(selected,es)}; ${selected.values['Amount period']}. ${citation}`;conditions.push(selected.values['Conditions / notes'],selected.normalized.caveated_handling);}
  else if(feeOnly)answer=es?`${v.College}: la referencia no establece un subtotal único de matrícula para este alcance. ${citation}`:`${v.College}: this reference does not establish one tuition subtotal for this scope. ${citation}`;
@@ -102,20 +115,21 @@ export function projectNursingRecord(row,items,language='en',question='',{now=Da
   [...decisions.filter(d=>!/^NUR-\d{4}-\d{3}$/u.test(d.reference)||d.reference===selected.id),...(selected.normalized.caveated_decisions||[])]:decisions;
  const relevantDecisions=[...new Map(applicable.map(d=>[d.reference,d])).values()];
  let qualification=selected?[pending,scope,selected.values['Relationship to total'],selected.values['Conditions / notes'],selected.normalized.caveated_handling,...relevantDecisions.flatMap(d=>[d.required_caveat,d.still_unresolved])].filter(Boolean).join(' '):fullQualification;
+ if(scopeBlocked)qualification=[pending,scope].join(' ');
  // Never shorten a material qualification to fit a spoken monetary claim.
  // Long records remain fully available in the report and focused follow-ups.
  if(!boundedBrief(answer,qualification)){
   ({answer,qualification}=caveatedFallback({college:v.College,scope,pending,selected,answer,citation,
-   decisions:relevantDecisions,conditions,es,preserveAnswer:multipleComponents||missingComponent||feeOnly&&!selected,
-   includeSuggestions:!multipleComponents&&!missingComponent}));
+   decisions:scopeBlocked?[]:relevantDecisions,conditions:scopeBlocked?[]:conditions,es,preserveAnswer:scopeBlocked||multipleComponents||missingComponent||feeOnly&&!selected,
+   includeSuggestions:!scopeBlocked&&!multipleComponents&&!missingComponent}));
  }
  const detail=[`${record.id}: ${v.College}`,scope,fullQualification,...allItems.map(i=>{
   const id=sourceId(i.normalized.source_url)||mainId;
   return `${i.id}: ${i.values['Original source label']}: ${itemValue(i,es)}; ${i.values['Amount period']}; ${i.values['Relationship to total']}. ${i.values['Conditions / notes']||''} ${i.normalized.caveated_handling||''} [${id}]`;
  }),...decisions.map(d=>`${d.suggested_wording||''} ${d.required_caveat} ${d.still_unresolved||''}`)].join('\n');
- const aspect=feeOnly?'tuition_fees':(selected&&selected!==totalRange||multipleComponents||missingComponent)?'other':'total_budget';
+ const aspect=scopeBlocked?'other':feeOnly?'tuition_fees':(selected&&selected!==totalRange||multipleComponents||missingComponent)?'other':'total_budget';
  const finding={subject:v.College,aspect,status:'partial',answer,qualification,budget:null,evidence:null};
- const result={text:detail,parts:[{text:detail}],sources,checkedAt:v['Source checked'],voiceBrief:{status:'partial',answer,qualification,nextStep:'',findings:[finding]},catalogPublication:'production',nursingCatalog:{recordId:record.id,pending:true,sourceVerified:false,publicationId:row.publication_id},catalogAdditionalDetails:detail};
+ const result={text:detail,parts:[{text:detail}],sources,checkedAt:v['Source checked'],voiceBrief:{status:'partial',answer,qualification,nextStep:'',findings:[finding]},catalogPublication:'production',nursingCatalog:{recordId:record.id,pending:true,sourceVerified:false,publicationId:row.publication_id,...(scopeBlocked?{clarification:true}:{})},catalogAdditionalDetails:detail};
  if(researchBriefSelection(result).evidenceFormat!=='brief-v1')throw Error('nursing_brief_not_bounded');
  return result;
 }
